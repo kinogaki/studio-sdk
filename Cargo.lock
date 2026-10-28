@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "kinogaki-studio-api"
 version = "0.1.0"
+
+[[package]]
+name = "kinogaki-studio-ui-api"
+version = "0.1.0"
+dependencies = [
+ "kinogaki-studio-api",
+]

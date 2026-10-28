@@ -5,14 +5,15 @@ What a Kinogaki Studio plugin compiles against. Studio is an environment: with n
 | Crate | Role |
 |---|---|
 | `kinogaki-studio-api` (`crates/api`) | The headless API: ids, `Data` and `Typed`, `DataType` with its optional facets (`Displayable`, `Pickable`, `Tabular`, `Renderable`), `Components`, `DataCodec`, `Conversion`, the node cook contract (`NodeType`, `CookCx`, `Incremental`, `Outputs`) and `HeldEdit`, `ObjectBody` and `ObjectKindSpec`, `FileFormat` and `Imported`, `SessionSlot`, `CancelToken`, `Time`, `Package` and the `Registry`; and the plain types they exchange: `math`, `params`, `element`, `viewport`, `render` and the `parallel` workers service |
+| `kinogaki-studio-ui-api` (`crates/ui-api`, library `studio_ui_api`) | The UI layer: how a plugin's panels, tool cards, overlays and settings pages ask the host to draw. Geometry (`Pos`, `Vec2`, `Rect`, `Align2`), `Color`, the host-filled `Theme`, fonts and icons by name, `Id`, plain-data `Input`, the `Painter` and `Shape`s, the `Ui` trait (immediate widgets, layout, and the host's composites: property sheets, cards, popovers, value fields) with `UiExt`; property sheets as data (`sheet::Schema`); the pure viewport maths of the transform gizmo and point labels; and `testing`'s headless `RecordingUi` and `RecordingPainter`. **Plugins never see Studio's UI library or egui: the host draws.** |
 
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the API: what each part is for, the rules every package follows, and how the environment uses it.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the API and the UI layer: what each part is for, the rules every package follows, and how the environment uses it.
 
 ## Coming next
 
 These parts are designed but not written yet:
 
-- **`studio-ui-api`**: the host UI interface. This covers what a context, tool or panel can ask of the host: selection, transactions and undo, cooking results, viewport drawing layers, gizmos, picking, the input state, menus and shelves, the inspector, status and messages, and settings sections. It is written against `Host` traits, never against the editor's internals, and Studio implements it.
+- **The host traits** in `kinogaki-studio-ui-api`: what a context, tool or panel can ask of the host beyond drawing. This covers selection, transactions and undo, cooking results, viewport drawing layers, gizmo painting and picking, menus and shelves, status and messages, and settings sections. They are written against `Host` traits, never against the editor's internals, and Studio implements them.
 - **`testkit`**: a toy kernel and context, plus the conformance suite (`conformance::check`) that every kernel's data types pass.
 
 ## Who depends on it
@@ -36,6 +37,7 @@ The SDK depends on the Rust standard library and nothing else. Every type the AP
 | `viewport` | `Surface` (the display packet), `Level`, `Elements`, `Hit` | its viewport's packets and picks |
 | `render` | `RenderItem`, and for now the source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`), a placeholder until the SDK's `render-api` crate owns it | its render scenes |
 | `parallel` | `Workers`, the host service behind `CookCx::parallel_for` / `parallel_map`, and `Serial` for tests | its shared worker threads |
+| the `ui-api` crate | Geometry, colors, the theme, input, the painter, widgets and property sheets | its UI library (each call maps to the call it replaces) |
 
 So a package written against the SDK compiles against nothing private, and the SDK builds and tests from a plain clone. A plugin's kernel may use any library it likes inside; it converts at its own boundary, as Studio does at its.
 
@@ -59,3 +61,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 ```
 
 Studio's `tools/check_all.py` runs the same checks on the SDK.
+
+## Licenses
+
+Some of `kinogaki-studio-ui-api`'s geometry and color arithmetic follows egui's, formula for formula, so Studio's egui-based UI library converts its values bit for bit. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits it, and egui's licenses are in [licenses/](licenses/).

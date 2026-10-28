@@ -1,0 +1,16 @@
+[package]
+name = "kinogaki-studio-ui-api"
+description = "Kinogaki Studio's UI layer for plugins: geometry, colors, the theme, input, a painter and immediate widgets, property sheets, cards and the pure parts of value fields, gizmos and point labels. The host draws; plugins never see its UI toolkit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "studio_ui_api"
+
+[lints]
+workspace = true
+
+[dependencies]
+kinogaki-studio-api.workspace = true

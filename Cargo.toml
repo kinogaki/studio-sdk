@@ -11,6 +11,7 @@ publish = false
 # The SDK depends on the standard library alone (README "Self-contained").
 [workspace.dependencies]
 kinogaki-studio-api = { path = "crates/api" }
+kinogaki-studio-ui-api = { path = "crates/ui-api" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

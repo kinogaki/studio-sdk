@@ -1,6 +1,12 @@
-# The headless API
+# Architecture
 
-`kinogaki-studio-api` is the part of the plugin API that has no UI. This page explains how its parts fit together and the rules packages follow. The rustdoc on each item is the reference.
+The SDK has two crates:
+- `kinogaki-studio-api` (`crates/api`) is the headless API: everything a package registers and exchanges that has no UI.
+- `kinogaki-studio-ui-api` (`crates/ui-api`, library `studio_ui_api`) is the UI layer: how a plugin's panels, cards, overlays and settings pages ask the host to draw. It is described in [The UI layer](#the-ui-layer) below.
+
+This page explains how their parts fit together and the rules packages follow. The rustdoc on each item is the reference.
+
+# The headless API
 
 ## Environment and packages
 
@@ -14,7 +20,7 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
 | Render | engines; they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
 
-The environment registers packages into a `Registry` in dependency order. The librarian resolves that order from the packages' manifests, so a kernel always comes before the packages that build on it. Node types, contexts and UI register through the librarian and the host UI interface (`studio-ui-api`, to come), not through this crate. The two share the ids defined here.
+The environment registers packages into a `Registry` in dependency order. The librarian resolves that order from the packages' manifests, so a kernel always comes before the packages that build on it. Node types, contexts and UI register through the librarian and the host UI interface (the host traits of `kinogaki-studio-ui-api`, to come), not through this crate. The two share the ids defined here.
 
 ## Ids
 
@@ -176,3 +182,50 @@ Studio's core draws and picks. A data type describes what to draw as a `viewport
 
 The SDK depends on the standard library alone. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
 
+
+# The UI layer
+
+`kinogaki-studio-ui-api` is how a plugin shows things: an inspector, a tool's card, viewport overlays, a settings page, heads-up value fields.
+
+## The host draws
+
+**Plugins never see Studio's UI library or egui.** Every type a plugin draws with is this crate's own: geometry, colors, the theme, fonts and icons by name, input, a painter and the widgets. Studio implements the `Ui` and `Painter` traits over its private UI library, and each call maps to exactly the call it replaces there. So the SDK stays self-contained, a plugin compiles against nothing private, and Studio can change how it draws without breaking a plugin.
+
+The crate depends on `kinogaki-studio-api` (for parameter values, units and diagnostics) and the standard library, nothing else.
+
+## What a plugin uses
+
+From the most declarative to the most direct:
+
+| Part | What it is | Used for |
+|---|---|---|
+| `sheet::Schema<K>` | Sections and typed fields with their values, as data; the host draws it with `Ui::sheet` and reports `Edits` | inspectors, a tool's card body, settings pages (`page() -> Schema`, then apply the `Edits`) |
+| `CardSpec`, `PopoverSpec` | Floating panels the host frames around a body | a tool's parameters; a picker beside a handle |
+| `ValueFields` | The heads-up boxes a drawing tool types into; `type_events` is the whole keyboard behaviour, `Ui::value_fields` draws them | a line's length and angle while drawing |
+| `Ui` | Immediate widgets (labels, buttons, toggles, number fields, sliders, text fields, choices, swatches, menus) and layout | small panels the schema can't express |
+| `Painter` | Segments, circles, rectangles, polylines, text and icons, single or in batches; text measuring; reserved slots | viewport overlays: handles, guides, badges, labels |
+| `Input` | This frame's pointer, keys and typing, as plain data | tools reading the pointer and shortcuts |
+
+A node's parameter schema (`params::Schema`) becomes a sheet with `From`, keyed by parameter name, so the host shows every node's parameters the same way.
+
+Meshes, CAD surfaces and wireframes never go through the painter. They are the data types' display surfaces (the `Displayable` facet), drawn by the host's viewport; the painter is for the few hundred marks a tool puts over them.
+
+## Rules
+
+- **Immediate mode, on the UI thread.** A plugin calls its `Ui` every frame, inside the host's frame, and what it called is what shows. Nothing it draws persists. No call blocks; long work belongs on the host's workers.
+- **Bodies run once.** Layout methods take their body as `&mut dyn FnMut(&mut dyn Ui)` so the traits stay object-safe. The host calls it exactly once before returning; menu bodies run only while the menu is open. `UiExt` wraps the layouts for closures that return a value (`horizontal_with`, `card_with` and so on).
+- **Ids name what a widget is**, never where it is. Make them from stable keys with `Id::new` and `Id::with`. `UiExt::sheet_keyed` turns any hashable field key into a `FieldKey` by hashing it, so a row keeps its focus or open dropdown when rows above it come and go.
+- **Colors come from the theme.** `Theme` is filled in by the host. Use the token that names the role (`surface`, `muted`, `accent`), and ink a fill with `Theme::ink_on`, so a plugin follows the host's theme. `Color` is premultiplied sRGBA bytes; its arithmetic matches the host's to the bit.
+- **Icons are named**, from the host's icon set. An unknown name draws nothing.
+- **Values are edited in place.** A widget writes what it edits into the `&mut` the plugin passed and reports `changed`. A sheet writes new values into its schema and reports `Edits`: the fields changed, the actions taken, and the gesture's start and finish, which one undo step spans.
+
+## Viewport maths
+
+Some pure maths the host's own tools use lives here, so a plugin's tools hit, drag and label exactly as Studio's do:
+- `projection`: a view's `Projection` (clip space from the edited object's space and back, and the direction towards the viewer), filled in by the host from its camera for one view rectangle's aspect;
+- `gizmo`: the transform gizmo's frame, handles, hit testing, and what a drag of a handle means (move along an axis or plane, scale factors, angle changes). The host paints the gizmo;
+- `labels::point_labels`: where to put point numbers so a dense mesh shows an evenly spread, readable subset at a bounded cost.
+
+## Testing
+
+`testing::RecordingUi` and `testing::RecordingPainter` are headless fakes: they lay widgets out simply, record every call and every shape, and play back scripted user actions (click a button, edit a sheet field, type into a field, pick a choice). A plugin's unit tests drive its panels with them, with no window and no GPU.
