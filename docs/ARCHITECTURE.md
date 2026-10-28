@@ -170,7 +170,7 @@ Engines never see kernel types. A data type's `Renderable` facet returns `Render
 - `placements` are relative to the object: the first is the item, the rest are copies sharing its acceleration structure;
 - `label` is the name Cryptomatte gives the object.
 
-The source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`, `AttributeDomain`) lives in `render` as a placeholder until the SDK's `render-api` crate lands; this crate then re-exports it from there. `RenderItem` stays here.
+The source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`, `AttributeDomain`) is `kinogaki-render-api`'s, the render interface engines build on, and `render` re-exports it; so a source a data type makes is what a host hands its engines, with no conversion. `RenderItem` stays here.
 
 The host keeps engine scenes in step cheaply: a source with the last identity is skipped; one with the same topology is a points update narrowed by `moved_since`; looks, coordinates and attributes are resent only when their identities change. Normals are asked for lazily, after a drag ends.
 

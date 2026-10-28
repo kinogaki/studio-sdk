@@ -8,3 +8,7 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+# The render interface: the triangle source contract data types render through.
+kinogaki-render-api.workspace = true
