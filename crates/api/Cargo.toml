@@ -1,0 +1,10 @@
+[package]
+name = "kinogaki-studio-api"
+description = "Kinogaki Studio's headless plugin API: ids, data and data types with their facets, the node cook contract, object kinds, file formats, session slots and the package registry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

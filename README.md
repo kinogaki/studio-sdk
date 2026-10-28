@@ -1,0 +1,61 @@
+# studio-sdk
+
+What a Kinogaki Studio plugin compiles against. Studio is an environment: with no packages installed it organises a scene (Parts, Cameras, an empty Material Library, a File node that reads nothing). Meshes, CAD bodies, file formats and render engines all come from packages, and this repository holds the contract between Studio and those packages. Its version is the version plugins and Studio agree on.
+
+| Crate | Role |
+|---|---|
+| `kinogaki-studio-api` (`crates/api`) | The headless API: ids, `Data` and `Typed`, `DataType` with its optional facets (`Displayable`, `Pickable`, `Tabular`, `Renderable`), `Components`, `DataCodec`, `Conversion`, the node cook contract (`NodeType`, `CookCx`, `Incremental`, `Outputs`) and `HeldEdit`, `ObjectBody` and `ObjectKindSpec`, `FileFormat` and `Imported`, `SessionSlot`, `CancelToken`, `Time`, `Package` and the `Registry`; and the plain types they exchange: `math`, `params`, `element`, `viewport`, `render` and the `parallel` workers service |
+
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the API: what each part is for, the rules every package follows, and how the environment uses it.
+
+## Coming next
+
+These parts are designed but not written yet:
+
+- **`studio-ui-api`**: the host UI interface. This covers what a context, tool or panel can ask of the host: selection, transactions and undo, cooking results, viewport drawing layers, gizmos, picking, the input state, menus and shelves, the inspector, status and messages, and settings sections. It is written against `Host` traits, never against the editor's internals, and Studio implements it.
+- **`testkit`**: a toy kernel and context, plus the conformance suite (`conformance::check`) that every kernel's data types pass.
+
+## Who depends on it
+
+- **studio** (the environment) implements the host side and registers packages.
+- **studio-mesh** and **studio-cad** (and later studio-cam, studio-usd and the render plugins) implement it over their kernels.
+
+Plugins never link Studio's editor crate.
+
+## Self-contained
+
+**The SDK never depends on a private Kinogaki crate; Studio adapts at the boundary.**
+
+The SDK depends on the Rust standard library and nothing else. Every type the API exposes is its own:
+
+| Module | What it defines | Studio converts it to and from |
+|---|---|---|
+| `math` | `Vec3`, `Affine3`, `Mat4`, `Bounds`: plain `Copy` data, no algorithms | its maths library |
+| `params` | `Value`, `Parameters`, `Schema` (sections and typed parameters: number with unit and range, integer, toggle, choice, text, code, file, color, vector, ramp), `Diagnostic` | its inspector's property schemas |
+| `element` | `ElementWriter` / `ElementReader` (typed fields, metadata, children, shared values) and `MemoryElement` | its project documents |
+| `viewport` | `Surface` (the display packet), `Level`, `Elements`, `Hit` | its viewport's packets and picks |
+| `render` | `RenderItem`, and for now the source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`), a placeholder until the SDK's `render-api` crate owns it | its render scenes |
+| `parallel` | `Workers`, the host service behind `CookCx::parallel_for` / `parallel_map`, and `Serial` for tests | its shared worker threads |
+
+So a package written against the SDK compiles against nothing private, and the SDK builds and tests from a plain clone. A plugin's kernel may use any library it likes inside; it converts at its own boundary, as Studio does at its.
+
+Studio's `tools/check_architecture.py` enforces the rule: the SDK's crates depend on no Kinogaki crate but their own. The SDK has no third-party dependencies either; if one is ever needed, it is pinned to an exact version and frozen into this repository's own `vendor/`.
+
+## Building
+
+```sh
+git clone https://github.com/kinogaki/studio-sdk.git
+cd studio-sdk
+cargo test --workspace --locked
+```
+
+## Checks
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+```
+
+Studio's `tools/check_all.py` runs the same checks on the SDK.
