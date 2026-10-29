@@ -99,6 +99,10 @@ pub enum Kind {
     Buttons(Vec<(Text, bool)>),
     /// `Value::Text` then icon chips ([`Action::Index`](super::Action::Index)).
     Chips(Vec<Chip>),
+    /// A multi-input's wires in order, by the names of what they come
+    /// from: rows that drag to reorder ([`Action::Reorder`](super::Action::Reorder))
+    /// and remove ([`Action::Remove`](super::Action::Remove)); no value.
+    Wires(Vec<Text>),
     /// `Value::Numbers`: an encoded ramp (the key count, then position,
     /// value and interpolation code for each key) between `min` and `max`.
     Ramp {

@@ -23,6 +23,17 @@ pub enum Action {
     /// this many lines (`None`: sized by its text). The field's kind holds
     /// it already.
     Resize(Option<u32>),
+    /// A [`Kind::Wires`](super::Kind::Wires) row was dragged: wire `from`
+    /// goes to place `to`.
+    Reorder {
+        /// The wire's place before.
+        from: usize,
+        /// Its place after.
+        to: usize,
+    },
+    /// A [`Kind::Wires`](super::Kind::Wires) row's remove button: that
+    /// wire goes.
+    Remove(usize),
 }
 
 /// What the user did to a schema this frame. Changed fields have their new

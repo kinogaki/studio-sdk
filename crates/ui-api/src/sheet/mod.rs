@@ -17,7 +17,7 @@
 //! sheet with `From`.
 //!
 //! This mirrors Studio's own property schemas, minus the kinds that are
-//! the host's alone (secrets, material sockets and wires, tone curves,
+//! the host's alone (secrets, material sockets, tone curves,
 //! palettes, linked channels).
 mod code;
 mod edits;
