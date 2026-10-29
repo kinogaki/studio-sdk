@@ -18,6 +18,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub struct CancelToken(Arc<AtomicBool>);
 
 impl CancelToken {
+    /// A token raised by whoever raises `flag`: a host's own cancellation
+    /// lent to a package's work without copying it.
+    pub fn sharing(flag: Arc<AtomicBool>) -> Self {
+        Self(flag)
+    }
+
     /// Raises the flag: every clone now reports cancelled.
     pub fn cancel(&self) {
         self.0.store(true, Ordering::Relaxed);
