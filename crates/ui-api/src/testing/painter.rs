@@ -13,9 +13,10 @@ use std::rc::Rc;
 /// fraction of the font size; a line is one font size tall.
 pub const GLYPH_ADVANCE: f32 = 0.5;
 
-/// One recorded draw: the clip it was drawn under and the shape; `None`
-/// for a [reserved](Painter::reserve) place not yet filled.
-type Entry = (Rect, Option<Shape>);
+/// One recorded draw: the clip it was drawn under and its shapes (one
+/// for a draw; what fills a [reserved](Painter::reserve) place, none
+/// until it is filled).
+type Entry = (Rect, Vec<Shape>);
 
 /// A headless [`Painter`] for tests: every call is recorded as [`Shape`]s
 /// in draw order, nothing is drawn. Text is measured in a made-up face
@@ -44,7 +45,7 @@ impl RecordingPainter {
         self.log
             .borrow()
             .iter()
-            .filter_map(|(_, s)| s.clone())
+            .flat_map(|(_, s)| s.iter().cloned())
             .collect()
     }
 
@@ -53,7 +54,7 @@ impl RecordingPainter {
         self.log
             .borrow()
             .iter()
-            .filter_map(|(clip, s)| s.clone().map(|s| (*clip, s)))
+            .flat_map(|(clip, s)| s.iter().map(|s| (*clip, s.clone())))
             .collect()
     }
 
@@ -63,7 +64,7 @@ impl RecordingPainter {
     }
 
     fn push(&self, shape: Shape) {
-        self.log.borrow_mut().push((self.clip, Some(shape)));
+        self.log.borrow_mut().push((self.clip, vec![shape]));
     }
 
     /// `text`'s size on one line in `font`, in the made-up face.
@@ -71,6 +72,19 @@ impl RecordingPainter {
         Vec2::new(
             text.chars().count() as f32 * font.size * GLYPH_ADVANCE,
             font.size,
+        )
+    }
+
+    /// `text`'s size in `font` wrapped to lines at most `width` wide, in
+    /// the made-up face (a line breaks at any glyph; at least one a line).
+    pub fn measure_wrapped(text: &str, font: Font, width: f32) -> Vec2 {
+        let advance = font.size * GLYPH_ADVANCE;
+        let glyphs = text.chars().count();
+        let per_line = ((width / advance).floor() as usize).max(1);
+        let lines = glyphs.div_ceil(per_line).max(1);
+        Vec2::new(
+            glyphs.min(per_line) as f32 * advance,
+            lines as f32 * font.size,
         )
     }
 }
@@ -123,6 +137,20 @@ impl Painter for RecordingPainter {
         anchor.anchor_size(at, Self::measure(text, font))
     }
 
+    fn wrapped_text(
+        &self,
+        at: Pos,
+        anchor: Align2,
+        text: &str,
+        font: Font,
+        color: Color,
+        width: f32,
+    ) -> Rect {
+        let rect = anchor.anchor_size(at, Self::measure_wrapped(text, font, width));
+        self.push(Shape::text(rect.min, Align2::LEFT_TOP, text, font, color));
+        rect
+    }
+
     fn icon(&self, rect: Rect, name: &str, tint: Color) {
         self.push(Shape::icon(rect, name, tint));
     }
@@ -161,19 +189,27 @@ impl Painter for RecordingPainter {
         Self::measure(text, font)
     }
 
+    fn wrapped_text_size(&self, text: &str, font: Font, width: f32) -> Vec2 {
+        Self::measure_wrapped(text, font, width)
+    }
+
     fn glyph_width(&self, _glyph: char, font: Font) -> f32 {
         font.size * GLYPH_ADVANCE
     }
 
     fn reserve(&self) -> Slot {
         let mut log = self.log.borrow_mut();
-        log.push((self.clip, None));
+        log.push((self.clip, Vec::new()));
         Slot((log.len() - 1) as u32)
     }
 
     fn fill(&self, slot: Slot, shape: Shape) {
+        self.fill_many(slot, vec![shape]);
+    }
+
+    fn fill_many(&self, slot: Slot, shapes: Vec<Shape>) {
         if let Some(entry) = self.log.borrow_mut().get_mut(slot.0 as usize) {
-            entry.1 = Some(shape);
+            entry.1 = shapes;
         }
     }
 }
@@ -217,5 +253,38 @@ mod tests {
         );
         painter.clear();
         assert!(painter.shapes().is_empty());
+    }
+
+    #[test]
+    fn a_reserved_place_holds_many_shapes_and_text_wraps() {
+        let window = Rect::from_min_size(Pos::ZERO, vec2(100.0, 100.0));
+        let painter = RecordingPainter::new(window);
+        let labels = painter.reserve();
+        painter.segment(
+            pos(0.0, 0.0),
+            pos(10.0, 10.0),
+            Stroke::new(1.0, Color::WHITE),
+        );
+        let font = Font::ui(10.0);
+        let label = |i: u32| {
+            Shape::haloed_text(
+                pos(5.0, 5.0),
+                Align2::LEFT_BOTTOM,
+                i.to_string(),
+                font,
+                Color::WHITE,
+                Color::BLACK,
+            )
+        };
+        painter.fill_many(labels, vec![label(1), label(2)]);
+        let shapes = painter.shapes();
+        assert_eq!(shapes.len(), 3);
+        assert!(matches!(&shapes[1], Shape::Haloed { text, .. } if text.text == "2"));
+        assert!(
+            matches!(shapes[2], Shape::Segment(_)),
+            "drawn after, over them"
+        );
+        let size = painter.wrapped_text_size("abcdefghij", font, 22.0);
+        assert_eq!(size, vec2(20.0, 30.0), "four glyphs a line, three lines");
     }
 }

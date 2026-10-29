@@ -177,6 +177,15 @@ pub enum Shape {
     },
     /// Text.
     Text(TextShape),
+    /// Text over a one-point outline in `halo` (four copies of it in that
+    /// color, a point off each diagonal), readable over light and dark
+    /// alike: labels over a model.
+    Haloed {
+        /// The text.
+        text: TextShape,
+        /// The outline's color.
+        halo: Color,
+    },
     /// An icon.
     Icon(IconShape),
 }
@@ -281,6 +290,28 @@ impl Shape {
         })
     }
 
+    /// `text` (as [`Shape::text`] places it) over a one-point outline in
+    /// `halo`.
+    pub fn haloed_text(
+        at: Pos,
+        anchor: Align2,
+        text: impl Into<String>,
+        font: Font,
+        color: Color,
+        halo: Color,
+    ) -> Self {
+        Shape::Haloed {
+            text: TextShape {
+                at,
+                anchor,
+                text: text.into(),
+                font,
+                color,
+            },
+            halo,
+        }
+    }
+
     /// The icon `name` fitted to `rect`, tinted `tint`.
     pub fn icon(rect: Rect, name: impl Into<String>, tint: Color) -> Self {
         Shape::Icon(IconShape {
@@ -327,6 +358,18 @@ pub trait Painter {
     /// went.
     fn text(&self, at: Pos, anchor: Align2, text: &str, font: Font, color: Color) -> Rect;
 
+    /// `text` wrapped to lines at most `width` wide, with its `anchor`
+    /// point at `at`; returns where it went.
+    fn wrapped_text(
+        &self,
+        at: Pos,
+        anchor: Align2,
+        text: &str,
+        font: Font,
+        color: Color,
+        width: f32,
+    ) -> Rect;
+
     /// The icon `name` from the host's icon set fitted to `rect` and tinted
     /// `tint`; an unknown name draws nothing.
     fn icon(&self, rect: Rect, name: &str, tint: Color);
@@ -349,6 +392,9 @@ pub trait Painter {
     /// How much room `text` takes on one line in `font`.
     fn text_size(&self, text: &str, font: Font) -> Vec2;
 
+    /// How much room `text` takes wrapped to lines at most `width` wide.
+    fn wrapped_text_size(&self, text: &str, font: Font, width: f32) -> Vec2;
+
     /// How wide `glyph` is in `font` (columns of a code face).
     fn glyph_width(&self, glyph: char, font: Font) -> f32;
 
@@ -358,6 +404,11 @@ pub trait Painter {
 
     /// Draw `shape` in the place `slot` kept, this frame.
     fn fill(&self, slot: Slot, shape: Shape);
+
+    /// Draw `shapes`, in order, in the place `slot` kept, this frame: many
+    /// marks known only after what is drawn over them (a view's labels
+    /// under its tools).
+    fn fill_many(&self, slot: Slot, shapes: Vec<Shape>);
 
     /// A filled circle.
     fn circle_filled(&self, center: Pos, radius: f32, fill: Color) {
