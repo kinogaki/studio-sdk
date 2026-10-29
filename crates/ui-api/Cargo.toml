@@ -19,3 +19,5 @@ in-tree = []
 
 [dependencies]
 kinogaki-studio-api.workspace = true
+# The viewport packet contract: what a context's views draw of its own.
+kinogaki-viewport-api.workspace = true

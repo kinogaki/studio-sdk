@@ -9,7 +9,7 @@
 //! [`Displayable`](crate::Displayable) to draw it and its
 //! [`Pickable`](crate::Pickable) to make one from a pick.
 use crate::id::DataTypeId;
-use crate::viewport::Level;
+use crate::viewport::ElementKind;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
@@ -22,7 +22,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct Components {
     ty: DataTypeId,
-    level: Level,
+    level: ElementKind,
     count: usize,
     set: Arc<dyn Any + Send + Sync>,
 }
@@ -30,7 +30,12 @@ pub struct Components {
 impl Components {
     /// `set`, a selection of `count` components at `level` of data of type
     /// `ty`, in that type's own representation.
-    pub fn new<T: Any + Send + Sync>(ty: DataTypeId, level: Level, count: usize, set: T) -> Self {
+    pub fn new<T: Any + Send + Sync>(
+        ty: DataTypeId,
+        level: ElementKind,
+        count: usize,
+        set: T,
+    ) -> Self {
         Self {
             ty,
             level,
@@ -45,7 +50,7 @@ impl Components {
     }
 
     /// What is selected: points, edges, faces, vertices or whole objects.
-    pub fn level(&self) -> Level {
+    pub fn level(&self) -> ElementKind {
         self.level
     }
 
@@ -87,15 +92,15 @@ mod tests {
     #[test]
     fn a_selection_reads_back_only_as_its_own_representation() {
         let ty = DataTypeId::declared("acme.points.cloud");
-        let picked = Components::new(ty, Level::Point, 2, vec![3u32, 7]);
+        let picked = Components::new(ty, ElementKind::Point, 2, vec![3u32, 7]);
         assert_eq!(picked.get::<Vec<u32>>(), Some(&vec![3, 7]));
         assert!(picked.get::<Vec<u64>>().is_none());
         assert_eq!(
             (picked.ty(), picked.level(), picked.len()),
-            (ty, Level::Point, 2)
+            (ty, ElementKind::Point, 2)
         );
         assert!(!picked.is_empty() && picked.ptr_eq(&picked.clone()));
-        let none = Components::new(ty, Level::Point, 0, Vec::<u32>::new());
+        let none = Components::new(ty, ElementKind::Point, 0, Vec::<u32>::new());
         assert!(none.is_empty() && !none.ptr_eq(&picked));
     }
 }

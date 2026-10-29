@@ -350,6 +350,7 @@ name = "kinogaki-studio-api"
 version = "0.1.0"
 dependencies = [
  "kinogaki-render-api",
+ "kinogaki-viewport-api",
 ]
 
 [[package]]
@@ -357,6 +358,7 @@ name = "kinogaki-studio-ui-api"
 version = "0.1.0"
 dependencies = [
  "kinogaki-studio-api",
+ "kinogaki-viewport-api",
 ]
 
 [[package]]

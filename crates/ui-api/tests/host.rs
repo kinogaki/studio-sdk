@@ -97,7 +97,7 @@ impl Levels<Forest> for TreeLevels {
                 id: name.into(),
                 label: name.into(),
                 icon: "cube".into(),
-                level: kinogaki_studio_api::Level::Object,
+                level: kinogaki_studio_api::ElementKind::Object,
                 combines: false,
             })
             .into()

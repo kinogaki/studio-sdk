@@ -30,13 +30,16 @@
 //! And the plain types those exchange: [`math`] (vectors, placements, units,
 //! bounds), [`params`] (parameter values, schemas, diagnostics),
 //! [`element`] (the project's element tree codecs write), [`viewport`]
-//! (display surfaces, picks) and [`render`] (neutral render items).
+//! (display surfaces, element sets, picks), [`refs`] (the host's objects
+//! and nodes) and [`render`] (neutral render items).
 //!
-//! **Self-contained.** The crate depends on the standard library alone,
-//! never on Studio, a kernel or any other Kinogaki library: every type it
-//! exposes is its own, and Studio converts between these types and its
-//! own libraries' at the boundary. So the SDK builds from a plain clone,
-//! and a package written against it compiles against nothing private.
+//! **Self-contained.** The crate depends on the standard library and the
+//! SDK's leaf crates alone (the render interface, the viewport packet
+//! contract), never on Studio, a kernel or any other Kinogaki library:
+//! every type it exposes is the SDK's own, and Studio converts between
+//! these types and its own libraries' at the boundary. So the SDK builds
+//! from a plain clone, and a package written against it compiles against
+//! nothing private.
 //!
 //! Every value crosses as a Rust type: Studio and its packages are built
 //! by one compiler and share one copy of each crate, so `TypeId`s and
@@ -60,6 +63,7 @@ pub mod object;
 pub mod package;
 pub mod parallel;
 pub mod params;
+pub mod refs;
 pub mod registry;
 pub mod render;
 pub mod session;
@@ -78,8 +82,8 @@ pub use data_type::{Color, DataType, InfoRow, Stamp};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use error::Error;
 pub use facets::{
-    CellKind, Cells, Combine, DisplayQuality, Displayable, Drawn, Pickable, Renderable, Table,
-    TableColumn, Tabular,
+    CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, Drawn, Pickable, Piece,
+    Renderable, Role, Table, TableColumn, Tabular, WhenOpen,
 };
 pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};
 pub use held::HeldEdit;
@@ -91,8 +95,9 @@ pub use object::{ObjectBody, ObjectKindSpec};
 pub use package::Package;
 pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};
+pub use refs::{NodeRef, ObjectRef};
 pub use registry::{Registry, RegistryError};
 pub use render::{PlainTriangles, RenderItem, TriangleSource};
 pub use session::{SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use time::Time;
-pub use viewport::{Elements, Hit, Level, Surface};
+pub use viewport::{ElementKind, ElementSet, Hit, Surface, SurfaceSource};

@@ -2,7 +2,7 @@
 use crate::components::Components;
 use crate::data::Data;
 use crate::facets::Drawn;
-use crate::viewport::{Elements, Hit, Level};
+use crate::viewport::{ElementKind, ElementSet, Hit};
 
 /// How a new selection meets the current one (click, Shift, Ctrl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -24,10 +24,11 @@ pub enum Combine {
 pub trait Pickable: Send + Sync {
     /// What `hit` on `drawn` selects at `level`; `None` when it hit
     /// nothing selectable at that level.
-    fn pick(&self, data: &Data, drawn: &Drawn, hit: &Hit, level: Level) -> Option<Components>;
+    fn pick(&self, data: &Data, drawn: &Drawn, hit: &Hit, level: ElementKind)
+    -> Option<Components>;
 
     /// The components a set of surface elements (a box or lasso's) is.
-    fn select(&self, data: &Data, drawn: &Drawn, elements: &Elements) -> Components;
+    fn select(&self, data: &Data, drawn: &Drawn, elements: &ElementSet) -> Components;
 
     /// `current` and `new` (both of `data`, at one level) combined by
     /// `how`.

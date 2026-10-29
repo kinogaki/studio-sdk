@@ -4,15 +4,7 @@
 use crate::gizmo::TransformTool;
 use crate::{Modifiers, Pos, Projection, Rect, Response, Slot};
 use kinogaki_studio_api::{ContextId, Units, Vec3};
-
-/// A scene object, by the host's id for it. Valid while the object
-/// exists; the host answers `None` for one that is gone.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ObjectRef(pub u64);
-
-/// A node of the open network, by the host's id for it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct NodeRef(pub u64);
+pub use kinogaki_studio_api::{NodeRef, ObjectRef};
 
 /// Where the user is: an object level, or a place inside an object (its
 /// context's network, a subnet in it, a node the level is opened on).

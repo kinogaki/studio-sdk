@@ -26,8 +26,8 @@ mod settings;
 
 pub use data::{
     BarField, BarValue, ContextObject, ContextView, Creation, FlagSide, FlagSpec, LevelSpec,
-    LineLayer, Lines, NetworkNode, NetworkWire, NumericBar, OutlineRow, Start, Status, TimeDomain,
-    TimeMark, TimeUnits, ToolbarItem, Tools, VocabularyItem,
+    NetworkNode, NetworkWire, NumericBar, OutlineRow, Start, Status, TimeDomain, TimeMark,
+    TimeUnits, ToolbarItem, Tools, VocabularyItem,
 };
 pub use parts::{
     Creations, Erased, Inspector, Levels, NetworkView, ObjectRows, OutlineRows, ViewportLayer,

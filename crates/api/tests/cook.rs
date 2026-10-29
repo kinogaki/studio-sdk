@@ -146,7 +146,7 @@ fn a_cook_reads_parameters_ports_and_scratch() {
     let parameters = factor(2.0);
     let cancel = CancelToken::default();
     let mut scratch: Option<Box<dyn Any + Send>> = None;
-    let incoming = Components::new(NUMBERS.id(), Level::Point, 1, vec![0u32]);
+    let incoming = Components::new(NUMBERS.id(), ElementKind::Point, 1, vec![0u32]);
     // Port 0 has two wires, port 1 one.
     let inputs = [numbers(&[1.0, 2.0]), numbers(&[3.0]), numbers(&[100.0])];
     for cooks in 1..=2 {

@@ -12,6 +12,8 @@ workspace = true
 [dependencies]
 # The render interface: the triangle source contract data types render through.
 kinogaki-render-api.workspace = true
+# The viewport packet contract: what data types draw through.
+kinogaki-viewport-api.workspace = true
 
 [features]
 # Packages' render engines (`Package::engines`): the render interface's

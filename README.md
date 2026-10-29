@@ -35,7 +35,7 @@ The SDK depends on the Rust standard library and, behind optional features only,
 | `math` | `Vec3`, `Affine3`, `Mat4`, `Bounds`: plain `Copy` data, no algorithms | its maths library |
 | `params` | `Value`, `Parameters`, `Schema` (sections and typed parameters: number with unit and range, integer, toggle, choice, text, code, file, color, vector, ramp), `Diagnostic` | its inspector's property schemas |
 | `element` | `ElementWriter` / `ElementReader` (typed fields, metadata, children, shared values) and `MemoryElement` | its project documents |
-| `viewport` | `Surface` (the simple display packet), `Level`, `Elements`, `Hit`; the full packet contract is `kinogaki-viewport-api`'s | its viewport's picks |
+| `viewport` | `Surface` (the simple display packet, a `SurfaceSource` itself) and `Hit`; packets, `ElementKind` and `ElementSet` are `kinogaki-viewport-api`'s, re-exported | its viewport's picks |
 | `render` | `RenderItem`; the source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`) is `kinogaki-render-api`'s, re-exported | its render scenes |
 | `parallel` | `Workers`, the host service behind `CookCx::parallel_for` / `parallel_map`, and `Serial` for tests | its shared worker threads |
 | the `ui-api` crate | Geometry, colors, the theme, input, the painter, widgets and property sheets | its UI library (each call maps to the call it replaces) |

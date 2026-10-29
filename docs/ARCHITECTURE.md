@@ -76,8 +76,8 @@ Facets are optional:
 
 | Facet | Used by | Notes |
 |---|---|---|
-| `Displayable` | the viewport | levels, `prepare` → `Drawn` (a `viewport::Surface` plus type-owned detail), `highlight` → `Elements`, and `convert` |
-| `Pickable` | viewport picking | the host finds surface elements (`Hit`s, box `Elements`); the facet turns them into `Components` and combines selections |
+| `Displayable` | the viewport | levels (`ElementKind`s), `prepare` → `Drawn` (pieces: packets with their placements, roles and how they draw while the object is open, plus type-owned detail) over the value shown before, `refine` once a value rests, `highlight` → `ElementSet`, and `convert` |
+| `Pickable` | viewport picking | the host finds packet elements (`Hit`s, box `ElementSet`s); the facet turns them into `Components` and combines selections |
 | `Tabular` | the spreadsheet | tables, columns, and cells read a range of rows at a time |
 | `Renderable` | render sync | `RenderItem::Triangles` over a `TriangleSource`, placed once or many times |
 
@@ -187,7 +187,9 @@ The host keeps engine scenes in step cheaply: a source with the last identity is
 
 Studio's core draws and picks. What it draws is a packet behind `kinogaki-viewport-api`'s `SurfaceSource` trait: shared point positions, vertex shading records, triangles, line segments in line classes and point markers in point classes, each class with its own look and ids, and the ranges that changed since the packet it was derived from. A kernel that needs full control (smooth and authored normals, curvature, hulls and control vertices, see-through faces, live transform previews) makes its own packets and reads them back as their own type with `packet_as`. The contract's maths is plain arrays: vectors `[f64; 3]`, quaternions `[x, y, z, w]` and matrices `[[f64; 4]; 4]`, column by column.
 
-The simpler path is a `viewport::Surface`: points, polygon corners (point, face, normal), triangles over the corners, line segments with edge ids and point markers with point ids. During a drag it returns a surface `derived` from the last one, with the points that moved, and the host patches only those. Picks come back as `Hit`s and box selections as `Elements`, in the ids the surface gave.
+The simpler path is a `viewport::Surface`, a `SurfaceSource` itself: points, polygon corners (point, face, normal), triangles over the corners, line segments with edge ids and point markers with point ids. During a drag a type returns a surface `derived` from the last one, with the points that moved, and the host patches only those. Picks come back as `Hit`s and box selections as `ElementSet`s, in the ids the packet gave.
+
+`Displayable::prepare` returns a `Drawn`: the value's pieces in drawing order. A piece is a packet, where it sits in its object (none, or several placements sharing one upload), its role (the object's own surface, or a templated node's faint result the open context marks) and how it draws while its object is open (left to the open context as its edited surface, drawn as anywhere, or shaded beside it). `prepare` receives what the type made for the value shown before, so a type whose values change a little at a time builds on it, and `refine` offers a finer display once the value rests.
 
 ## Self-contained
 

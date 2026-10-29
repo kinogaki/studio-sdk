@@ -37,6 +37,24 @@ pub struct Vertex {
     /// vertex index).
     pub component: u32,
 }
+impl Vertex {
+    /// The record as a renderer uploads it: its fields in order, each in
+    /// native byte order (what a byte cast of the `repr(C)` record gives).
+    pub fn bytes(&self) -> [u8; 44] {
+        let mut out = [0; 44];
+        let words = self
+            .normal
+            .iter()
+            .chain(&self.smooth_normal)
+            .chain(&self.curvature)
+            .map(|f| f.to_ne_bytes())
+            .chain([self.face, self.point, self.component].map(u32::to_ne_bytes));
+        for (at, word) in out.as_chunks_mut::<4>().0.iter_mut().zip(words) {
+            *at = word;
+        }
+        out
+    }
+}
 /// Connectivity only: surfaces, edges and markers fetch one shared point array.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,6 +128,14 @@ impl ElementSet {
             ids,
             revision: NEXT.fetch_add(1, Ordering::Relaxed),
         }
+    }
+    /// Every element of `kind`.
+    pub fn all(kind: ElementKind) -> Self {
+        Self::from_sorted(kind, true, Arc::from([]))
+    }
+    /// Whether `id` is in the set.
+    pub fn contains(&self, id: u32) -> bool {
+        self.all || self.ids.binary_search(&id).is_ok()
     }
     /// Sorted unique ids.
     pub fn ids(&self) -> &[u32] {
@@ -327,6 +353,30 @@ mod tests {
         fn selection_segments(&self, _: &ElementSet, _: u64) -> Result<Vec<OverlayVertex>, String> {
             Ok(Vec::new())
         }
+    }
+
+    #[test]
+    fn a_vertex_writes_its_fields_in_order_and_sets_answer_membership() {
+        let v = Vertex {
+            normal: [1.0, 2.0, 3.0],
+            smooth_normal: [4.0, 5.0, 6.0],
+            curvature: [7.0, 8.0],
+            face: 9,
+            point: 10,
+            component: 11,
+        };
+        let bytes = v.bytes();
+        assert_eq!(bytes.len(), std::mem::size_of::<Vertex>());
+        assert_eq!(bytes[..4], 1.0f32.to_ne_bytes());
+        assert_eq!(bytes[28..32], 8.0f32.to_ne_bytes());
+        assert_eq!(bytes[40..], 11u32.to_ne_bytes());
+        #[cfg(feature = "bytemuck")]
+        assert_eq!(&bytes[..], bytemuck::bytes_of(&v));
+        let set = ElementSet::new(ElementKind::Point, false, [3, 1, 3]);
+        assert_eq!(set.ids(), &[1, 3]);
+        assert!(set.contains(3) && !set.contains(2));
+        let all = ElementSet::all(ElementKind::Face);
+        assert!(all.contains(99) && !all.is_empty());
     }
 
     #[test]

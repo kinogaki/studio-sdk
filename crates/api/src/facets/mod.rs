@@ -3,7 +3,7 @@
 //!
 //! | Facet | Read by |
 //! |---|---|
-//! | [`Displayable`] | the viewport: surfaces at a quality, levels, highlights |
+//! | [`Displayable`] | the viewport: packets at a quality, levels, highlights |
 //! | [`Pickable`] | the viewport's picking: hits and boxes to components |
 //! | [`Tabular`] | the spreadsheet |
 //! | [`Renderable`] | render sync: neutral prims for every engine |
@@ -16,7 +16,7 @@ mod pick;
 mod render;
 mod table;
 
-pub use display::{DisplayQuality, Displayable, Drawn};
+pub use display::{DisplayQuality, DisplayRequest, Displayable, Drawn, Piece, Role, WhenOpen};
 pub use pick::{Combine, Pickable};
 pub use render::Renderable;
 pub use table::{CellKind, Cells, Table, TableColumn, Tabular};

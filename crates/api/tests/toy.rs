@@ -2,6 +2,7 @@
 //! no other facet), a "count" type a bridge converts clouds into, a Cloud
 //! object kind, a format and a selection slot, registered as packages.
 use kinogaki_studio_api::element::MemoryElement;
+use kinogaki_studio_api::viewport::OverlayVertex;
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
@@ -36,13 +37,14 @@ impl DataCodec for CloudCodec {
 
 struct CloudDisplay;
 impl Displayable for CloudDisplay {
-    fn levels(&self) -> &[Level] {
-        &[Level::Point]
+    fn levels(&self) -> &[ElementKind] {
+        &[ElementKind::Point]
     }
     fn prepare(
         &self,
         data: &Data,
-        _quality: DisplayQuality,
+        _previous: Option<&Drawn>,
+        _request: &DisplayRequest,
         cancel: &CancelToken,
     ) -> Result<Drawn, Error> {
         cancel.check()?;
@@ -51,17 +53,22 @@ impl Displayable for CloudDisplay {
             .ok_or_else(|| Error::invalid("not a cloud"))?;
         // Points as markers, no triangles.
         let points: Arc<[[f32; 3]]> = cloud.0.iter().map(|p| p.map(|c| c as f32)).collect();
-        let markers: Arc<[[u32; 2]]> = (0..points.len() as u32).map(|i| [i, i]).collect();
+        let markers: Arc<[OverlayVertex]> = (0..points.len() as u32)
+            .map(|i| OverlayVertex {
+                point: i,
+                component: i,
+            })
+            .collect();
         let surface =
             Surface::new(points, Arc::from([]), Arc::from([]), 0, 0).with_markers(markers);
-        Ok(Drawn::new(surface).with_detail(cloud.0.len()))
+        Ok(Drawn::one(Arc::new(surface)).with_detail(cloud.0.len()))
     }
-    fn highlight(&self, _data: &Data, _drawn: &Drawn, components: &Components) -> Elements {
+    fn highlight(&self, _data: &Data, _drawn: &Drawn, components: &Components) -> ElementSet {
         let ids = components.get::<Vec<u32>>().cloned().unwrap_or_default();
-        Elements::new(Level::Point, ids)
+        ElementSet::new(ElementKind::Point, false, ids)
     }
-    fn convert(&self, _: &Data, components: &Components, to: Level) -> Option<Components> {
-        (to == Level::Point).then(|| components.clone())
+    fn convert(&self, _: &Data, components: &Components, to: ElementKind) -> Option<Components> {
+        (to == ElementKind::Point).then(|| components.clone())
     }
 }
 
@@ -321,19 +328,19 @@ fn display_prepares_highlights_and_cancels() {
     let display = CloudDisplay;
     let data = cloud(&[[0.0; 3], [1.0; 3], [2.0; 3]]);
     let cancel = CancelToken::default();
-    let drawn = display
-        .prepare(&data, DisplayQuality::default(), &cancel)
-        .unwrap();
+    let request = DisplayRequest::default();
+    let drawn = display.prepare(&data, None, &request, &cancel).unwrap();
     assert_eq!(drawn.detail::<usize>(), Some(&3));
     assert!(drawn.detail::<String>().is_none());
-    assert_eq!(drawn.surface.markers().len(), 3);
-    assert_eq!(drawn.surface.points()[2], [2.0; 3]);
-    let picked = Components::new(CLOUD.id(), Level::Point, 2, vec![2u32, 0]);
+    let surface = viewport::packet_as::<Surface>(&drawn.pieces[0].packet).unwrap();
+    assert_eq!(surface.markers().len(), 3);
+    assert_eq!(surface.points()[2], [2.0; 3]);
+    let picked = Components::new(CLOUD.id(), ElementKind::Point, 2, vec![2u32, 0]);
     assert_eq!(display.highlight(&data, &drawn, &picked).ids(), &[0, 2]);
-    assert!(display.convert(&data, &picked, Level::Face).is_none());
+    assert!(display.convert(&data, &picked, ElementKind::Face).is_none());
     cancel.cancel();
     assert_eq!(
-        display.prepare(&data, DisplayQuality::Fine, &cancel).err(),
+        display.prepare(&data, None, &request, &cancel).err(),
         Some(Error::Cancelled)
     );
 }

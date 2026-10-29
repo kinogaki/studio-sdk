@@ -76,11 +76,12 @@ fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
 
     let display = ty.displayable().unwrap();
     let drawn = display
-        .prepare(&data, DisplayQuality::Normal, &cancel)
+        .prepare(&data, None, &DisplayRequest::default(), &cancel)
         .unwrap();
-    assert_eq!(drawn.surface.faces(), 6);
-    assert_eq!(drawn.surface.triangles().len(), 12);
-    assert_eq!(drawn.surface.lines().len(), 2 * 12); // twelve edges
+    let surface = viewport::packet_as::<Surface>(&drawn.pieces[0].packet).unwrap();
+    assert_eq!(surface.faces(), 6);
+    assert_eq!(surface.triangles().len(), 12);
+    assert_eq!(surface.lines().len(), 2 * 12); // twelve edges
 }
 
 #[test]

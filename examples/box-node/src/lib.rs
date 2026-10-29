@@ -106,17 +106,23 @@ impl DataType for BoxType {
 
 /// In the viewport: six flat faces and their twelve edges.
 impl Displayable for BoxType {
-    fn levels(&self) -> &[Level] {
+    fn levels(&self) -> &[ElementKind] {
         &[] // selected as a whole object only
     }
-    fn prepare(&self, data: &Data, _: DisplayQuality, _: &CancelToken) -> Result<Drawn, Error> {
+    fn prepare(
+        &self,
+        data: &Data,
+        _: Option<&Drawn>,
+        _: &DisplayRequest,
+        _: &CancelToken,
+    ) -> Result<Drawn, Error> {
         let surface = Surface::polygons(box_of(data)?.points(), FACES, TOPOLOGY);
-        Ok(Drawn::new(surface))
+        Ok(Drawn::one(Arc::new(surface)))
     }
-    fn highlight(&self, _: &Data, _: &Drawn, _: &Components) -> Elements {
-        Elements::new(Level::Face, [])
+    fn highlight(&self, _: &Data, _: &Drawn, _: &Components) -> ElementSet {
+        ElementSet::new(ElementKind::Face, false, [])
     }
-    fn convert(&self, _: &Data, _: &Components, _: Level) -> Option<Components> {
+    fn convert(&self, _: &Data, _: &Components, _: ElementKind) -> Option<Components> {
         None
     }
 }

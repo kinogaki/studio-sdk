@@ -6,8 +6,10 @@
 use crate::Color;
 use crate::host::{NodeRef, ObjectRef};
 use kinogaki_studio_api::params::Unit;
-use kinogaki_studio_api::viewport::{Level, Surface};
+use kinogaki_studio_api::viewport::{ElementKind, SurfaceSource};
 use kinogaki_studio_api::{Mat4, ObjectKindId};
+use kinogaki_viewport_api::SceneLines;
+use std::fmt;
 use std::sync::Arc;
 
 /// One selection level of a context (Face, Edge, CV…), what the levels
@@ -21,7 +23,7 @@ pub struct LevelSpec {
     /// Its icon, by name in the host's icon set.
     pub icon: String,
     /// What it addresses.
-    pub level: Level,
+    pub level: ElementKind,
     /// Whether it may be active together with others (Shift+number).
     pub combines: bool,
 }
@@ -113,48 +115,49 @@ impl BarValue {
     }
 }
 
-/// World-space lines a context draws in every view (CAM's plate, CAD's
-/// curvature combs): shared points and colored segments between them.
-/// The host uploads a value once per allocation, so a context keeps its
-/// `Arc` while nothing changed.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Lines {
-    /// The points, in world space.
-    pub positions: Vec<[f32; 3]>,
-    /// The segments, by color.
-    pub layers: Vec<LineLayer>,
-}
-
-/// Segments of one color.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LineLayer {
-    /// Its sRGB color.
-    pub color: [u8; 3],
-    /// Each segment's two point indices.
-    pub segments: Arc<[[u32; 2]]>,
-}
-
-/// A shaded object of a context's own (CAM's toolpath beads): a display
-/// surface placed in the world.
-#[derive(Clone, Debug)]
+/// A shaded object of a context's own (CAM's toolpath beads): a packet
+/// placed in the world.
+#[derive(Clone)]
 pub struct ContextObject {
     /// What it draws (uploaded once per allocation).
-    pub surface: Arc<Surface>,
+    pub surface: Arc<dyn SurfaceSource>,
     /// Where it is: world from the surface's space.
     pub model: Mat4,
     /// One 0xRRGGBB color a face; `None`: the clay.
     pub colors: Option<Arc<[u32]>>,
 }
 
+impl fmt::Debug for ContextObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ContextObject")
+            .field("faces", &self.surface.face_count())
+            .field("model", &self.model)
+            .field("colors", &self.colors.as_ref().map(|c| c.len()))
+            .finish()
+    }
+}
+
 /// What the views draw of a context's own while it is open.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct ContextView {
-    /// Line layers.
-    pub lines: Vec<Arc<Lines>>,
+    /// World-space line layers drawn in every view (CAM's plate, CAD's
+    /// curvature combs). The host uploads a value once per allocation, so
+    /// a context keeps its `Arc` while nothing changed.
+    pub lines: Vec<Arc<SceneLines>>,
     /// Shaded objects.
     pub objects: Vec<ContextObject>,
     /// Whether they take the place of the scene's objects.
     pub replaces_scene: bool,
+}
+
+impl fmt::Debug for ContextView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ContextView")
+            .field("lines", &self.lines.len())
+            .field("objects", &self.objects)
+            .field("replaces_scene", &self.replaces_scene)
+            .finish()
+    }
 }
 
 /// How a context's time is labelled and stepped.
