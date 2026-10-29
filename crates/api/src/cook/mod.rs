@@ -12,14 +12,16 @@
 //! ([`CookCx::scratch`]).
 //!
 //! A node type also says what it is ([`NodeType::description`]: its label,
-//! ports and parameters), which the environment reads once when the
-//! package registers.
+//! ports, parameters and the viewport [`Handle`]s bound to them), which the
+//! environment reads once when the package registers.
 mod context;
 mod description;
+mod handle;
 mod incremental;
 
 pub use context::CookCx;
 pub use description::{Description, Port};
+pub use handle::{Constraint, Handle, HandleKind, Space, Vector};
 pub use incremental::{CookPlan, Incremental, Prepared};
 
 use crate::components::Components;
@@ -125,7 +127,7 @@ pub trait NodeType: Send + Sync {
     /// Its id (`kinogaki.mesh.extrude`).
     fn id(&self) -> NodeTypeId;
 
-    /// Its label, ports and parameters, read once when its package
+    /// Its label, ports, parameters and handles, read once when its package
     /// registers.
     fn description(&self) -> Description;
 

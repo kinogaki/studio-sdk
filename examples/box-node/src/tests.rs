@@ -1,15 +1,24 @@
 //! Cooks the Box node the way Studio does, then asks the box data type
-//! what Studio asks it: bounds, viewport surface, render triangles, save.
+//! what Studio asks it: bounds, viewport surface, render triangles, save;
+//! and reads the handles the node type binds.
 use super::*;
+use kinogaki_studio_api::cook::{Constraint, Space};
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::parallel::Serial;
 
-/// Cooks the Box node with `width`, `depth` and `height`.
+/// Cooks the Box node with `width`, `depth` and `height`, centered on the
+/// origin.
 fn cook(width: f64, depth: f64, height: f64) -> Result<Outputs, CookError> {
+    cook_at(width, depth, height, [0.0; 3])
+}
+
+/// Cooks the Box node with `width`, `depth`, `height` and `center`.
+fn cook_at(width: f64, depth: f64, height: f64, center: [f64; 3]) -> Result<Outputs, CookError> {
     let mut parameters = BoxNode.description().parameters.values();
     parameters.insert("width".into(), width.into());
     parameters.insert("depth".into(), depth.into());
     parameters.insert("height".into(), height.into());
+    parameters.insert("center".into(), center.to_vec().into());
     let cancel = CancelToken::default();
     let mut scratch = None;
     let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
@@ -39,7 +48,8 @@ fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
     assert_eq!(
         BOX.get(&data),
         Some(&BoxShape {
-            size: [2.0, 3.0, 4.0]
+            size: [2.0, 3.0, 4.0],
+            center: [0.0; 3],
         })
     );
     let ty = registry.data_type(data.ty()).unwrap();
@@ -86,7 +96,10 @@ fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
 
 #[test]
 fn a_box_saves_and_reads_back() {
-    let data = cook(1.0, 2.0, 0.5).unwrap().data.remove(0);
+    let data = cook_at(1.0, 2.0, 0.5, [3.0, -1.0, 2.0])
+        .unwrap()
+        .data
+        .remove(0);
     let codec = BoxType;
     let codec = codec.codec();
     let mut element = MemoryElement::new("box");
@@ -94,6 +107,64 @@ fn a_box_saves_and_reads_back() {
     let read = element.read(|reader| codec.read(reader, None)).unwrap();
     assert_eq!(BOX.get(&read), BOX.get(&data));
     assert_eq!(codec_stamp(&read), codec_stamp(&data));
+}
+
+#[test]
+fn a_moved_box_has_its_own_bounds_and_stamp() {
+    let moved = cook_at(2.0, 2.0, 2.0, [1.0, 0.0, 0.0])
+        .unwrap()
+        .data
+        .remove(0);
+    let bounds = BoxType.bounds(&moved).unwrap();
+    assert_eq!(bounds.min, Vec3::new(0.0, -1.0, -1.0));
+    assert_eq!(bounds.max, Vec3::new(2.0, 1.0, 1.0));
+    let still = cook(2.0, 2.0, 2.0).unwrap().data.remove(0);
+    assert_ne!(codec_stamp(&moved), codec_stamp(&still));
+}
+
+/// What Studio reads to run the node's handle: a box handle whose center
+/// is the `center` parameter and whose size is the three sides, in the
+/// object's space, free and always shown; and the values it reads from a
+/// new node.
+#[test]
+fn the_node_binds_a_box_handle_to_its_center_and_sides() {
+    let description = BoxNode.description();
+    let [handle] = &description.handles[..] else {
+        panic!("one handle: {:?}", description.handles);
+    };
+    let HandleKind::Box { center, size } = &handle.kind else {
+        panic!("a box handle: {:?}", handle.kind);
+    };
+    assert_eq!(*center, Vector::parameter("center"));
+    assert_eq!(*size, Vector::components("width", "depth", "height"));
+    assert_eq!(handle.label, "box");
+    assert_eq!(
+        (handle.space, handle.constraint, handle.range),
+        (Space::Object, Constraint::Free, None)
+    );
+    // It binds only parameters the node declares, and shows for any.
+    let values = description.parameters.values();
+    for name in handle.parameters() {
+        assert!(values.contains_key(name), "{name} is declared");
+    }
+    assert!(handle.shown(&values));
+    assert_eq!(center.read(&values), Some([0.0; 3]));
+    assert_eq!(size.read(&values), Some([1.0; 3]));
+    // A drag's write is what the next cook reads.
+    let mut moved = values;
+    size.write(&mut moved, [2.0, 1.0, 1.0]);
+    center.write(&mut moved, [0.5, 0.0, 0.0]);
+    let cancel = CancelToken::default();
+    let mut scratch = None;
+    let mut cx = CookCx::new(&moved, &cancel, &Serial, &mut scratch);
+    let data = BoxNode.cook(&mut cx, &[]).unwrap().data.remove(0);
+    assert_eq!(
+        BOX.get(&data),
+        Some(&BoxShape {
+            size: [2.0, 1.0, 1.0],
+            center: [0.5, 0.0, 0.0],
+        })
+    );
 }
 
 #[test]

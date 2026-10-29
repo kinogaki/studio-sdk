@@ -1,11 +1,13 @@
 //! [`Description`]: what a node type is to the user and to a network: its
-//! label, its ports and its parameters. The environment reads it once,
-//! when the package registers, and builds node creation, the network's
-//! ports and the inspector from it.
+//! label, its ports, its parameters and the viewport handles bound to
+//! them. The environment reads it once, when the package registers, and
+//! builds node creation, the network's ports, the inspector and the
+//! handles from it.
+use super::handle::Handle;
 use crate::id::DataTypeId;
 use crate::params::Schema;
 
-/// A node type's label, ports and parameters.
+/// A node type's label, ports, parameters and handles.
 ///
 /// ```
 /// use kinogaki_studio_api::cook::{Description, Port};
@@ -35,16 +37,20 @@ pub struct Description {
     /// new node's [`Parameters`](crate::Parameters) are
     /// [`Schema::values`].
     pub parameters: Schema,
+    /// The viewport handles Studio shows while a node of this type is
+    /// selected, each bound to some of its parameters.
+    pub handles: Vec<Handle>,
 }
 
 impl Description {
-    /// A node type called `label`, with no ports and no parameters.
+    /// A node type called `label`, with no ports, parameters or handles.
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
             inputs: Vec::new(),
             outputs: Vec::new(),
             parameters: Schema::default(),
+            handles: Vec::new(),
         }
     }
 
@@ -63,6 +69,12 @@ impl Description {
     /// With `parameters`.
     pub fn parameters(mut self, parameters: Schema) -> Self {
         self.parameters = parameters;
+        self
+    }
+
+    /// With `handle` next.
+    pub fn handle(mut self, handle: Handle) -> Self {
+        self.handles.push(handle);
         self
     }
 }

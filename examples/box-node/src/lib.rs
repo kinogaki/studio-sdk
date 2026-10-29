@@ -1,34 +1,50 @@
 //! A Kinogaki Studio plugin that adds a Box node.
 //!
-//! The package defines a data type, `example.boxes.box` (a box's size),
-//! and a node type, `example.boxes.box_node`, that makes a box from its
-//! width, depth and height. The data type tells Studio how a box shows in
-//! the viewport, how it renders and how it saves.
+//! The package defines a data type, `example.boxes.box` (a box's size and
+//! center), and a node type, `example.boxes.box_node`, that makes a box
+//! from its width, depth, height and center. The data type tells Studio how
+//! a box shows in the viewport, how it renders and how it saves; the node
+//! type binds a box handle to its parameters, so Studio draws the box in
+//! the viewport and drags its faces and center with no code here.
+use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::params::{Number, Parameter, ParameterKind};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
-/// A box centered on the origin: its size along x, y and z (z is up).
+/// A box: its size along x, y and z (z is up) and its middle.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BoxShape {
     /// Width, depth and height.
     pub size: [f64; 3],
+    /// The middle.
+    pub center: [f64; 3],
 }
 
 impl BoxShape {
+    /// Its smallest and largest corners.
+    pub fn corners(&self) -> ([f64; 3], [f64; 3]) {
+        let half = self.size.map(|s| s / 2.0);
+        (
+            [0, 1, 2].map(|k| self.center[k] - half[k]),
+            [0, 1, 2].map(|k| self.center[k] + half[k]),
+        )
+    }
+
     /// Its eight corners: the bottom four, then the top four.
     pub fn points(&self) -> [[f32; 3]; 8] {
-        let [x, y, z] = self.size.map(|s| (s / 2.0) as f32);
+        let (low, high) = self.corners();
+        let [a, b, c] = low.map(|v| v as f32);
+        let [x, y, z] = high.map(|v| v as f32);
         [
-            [-x, -y, -z],
-            [x, -y, -z],
-            [x, y, -z],
-            [-x, y, -z],
-            [-x, -y, z],
-            [x, -y, z],
+            [a, b, c],
+            [x, b, c],
+            [x, y, c],
+            [a, y, c],
+            [a, b, z],
+            [x, b, z],
             [x, y, z],
-            [-x, y, z],
+            [a, y, z],
         ]
     }
 }
@@ -69,11 +85,17 @@ impl DataType for BoxType {
         Color::rgb(232, 164, 58)
     }
     fn stamp(&self, data: &Data) -> Stamp {
+        // The sides, then a hash of the middle (FNV-1a).
         let mut stamp = [0; 32];
         if let Some(shape) = BOX.get(data) {
             for (bytes, side) in stamp.chunks_mut(8).zip(shape.size) {
                 bytes.copy_from_slice(&side.to_le_bytes());
             }
+            let middle = shape.center.iter().flat_map(|v| v.to_le_bytes());
+            let hash = middle.fold(0xcbf2_9ce4_8422_2325_u64, |h, byte| {
+                (h ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+            });
+            stamp[24..].copy_from_slice(&hash.to_le_bytes());
         }
         stamp
     }
@@ -81,14 +103,17 @@ impl DataType for BoxType {
         size_of::<BoxShape>()
     }
     fn bounds(&self, data: &Data) -> Option<Bounds> {
-        let [x, y, z] = BOX.get(data)?.size.map(|s| s / 2.0);
+        let ([a, b, c], [x, y, z]) = BOX.get(data)?.corners();
         Some(Bounds {
-            min: Vec3::new(-x, -y, -z),
+            min: Vec3::new(a, b, c),
             max: Vec3::new(x, y, z),
         })
     }
     fn info(&self, data: &Data) -> Vec<InfoRow> {
-        let Some(BoxShape { size: [w, d, h] }) = BOX.get(data) else {
+        let Some(BoxShape {
+            size: [w, d, h], ..
+        }) = BOX.get(data)
+        else {
             return Vec::new();
         };
         vec![InfoRow::new("Size", format!("{w} × {d} × {h}"))]
@@ -139,7 +164,7 @@ impl Renderable for BoxType {
     }
 }
 
-/// In project files: the size.
+/// In project files: the size and the middle.
 impl DataCodec for BoxType {
     fn write(
         &self,
@@ -147,14 +172,21 @@ impl DataCodec for BoxType {
         _: Option<&Data>,
         out: &mut dyn ElementWriter,
     ) -> Result<(), Error> {
-        out.set("size", Field::F64s(box_of(data)?.size.to_vec()))
+        let shape = box_of(data)?;
+        out.set("size", Field::F64s(shape.size.to_vec()))?;
+        out.set("center", Field::F64s(shape.center.to_vec()))
     }
     fn read(&self, element: &dyn ElementReader, _: Option<&Data>) -> Result<Data, Error> {
-        let size = element.f64s("size")?;
-        let size = size
-            .try_into()
-            .map_err(|_| Error::invalid("a box has three sides"))?;
-        Ok(BOX.wrap(BoxShape { size }))
+        let three = |name: &str| -> Result<[f64; 3], Error> {
+            element
+                .f64s(name)?
+                .try_into()
+                .map_err(|_| Error::invalid(format!("a box's {name} has three numbers")))
+        };
+        Ok(BOX.wrap(BoxShape {
+            size: three("size")?,
+            center: three("center")?,
+        }))
     }
 }
 
@@ -165,12 +197,18 @@ impl NodeType for BoxNode {
     fn id(&self) -> NodeTypeId {
         NodeTypeId::declared("example.boxes.box_node")
     }
-    /// No inputs, one box out, and its width, depth and height in scene
-    /// units.
+    /// No inputs, one box out, its width, depth, height and center in
+    /// scene units, and a box handle on them: Studio draws the box with a
+    /// dot on each face and one in the middle, and dragging them writes
+    /// the sides and the center.
     fn description(&self) -> Description {
         let side = |name: &str, label: &str| {
             let length = ParameterKind::Number(Number::length().range(0.001, f64::INFINITY));
             Parameter::new(name, label, length, 1.0)
+        };
+        let center = ParameterKind::Vector {
+            components: 3,
+            number: Number::length(),
         };
         Description::new("Box")
             .output(Port::new("box", "Box", BOX.id()))
@@ -178,8 +216,16 @@ impl NodeType for BoxNode {
                 Schema::default()
                     .parameter(side("width", "Width"))
                     .parameter(side("depth", "Depth"))
-                    .parameter(side("height", "Height")),
+                    .parameter(side("height", "Height"))
+                    .parameter(Parameter::new("center", "Center", center, vec![0.0; 3])),
             )
+            .handle(Handle::new(
+                "box",
+                HandleKind::Box {
+                    center: Vector::parameter("center"),
+                    size: Vector::components("width", "depth", "height"),
+                },
+            ))
     }
     fn cook(&self, cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {
         let size = [
@@ -190,7 +236,10 @@ impl NodeType for BoxNode {
         if size.iter().any(|&side| side <= 0.0) {
             return Err(CookError::message("every side must be longer than zero"));
         }
-        Ok(Outputs::one(BOX.wrap(BoxShape { size })))
+        let center = Vector::parameter("center")
+            .read(cx.parameters())
+            .ok_or_else(|| CookError::message("the center is three numbers"))?;
+        Ok(Outputs::one(BOX.wrap(BoxShape { size, center })))
     }
 }
 
