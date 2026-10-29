@@ -719,8 +719,11 @@ fn another_engines_material_is_adopted_flat_in_its_tint() {
         here.default_material()
     );
     let engines = Engines::new(vec![here.clone(), there]);
-    assert_eq!(&*engines.default_engine().id, "here");
+    assert_eq!(&*engines.default_engine().unwrap().id, "here");
     assert!(engines.get("there").is_some() && engines.get("nope").is_none());
+    // A host with no engine installed has none to default to.
+    let none = Engines::new(Vec::new());
+    assert!(none.is_empty() && none.default_engine().is_none() && none.get("here").is_none());
 }
 
 #[test]

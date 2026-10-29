@@ -250,14 +250,14 @@ impl EngineDescription {
 }
 
 /// The engines a host can make, in the order it lists them; the first is
-/// its default.
+/// its default. A host may have none (no render engine is installed): it
+/// then renders nothing.
 #[derive(Clone, Debug)]
 pub struct Engines(Arc<[Arc<EngineDescription>]>);
 
 impl Engines {
-    /// The engines `descriptions` describe (at least one).
+    /// The engines `descriptions` describe.
     pub fn new(descriptions: Vec<EngineDescription>) -> Engines {
-        assert!(!descriptions.is_empty(), "a host has an engine");
         Engines(descriptions.into_iter().map(Arc::new).collect())
     }
 
@@ -266,9 +266,14 @@ impl Engines {
         self.0.iter().find(|e| &*e.id == id)
     }
 
-    /// The default engine: the first.
-    pub fn default_engine(&self) -> &Arc<EngineDescription> {
-        &self.0[0]
+    /// The default engine: the first, when there is one.
+    pub fn default_engine(&self) -> Option<&Arc<EngineDescription>> {
+        self.0.first()
+    }
+
+    /// Whether there is no engine.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     /// Every engine, in order.
