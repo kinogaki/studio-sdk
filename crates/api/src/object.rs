@@ -1,14 +1,16 @@
 //! Scene objects a package contributes: [`ObjectKindSpec`] describes a
 //! kind (Mesh, CAD, a CAM setup), [`ObjectBody`] is one object's own state
-//! (a Mesh object's network). A kind whose objects take part in a render
+//! (a Mesh object's display settings). A kind whose objects take part in a render
 //! themselves says how through its optional facets: [`RenderedKind`] (a
 //! light, fog: prims of types engines declare) and [`RenderSetupKind`]
 //! (Render Settings: which engine renders, and how).
 //!
 //! The environment keeps every object's name, place in the hierarchy,
-//! placement and flags; the body is the rest, owned and read by the
-//! package. A project that names a kind no package provides still opens:
-//! its objects are kept as placeholders and save back unchanged.
+//! placement and flags, and, for a kind that names a context
+//! ([`ObjectKindSpec::context`]), the network inside the object: core
+//! creates, edits, cooks, undoes and saves it beside the body. The body is
+//! the rest, owned and read by the package. A project that names a kind no
+//! package provides still opens: its objects are skipped and reported.
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, ObjectKindId};
@@ -47,7 +49,9 @@ pub trait ObjectKindSpec: Send + Sync {
     /// objects do; a Material Library doesn't).
     fn placed(&self) -> bool;
 
-    /// The context of the network inside its objects, when they hold one.
+    /// The context of the network inside its objects, when they hold one:
+    /// core keeps that network beside each object's body (the body never
+    /// holds it).
     fn context(&self) -> Option<ContextId>;
 
     /// The data type of its objects' results (what the viewport draws and
@@ -60,9 +64,10 @@ pub trait ObjectKindSpec: Send + Sync {
     /// How its bodies save into a project.
     fn codec(&self) -> &dyn ObjectCodec;
 
-    /// A new body holding `data` (an imported value), when this kind takes
-    /// values of its type: a Mesh object adopts a mesh as a network that
-    /// yields it. `None`: this kind doesn't take such values.
+    /// A new body for an object holding `data` (an imported value), when
+    /// this kind takes values of its type: a Mesh object adopts a mesh,
+    /// which its network then yields. `None`: this kind doesn't take such
+    /// values.
     fn adopts(&self, data: &Data) -> Option<Arc<dyn ObjectBody>>;
 
     /// Whether its objects live only at the scene's root (Fog, Render

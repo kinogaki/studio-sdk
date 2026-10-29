@@ -137,13 +137,13 @@ If a project uses a package that is not installed, it still opens: the objects t
 An `ObjectKindSpec` describes one kind of object. It gives:
 - the label and icon;
 - whether its objects are placed in the scene;
-- the context of the network inside them;
+- the context of the network inside them (core keeps that network beside each object's body, and creates, edits, cooks, undoes and saves it; the body never holds it);
 - the data type of their result;
 - a new body;
 - a codec;
 - `adopts`, which turns an imported value into a new body.
 
-An `ObjectBody` is the part of an object that the package owns. The environment keeps the object's name, its place in the hierarchy, its placement and its flags. Bodies are immutable and are replaced whole, so undo keeps the previous body.
+An `ObjectBody` is the part of an object that the package owns: the kind's own state (a Mesh object's display settings, a Render Settings object's engine and settings). The environment keeps the object's name, its place in the hierarchy, its placement, its flags and its network. Bodies are immutable and are replaced whole, so undo keeps the previous body.
 
 A kind whose objects take part in a render themselves says how through two optional facets, so the host's render sync and its Render mode and Render Image never read the body:
 - `renders()`, a `RenderedKind`: what an object is, as `Declared` prims of types engines declare with every value it holds (`declared`), and the body holding an edit of them (`with_declared`). The host keeps, for the active engine, the values that engine's type and applied schemas declare, places the prims at the object, decodes the standard ones (UsdLux lights) for the viewport and exports, and draws the inspector rows from the types' schemas.
