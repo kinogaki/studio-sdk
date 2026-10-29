@@ -255,20 +255,6 @@ pub struct NetworkWire {
     pub to: (NodeRef, usize, usize),
 }
 
-/// One item of a context's vocabulary: a tool or command its menus,
-/// shelves and Tab may hold, by its stored name.
-#[derive(Clone, Debug, PartialEq)]
-pub struct VocabularyItem {
-    /// Its stored name ("acme.trees.branch", "command:prune").
-    pub name: String,
-    /// What menus call it.
-    pub label: String,
-    /// The family menus and Tab group it under.
-    pub family: String,
-    /// Lower-case synonyms for search.
-    pub aliases: Vec<String>,
-}
-
 /// A kind of object an object level can create, contributed by the
 /// context that owns the kind.
 #[derive(Clone, Debug, PartialEq)]

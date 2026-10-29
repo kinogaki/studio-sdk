@@ -10,8 +10,9 @@ use studio_ui_api::host::{
     View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
-    ContextPart, Creation, Creations, Inspector, LevelSpec, Levels, Section, SettingsSection,
-    Start, Status, ToolbarItem, Tools, UiPackage, ViewportLayer, register,
+    ContextPart, Creation, Creations, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec,
+    Levels, Library, MarkingDefault, MenuDefaults, Places, Section, SettingsSection, Shared, Start,
+    Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem, When, register,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -71,6 +72,7 @@ impl UiPackage for Trees {
     fn contexts(&self) -> Vec<ContextPart<Forest>> {
         vec![
             ContextPart::new(forest())
+                .with_library(library())
                 .with_levels(TreeLevels)
                 .with_viewport(TreeView)
                 .with_inspector(TreeInspector)
@@ -85,6 +87,57 @@ impl UiPackage for Trees {
     }
     fn poll(&self, s: &mut Forest, _cx: &mut dyn Cx) {
         s.polls += 1;
+    }
+}
+
+/// Grow, bound to G, on A at the Tree level; at the Branch level only.
+fn library() -> Library {
+    Library {
+        items: vec![VocabularyItem {
+            name: "toy.trees.grow".into(),
+            label: "Grow".into(),
+            family: "Trees".into(),
+            section: "Create".into(),
+            when: When::levels(["Branch"]),
+            places: Places {
+                tools: true,
+                menus: true,
+                ..Places::default()
+            },
+            ..VocabularyItem::default()
+        }],
+        keys: Some(Shared::Own(KeyStore {
+            id: "Trees".into(),
+            label: "Trees".into(),
+            parent: None,
+            active: KeysActive::Always,
+            defaults: vec![KeyBinding {
+                item: "toy.trees.grow".into(),
+                key: studio_ui_api::Key::G,
+                modifiers: Modifiers::NONE,
+            }],
+        })),
+        menus: Some(Shared::Own(MenuDefaults {
+            store: "Trees".into(),
+            titles: ["Grow".into(), "Prune".into(), "Select".into()],
+            marking: vec![MarkingDefault {
+                menu: Held::A,
+                level: "Tree".into(),
+                compass: [
+                    Some("toy.trees.grow".into()),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                list: Vec::new(),
+            }],
+            shelves: Vec::new(),
+        })),
+        ..Library::default()
     }
 }
 
@@ -299,6 +352,11 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     assert_eq!(package.settings[0].context(), forest());
     let levels = context.levels.as_ref().unwrap().levels();
     assert_eq!(levels.len(), 2);
+    // The library is data, kept as given.
+    assert_eq!(context.library, library());
+    let grow = &context.library.items[0];
+    assert!(grow.when.holds(Some("Branch"), false, false));
+    assert!(!grow.when.holds(Some("Tree"), false, false));
 }
 
 #[test]

@@ -10,27 +10,36 @@
 //! snapshots never hold it: what undo restores is the document and the
 //! session's [slots](kinogaki_studio_api::Slot).
 //!
-//! **A context** ([`ContextPart`]) is an id and a set of optional parts:
-//! the selection [`Levels`], the [`ViewportLayer`], the [`Inspector`], the
-//! [`Vocabulary`], the [`NetworkView`], [`ObjectRows`] and [`OutlineRows`]
-//! for the object kinds it owns, and the [`Creations`] it adds to an
-//! object level's Create. A part a context leaves out is nothing there,
-//! never another context's.
+//! **A context** ([`ContextPart`]) is an id, its [`Library`] (what it
+//! offers the host's menus, keys, Tab and viewport chrome, as data) and a
+//! set of optional parts: the selection [`Levels`], the [`ViewportLayer`],
+//! the [`Inspector`], the [`Vocabulary`] that runs its items, the
+//! [`NetworkView`], [`ObjectRows`] and [`OutlineRows`] for the object
+//! kinds it owns, and the [`Creations`] it adds to an object level's
+//! Create. A part a context leaves out is nothing there, never another
+//! context's.
 //!
 //! **Registering** ([`register`]) erases the state's type: the host holds
 //! every package as a [`Registered`], whose parts take the state as
 //! `dyn Any` and downcast it back.
 mod data;
 mod edited;
+mod library;
 mod parts;
 mod settings;
 
 pub use data::{
     BarField, BarValue, ContextObject, ContextView, Creation, FlagSide, FlagSpec, LevelSpec,
     NetworkNode, NetworkWire, NumericBar, OutlineRow, Start, Status, TimeDomain, TimeMark,
-    TimeUnits, ToolbarItem, Tools, VocabularyItem,
+    TimeUnits, ToolbarItem, Tools,
 };
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
+pub use library::{
+    AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
+    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, Pivot, Places, Shared,
+    SharedRows, Shelf, ShelfEntry, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem,
+    When,
+};
 pub use parts::{
     Creations, Erased, Inspector, Levels, NetworkView, ObjectRows, OutlineRows, ViewportLayer,
     Vocabulary,
@@ -94,6 +103,8 @@ pub struct ContextPart<S: ?Sized> {
     /// Whether it is its context's mode on one of the network's nodes (CAD's
     /// sketch mode on a Sketch node) rather than the network itself.
     pub mode: bool,
+    /// What it offers the host's menus, keys, Tab and viewport chrome.
+    pub library: Library,
     /// Its selection levels; `None`: whole objects.
     pub levels: Option<Box<dyn Levels<S>>>,
     /// What it adds to the viewport.
@@ -118,6 +129,7 @@ impl<S: ?Sized> ContextPart<S> {
         ContextPart {
             id,
             mode: false,
+            library: Library::default(),
             levels: None,
             viewport: None,
             inspector: None,
@@ -132,6 +144,12 @@ impl<S: ?Sized> ContextPart<S> {
     /// As its context's mode on a node.
     pub fn as_mode(mut self) -> Self {
         self.mode = true;
+        self
+    }
+
+    /// With its library.
+    pub fn with_library(mut self, library: Library) -> Self {
+        self.library = library;
         self
     }
 
@@ -190,6 +208,7 @@ impl<S: 'static> ContextPart<S> {
         ContextPart {
             id: self.id,
             mode: self.mode,
+            library: self.library,
             levels: self
                 .levels
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Levels<dyn Any>>),
@@ -224,6 +243,7 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
         f.debug_struct("ContextPart")
             .field("id", &self.id)
             .field("mode", &self.mode)
+            .field("items", &self.library.items.len())
             .field("levels", &has(self.levels.is_some()))
             .field("viewport", &has(self.viewport.is_some()))
             .field("inspector", &has(self.inspector.is_some()))

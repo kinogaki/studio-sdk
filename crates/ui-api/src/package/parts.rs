@@ -14,7 +14,7 @@
 //! the host lends back to `S`.
 use super::data::{
     ContextView, Creation, FlagSpec, LevelSpec, NetworkNode, NetworkWire, NumericBar, OutlineRow,
-    Status, TimeDomain, ToolbarItem, Tools, VocabularyItem,
+    Status, TimeDomain, ToolbarItem, Tools,
 };
 use super::edited::{Edited, TemplateMark};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
@@ -39,6 +39,14 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     fn choose(&self, s: &mut S, cx: &mut dyn Cx, level: usize);
     /// Adds `level` to the active levels, or removes it (never the last).
     fn toggle(&self, s: &mut S, cx: &mut dyn Cx, level: usize);
+    /// The level of what is selected, by index (an edge selected while
+    /// faces are the active level: the edge level); `None`: nothing is.
+    /// The library's entries are held against it, else against the
+    /// primary level ([`When`](super::When)).
+    fn selected(&self, s: &S, cx: &dyn Cx) -> Option<usize> {
+        let _ = (s, cx);
+        None
+    }
     /// The pointer over view `rect` (`None`: off it): show what lies under
     /// it hovered.
     fn hover(&self, s: &mut S, cx: &mut dyn Cx, rect: Rect, pointer: Option<Pos>) {
@@ -177,17 +185,29 @@ pub trait Inspector<S: ?Sized>: Send + Sync {
     }
 }
 
-/// Every tool and command a context offers, by stored name: what its
-/// menus, shelves and Tab hold.
+/// How a context's items run, and what of them applies now. The items
+/// themselves, and every menu, shelf, key and Tab entry holding them, are
+/// its [`Library`](super::Library).
 pub trait Vocabulary<S: ?Sized>: Send + Sync {
     /// Its name, which actions carry ("acme.trees").
     fn name(&self) -> &str;
-    /// Its items, in the order Tab and the Settings window list them.
-    fn items(&self) -> Vec<VocabularyItem>;
-    /// Runs `item`.
+    /// Runs `item`. An item can be run where it doesn't apply (a key, a
+    /// shelf tile): it then does nothing but say why
+    /// ([`HostStatus::fail`](crate::host::HostStatus::fail)).
     fn run(&self, s: &mut S, cx: &mut dyn Cx, item: &str);
-    /// Why `item` can't run now; `None` when it can.
-    fn unavailable(&self, s: &S, cx: &dyn Cx, item: &str) -> Option<String> {
+    /// Whether `item` applies now: at the active level, to the selection,
+    /// in this mode (Fillet needs edges selected; Repeat a last tool).
+    /// Menus, Tab and the marking menus hide what doesn't apply; nothing
+    /// is greyed. Never a passing state (a cook under way): [`run`](Self::run)
+    /// refuses that, saying why. Called while a menu shows, once an entry
+    /// a frame.
+    fn shown(&self, s: &S, cx: &dyn Cx, item: &str) -> bool {
+        let _ = (s, cx, item);
+        true
+    }
+    /// `item`'s label now, when its state renames it ("Repeat Bevel",
+    /// "Slice Off"); `None`: its library label.
+    fn label(&self, s: &S, cx: &dyn Cx, item: &str) -> Option<String> {
         let _ = (s, cx, item);
         None
     }
@@ -304,6 +324,9 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     fn toggle(&self, s: &mut dyn Any, cx: &mut dyn Cx, level: usize) {
         self.part.toggle(own_mut(s), cx, level)
     }
+    fn selected(&self, s: &dyn Any, cx: &dyn Cx) -> Option<usize> {
+        self.part.selected(own(s), cx)
+    }
     fn hover(&self, s: &mut dyn Any, cx: &mut dyn Cx, rect: Rect, pointer: Option<Pos>) {
         self.part.hover(own_mut(s), cx, rect, pointer)
     }
@@ -411,14 +434,14 @@ impl<S: 'static> Vocabulary<dyn Any> for Erased<S, dyn Vocabulary<S>> {
     fn name(&self) -> &str {
         self.part.name()
     }
-    fn items(&self) -> Vec<VocabularyItem> {
-        self.part.items()
-    }
     fn run(&self, s: &mut dyn Any, cx: &mut dyn Cx, item: &str) {
         self.part.run(own_mut(s), cx, item)
     }
-    fn unavailable(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> Option<String> {
-        self.part.unavailable(own(s), cx, item)
+    fn shown(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> bool {
+        self.part.shown(own(s), cx, item)
+    }
+    fn label(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> Option<String> {
+        self.part.label(own(s), cx, item)
     }
 }
 

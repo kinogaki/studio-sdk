@@ -392,6 +392,8 @@ pub enum Key {
     Minus,
     /// `.`.
     Period,
+    /// Insert (Help on some Mac keyboards).
+    Insert,
     /// Any other key, by the host's own code for it: compare it only with
     /// another `Other` from the same host.
     Other(u32),
@@ -464,6 +466,7 @@ impl Key {
             Self::F12 => "F12",
             Self::Minus => "Minus",
             Self::Period => "Period",
+            Self::Insert => "Insert",
             Self::Other(_) => return None,
         })
     }
