@@ -1,6 +1,9 @@
 //! Scene objects a package contributes: [`ObjectKindSpec`] describes a
 //! kind (Mesh, CAD, a CAM setup), [`ObjectBody`] is one object's own state
-//! (a Mesh object's network).
+//! (a Mesh object's network). A kind whose objects take part in a render
+//! themselves says how through its optional facets: [`RenderedKind`] (a
+//! light, fog: prims of types engines declare) and [`RenderSetupKind`]
+//! (Render Settings: which engine renders, and how).
 //!
 //! The environment keeps every object's name, place in the hierarchy,
 //! placement and flags; the body is the rest, owned and read by the
@@ -9,6 +12,8 @@
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, ObjectKindId};
+use crate::refs::ObjectRef;
+use kinogaki_render_api::{Aov, Declared, SettingValues};
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -59,4 +64,70 @@ pub trait ObjectKindSpec: Send + Sync {
     /// values of its type: a Mesh object adopts a mesh as a network that
     /// yields it. `None`: this kind doesn't take such values.
     fn adopts(&self, data: &Data) -> Option<Arc<dyn ObjectBody>>;
+
+    /// Whether its objects live only at the scene's root (Fog, Render
+    /// Settings).
+    fn at_root(&self) -> bool {
+        false
+    }
+
+    /// How its objects are render prims themselves (lights, fog), when they
+    /// are.
+    fn renders(&self) -> Option<&dyn RenderedKind> {
+        None
+    }
+
+    /// How its objects set up a render (Render Settings), when they do.
+    fn render_setup(&self) -> Option<&dyn RenderSetupKind> {
+        None
+    }
+}
+
+/// A kind whose objects are render prims of their own: a light or fog,
+/// prims of types engines declare. The host reads what an object is
+/// through it and never reads the body: render sync keeps, for the active
+/// engine, the values its type and applied schemas declare; the viewport
+/// and exports read the standard ones (UsdLux lights); the inspector draws
+/// the values by their types' schemas and writes an edit back.
+pub trait RenderedKind: Send + Sync {
+    /// What `body` is: its prims, with every value it holds, placed at the
+    /// origin (the host places them at the object).
+    fn declared(&self, body: &dyn ObjectBody) -> Vec<Declared>;
+
+    /// `body` holding `declared` instead (an edit of what
+    /// [`declared`](Self::declared) answered), when it is one of this
+    /// kind's and `declared` fits it.
+    fn with_declared(
+        &self,
+        body: &dyn ObjectBody,
+        declared: &[Declared],
+    ) -> Option<Arc<dyn ObjectBody>>;
+}
+
+/// A kind whose objects set up a render: which engine renders, at what
+/// size, through which camera, with which of the engine's settings and
+/// outputs. The host's Render mode and Render Image read the active one
+/// (the first at the scene's root with its Render flag on).
+pub trait RenderSetupKind: Send + Sync {
+    /// The render `body` sets up, when it is one of this kind's.
+    fn setup(&self, body: &dyn ObjectBody) -> Option<RenderSetup>;
+}
+
+/// What a render is set up as: what [`RenderSetupKind::setup`] answers.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RenderSetup {
+    /// The engine that renders (its id).
+    pub engine: Arc<str>,
+    /// The final image's width and height, pixels.
+    pub resolution: [u32; 2],
+    /// The Camera object a final render looks through (none: the view's).
+    pub camera: Option<ObjectRef>,
+    /// Where a final render writes its image, relative to the project's
+    /// folder unless absolute.
+    pub output: String,
+    /// The outputs a final render writes beside the beauty, by the
+    /// engine's ids (`EngineDescription::aovs`).
+    pub outputs: Vec<Aov>,
+    /// The engine's own settings, by its descriptors' names.
+    pub values: SettingValues,
 }

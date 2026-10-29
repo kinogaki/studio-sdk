@@ -127,7 +127,9 @@ Codecs follow the project rules:
 - there are no defaults for missing values;
 - there are no version fields.
 
-If a project uses a package that is not installed, it still opens. The elements that package wrote are kept and saved back exactly as they were.
+`ObjectCodec::read` also receives a `ReadCx`, a read-only view of what is installed (the render engines' descriptions, `engines()`). A body that needs something no installed package provides, such as a light of a type no installed engine declares, reads as `Error::NotInstalled` with a plain message saying what is missing.
+
+If a project uses a package that is not installed, it still opens: the objects that package's kinds hold, and the bodies that read as `NotInstalled`, are skipped, and the Console says what was skipped and why. Saving writes only what loaded.
 
 ## Objects
 
@@ -141,6 +143,13 @@ An `ObjectKindSpec` describes one kind of object. It gives:
 - `adopts`, which turns an imported value into a new body.
 
 An `ObjectBody` is the part of an object that the package owns. The environment keeps the object's name, its place in the hierarchy, its placement and its flags. Bodies are immutable and are replaced whole, so undo keeps the previous body.
+
+A kind whose objects take part in a render themselves says how through two optional facets, so the host's render sync and its Render mode and Render Image never read the body:
+- `renders()`, a `RenderedKind`: what an object is, as `Declared` prims of types engines declare with every value it holds (`declared`), and the body holding an edit of them (`with_declared`). The host keeps, for the active engine, the values that engine's type and applied schemas declare, places the prims at the object, decodes the standard ones (UsdLux lights) for the viewport and exports, and draws the inspector rows from the types' schemas.
+- `at_root()`: its objects live only at the scene's root (Fog, Render Settings).
+- `render_setup()`, a `RenderSetupKind`: the render an object sets up (Render Settings), as a `RenderSetup`: the engine, the image size, the camera (an `ObjectRef`), the output path and outputs, and the engine's settings. The host renders with the active one.
+
+The render-domain package owns these kinds; engines only declare the types and settings they render (`EngineDescription`), so an object survives a change of engine.
 
 ## Formats
 

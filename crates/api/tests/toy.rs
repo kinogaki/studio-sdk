@@ -182,7 +182,11 @@ impl ObjectCodec for CloudBodyCodec {
             .ok_or_else(|| Error::invalid("not a Cloud object"))?;
         CloudCodec.write(&body.0, None, &mut *out.child("cloud", "cloud")?)
     }
-    fn read(&self, element: &dyn ElementReader) -> Result<Arc<dyn ObjectBody>, Error> {
+    fn read(
+        &self,
+        element: &dyn ElementReader,
+        _cx: &ReadCx<'_>,
+    ) -> Result<Arc<dyn ObjectBody>, Error> {
         let cloud = CloudCodec.read(&*element.required_child("cloud")?, None)?;
         Ok(Arc::new(CloudBody(cloud)))
     }
@@ -387,7 +391,10 @@ fn objects_adopt_imported_values_of_their_result_type() {
     element
         .write(|out| kind.codec().write(&*body, out))
         .unwrap();
-    let back = element.read(|r| kind.codec().read(r)).unwrap();
+    let engines = kinogaki_render_api::Engines::new(Vec::new());
+    let back = element
+        .read(|r| kind.codec().read(r, &ReadCx::new(&engines)))
+        .unwrap();
     let back = back.downcast_ref::<CloudBody>().unwrap();
     assert_eq!(CLOUD.get(&back.0), CLOUD.get(value));
     assert_eq!(

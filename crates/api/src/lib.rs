@@ -71,7 +71,7 @@ pub mod time;
 pub mod viewport;
 
 pub use cancel::CancelToken;
-pub use codec::{DataCodec, ObjectCodec};
+pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
 pub use conversion::Conversion;
 pub use cook::{
@@ -91,7 +91,7 @@ pub use id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
-pub use object::{ObjectBody, ObjectKindSpec};
+pub use object::{ObjectBody, ObjectKindSpec, RenderSetup, RenderSetupKind, RenderedKind};
 pub use package::Package;
 pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};

@@ -9,11 +9,15 @@
 //! still opens and saves them back as they were.
 //!
 //! Codecs follow the project's rules: strict reading (no defaults for
-//! missing values, no fallbacks) and no version fields.
+//! missing values, no fallbacks) and no version fields. A body that needs
+//! something no installed package provides (a light of a type no engine
+//! declares) reads as [`Error::NotInstalled`]: the host skips that object
+//! and says why, and the rest of the project opens.
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter};
 use crate::error::Error;
 use crate::object::ObjectBody;
+use kinogaki_render_api::Engines;
 use std::sync::Arc;
 
 /// Writes and reads values of one data type.
@@ -43,6 +47,32 @@ pub trait ObjectCodec: Send + Sync {
     /// network as children).
     fn write(&self, body: &dyn ObjectBody, out: &mut dyn ElementWriter) -> Result<(), Error>;
 
-    /// Reads the body [`write`](Self::write) wrote into `element`.
-    fn read(&self, element: &dyn ElementReader) -> Result<Arc<dyn ObjectBody>, Error>;
+    /// Reads the body [`write`](Self::write) wrote into `element`, with
+    /// `cx` saying what is installed: [`Error::NotInstalled`] when the body
+    /// needs something that isn't.
+    fn read(
+        &self,
+        element: &dyn ElementReader,
+        cx: &ReadCx<'_>,
+    ) -> Result<Arc<dyn ObjectBody>, Error>;
+}
+
+/// What is installed, as an object's codec may ask while it reads a body:
+/// a read-only view of the host's packages.
+#[derive(Clone, Copy, Debug)]
+pub struct ReadCx<'a> {
+    engines: &'a Engines,
+}
+
+impl<'a> ReadCx<'a> {
+    /// What a host with render engines `engines` has installed.
+    pub fn new(engines: &'a Engines) -> Self {
+        Self { engines }
+    }
+
+    /// The installed render engines' descriptions (their declared prim
+    /// types, settings and vocabularies); none installed: empty.
+    pub fn engines(&self) -> &'a Engines {
+        self.engines
+    }
 }

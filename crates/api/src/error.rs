@@ -13,6 +13,11 @@ pub enum Error {
     Invalid(String),
     /// Reading or writing a file failed (the operating system's message).
     Io(String),
+    /// What the work needs isn't installed (a light of a type no installed
+    /// engine declares). Reading a project, the host skips the object and
+    /// reports this message: say what is missing, plainly ("light type
+    /// kinogaki.pixel.rim_light isn't installed").
+    NotInstalled(String),
 }
 
 impl Error {
@@ -26,7 +31,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Cancelled => f.write_str("cancelled"),
-            Self::Invalid(message) | Self::Io(message) => f.write_str(message),
+            Self::Invalid(message) | Self::Io(message) | Self::NotInstalled(message) => {
+                f.write_str(message)
+            }
         }
     }
 }

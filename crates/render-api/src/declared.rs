@@ -108,6 +108,19 @@ impl Declared {
         value(&self.values, name)
     }
 
+    /// Made type `ty`: values of the same names are kept (so switching
+    /// back restores them), and the type's others, or those that don't
+    /// fit it, take their defaults.
+    pub fn retype(&mut self, ty: &PrimType) {
+        self.type_id = ty.id.clone();
+        for d in &ty.params {
+            let fits = value(&self.values, &d.name).is_some_and(|v| d.accepts(v));
+            if !fits {
+                crate::settings::set_value(&mut self.values, &d.name, d.default_value());
+            }
+        }
+    }
+
     /// Number `name`, as `f32` (0 when missing or not a number).
     pub fn float(&self, name: &str) -> f32 {
         self.value(name)
