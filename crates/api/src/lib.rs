@@ -91,7 +91,9 @@ pub use id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
-pub use object::{ObjectBody, ObjectKindSpec, RenderSetup, RenderSetupKind, RenderedKind};
+pub use object::{
+    ObjectBody, ObjectKindSpec, Processing, RenderSetup, RenderSetupKind, RenderedKind,
+};
 pub use package::Package;
 pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};

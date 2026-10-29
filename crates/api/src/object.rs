@@ -14,7 +14,7 @@
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, ObjectKindId};
-use crate::refs::ObjectRef;
+use crate::refs::{NodeRef, ObjectRef};
 use kinogaki_render_api::{Aov, Declared, SettingValues};
 use std::any::Any;
 use std::fmt::Debug;
@@ -135,4 +135,29 @@ pub struct RenderSetup {
     pub outputs: Vec<Aov>,
     /// The engine's own settings, by its descriptors' names.
     pub values: SettingValues,
+    /// What its render shows: a Comp network's result, or the raw render.
+    pub processing: Processing,
+}
+
+/// What a render shows: the raw render, or a Comp network's result (the
+/// host resolves the nodes against the network and compiles them).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Processing {
+    /// A Comp network's displayed node; the raw render while it shows
+    /// nothing (empty, or no display flag).
+    Network {
+        /// The Render Settings object holding the network (`None`: the
+        /// object itself).
+        source: Option<ObjectRef>,
+    },
+    /// One node of a Comp network, whatever its display flag.
+    Node {
+        /// As [`Processing::Network`]'s.
+        source: Option<ObjectRef>,
+        /// The node.
+        node: NodeRef,
+    },
+    /// The raw render through the view transform.
+    #[default]
+    Raw,
 }

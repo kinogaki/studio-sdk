@@ -94,6 +94,7 @@ impl RenderSetupKind for Setups {
             output: "render.exr".into(),
             outputs: Vec::new(),
             values: SettingValues::default(),
+            processing: Processing::Network { source: None },
         })
     }
 }
