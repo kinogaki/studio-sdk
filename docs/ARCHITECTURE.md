@@ -148,11 +148,13 @@ To import, the environment passes each value to the first object kind that `adop
 
 ## Session slots
 
-Some state belongs to a package and lasts only for the session: a selection, picks, an open sketch. A package registers a `SessionSlot` for each such piece of state.
+Some state belongs to a package and lasts only for the session: a selection, picks, an open sketch. A package declares each such piece of state as a value type implementing `Slot` and registers it (`SessionSlot::of::<T>()`, `Package::with_slot`, `UiPackage::slots`):
+- `id`, `initial`, and whether undo keeps it (`UNDOABLE`);
+- `PLACE_BOUND`: another level starts it over (a selection belongs to the level it was made at);
+- `restored`: after an undo, a redo or an edit, the value brought in line with where the user is (`SlotDoc`);
+- `estimated_bytes` for the undo history's budget; values compare with `PartialEq`, so an unchanged value records no step.
 
-`SessionSlots` holds every slot's current value. The values are immutable and are replaced whole, so:
-- `set` returns the previous value for the undo step;
-- a clone of `SessionSlots` is a snapshot.
+`SessionSlots` holds every slot's value, shared and copy-on-write: a clone is a snapshot (one pointer a value), and changing a value copies it only while a snapshot still shares it. Studio keeps its undo history with these tables.
 
 Session state is never saved in the project.
 
@@ -226,6 +228,16 @@ Some pure maths the host's own tools use lives here, so a plugin's tools hit, dr
 - `gizmo`: the transform gizmo's frame, handles, hit testing, and what a drag of a handle means (move along an axis or plane, scale factors, angle changes). The host paints the gizmo;
 - `labels::point_labels`: where to put point numbers so a dense mesh shows an evenly spread, readable subset at a bounded cost.
 
+## The host interface
+
+A package's UI never sees the editor. Each call into it gets a context, `&mut dyn host::Cx`, reaching the host's capabilities, one trait each: `HostUndo` (gestures, undo, redo), `HostSlots` (typed through `HostSlotsExt`), `HostSelection`, `HostDoc` (where the user is, objects and their bodies), `HostView`, `HostStatus`, `HostShell`, `HostTransform` and `HostSettings` (typed through `HostSettingsExt`); plus the plain `HostPrefs`, the wake for the package's workers, and two services over the host's drawing: `GizmoService` (a view's transform gizmo) and `UnitsService` (numbers in the user's units). A view's parts get a `ViewCx` (the view as data: rectangle, response, pointer, modifiers, camera), the inspector an `InspectorCx`.
+
+**A package** (`package::UiPackage`) is a state type, its contexts (`ContextPart<S>`: optional `Levels`, `ViewportLayer`, `Inspector`, `Vocabulary`, `NetworkView`, `ObjectRows`, `OutlineRows`, `Creations`), its session slots and its settings sections (`Section`, `SettingsSection`). The host keeps the state: `register` erases its type, and for each call the host takes the state out, lends it to the part with the call's context, and puts it back. Host methods never call back into a package; what would (an undo ending a live tool, an action) is queued until the call returns. Undo never holds a package's state: it restores the document and the slots.
+
+Rules: every call runs on the UI thread and returns at once; a query gets `&S` and `&dyn Cx` and changes nothing; workers wake the host once per result and the host calls `UiPackage::poll`; no timers.
+
 ## Testing
+
+`testing::FakeHost` stands in for Studio's host interface (slots with a real undo history, selections, a place, views and settings sections as plain fields, every request recorded as a `HostCall`), and `testing::Hosting` calls a registered package's parts on it as the host does.
 
 `testing::RecordingUi` and `testing::RecordingPainter` are headless fakes: they lay widgets out simply, record every call and every shape, and play back scripted user actions (click a button, edit a sheet field, type into a field, pick a choice). A plugin's unit tests drive its panels with them, with no window and no GPU.

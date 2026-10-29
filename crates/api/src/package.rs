@@ -6,7 +6,7 @@ use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::id::PackageId;
 use crate::object::ObjectKindSpec;
-use crate::session::SessionSlot;
+use crate::session::{SessionSlot, Slot};
 use std::fmt;
 use std::sync::Arc;
 
@@ -44,7 +44,7 @@ pub struct Package {
     /// The file formats it reads and writes.
     pub formats: Vec<Arc<dyn FileFormat>>,
     /// Its session state.
-    pub slots: Vec<Arc<dyn SessionSlot>>,
+    pub slots: Vec<SessionSlot>,
 }
 
 impl Package {
@@ -99,9 +99,9 @@ impl Package {
         self
     }
 
-    /// With session slot `slot` too.
-    pub fn with_slot(mut self, slot: impl SessionSlot + 'static) -> Self {
-        self.slots.push(Arc::new(slot));
+    /// With session slot `T` too.
+    pub fn with_slot<T: Slot>(mut self) -> Self {
+        self.slots.push(SessionSlot::of::<T>());
         self
     }
 }
@@ -124,7 +124,14 @@ impl fmt::Debug for Package {
                 &ids(&self.object_kinds, |k| k.id().as_str()),
             )
             .field("formats", &ids(&self.formats, |f| f.id().as_str()))
-            .field("slots", &ids(&self.slots, |s| s.id().as_str()))
+            .field(
+                "slots",
+                &self
+                    .slots
+                    .iter()
+                    .map(|s| s.id().as_str())
+                    .collect::<Vec<_>>(),
+            )
             .finish()
     }
 }

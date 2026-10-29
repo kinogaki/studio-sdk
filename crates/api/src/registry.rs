@@ -149,7 +149,7 @@ pub struct Registry {
     routes: BTreeMap<(DataTypeId, DataTypeId), ConversionId>,
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
     formats: BTreeMap<FormatId, Entry<dyn FileFormat>>,
-    slots: BTreeMap<SlotId, Entry<dyn SessionSlot>>,
+    slots: BTreeMap<SlotId, Entry<SessionSlot>>,
 }
 
 impl Registry {
@@ -187,7 +187,7 @@ impl Registry {
             self.formats.insert(format.id(), Entry::new(id, format));
         }
         for slot in package.slots {
-            self.slots.insert(slot.id(), Entry::new(id, slot));
+            self.slots.insert(slot.id(), Entry::new(id, Arc::new(slot)));
         }
         self.packages.push((id, package.label));
         Ok(())
@@ -397,13 +397,13 @@ impl Registry {
     }
 
     /// Session slot `id`.
-    pub fn slot(&self, id: SlotId) -> Option<&dyn SessionSlot> {
-        self.slots.get(&id).map(|e| &*e.item)
+    pub fn slot(&self, id: SlotId) -> Option<SessionSlot> {
+        self.slots.get(&id).map(|e| *e.item)
     }
 
     /// A new session's slots, each at its initial value.
     pub fn new_session(&self) -> SessionSlots {
-        SessionSlots::new(self.slots.values().map(|e| &*e.item))
+        SessionSlots::new(self.slots.values().map(|e| *e.item))
     }
 
     /// The package that registered data type `id`.

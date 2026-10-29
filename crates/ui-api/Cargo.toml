@@ -12,5 +12,10 @@ name = "studio_ui_api"
 [lints]
 workspace = true
 
+[features]
+# Studio's own build only, until its in-tree contexts are ported (removed
+# with them): `Cx::in_tree_host`, the host's own object behind a context.
+in-tree = []
+
 [dependencies]
 kinogaki-studio-api.workspace = true

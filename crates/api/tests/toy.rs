@@ -247,13 +247,22 @@ impl FileFormat for XyzFormat {
     }
 }
 
-struct Selection;
-impl SessionSlot for Selection {
-    fn id(&self) -> SlotId {
+/// The points selected; place-bound, and a sketch-like mode clears it.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Selection(Vec<u32>);
+impl Slot for Selection {
+    fn id() -> SlotId {
         SlotId::declared("toy.points.selection")
     }
-    fn initial(&self) -> SlotValue {
-        SlotValue::new(Vec::<u32>::new())
+    fn initial() -> Self {
+        Self::default()
+    }
+    const PLACE_BOUND: bool = true;
+    fn restored(&self, doc: &dyn SlotDoc) -> Option<Self> {
+        (doc.in_mode() && !self.0.is_empty()).then(Self::default)
+    }
+    fn estimated_bytes(&self) -> usize {
+        self.0.len() * 4
     }
 }
 
@@ -263,7 +272,7 @@ fn kernel() -> Package {
         .with_data_type(CountType)
         .with_object_kind(CloudObject)
         .with_format(XyzFormat)
-        .with_slot(Selection)
+        .with_slot::<Selection>()
 }
 
 fn bridge() -> Package {
@@ -406,22 +415,58 @@ fn conversions_come_from_bridges() {
     );
 }
 
+/// Where a slot test pretends the user is.
+struct Here {
+    mode: bool,
+}
+impl SlotDoc for Here {
+    fn context(&self) -> ContextId {
+        ContextId::declared("toy.points.context")
+    }
+    fn in_mode(&self) -> bool {
+        self.mode
+    }
+}
+
 #[test]
-fn session_slots_start_initial_and_replace_whole() {
+fn session_slots_start_initial_and_are_copied_on_write() {
     let mut registry = Registry::new();
     registry.register(kernel()).unwrap();
     let id = SlotId::declared("toy.points.selection");
+    assert!(
+        registry
+            .slot(id)
+            .is_some_and(|s| s.place_bound() && s.undoable())
+    );
     let mut session = registry.new_session();
-    assert_eq!(session.get_as::<Vec<u32>>(id), Some(&Vec::new()));
+    assert_eq!(session.get::<Selection>(), Some(&Selection::default()));
     let before = session.clone();
-    let previous = session.set(id, SlotValue::new(vec![1u32, 2])).unwrap();
-    assert!(previous.ptr_eq(before.get(id).unwrap()));
-    assert_eq!(session.get_as::<Vec<u32>>(id), Some(&vec![1, 2]));
+    session.get_mut::<Selection>().unwrap().0.push(1);
+    assert!(session.set(Selection(vec![1, 2])));
+    assert_eq!(session.get::<Selection>(), Some(&Selection(vec![1, 2])));
+    assert_eq!(session.estimated_bytes(), 8);
     // The snapshot is unchanged: an undo restores it.
-    assert_eq!(before.get_as::<Vec<u32>>(id), Some(&Vec::new()));
-    let unknown = SlotId::declared("toy.points.unknown");
-    assert!(session.set(unknown, SlotValue::new(0u8)).is_none());
-    assert!(session.get(unknown).is_none());
+    assert_eq!(before.get::<Selection>(), Some(&Selection::default()));
+    assert_ne!(before, session);
+    // Untyped access checks the type.
+    assert!(!session.set_any(id, Arc::new(7u8)));
+    assert!(session.set_any(id, Arc::new(Selection(vec![3]))));
+    assert!(session.get_any(id).unwrap().is::<Selection>());
+    // Restoring brings values in line; a new level starts place-bound
+    // ones over.
+    session.keep(&Here { mode: false });
+    assert_eq!(session.get::<Selection>(), Some(&Selection(vec![3])));
+    session.keep(&Here { mode: true });
+    assert_eq!(session.get::<Selection>(), Some(&Selection::default()));
+    session.set(Selection(vec![4]));
+    session.reset_place_bound();
+    assert_eq!(session, before);
+    // An unregistered slot is none of these.
+    assert!(!session.set(Selection2));
+    assert!(session.get::<Selection2>().is_none());
+    // Installing one into a running session starts it at its initial value.
+    session.install(SessionSlot::of::<Selection2>());
+    assert_eq!(session.get::<Selection2>(), Some(&Selection2));
 }
 
 #[test]
@@ -435,7 +480,7 @@ fn a_duplicate_id_refuses_the_whole_package() {
     );
     // Another package declaring the cloud type again, beside a new slot.
     let copy = Package::new(PackageId::declared("toy.copy"), "Copy")
-        .with_slot(Selection2)
+        .with_slot::<Selection2>()
         .with_data_type(CloudType);
     assert_eq!(
         registry.register(copy).unwrap_err(),
@@ -455,8 +500,8 @@ fn a_duplicate_id_refuses_the_whole_package() {
     assert_eq!(registry.packages().count(), 1);
     // A package declaring one id twice.
     let twice = Package::new(PackageId::declared("toy.twice"), "Twice")
-        .with_slot(Selection2)
-        .with_slot(Selection2);
+        .with_slot::<Selection2>()
+        .with_slot::<Selection2>();
     assert!(matches!(
         registry.register(twice),
         Err(RegistryError::DuplicateId {
@@ -467,13 +512,14 @@ fn a_duplicate_id_refuses_the_whole_package() {
 }
 
 /// A slot a second package declares.
+#[derive(Clone, Debug, PartialEq)]
 struct Selection2;
-impl SessionSlot for Selection2 {
-    fn id(&self) -> SlotId {
+impl Slot for Selection2 {
+    fn id() -> SlotId {
         SlotId::declared("toy.copy.selection")
     }
-    fn initial(&self) -> SlotValue {
-        SlotValue::new(())
+    fn initial() -> Self {
+        Self
     }
 }
 

@@ -1,0 +1,317 @@
+//! The plain values a context's parts hand the host: levels, toolbar
+//! items, the status bar's pieces, the numeric bar, what the views draw
+//! of the context's own, its time, its network's tiles, its creations and
+//! its outliner rows. The host draws all of them with its own components,
+//! so every context's chrome looks and behaves alike.
+use crate::Color;
+use crate::host::{NodeRef, ObjectRef};
+use kinogaki_studio_api::params::Unit;
+use kinogaki_studio_api::viewport::{Level, Surface};
+use kinogaki_studio_api::{Mat4, ObjectKindId};
+use std::sync::Arc;
+
+/// One selection level of a context (Face, Edge, CV…), what the levels
+/// row, the number keys and the marking menus show.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LevelSpec {
+    /// Its stable name for settings keys ("Face"), unique in its context.
+    pub id: String,
+    /// What the row's tooltip calls it.
+    pub label: String,
+    /// Its icon, by name in the host's icon set.
+    pub icon: String,
+    /// What it addresses.
+    pub level: Level,
+    /// Whether it may be active together with others (Shift+number).
+    pub combines: bool,
+}
+
+/// A button of the viewport's left toolbar.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToolbarItem {
+    /// Its stable name ([`ViewportLayer::run_tool`](super::ViewportLayer::run_tool)
+    /// gets it back).
+    pub id: String,
+    /// Its icon, by name.
+    pub icon: String,
+    /// The tooltip.
+    pub label: String,
+    /// Drawn lit.
+    pub on: bool,
+    /// Greyed, with this reason on hover; pressing it does nothing.
+    pub unavailable: Option<String>,
+}
+
+/// What a context's live tools take this frame, before camera navigation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Tools {
+    /// A tool owns the pointer: no picking, no gizmo.
+    pub busy: bool,
+    /// The wheel belongs to the tool, not the camera.
+    pub wheel: bool,
+    /// No right-click menu now.
+    pub menu: bool,
+}
+
+/// The pieces of the status bar a context owns.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Status {
+    /// Left: (text, emphasized), the place first.
+    pub left: Vec<(String, bool)>,
+    /// The context's problems, for the error line.
+    pub problems: Vec<String>,
+    /// How long its last cook took, in milliseconds.
+    pub took: Option<f64>,
+}
+
+/// The numeric bar under the active view: its fields in order.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NumericBar {
+    /// The fields.
+    pub fields: Vec<BarField>,
+    /// What the numbers measure.
+    pub unit: Unit,
+}
+
+/// One field of the numeric bar.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BarField {
+    /// Shown before the field; `None`: an axis (X, Y, Z by position, in
+    /// the axis colors).
+    pub name: Option<String>,
+    /// What it holds.
+    pub value: BarValue,
+    /// Greyed, with this reason on hover: it takes no value.
+    pub unavailable: Option<String>,
+}
+
+/// What a numeric bar field holds.
+#[derive(Clone, Debug, PartialEq)]
+pub enum BarValue {
+    /// A number typed in.
+    Number(f64),
+    /// A whole number, unitless.
+    Count(u32),
+    /// One of `labels`, `at` chosen.
+    Choice {
+        /// The choices.
+        labels: Vec<String>,
+        /// The chosen one.
+        at: usize,
+    },
+}
+
+impl BarValue {
+    /// The value [`ViewportLayer::apply_numeric`](super::ViewportLayer::apply_numeric)
+    /// gets as current.
+    pub fn value(&self) -> f64 {
+        match *self {
+            Self::Number(v) => v,
+            Self::Count(n) => f64::from(n),
+            Self::Choice { at, .. } => at as f64,
+        }
+    }
+}
+
+/// World-space lines a context draws in every view (CAM's plate, CAD's
+/// curvature combs): shared points and colored segments between them.
+/// The host uploads a value once per allocation, so a context keeps its
+/// `Arc` while nothing changed.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Lines {
+    /// The points, in world space.
+    pub positions: Vec<[f32; 3]>,
+    /// The segments, by color.
+    pub layers: Vec<LineLayer>,
+}
+
+/// Segments of one color.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LineLayer {
+    /// Its sRGB color.
+    pub color: [u8; 3],
+    /// Each segment's two point indices.
+    pub segments: Arc<[[u32; 2]]>,
+}
+
+/// A shaded object of a context's own (CAM's toolpath beads): a display
+/// surface placed in the world.
+#[derive(Clone, Debug)]
+pub struct ContextObject {
+    /// What it draws (uploaded once per allocation).
+    pub surface: Arc<Surface>,
+    /// Where it is: world from the surface's space.
+    pub model: Mat4,
+    /// One 0xRRGGBB color a face; `None`: the clay.
+    pub colors: Option<Arc<[u32]>>,
+}
+
+/// What the views draw of a context's own while it is open.
+#[derive(Clone, Debug, Default)]
+pub struct ContextView {
+    /// Line layers.
+    pub lines: Vec<Arc<Lines>>,
+    /// Shaded objects.
+    pub objects: Vec<ContextObject>,
+    /// Whether they take the place of the scene's objects.
+    pub replaces_scene: bool,
+}
+
+/// How a context's time is labelled and stepped.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum TimeUnits {
+    /// Frames at this many a second.
+    Frames(f64),
+    /// Seconds, labelled h:mm:ss.
+    Clock,
+}
+
+/// A mark on a context's time ruler.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TimeMark {
+    /// Where, in seconds.
+    pub at: f64,
+    /// A layer's start (true) or a key.
+    pub layer: bool,
+    /// Its name, on hover.
+    pub label: String,
+}
+
+/// A context's own time, which the Timeline shows and drives instead of
+/// the scene's while the context is open (CAM: the print's seconds).
+#[derive(Clone, Debug, PartialEq)]
+pub struct TimeDomain {
+    /// Start and end, in seconds.
+    pub range: (f64, f64),
+    /// How the ruler labels, snaps and steps.
+    pub units: TimeUnits,
+    /// Sorted by time; built once a result and shared.
+    pub marks: Arc<[TimeMark]>,
+    /// Now.
+    pub current: f64,
+    /// The playback speeds offered; none: 1×.
+    pub speeds: Vec<f64>,
+}
+
+/// A flag button the network's tiles carry (Display, Bypass…).
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlagSpec {
+    /// What it does, shown on hover.
+    pub label: String,
+    /// The tile's edge it sits on.
+    pub side: FlagSide,
+    /// Its color when lit.
+    pub color: Color,
+}
+
+/// The edge of a tile a flag sits on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlagSide {
+    /// The left edge (Bypass).
+    Left,
+    /// The right edge (Display).
+    Right,
+}
+
+/// One tile of a context's network.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NetworkNode {
+    /// The node.
+    pub node: NodeRef,
+    /// Its top-left corner, in network units.
+    pub position: [f32; 2],
+    /// The user's name for it.
+    pub title: String,
+    /// Its type ("Merge"), drawn inside the tile.
+    pub kind: String,
+    /// The line under the title (its state); empty for none.
+    pub detail: String,
+    /// Its inputs' and outputs' labels.
+    pub inputs: Vec<String>,
+    /// Its outputs' labels.
+    pub outputs: Vec<String>,
+    /// It is picked.
+    pub picked: bool,
+    /// Bit `i` lights flag `i` of [`NetworkView::flags`](super::NetworkView::flags).
+    pub flags: u32,
+    /// Why it has no result (hover), and whether that is an error.
+    pub problem: Option<(String, bool)>,
+}
+
+/// A wire from `from`'s output into `to`'s input (at a place among a
+/// multi-input's wires; 0 otherwise).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NetworkWire {
+    /// The node and output it leaves.
+    pub from: (NodeRef, usize),
+    /// The node, input and place it enters.
+    pub to: (NodeRef, usize, usize),
+}
+
+/// One item of a context's vocabulary: a tool or command its menus,
+/// shelves and Tab may hold, by its stored name.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VocabularyItem {
+    /// Its stored name ("acme.trees.branch", "command:prune").
+    pub name: String,
+    /// What menus call it.
+    pub label: String,
+    /// The family menus and Tab group it under.
+    pub family: String,
+    /// Lower-case synonyms for search.
+    pub aliases: Vec<String>,
+}
+
+/// A kind of object an object level can create, contributed by the
+/// context that owns the kind.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Creation {
+    /// The kind (its id).
+    pub kind: ObjectKindId,
+    /// What menus call it.
+    pub label: String,
+    /// Lower-case synonyms for search.
+    pub aliases: Vec<String>,
+    /// The new object opens, ready for its first node.
+    pub opens: bool,
+    /// Only the scene root holds it: why, elsewhere.
+    pub root_only: Option<String>,
+    /// What a new object of this kind can start with, each offered as its
+    /// own entry ("Sphere": a new Mesh object holding a Sphere).
+    pub starts: Vec<Start>,
+}
+
+/// A start: a new object of a creation's kind holding one node,
+/// made in one step ([`Creations::start`](super::Creations::start)).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Start {
+    /// Its stored name (the node type's id, "kinogaki.mesh.sphere").
+    pub id: String,
+    /// What menus call it.
+    pub label: String,
+    /// The family it is listed in.
+    pub family: String,
+    /// Lower-case synonyms for search.
+    pub aliases: Vec<String>,
+}
+
+/// One outliner row inside an object of a kind a context owns.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OutlineRow {
+    /// The object it is inside.
+    pub object: ObjectRef,
+    /// The node it stands for, if any.
+    pub node: Option<NodeRef>,
+    /// What it shows.
+    pub label: String,
+    /// Its icon, by name.
+    pub icon: String,
+    /// Its collapse key, unique among the object's rows.
+    pub key: String,
+    /// Its depth under the object (0: right under it).
+    pub depth: usize,
+    /// It has rows under it.
+    pub branch: bool,
+    /// It is picked (drawn selected).
+    pub picked: bool,
+}

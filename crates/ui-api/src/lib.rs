@@ -34,15 +34,26 @@
 //! geometry and hit testing ([`gizmo`]) and point-label placement
 //! ([`labels`]), over a host-provided [`Projection`].
 //!
+//! **The host interface** ([`host`]) is what a package's UI asks of
+//! Studio: undo and gestures, the session's slots, selections, the
+//! document, views, status, the shell, the transform tool and settings,
+//! reached through one call context ([`host::Cx`]). **A package's UI**
+//! ([`package`]) is its contexts, each a set of parts (levels, a viewport
+//! layer, an inspector, a vocabulary…) over the package's own state,
+//! which the host keeps and lends for one call at a time.
+//!
 //! [`testing`] has headless fakes ([`testing::RecordingUi`],
-//! [`testing::RecordingPainter`]) for plugin unit tests.
+//! [`testing::RecordingPainter`], and [`testing::FakeHost`] with
+//! [`testing::Hosting`] for a package's parts) for plugin unit tests.
 mod card;
 mod color;
 pub mod geom;
 pub mod gizmo;
+pub mod host;
 mod id;
 mod input;
 pub mod labels;
+pub mod package;
 mod paint;
 pub mod projection;
 mod response;

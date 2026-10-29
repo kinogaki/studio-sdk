@@ -21,8 +21,8 @@
 //! - **Objects** ([`ObjectKindSpec`], [`ObjectBody`]): kinds of scene
 //!   objects a package adds and their package-owned state.
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
-//! - **Session slots** ([`SessionSlot`]): package-owned, undoable state of
-//!   an editing session.
+//! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
+//!   state of an editing session.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
 //!   and the environment's table of it all.
 //!
@@ -89,6 +89,6 @@ pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};
 pub use registry::{Registry, RegistryError};
 pub use render::{RenderItem, TriangleSource};
-pub use session::{SessionSlot, SessionSlots, SlotValue};
+pub use session::{SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use time::Time;
 pub use viewport::{Elements, Hit, Level, Surface};
