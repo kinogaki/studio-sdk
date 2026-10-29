@@ -81,8 +81,9 @@ impl PointerButton {
 }
 
 /// The pointer: where it is and what its buttons do. Button arrays are
-/// indexed by [`PointerButton::index`]. The helpers are named as egui's
-/// `PointerState`'s are.
+/// indexed by [`PointerButton::index`]. A helper named as one of egui's
+/// `PointerState`'s reads the same; [`Pointer::moved`] has its own name
+/// because egui's `is_moving` is smoothed over several frames.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Pointer {
     /// Where it is, while it is over the window.
@@ -124,7 +125,7 @@ impl Pointer {
     }
 
     /// Whether it moved this frame.
-    pub fn is_moving(&self) -> bool {
+    pub fn moved(&self) -> bool {
         self.delta != Vec2::ZERO
     }
 
@@ -458,6 +459,6 @@ mod tests {
         pointer.pressed[0] = true;
         assert!(pointer.secondary_down() && !pointer.primary_down());
         assert!(pointer.primary_pressed() && pointer.any_pressed() && !pointer.any_released());
-        assert!(!pointer.has_pointer() && !pointer.is_moving());
+        assert!(!pointer.has_pointer() && !pointer.moved());
     }
 }
