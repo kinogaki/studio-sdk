@@ -6,18 +6,19 @@
 pub enum Action {
     /// A [`Kind::Button`](super::Kind::Button) was pressed.
     Press,
-    /// A [`Kind::Path`](super::Kind::Path) field's folder button.
-    Browse,
     /// A [`Kind::Expression`](super::Kind::Expression) field's pick button.
     Pick,
     /// A button of [`Kind::Buttons`](super::Kind::Buttons) or a chip of
     /// [`Kind::Chips`](super::Kind::Chips).
     Index(usize),
+    /// The field's material connection button
+    /// ([`Socket`](super::Socket)).
+    Socket,
     /// The trailing icon.
     Trailing,
     /// The tree path picker's Relative paths toggle, now this.
     Relative(bool),
-    /// The vector's uniform lock, now this.
+    /// The vector's uniform lock, or the channels' link, now this.
     Lock(bool),
     /// A [`Kind::Code`](super::Kind::Code) field's grip set its height, now
     /// this many lines (`None`: sized by its text). The field's kind holds

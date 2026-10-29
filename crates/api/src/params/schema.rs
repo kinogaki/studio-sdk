@@ -290,10 +290,16 @@ pub enum Unit {
     Plain,
     /// A length, stored in scene units.
     Length,
+    /// A length stored and always shown in millimetres, whatever the
+    /// project's unit (a machine's settings).
+    Millimeters,
     /// An angle, stored in degrees.
     Angle,
     /// A percentage, stored as shown (0–100).
     Percent,
+    /// A plain number shown and typed with this suffix after it (`" px"`,
+    /// `" EV"`, `" K"`).
+    Suffix(&'static str),
 }
 
 #[cfg(test)]

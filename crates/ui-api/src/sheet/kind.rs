@@ -1,6 +1,7 @@
 //! [`Kind`]: what a field holds and how it is presented, with the
-//! pieces some kinds carry ([`PathChoice`], [`Chip`]) and the slot at a
-//! field's right edge ([`Trailing`]).
+//! pieces some kinds carry ([`PathChoice`], [`Chip`], [`CurveChannel`],
+//! [`FileDialog`]), a material input's connection button ([`Socket`]) and
+//! the slot at a field's right edge ([`Trailing`]).
 use super::{Number, Text};
 use kinogaki_studio_api::params::Diagnostic;
 
@@ -25,6 +26,16 @@ pub enum Kind {
     /// `Value::Numbers` (3 or 4): working-space RGB(A), a swatch and
     /// channel fields.
     Color,
+    /// `Value::Numbers` (4): R, G, B, A. Linked, one slider (the value of
+    /// R) sets all four; unlinked, four fields lettered R, G, B, A. The
+    /// link button reports [`Action::Lock`](super::Action::Lock) with its
+    /// new state; the owner keeps `linked`.
+    Channels {
+        /// How each channel shows and moves.
+        number: Number,
+        /// One value sets all four channels.
+        linked: bool,
+    },
     /// `Value::Index` as segments.
     Choice(Vec<Text>),
     /// `Value::Index` in a menu.
@@ -55,8 +66,16 @@ pub enum Kind {
         /// `None` sizes it by its text.
         lines: Option<u32>,
     },
-    /// `Value::Text` with a folder button ([`Action::Browse`](super::Action::Browse)).
-    Path,
+    /// `Value::Text` that stays hidden (an access code): shown as a fixed
+    /// run of bullets whatever its length, typed masked, never copied out;
+    /// holding the eye button shows it.
+    Secret,
+    /// `Value::Text`: a file's path, typed or chosen with the folder
+    /// button. The button opens the host's file dialog as `FileDialog`
+    /// says; the chosen file is written into the field as an edit of its
+    /// own (one undo step), stored relative to the project's folder when it
+    /// lies inside it.
+    Path(FileDialog),
     /// `Value::Text`: a path in the scene's tree with a picker of
     /// `choices`.
     TreePath {
@@ -116,6 +135,119 @@ pub enum Kind {
         /// The interpolation codes' names.
         interpolations: Vec<Text>,
     },
+    /// `Value::Numbers`: tone curves, one a channel, as
+    /// [`tone_curve::encode`](super::tone_curve::encode) writes them with
+    /// `capacity` keys a curve; drawn as a curve editor with a tab a
+    /// channel.
+    ToneCurves {
+        /// The channels, in curve order: each one's tab.
+        channels: Vec<CurveChannel>,
+        /// The most keys a curve holds.
+        capacity: usize,
+    },
+    /// `Value::Numbers`: a palette, r, g, b a color (display code values,
+    /// 0–1, drawn as they are), at most `capacity` colors; drawn as a
+    /// swatch grid. Editable: a click on a swatch edits its color, and
+    /// colors can be added and removed; otherwise read-only.
+    Palette {
+        /// The most colors it holds.
+        capacity: usize,
+        /// Colors can be edited, added and removed.
+        editable: bool,
+    },
+}
+
+/// One channel of [`Kind::ToneCurves`]: its tab's text and its curve's
+/// tint.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CurveChannel {
+    /// The tab's text.
+    pub label: Text,
+    /// The curve's tint, linear RGB; `None` draws it in the text color.
+    pub tint: Option<[f64; 3]>,
+}
+
+/// The file dialog of a [`Kind::Path`] field's folder button.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FileDialog {
+    /// Asks for a file to write (a new name may be typed) instead of one
+    /// to read.
+    pub save: bool,
+    /// The kinds of file offered, each a name and its extensions; empty
+    /// offers every file.
+    pub filters: Vec<FileFilter>,
+}
+
+impl FileDialog {
+    /// Asks for an existing file, of any kind until filtered.
+    pub fn open() -> Self {
+        FileDialog::default()
+    }
+
+    /// Asks for a file to write.
+    pub fn save() -> Self {
+        FileDialog {
+            save: true,
+            filters: Vec::new(),
+        }
+    }
+
+    /// Offering files named `name` ("Images (PNG, JPEG)") with these
+    /// `extensions` (without the dot).
+    pub fn filter(mut self, name: impl Into<Text>, extensions: &[&'static str]) -> Self {
+        self.filters.push(FileFilter {
+            name: name.into(),
+            extensions: extensions.iter().map(|&e| e.into()).collect(),
+        });
+        self
+    }
+}
+
+/// One kind of file a [`FileDialog`] offers.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FileFilter {
+    /// What the dialog calls it.
+    pub name: Text,
+    /// Its extensions, without the dot.
+    pub extensions: Vec<Text>,
+}
+
+/// The kind of value a material input carries: its connection button's
+/// fill.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SocketKind {
+    /// A number.
+    Float,
+    /// A color.
+    Color,
+    /// A direction or point.
+    Vector,
+    /// Texture coordinates.
+    Uv,
+    /// A shading surface.
+    Surface,
+}
+
+impl SocketKind {
+    /// Every kind, in the order the host lists them.
+    pub const ALL: [SocketKind; 5] = [
+        Self::Float,
+        Self::Color,
+        Self::Vector,
+        Self::Uv,
+        Self::Surface,
+    ];
+}
+
+/// A material input's connection button before its field: unlinked, or
+/// linked to a source of `kind`. Its click is
+/// [`Action::Socket`](super::Action::Socket).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Socket {
+    /// What the input carries (the linked source, when linked).
+    pub kind: SocketKind,
+    /// Whether a source is linked.
+    pub linked: bool,
 }
 
 /// A tree path picker's entry: its depth in the tree, name and icon, and
@@ -170,4 +302,13 @@ pub enum Trailing {
     },
     /// A color swatch of linear RGB.
     Swatch([f64; 3]),
+}
+
+impl Trailing {
+    /// The swatch of an emission of any intensity (a light's color times
+    /// its strength, HDR): its color with the brightest channel at 1.
+    pub fn emission(rgb: [f64; 3]) -> Self {
+        let top = rgb.iter().copied().fold(0.0, f64::max).max(1e-9);
+        Trailing::Swatch(rgb.map(|v| v.max(0.0) / top))
+    }
 }

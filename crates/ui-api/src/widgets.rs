@@ -181,6 +181,8 @@ pub struct MenuItem<'a> {
     pub checked: Option<bool>,
     /// Takes clicks.
     pub enabled: bool,
+    /// Hover text; on a disabled entry, why it can't be chosen.
+    pub tooltip: Option<&'a str>,
     /// The name of an icon before the text.
     pub icon: Option<&'a str>,
 }
@@ -193,6 +195,7 @@ impl<'a> MenuItem<'a> {
             shortcut: None,
             checked: None,
             enabled: true,
+            tooltip: None,
             icon: None,
         }
     }
@@ -212,6 +215,19 @@ impl<'a> MenuItem<'a> {
     /// Enabled, or not.
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
+        self
+    }
+
+    /// Disabled, with `reason` (why it can't be chosen) on hover.
+    pub fn unavailable(mut self, reason: &'a str) -> Self {
+        self.enabled = false;
+        self.tooltip = Some(reason);
+        self
+    }
+
+    /// With hover text `tooltip`.
+    pub fn tooltip(mut self, tooltip: &'a str) -> Self {
+        self.tooltip = Some(tooltip);
         self
     }
 

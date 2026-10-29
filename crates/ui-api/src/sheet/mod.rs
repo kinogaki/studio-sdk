@@ -16,9 +16,11 @@
 //! so a node's parameters ([`kinogaki_studio_api::params::Schema`]) become a
 //! sheet with `From`.
 //!
-//! This mirrors Studio's own property schemas, minus the kinds that are
-//! the host's alone (secrets, material sockets, tone curves,
-//! palettes, linked channels).
+//! Every kind of value has its field kind here, drawn by Studio's own
+//! widget for it: numbers, vectors, colors, linked channels, choices, text,
+//! code, secrets, file paths (with the host's file dialog), paths in the
+//! scene's tree, ramps, tone curves, palettes and material inputs'
+//! connection buttons ([`Socket`]).
 mod code;
 mod edits;
 mod from_params;
@@ -26,12 +28,15 @@ mod keyed;
 mod kind;
 mod number;
 mod schema;
+pub mod tone_curve;
 
 pub use code::{CodeLanguage, Completion, Completions, PlainText, Token, TokenClass};
 pub use edits::{Action, Edits};
 pub use from_params::RAMP_INTERPOLATIONS;
 pub use keyed::{FieldKey, Keyed};
-pub use kind::{Chip, Kind, PathChoice, Trailing};
+pub use kind::{
+    Chip, CurveChannel, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing,
+};
 pub use number::{Number, NumberStyle};
 pub use schema::{Field, Item, Schema, Section};
 

@@ -1,5 +1,6 @@
 //! [`Schema`]: sections, headings and fields, top to bottom.
-use super::{Kind, Number, Text, Trailing};
+use super::tone_curve::{self, ToneCurve};
+use super::{CurveChannel, FileDialog, Kind, Number, Socket, Text, Trailing};
 use kinogaki_studio_api::params::Value;
 
 /// What a property sheet shows, top to bottom. `K` is the owner's key for
@@ -66,6 +67,8 @@ pub struct Field<K> {
     pub error: bool,
     /// Several selected items differ here.
     pub mixed: bool,
+    /// A material input's connection button, before the value.
+    pub socket: Option<Socket>,
     /// The slot at the field's right edge.
     pub trailing: Trailing,
 }
@@ -83,6 +86,7 @@ impl<K> Field<K> {
             keywords: Text::Borrowed(""),
             error: false,
             mixed: false,
+            socket: None,
             trailing: Trailing::None,
         }
     }
@@ -105,6 +109,56 @@ impl<K> Field<K> {
     /// A working-space color field (RGB or RGBA).
     pub fn color(key: K, label: impl Into<Text>, rgb: &[f64]) -> Self {
         Self::new(key, label, Kind::Color, Some(Value::Numbers(rgb.to_vec())))
+    }
+
+    /// Linked RGBA channels (see [`Kind::Channels`]).
+    pub fn channels(
+        key: K,
+        label: impl Into<Text>,
+        rgba: [f64; 4],
+        number: Number,
+        linked: bool,
+    ) -> Self {
+        Self::new(
+            key,
+            label,
+            Kind::Channels { number, linked },
+            Some(Value::Numbers(rgba.to_vec())),
+        )
+    }
+
+    /// Tone curves, one a channel of `channels`, with room for `capacity`
+    /// keys a curve.
+    pub fn tone_curves(
+        key: K,
+        label: impl Into<Text>,
+        curves: &[ToneCurve],
+        channels: Vec<CurveChannel>,
+        capacity: usize,
+    ) -> Self {
+        Self::new(
+            key,
+            label,
+            Kind::ToneCurves { channels, capacity },
+            Some(Value::Numbers(tone_curve::encode(curves, capacity))),
+        )
+    }
+
+    /// A palette of `colors` (display code values), holding at most
+    /// `capacity`; `editable` lets its colors be edited, added and removed.
+    pub fn palette(
+        key: K,
+        label: impl Into<Text>,
+        colors: &[[f64; 3]],
+        capacity: usize,
+        editable: bool,
+    ) -> Self {
+        Self::new(
+            key,
+            label,
+            Kind::Palette { capacity, editable },
+            Some(Value::Numbers(colors.iter().flatten().copied().collect())),
+        )
     }
 
     /// A toggle.
@@ -164,6 +218,27 @@ impl<K> Field<K> {
         )
     }
 
+    /// A secret text field (see [`Kind::Secret`]).
+    pub fn secret(key: K, label: impl Into<Text>, text: impl Into<String>) -> Self {
+        Self::new(key, label, Kind::Secret, Some(Value::Text(text.into())))
+    }
+
+    /// A file's path, its folder button asking with `dialog` (see
+    /// [`Kind::Path`]).
+    pub fn path(
+        key: K,
+        label: impl Into<Text>,
+        path: impl Into<String>,
+        dialog: FileDialog,
+    ) -> Self {
+        Self::new(
+            key,
+            label,
+            Kind::Path(dialog),
+            Some(Value::Text(path.into())),
+        )
+    }
+
     /// Read-only text, right-aligned.
     pub fn info(key: K, label: impl Into<Text>, text: impl Into<String>) -> Self {
         Self::new(key, label, Kind::Info, Some(Value::Text(text.into())))
@@ -220,6 +295,12 @@ impl<K> Field<K> {
         self
     }
 
+    /// With a material input's connection button.
+    pub fn socket(mut self, socket: Socket) -> Self {
+        self.socket = Some(socket);
+        self
+    }
+
     /// With `trailing` at its right edge.
     pub fn trailing(mut self, trailing: Trailing) -> Self {
         self.trailing = trailing;
@@ -238,6 +319,7 @@ impl<K> Field<K> {
             keywords: self.keywords,
             error: self.error,
             mixed: self.mixed,
+            socket: self.socket,
             trailing: self.trailing,
         }
     }

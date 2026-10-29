@@ -292,6 +292,10 @@ impl Ui for RecordingUi {
         self.scripted_click(response, item.text, item.enabled)
     }
 
+    fn close_menu(&mut self) {
+        self.record(Call::CloseMenu);
+    }
+
     fn sheet(
         &mut self,
         style: &SheetStyle<'_>,

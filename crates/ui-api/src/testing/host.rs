@@ -393,10 +393,11 @@ impl UnitsService for FakeHost {
     }
     fn format(&self, stored: f64, unit: Unit, decimals: usize) -> String {
         match unit {
-            Unit::Length => format!("{stored:.decimals$} mm"),
+            Unit::Length | Unit::Millimeters => format!("{stored:.decimals$} mm"),
             Unit::Angle => format!("{stored:.decimals$}°"),
             Unit::Percent => format!("{stored:.decimals$}%"),
             Unit::Plain => format!("{stored:.decimals$}"),
+            Unit::Suffix(suffix) => format!("{stored:.decimals$}{suffix}"),
         }
     }
 }

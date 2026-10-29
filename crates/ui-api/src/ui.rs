@@ -70,7 +70,7 @@ pub trait Ui {
     fn allocate(&mut self, size: Vec2, sense: Sense) -> Response;
 
     /// Show `text` beside the pointer while it rests on `response`'s
-    /// widget.
+    /// widget, enabled or not: a disabled widget's tooltip says why it is.
     fn tooltip(&mut self, response: &Response, text: &str);
 
     /// Give the keyboard focus to widget `id`.
@@ -155,6 +155,11 @@ pub trait Ui {
     /// An entry in an open menu; [`Response::clicked`] when chosen (the
     /// menu then closes).
     fn menu_item(&mut self, item: &MenuItem<'_>) -> Response;
+
+    /// Closes the menu this region is in, from inside its body: when
+    /// something other than a [`Ui::menu_item`] acted (a text field's edit
+    /// committed), or when there is nothing to offer.
+    fn close_menu(&mut self);
 
     /// A property sheet: the host draws `schema` across the region and
     /// writes edited values into it. `menu`, when given, fills the menu a

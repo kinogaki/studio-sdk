@@ -1,6 +1,6 @@
 //! A node's or format's parameter [`params::Schema`] as a sheet, keyed by
 //! parameter name: what the host shows for a node's parameters.
-use super::{Field, Item, Kind, Number, NumberStyle, Schema, Section};
+use super::{Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
 use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
 
 /// The interpolation codes' names of a parameter ramp (its encoding's 0,
@@ -46,8 +46,10 @@ impl From<&params::Number> for Number {
         let base = match number.unit {
             Unit::Plain => Number::new(),
             Unit::Length => Number::length(),
+            Unit::Millimeters => Number::new().unit(Unit::Millimeters),
             Unit::Angle => Number::angle(),
             Unit::Percent => Number::percent(),
+            Unit::Suffix(_) => Number::new().unit(number.unit),
         };
         let mut out = base.range(number.min..=number.max);
         if let Some((min, max)) = number.soft {
@@ -84,7 +86,7 @@ impl From<&ParameterKind> for Kind {
                 fill: false,
                 lines: None,
             },
-            ParameterKind::File => Kind::Path,
+            ParameterKind::File => Kind::Path(FileDialog::open()),
             // The host fills the pickers and menus from the scene and the
             // node's input.
             ParameterKind::Path => Kind::TreePath {

@@ -104,6 +104,9 @@ pub struct Metrics {
     pub icon_size: f32,
     /// Slider-like value fields' width.
     pub slider_width: f32,
+    /// A text field's width when it is given none (beside a label in a
+    /// menu).
+    pub text_field: f32,
     /// A property sheet's label column.
     pub property_label: f32,
     /// A property row.
@@ -171,6 +174,7 @@ impl Default for Theme {
                 icon_button: 28.0,
                 icon_size: 22.0,
                 slider_width: 120.0,
+                text_field: 280.0,
                 property_label: 104.0,
                 property_row: 24.0,
                 section_row: 24.0,

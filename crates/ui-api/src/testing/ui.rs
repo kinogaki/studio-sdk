@@ -57,6 +57,8 @@ pub enum Call {
     ContextMenu,
     /// [`Ui::menu_item`].
     MenuItem(String),
+    /// [`Ui::close_menu`](crate::Ui::close_menu).
+    CloseMenu,
     /// [`Ui::sheet`]: its fields' labels, in order.
     Sheet(Vec<String>),
     /// [`Ui::card`]: its title.
