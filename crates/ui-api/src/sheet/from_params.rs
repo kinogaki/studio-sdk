@@ -85,6 +85,7 @@ impl From<&ParameterKind> for Kind {
             ParameterKind::File => Kind::Path(FileDialog::open()),
             // The host fills the pickers and menus from the scene and the
             // node's input.
+            ParameterKind::Reference(filter) => Kind::Reference(filter.clone()),
             ParameterKind::Path => Kind::TreePath {
                 choices: Vec::new(),
                 relative: false,
@@ -113,7 +114,7 @@ impl From<&ParameterKind> for Kind {
 mod tests {
     use super::*;
     use crate::sheet::ramp;
-    use kinogaki_studio_api::params::{Parameter, Value};
+    use kinogaki_studio_api::params::{Parameter, RefFilter, Value};
 
     #[test]
     fn parameters_become_fields_keyed_by_name() {
@@ -148,6 +149,12 @@ mod tests {
                 "Falloff",
                 ParameterKind::Ramp { color: false },
                 ramp::encode(&ramp::Ramp::default_of(false), 4),
+            ))
+            .parameter(Parameter::new(
+                "source",
+                "Source",
+                ParameterKind::Reference(RefFilter::material(false)),
+                Value::Text("/Materials/Red".into()),
             ));
         let sheet = Schema::<String>::from(&schema);
         assert!(
@@ -179,6 +186,10 @@ mod tests {
                 color: false,
                 interpolation: None
             }
+        );
+        assert_eq!(
+            sheet.field(&"source".to_owned()).unwrap().kind,
+            Kind::Reference(RefFilter::material(false))
         );
     }
 }

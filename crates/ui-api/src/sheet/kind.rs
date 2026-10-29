@@ -76,8 +76,9 @@ pub enum Kind {
     /// own (one undo step), stored relative to the project's folder when it
     /// lies inside it.
     Path(FileDialog),
-    /// `Value::Text`: a path in the scene's tree with a picker of
-    /// `choices`.
+    /// `Value::Text`: a free path in the scene's tree with a picker of
+    /// `choices` (a [`Reference`](Kind::Reference) when only some things
+    /// fit).
     TreePath {
         /// The entries the picker offers.
         choices: Vec<PathChoice>,
@@ -87,6 +88,12 @@ pub enum Kind {
         /// The picker button's hover text.
         tooltip: Text,
     },
+    /// `Value::Text`: a path to what the filter says fits. The host fills
+    /// the picker (searchable, and taking what is dragged from the outliner
+    /// or a network) with the scene's fitting objects, nodes or Materials,
+    /// writes paths from the root or from the sheet's holder as the user
+    /// prefers, and resolves them.
+    Reference(kinogaki_studio_api::params::RefFilter),
     /// `Value::Text`: an expression; with `pick`, a pick button with that
     /// hover text ([`Action::Pick`](super::Action::Pick)).
     Expression {

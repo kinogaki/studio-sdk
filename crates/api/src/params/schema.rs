@@ -149,9 +149,13 @@ pub enum ParameterKind {
     Code,
     /// [`Value::Text`]: a file's path, with a browse button.
     File,
-    /// [`Value::Text`]: a path to another node or object of the scene,
+    /// [`Value::Text`]: a free path to any node or object of the scene,
     /// with a picker of the scene's tree.
     Path,
+    /// [`Value::Text`]: a path to what `RefFilter` says fits (objects of
+    /// some kinds, results of some data types, Materials); the host offers
+    /// what fits and resolves the path from the node holding it.
+    Reference(super::RefFilter),
     /// [`Value::Text`]: attribute names (a name or a pattern) on the
     /// node's input, with a menu of the input's attributes.
     Attribute,
@@ -188,7 +192,13 @@ impl ParameterKind {
             (Self::Toggle, Value::Bool(_)) => true,
             (Self::Choice(items), Value::Index(i)) => *i < items.len(),
             (
-                Self::Text | Self::Code | Self::File | Self::Path | Self::Attribute | Self::Group,
+                Self::Text
+                | Self::Code
+                | Self::File
+                | Self::Path
+                | Self::Reference(_)
+                | Self::Attribute
+                | Self::Group,
                 Value::Text(_),
             ) => true,
             (Self::Color, Value::Numbers(v)) => v.len() == 3,

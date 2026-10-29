@@ -33,7 +33,7 @@ The SDK depends on the Rust standard library and, behind optional features only,
 | Module | What it defines | Studio converts it to and from |
 |---|---|---|
 | `math` | `Vec3`, `Affine3`, `Mat4`, `Bounds`: plain `Copy` data, no algorithms | its maths library |
-| `params` | `Value`, `Parameters`, `Schema` (sections and typed parameters: number with unit and range, integer, toggle, choice, text, code, file, path, color, vector, float or color ramp with `params::ramp`'s encoding, render-api's `ramp` re-exported), `Diagnostic` | its inspector's property schemas |
+| `params` | `Value`, `Parameters`, `Schema` (sections and typed parameters: number with unit and range, integer, toggle, choice, text, code, file, path, reference with its `RefFilter`, color, vector, float or color ramp with `params::ramp`'s encoding, render-api's `ramp` re-exported), `Diagnostic` | its inspector's property schemas |
 | `element` | `ElementWriter` / `ElementReader` (typed fields, metadata, children, shared values) and `MemoryElement` | its project documents |
 | `viewport` | `Surface` (the simple display packet, a `SurfaceSource` itself) and `Hit`; packets, `ElementKind` and `ElementSet` are `kinogaki-viewport-api`'s, re-exported | its viewport's picks |
 | `render` | `RenderItem`; the source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`) is `kinogaki-render-api`'s, re-exported | its render scenes |
