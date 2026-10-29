@@ -12,9 +12,9 @@ use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
 /// types (a kernel's), held edits over them, conversions (a bridge's),
-/// node types' cooks, object kinds, file formats and session slots. Node
-/// descriptions, contexts and UI register through the librarian and the
-/// host UI interface.
+/// node types' cooks, object kinds, file formats and session slots, and
+/// with the `wgpu` feature its render engines. Node descriptions, contexts
+/// and UI register through the librarian and the host UI interface.
 ///
 /// Every id it declares has its vendor (the first segment of its id):
 /// `acme.trees` registers `acme.trees.branch` or `acme.format.tree`, never
@@ -45,6 +45,15 @@ pub struct Package {
     pub formats: Vec<Arc<dyn FileFormat>>,
     /// Its session state.
     pub slots: Vec<SessionSlot>,
+    /// The render engines it brings (the `wgpu` feature, which a host that
+    /// renders enables).
+    ///
+    /// A field behind a feature changes the struct's layout. That is sound
+    /// because a host and its plugins share one build of this crate (one
+    /// feature set, so one layout): a plugin built against another build
+    /// is refused before it is loaded.
+    #[cfg(feature = "wgpu")]
+    pub engines: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
 }
 
 impl Package {
@@ -60,6 +69,8 @@ impl Package {
             object_kinds: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
+            #[cfg(feature = "wgpu")]
+            engines: Vec::new(),
         }
     }
 
@@ -104,6 +115,16 @@ impl Package {
         self.slots.push(SessionSlot::of::<T>());
         self
     }
+
+    /// With render engine `engine` too.
+    #[cfg(feature = "wgpu")]
+    pub fn with_engine(
+        mut self,
+        engine: impl kinogaki_render_api::display::Engine + 'static,
+    ) -> Self {
+        self.engines.push(Arc::new(engine));
+        self
+    }
 }
 
 impl fmt::Debug for Package {
@@ -112,8 +133,8 @@ impl fmt::Debug for Package {
         fn ids<T: ?Sized>(items: &[Arc<T>], id: impl Fn(&T) -> &'static str) -> Vec<&'static str> {
             items.iter().map(|item| id(item)).collect()
         }
-        f.debug_struct("Package")
-            .field("id", &self.id)
+        let mut out = f.debug_struct("Package");
+        out.field("id", &self.id)
             .field("label", &self.label)
             .field("data_types", &ids(&self.data_types, |t| t.id().as_str()))
             .field("held_edits", &ids(&self.held_edits, |h| h.base().as_str()))
@@ -131,7 +152,16 @@ impl fmt::Debug for Package {
                     .iter()
                     .map(|s| s.id().as_str())
                     .collect::<Vec<_>>(),
-            )
-            .finish()
+            );
+        #[cfg(feature = "wgpu")]
+        out.field(
+            "engines",
+            &self
+                .engines
+                .iter()
+                .map(|e| e.description().id)
+                .collect::<Vec<_>>(),
+        );
+        out.finish()
     }
 }

@@ -5,7 +5,7 @@ What a Kinogaki Studio plugin compiles against. Studio is an environment: with n
 | Crate | Role |
 |---|---|
 | `kinogaki-render-api` (`crates/render-api`) | The render interface between a host and its engines: prims (meshes, instancers, cameras, materials, textures) and the prim types an engine declares (lights, fog: parameter schemas, the standard UsdLux ones shared), coalesced scene updates with dirty bits, material networks and an engine's vocabulary, settings and outputs by id, the `RenderEngine` trait and `EngineDescription`, and the triangle source contract (`TriangleSource`) every data type renders through. Engines depend on this crate alone. |
-| `kinogaki-studio-api` (`crates/api`) | The headless API: ids, `Data` and `Typed`, `DataType` with its optional facets (`Displayable`, `Pickable`, `Tabular`, `Renderable`), `Components`, `DataCodec`, `Conversion`, the node cook contract (`NodeType`, `CookCx`, `Incremental`, `Outputs`) and `HeldEdit`, `ObjectBody` and `ObjectKindSpec`, `FileFormat`, `Imported` and `Reading`, `SessionSlot`, `CancelToken`, `Time`, `Package` and the `Registry`; and the plain types they exchange: `math`, `params`, `element`, `viewport`, `render` and the `parallel` workers service |
+| `kinogaki-studio-api` (`crates/api`) | The headless API: ids, `Data` and `Typed`, `DataType` with its optional facets (`Displayable`, `Pickable`, `Tabular`, `Renderable`), `Components`, `DataCodec`, `Conversion`, the node cook contract (`NodeType`, `CookCx`, `Incremental`, `Outputs`) and `HeldEdit`, `ObjectBody` and `ObjectKindSpec`, `FileFormat`, `Imported` and `Reading`, `SessionSlot`, `CancelToken`, `Time`, `Package` (with its render engines behind the `wgpu` feature), `export_package!` (a plugin library's entry point) and the `Registry`; and the plain types they exchange: `math`, `params`, `element`, `viewport`, `render` and the `parallel` workers service |
 | `kinogaki-studio-ui-api` (`crates/ui-api`, library `studio_ui_api`) | The UI layer: how a plugin's panels, tool cards, overlays and settings pages ask the host to draw. Geometry (`Pos`, `Vec2`, `Rect`, `Align2`), `Color`, the host-filled `Theme`, fonts and icons by name, `Id`, plain-data `Input`, the `Painter` and `Shape`s, the `Ui` trait (immediate widgets, layout, and the host's composites: property sheets, cards, popovers, value fields) with `UiExt`; property sheets as data (`sheet::Schema`); the pure viewport maths of the transform gizmo and point labels; the host interface (`host`: the capabilities a package's UI asks of Studio through one call context) and a package's UI (`package`: `UiPackage`, its contexts' parts, `register`); and `testing`'s headless `RecordingUi`, `RecordingPainter`, `FakeHost` and `Hosting`. **Plugins never see Studio's UI library or egui: the host draws.** |
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the API and the UI layer: what each part is for, the rules every package follows, and how the environment uses it.
@@ -56,7 +56,10 @@ git clone https://github.com/kinogaki/studio-sdk.git
 cd studio-sdk
 cargo test --workspace --locked
 cargo test -p kinogaki-render-api --features wgpu --locked
+cargo test -p kinogaki-studio-api --features wgpu --locked
 ```
+
+`rust-toolchain.toml` pins the exact compiler Studio and its plugins are built with: a plugin is a Rust dylib sharing Studio's standard library, so it must come from the same compiler build.
 
 The `wgpu` feature is portable code with no platform-specific parts; it is verified on macOS so far.
 

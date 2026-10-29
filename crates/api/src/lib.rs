@@ -24,7 +24,8 @@
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
 //!   state of an editing session.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
-//!   and the environment's table of it all.
+//!   and the environment's table of it all; a plugin library exports its
+//!   package through [`export_package!`] ([`entry`]).
 //!
 //! And the plain types those exchange: [`math`] (vectors, placements, units,
 //! bounds), [`params`] (parameter values, schemas, diagnostics),
@@ -48,6 +49,7 @@ pub mod cook;
 pub mod data;
 pub mod data_type;
 pub mod element;
+pub mod entry;
 pub mod error;
 pub mod facets;
 pub mod format;

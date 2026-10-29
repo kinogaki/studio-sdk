@@ -18,9 +18,13 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 | Node package | node types (`NodeType`: description and cook) and object kinds (`ObjectKindSpec`); contexts through the UI interface | Mesh objects, the Mesh nodes and the Mesh context |
 | Bridge | conversions (`Conversion`) between two kernels' types | Tessellate: `kinogaki.cad.body` → `kinogaki.mesh.geometry` |
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
-| Render | engines; they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
+| Render | engines (`Package::engines`, the `wgpu` feature); they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
 
 The environment registers packages into a `Registry` in dependency order. The librarian resolves that order from the packages' manifests, so a kernel always comes before the packages that build on it. Node types, contexts and UI register through the librarian and the host UI interface (the host traits of `kinogaki-studio-ui-api`, to come), not through this crate. The two share the ids defined here.
+
+## Plugin libraries
+
+A plugin is a Rust dylib that exports its `Package` through `export_package!(make)`: the macro writes the entry Studio looks up (`entry::SYMBOL`, of type `entry::Entry`), catches a panic in `make`, and keeps `unsafe` out of the plugin's own code, so its crate keeps `unsafe_code = "forbid"`. Studio and its plugins share one standard library and one build of each shared crate, so values cross as plain Rust types and `TypeId`s agree. A plugin is therefore built with the exact compiler this repository pins (`rust-toolchain.toml`) against the build of the SDK its Studio release ships; Studio reads the plugin's manifest and refuses one built for another build before loading it, and never unloads a plugin it loaded.
 
 ## Ids
 
@@ -181,7 +185,7 @@ Studio's core draws and picks. A data type describes what to draw as a `viewport
 
 ## Self-contained
 
-The SDK depends on the standard library alone, but for `kinogaki-render-api`'s `wgpu` feature (the display contract), which brings wgpu 30.0.1 from crates.io. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
+The SDK depends on the standard library alone, but for `kinogaki-render-api`'s `wgpu` feature (the display contract), which brings wgpu 30.0.1 from crates.io; `kinogaki-studio-api`'s `wgpu` feature turns it on for packages' render engines (`Package::engines`), and is off by default. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
 
 
 # The UI layer

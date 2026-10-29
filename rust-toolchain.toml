@@ -1,0 +1,5 @@
+# The exact compiler Studio and its plugins are built with: a plugin is a
+# Rust dylib sharing Studio's standard library, so it must come from the
+# same compiler build (Studio refuses any other).
+[toolchain]
+channel = "1.98.1"

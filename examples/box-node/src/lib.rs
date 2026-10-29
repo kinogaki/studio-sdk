@@ -195,12 +195,8 @@ pub fn package() -> Package {
         .with_node_type(BoxNode)
 }
 
-/// The entry point Studio looks up in the plugin's library.
-#[allow(unsafe_code)] // `no_mangle` keeps the name Studio looks for.
-#[unsafe(no_mangle)]
-pub fn kinogaki_package() -> Package {
-    package()
-}
+// The entry point Studio looks up in the plugin's library.
+export_package!(package);
 
 #[cfg(test)]
 mod tests;

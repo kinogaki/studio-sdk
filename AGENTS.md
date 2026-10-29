@@ -3,7 +3,7 @@
 This public repository is Kinogaki Studio's plugin SDK: the public API Studio and every package (studio-mesh, studio-cad, third parties) compile against. Treat every public item as public API.
 
 - Every public item has rustdoc that says what it is for and the rules an implementation follows: who calls it, from which thread, what it may assume, what it must return. `missing_docs` is on and docs build with `-D warnings`.
-- The SDK is self-contained: it never depends on a private Kinogaki crate (Studio, a kernel, or any lib-*), and Studio adapts at the boundary. Every type the API exposes is defined here (`math`, `params`, `element`, `viewport`, `render`, `parallel`). `crates/api` stays headless: no UI and no GPU API. Studio's `tools/check_architecture.py` enforces this.
+- The SDK is self-contained: it never depends on a private Kinogaki crate (Studio, a kernel, or any lib-*), and Studio adapts at the boundary. Every type the API exposes is defined here (`math`, `params`, `element`, `viewport`, `render`, `parallel`). `crates/api` stays headless: no UI, and no GPU API but its opt-in `wgpu` feature, which carries packages' render engines (render-api's display contract) and nothing else. Studio's `tools/check_architecture.py` enforces this.
 - UI goes in `crates/ui-api` (`kinogaki-studio-ui-api`), never in `crates/api`. It defines its own drawing and widget types; plugins never see Studio's UI library or egui types, and the host draws.
 - Owned Rust code forbids unsafe.
 - No backward compatibility before the public release: no deprecated aliases, no shims, and no version fields in anything this API stores. Change the API and update its users in the same landing (Studio, studio-mesh, studio-cad).

@@ -12,3 +12,9 @@ workspace = true
 [dependencies]
 # The render interface: the triangle source contract data types render through.
 kinogaki-render-api.workspace = true
+
+[features]
+# Packages' render engines (`Package::engines`): the render interface's
+# display contract, which needs wgpu. Off by default: the API stays
+# headless for a host that renders nothing.
+wgpu = ["kinogaki-render-api/wgpu"]

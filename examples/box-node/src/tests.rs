@@ -111,3 +111,12 @@ fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
 fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
+
+#[test]
+fn the_entry_point_makes_the_package() {
+    // What Studio's loader calls, through the entry's own type.
+    let entry: kinogaki_studio_api::entry::Entry = kinogaki_package;
+    let package = entry().expect("no panic");
+    assert_eq!(package.id, PackageId::declared("example.boxes"));
+    assert_eq!(package.node_types.len(), 1);
+}

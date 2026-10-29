@@ -11,15 +11,8 @@ publish.workspace = true
 # copy of the SDK.
 crate-type = ["dylib"]
 
-# The workspace's lints, but `deny` for unsafe code: the entry point's
-# `no_mangle` is allowed by name.
-[lints.rust]
-unsafe_code = "deny"
-missing_docs = "warn"
-
-[lints.clippy]
-dbg_macro = "deny"
-todo = "deny"
+[lints]
+workspace = true
 
 [dependencies]
 kinogaki-studio-api.workspace = true
