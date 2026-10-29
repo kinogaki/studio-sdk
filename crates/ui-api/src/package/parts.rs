@@ -16,6 +16,7 @@ use super::data::{
     ContextView, Creation, FlagSpec, LevelSpec, NetworkNode, NetworkWire, NumericBar, OutlineRow,
     Status, TimeDomain, ToolbarItem, Tools, VocabularyItem,
 };
+use super::edited::{Edited, TemplateMark};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
 use crate::{Pos, Rect, Ui};
@@ -118,6 +119,25 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn layers(&self, s: &mut S, cx: &mut dyn Cx) -> Option<ContextView> {
         let _ = (s, cx);
         None
+    }
+    /// What the open location's edited surface shows in view `view` this
+    /// frame (`None`: no edited surface). Called once per drawn view
+    /// after the views' input; core draws it with the rest of the scene.
+    fn edited(&self, s: &mut S, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
+        let _ = (s, cx, view);
+        None
+    }
+    /// How the open object's templated piece of node `node` is marked
+    /// (`key`: its data type's name for the piece, a CAD body's name).
+    fn template_mark(
+        &self,
+        s: &S,
+        cx: &dyn Cx,
+        node: NodeRef,
+        key: Option<&(dyn Any + Send + Sync)>,
+    ) -> TemplateMark {
+        let _ = (s, cx, node, key);
+        TemplateMark::default()
     }
     /// This frame's live tools in a view, before camera navigation.
     fn tools(&self, s: &mut S, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
@@ -348,6 +368,18 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn layers(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<ContextView> {
         self.part.layers(own_mut(s), cx)
+    }
+    fn edited(&self, s: &mut dyn Any, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
+        self.part.edited(own_mut(s), cx, view)
+    }
+    fn template_mark(
+        &self,
+        s: &dyn Any,
+        cx: &dyn Cx,
+        node: NodeRef,
+        key: Option<&(dyn Any + Send + Sync)>,
+    ) -> TemplateMark {
+        self.part.template_mark(own(s), cx, node, key)
     }
     fn tools(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
         self.part.tools(own_mut(s), cx, ui)

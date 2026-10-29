@@ -125,6 +125,9 @@ pub struct ContextObject {
     pub model: Mat4,
     /// One 0xRRGGBB color a face; `None`: the clay.
     pub colors: Option<Arc<[u32]>>,
+    /// Drawn see-through, in the look the rest of the scene takes inside
+    /// an object (a live tool's operands, bodies behind a sketch).
+    pub ghost: bool,
 }
 
 impl fmt::Debug for ContextObject {
@@ -133,6 +136,7 @@ impl fmt::Debug for ContextObject {
             .field("faces", &self.surface.face_count())
             .field("model", &self.model)
             .field("colors", &self.colors.as_ref().map(|c| c.len()))
+            .field("ghost", &self.ghost)
             .finish()
     }
 }

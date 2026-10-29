@@ -21,6 +21,7 @@
 //! every package as a [`Registered`], whose parts take the state as
 //! `dyn Any` and downcast it back.
 mod data;
+mod edited;
 mod parts;
 mod settings;
 
@@ -29,6 +30,7 @@ pub use data::{
     NetworkNode, NetworkWire, NumericBar, OutlineRow, Start, Status, TimeDomain, TimeMark,
     TimeUnits, ToolbarItem, Tools, VocabularyItem,
 };
+pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use parts::{
     Creations, Erased, Inspector, Levels, NetworkView, ObjectRows, OutlineRows, ViewportLayer,
     Vocabulary,
