@@ -28,7 +28,7 @@ Plugins never link Studio's editor crate.
 
 **The SDK never depends on a private Kinogaki crate; Studio adapts at the boundary.**
 
-The SDK depends on the Rust standard library and nothing else. Every type the API exposes is its own:
+The SDK depends on the Rust standard library and, behind `kinogaki-render-api`'s `wgpu` feature only, on wgpu from crates.io. Every type the API exposes is its own:
 
 | Module | What it defines | Studio converts it to and from |
 |---|---|---|
@@ -42,7 +42,7 @@ The SDK depends on the Rust standard library and nothing else. Every type the AP
 
 So a package written against the SDK compiles against nothing private, and the SDK builds and tests from a plain clone. A plugin's kernel may use any library it likes inside; it converts at its own boundary, as Studio does at its.
 
-Studio's `tools/check_architecture.py` enforces the rule: the SDK's crates depend on no Kinogaki crate but their own. The SDK has no third-party dependencies either; if one is ever needed, it is pinned to an exact version and frozen into this repository's own `vendor/`.
+Studio's `tools/check_architecture.py` enforces the rule: the SDK's crates depend on no Kinogaki crate but their own. Its one third-party dependency is wgpu 30.0.1, pinned exactly and resolved from crates.io as a normal dependency, only with the `wgpu` feature: a wgpu host and its engines share the device and display textures, so they must agree on the version. The default build has no dependencies at all.
 
 ## Building
 
@@ -50,19 +50,25 @@ Studio's `tools/check_architecture.py` enforces the rule: the SDK's crates depen
 git clone https://github.com/kinogaki/studio-sdk.git
 cd studio-sdk
 cargo test --workspace --locked
+cargo test -p kinogaki-render-api --features wgpu --locked
 ```
+
+The `wgpu` feature is portable code with no platform-specific parts; it is verified on macOS so far.
 
 ## Checks
 
 ```sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo clippy --workspace --all-targets --locked --features kinogaki-render-api/wgpu -- -D warnings
 cargo test --workspace --locked
+cargo test -p kinogaki-render-api --features wgpu --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked --features kinogaki-render-api/wgpu
 ```
 
 Studio's `tools/check_all.py` runs the same checks on the SDK.
 
 ## Licenses
 
-Some of `kinogaki-studio-ui-api`'s geometry and color arithmetic follows egui's, formula for formula, so Studio's egui-based UI library converts its values bit for bit. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits it, and egui's licenses are in [licenses/](licenses/).
+Some of `kinogaki-studio-ui-api`'s geometry and color arithmetic follows egui's, formula for formula, so Studio's egui-based UI library converts its values bit for bit. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits it, and egui's licenses are in [licenses/](licenses/). The SDK copies no third-party code otherwise; its crates.io dependency (wgpu, with the `wgpu` feature) carries its own licenses.

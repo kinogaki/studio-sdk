@@ -16,11 +16,18 @@
 //! Hosts make mesh prims from [`TriangleSource`]s: plain triangles, from a
 //! polygon mesh, a CAD tessellation or a CAM preview alike.
 //! [`RecordingEngine`] stores what it is sent, for hosts' tests.
+//!
+//! The `wgpu` feature adds the `display` module: how a wgpu host
+//! shows an engine's frames as textures on its own device and makes
+//! engines there (wgpu 30.0.1, on every platform wgpu supports). Without
+//! it the crate depends on the standard library alone.
 
 pub mod aov;
 pub mod declared;
 pub mod description;
 pub mod dirty;
+#[cfg(feature = "wgpu")]
+pub mod display;
 pub mod engine;
 pub mod exchange;
 pub mod id;

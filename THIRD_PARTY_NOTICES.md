@@ -8,3 +8,9 @@ Parts of `kinogaki-studio-ui-api` (`crates/ui-api`) follow [egui](https://github
 - `src/color.rs`: `Color`'s constructors, gamma and linear multiplication, blending, opacity and the sRGB conversions, after egui's `ecolor` (`Color32`, `Rgba`), with its tests.
 
 egui is Copyright (c) 2018-2021 Emil Ernerfeldt <emil.ernerfeldt@gmail.com> and the egui contributors, dual-licensed under the MIT license ([licenses/egui-LICENSE-MIT](licenses/egui-LICENSE-MIT)) or the Apache License 2.0 ([licenses/egui-LICENSE-APACHE](licenses/egui-LICENSE-APACHE)), at your option.
+
+## Dependencies
+
+The SDK contains no third-party code beyond the above. Its crates.io dependencies carry their own licenses; the direct ones are:
+
+- [wgpu](https://crates.io/crates/wgpu) 30.0.1 (MIT OR Apache-2.0), only with `kinogaki-render-api`'s `wgpu` feature.

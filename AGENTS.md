@@ -7,7 +7,7 @@ This public repository is Kinogaki Studio's plugin SDK: the public API Studio an
 - UI goes in `crates/ui-api` (`kinogaki-studio-ui-api`), never in `crates/api`. It defines its own drawing and widget types; plugins never see Studio's UI library or egui types, and the host draws.
 - Owned Rust code forbids unsafe.
 - No backward compatibility before the public release: no deprecated aliases, no shims, and no version fields in anything this API stores. Change the API and update its users in the same landing (Studio, studio-mesh, studio-cad).
-- It builds from a plain clone: no sibling checkouts, no path dependencies outside this repository. It has no third-party crates; one that is truly needed is pinned to an exact version and frozen into this repository's own `vendor/`, never resolved from crates.io.
+- It builds from a plain clone: no sibling checkouts, no path dependencies outside this repository. Its one third-party dependency is wgpu, behind `kinogaki-render-api`'s `wgpu` feature, a normal crates.io dependency pinned to an exact version (`Cargo.lock` is committed). Anything else third-party is a deliberate decision, never a convenience; nothing is copied into this repository.
 - Nothing private goes in: no local paths, internal hostnames, credentials, or references to private repositories' contents.
 - Keep Cargo.lock. Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked` and `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` before committing. Push here before updating Studio's pin.
 - Verification runs locally only. Do not add GitHub Actions workflows or CI credentials unless the user explicitly asks for them.

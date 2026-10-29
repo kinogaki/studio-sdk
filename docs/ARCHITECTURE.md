@@ -180,7 +180,7 @@ Studio's core draws and picks. A data type describes what to draw as a `viewport
 
 ## Self-contained
 
-The SDK depends on the standard library alone. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
+The SDK depends on the standard library alone, but for `kinogaki-render-api`'s `wgpu` feature (the display contract), which brings wgpu 30.0.1 from crates.io. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
 
 
 # The UI layer

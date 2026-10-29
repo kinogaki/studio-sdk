@@ -8,3 +8,12 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+# The display contract between a wgpu host and its engines (`display`).
+wgpu = ["dep:wgpu"]
+
+[dependencies]
+# The host's GPU API, from crates.io at the exact version hosts and engines
+# share (a host and its engines must agree on it).
+wgpu = { version = "=30.0.1", optional = true }
