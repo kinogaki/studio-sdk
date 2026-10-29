@@ -14,14 +14,18 @@
 //! A node type also says what it is ([`NodeType::description`]: its label,
 //! ports, parameters and the viewport [`Handle`]s bound to them), which the
 //! environment reads once when the package registers.
+mod binding;
 mod context;
 mod description;
+mod frame;
 mod handle;
 mod incremental;
 
+pub use binding::{Scalar, Vector};
 pub use context::CookCx;
 pub use description::{Description, Port};
-pub use handle::{Constraint, Handle, HandleKind, Space, Vector};
+pub use frame::Frame;
+pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
 
 use crate::components::Components;
