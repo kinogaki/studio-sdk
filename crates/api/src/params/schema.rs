@@ -79,6 +79,9 @@ pub struct Parameter {
     pub value: Value,
     /// Its tooltip; empty for none.
     pub help: String,
+    /// More words a search finds it by ("orientation" for an up axis);
+    /// empty for none.
+    pub keywords: String,
     /// Whether it takes input; a disabled row shows its value greyed and
     /// its help says why.
     pub enabled: bool,
@@ -99,6 +102,7 @@ impl Parameter {
             kind,
             value: value.into(),
             help: String::new(),
+            keywords: String::new(),
             enabled: true,
         }
     }
@@ -106,6 +110,12 @@ impl Parameter {
     /// With `help` as its tooltip.
     pub fn help(mut self, help: impl Into<String>) -> Self {
         self.help = help.into();
+        self
+    }
+
+    /// Found by search under `keywords` too.
+    pub fn keywords(mut self, keywords: impl Into<String>) -> Self {
+        self.keywords = keywords.into();
         self
     }
 
@@ -194,6 +204,8 @@ pub struct Number {
     pub slider: bool,
     /// Most decimal places shown; `None` leaves it to the host.
     pub decimals: Option<u8>,
+    /// How much it changes per point dragged; `None` leaves it to the host.
+    pub speed: Option<f64>,
 }
 
 impl Number {
@@ -206,6 +218,7 @@ impl Number {
             soft: None,
             slider: false,
             decimals: None,
+            speed: None,
         }
     }
 
@@ -239,6 +252,12 @@ impl Number {
     /// Shown as a slider.
     pub fn slider(mut self) -> Self {
         self.slider = true;
+        self
+    }
+
+    /// Changing by `speed` per point dragged.
+    pub fn speed(mut self, speed: f64) -> Self {
+        self.speed = Some(speed);
         self
     }
 

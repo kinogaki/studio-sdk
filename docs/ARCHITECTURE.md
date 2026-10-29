@@ -138,11 +138,11 @@ An `ObjectBody` is the part of an object that the package owns. The environment 
 ## Formats
 
 A `FileFormat` declares:
-- its label and extensions;
+- its label and extensions, and optionally `detects`, for a file recognized by its first bytes;
 - the data types it produces;
-- its options: defaults by name, plus a `params::Schema` for the import dialog.
+- its options: defaults by name, a `params::Schema` for a `Purpose` (File ▸ Import's `Objects`, or a File node's `Node`, which leaves out options that shape objects), and how they are saved (`write_options`/`read_options`; by default one field per option).
 
-It reads a file into `Imported`, a list of `FileItem`s with parents listed before their children; an item with no data is a group. A format may also provide a `FormatWriter`.
+It reads a file (`read(path, options, &Reading)`) into `Imported`, a list of `FileItem`s with parents listed before their children; an item with no data is a group, and each is placed relative to its parent and shown or hidden. A `Reading` carries the purpose, the project's `Units` (lengths convert into them), an origin a format may seed names with (a File node's id), project values the host lends by type, and a cancellation poll. For a File node a format reads one item. A format may also provide a `FormatWriter`, which writes items in given units.
 
 To import, the environment passes each value to the first object kind that `adopts` it. With no formats installed, nothing can be imported.
 

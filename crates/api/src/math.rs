@@ -1,5 +1,5 @@
 //! The few geometric values the API exchanges: [`Vec3`], [`Affine3`],
-//! [`Mat4`] and [`Bounds`].
+//! [`Mat4`] and [`Bounds`], and a project's [`Units`].
 //!
 //! They are plain `Copy` data with public fields and no algorithm library:
 //! a package does its maths with whatever library it likes (Studio's
@@ -158,6 +158,36 @@ impl Bounds {
             (self.min.y + self.max.y) * 0.5,
             (self.min.z + self.max.z) * 0.5,
         )
+    }
+}
+
+/// Which axis points up.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum UpAxis {
+    /// Y up.
+    #[default]
+    Y,
+    /// Z up.
+    Z,
+}
+
+/// A project's units: the axis that is up and how long one unit is. Files
+/// read into a project convert their lengths into them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Units {
+    /// The axis that is up.
+    pub up: UpAxis,
+    /// Metres in one unit (0.001 in millimetres).
+    pub meters_per_unit: f64,
+}
+
+impl Default for Units {
+    /// Y up, in metres.
+    fn default() -> Self {
+        Self {
+            up: UpAxis::Y,
+            meters_per_unit: 1.0,
+        }
     }
 }
 

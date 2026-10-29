@@ -8,7 +8,8 @@ use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
 pub const RAMP_INTERPOLATIONS: [&str; 3] = ["Constant", "Linear", "Smooth"];
 
 /// The sheet of a parameter schema: its sections as top-level sections,
-/// each parameter a field keyed by its name, with its help as the tooltip.
+/// each parameter a field keyed by its name, with its help as the tooltip
+/// and its keywords for search.
 impl From<&params::Schema> for Schema<String> {
     fn from(schema: &params::Schema) -> Self {
         let items = schema
@@ -30,6 +31,7 @@ impl From<&params::Schema> for Schema<String> {
                     );
                     field.enabled = p.enabled;
                     field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
+                    field.keywords = p.keywords.clone().into();
                     Item::Field(field)
                 }
             })
@@ -56,6 +58,9 @@ impl From<&params::Number> for Number {
         }
         if let Some(places) = number.decimals {
             out.decimals = places.into();
+        }
+        if let Some(speed) = number.speed {
+            out.speed = speed;
         }
         out
     }

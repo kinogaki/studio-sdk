@@ -234,16 +234,14 @@ impl FileFormat for XyzFormat {
         &self,
         _path: &std::path::Path,
         _options: &FormatOptions,
-        cancel: &CancelToken,
+        reading: &Reading<'_>,
     ) -> Result<Imported, Error> {
-        cancel.check()?;
+        reading.check()?;
         Ok(Imported {
-            items: vec![FileItem {
-                name: "cloud".into(),
-                parent: None,
-                placement: Affine3::IDENTITY,
-                data: Some(CLOUD.wrap(Cloud(vec![[1.0, 2.0, 3.0]]))),
-            }],
+            items: vec![FileItem::top(
+                "cloud",
+                CLOUD.wrap(Cloud(vec![[1.0, 2.0, 3.0]])),
+            )],
             warnings: Vec::new(),
         })
     }
@@ -356,7 +354,7 @@ fn objects_adopt_imported_values_of_their_result_type() {
         .read(
             std::path::Path::new("in.xyz"),
             &format.options(),
-            &CancelToken::default(),
+            &Reading::new(Purpose::Objects, Units::default()),
         )
         .unwrap();
     let value = imported.items[0].data.as_ref().unwrap();

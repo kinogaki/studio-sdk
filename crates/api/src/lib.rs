@@ -26,7 +26,7 @@
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
 //!   and the environment's table of it all.
 //!
-//! And the plain types those exchange: [`math`] (vectors, placements,
+//! And the plain types those exchange: [`math`] (vectors, placements, units,
 //! bounds), [`params`] (parameter values, schemas, diagnostics),
 //! [`element`] (the project's element tree codecs write), [`viewport`]
 //! (display surfaces, picks) and [`render`] (neutral render items).
@@ -77,12 +77,12 @@ pub use facets::{
     CellKind, Cells, Combine, DisplayQuality, Displayable, Drawn, Pickable, Renderable, Table,
     TableColumn, Tabular,
 };
-pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported};
+pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};
 pub use held::HeldEdit;
 pub use id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
-pub use math::{Affine3, Bounds, Mat4, Vec3};
+pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
 pub use object::{ObjectBody, ObjectKindSpec};
 pub use package::Package;
 pub use parallel::Workers;
