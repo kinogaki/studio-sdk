@@ -16,6 +16,8 @@
 //! Hosts make mesh prims from [`TriangleSource`]s: plain triangles, from a
 //! polygon mesh, a CAD tessellation or a CAM preview alike.
 //! [`RecordingEngine`] stores what it is sent, for hosts' tests.
+//! [`ramp`] is every ramp's encoding and maths: a node's ramp parameter,
+//! the inspector's ramp widget and an engine's color ramps evaluate alike.
 //!
 //! The `wgpu` feature adds the `display` module: how a wgpu host
 //! shows an engine's frames as textures on its own device and makes
@@ -33,6 +35,7 @@ pub mod exchange;
 pub mod id;
 pub mod material;
 pub mod prim;
+pub mod ramp;
 pub mod ranges;
 pub mod recording;
 pub mod settings;

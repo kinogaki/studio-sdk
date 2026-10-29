@@ -1,6 +1,7 @@
 //! Parameters: what a node's or a format's settings hold ([`Value`],
 //! [`Parameters`]), how the host presents them ([`Schema`]), and the
-//! [`Diagnostic`]s cooks and readers report.
+//! [`Diagnostic`]s cooks and readers report; [`ramp`] holds the ramps'
+//! maths and encoding.
 //!
 //! These are the API's own types. Studio draws a [`Schema`] with its
 //! inspector and stores [`Value`]s in projects; a package never sees the
@@ -9,6 +10,7 @@ mod diagnostic;
 mod schema;
 
 pub use diagnostic::{Diagnostic, Severity, Span};
+pub use kinogaki_render_api::ramp;
 pub use schema::{Number, Parameter, ParameterKind, Schema, SchemaItem, Section, Unit};
 
 use std::collections::BTreeMap;

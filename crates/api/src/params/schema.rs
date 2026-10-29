@@ -170,14 +170,12 @@ pub enum ParameterKind {
         /// How each component shows and moves.
         number: Number,
     },
-    /// [`Value::Numbers`]: a ramp from 0 to 1 with values in `min..=max`,
-    /// encoded as the key count, then position, value and interpolation
-    /// (0 constant, 1 linear, 2 smooth) for each key.
+    /// [`Value::Numbers`]: a float or color ramp from 0 to 1, as
+    /// [`ramp::encode`](super::ramp::encode) writes it; its length fixes how
+    /// many keys it holds.
     Ramp {
-        /// The lowest value.
-        min: f64,
-        /// The highest value.
-        max: f64,
+        /// A color ramp (r, g, b a key) rather than a float ramp.
+        color: bool,
     },
 }
 
@@ -195,7 +193,10 @@ impl ParameterKind {
             ) => true,
             (Self::Color, Value::Numbers(v)) => v.len() == 3,
             (Self::Vector { components, .. }, Value::Numbers(v)) => v.len() == *components as usize,
-            (Self::Ramp { .. }, Value::Numbers(v)) => !v.is_empty(),
+            (Self::Ramp { color }, Value::Numbers(v)) => {
+                let stride = super::ramp::stride(*color);
+                v.len() > stride && (v.len() - 1) % stride == 0
+            }
             _ => false,
         }
     }

@@ -19,8 +19,9 @@
 //! Every kind of value has its field kind here, drawn by Studio's own
 //! widget for it: numbers, vectors, colors, linked channels, choices, text,
 //! code, secrets, file paths (with the host's file dialog), paths in the
-//! scene's tree, ramps, tone curves, palettes and material inputs'
-//! connection buttons ([`Socket`]).
+//! scene's tree, float and color ramps
+//! ([`ramp`]), tone curves, palettes and material inputs' connection
+//! buttons ([`Socket`]).
 mod code;
 mod edits;
 mod from_params;
@@ -30,9 +31,10 @@ mod number;
 mod schema;
 pub mod tone_curve;
 
+pub use kinogaki_studio_api::params::ramp;
+
 pub use code::{CodeLanguage, Completion, Completions, PlainText, Token, TokenClass};
 pub use edits::{Action, Edits};
-pub use from_params::RAMP_INTERPOLATIONS;
 pub use keyed::{FieldKey, Keyed};
 pub use kind::{
     Chip, CurveChannel, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing,

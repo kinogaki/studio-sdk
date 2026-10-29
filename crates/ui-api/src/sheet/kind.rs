@@ -122,18 +122,16 @@ pub enum Kind {
     /// from: rows that drag to reorder ([`Action::Reorder`](super::Action::Reorder))
     /// and remove ([`Action::Remove`](super::Action::Remove)); no value.
     Wires(Vec<Text>),
-    /// `Value::Numbers`: an encoded ramp (the key count, then position,
-    /// value and interpolation code for each key) between `min` and `max`.
+    /// `Value::Numbers`: a float or color ramp, as
+    /// [`ramp::encode`](super::ramp::encode) writes it (its length fixes
+    /// how many keys it holds); drawn as the ramp's curve or gradient with
+    /// its keys, the selected key's fields below.
     Ramp {
-        /// The lowest value of the ramp's range.
-        min: f64,
-        /// The highest value of the ramp's range.
-        max: f64,
-        /// The ramp sampled evenly from 0 to 1, for the plot; empty lets the
-        /// host sample the value.
-        curve: Vec<f64>,
-        /// The interpolation codes' names.
-        interpolations: Vec<Text>,
+        /// A color ramp rather than a float ramp.
+        color: bool,
+        /// Every key runs to the next this way and the keys offer no
+        /// choice (a renderer's linear ramps); `None`: each key chooses.
+        interpolation: Option<super::ramp::Interpolation>,
     },
     /// `Value::Numbers`: tone curves, one a channel, as
     /// [`tone_curve::encode`](super::tone_curve::encode) writes them with

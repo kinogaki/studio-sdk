@@ -3,10 +3,6 @@
 use super::{Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
 use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
 
-/// The interpolation codes' names of a parameter ramp (its encoding's 0,
-/// 1 and 2).
-pub const RAMP_INTERPOLATIONS: [&str; 3] = ["Constant", "Linear", "Smooth"];
-
 /// The sheet of a parameter schema: its sections as top-level sections,
 /// each parameter a field keyed by its name, with its help as the tooltip
 /// and its keywords for search.
@@ -105,11 +101,9 @@ impl From<&ParameterKind> for Kind {
                 number: number.into(),
                 lock: None,
             },
-            ParameterKind::Ramp { min, max } => Kind::Ramp {
-                min: *min,
-                max: *max,
-                curve: Vec::new(),
-                interpolations: RAMP_INTERPOLATIONS.iter().map(|&n| n.into()).collect(),
+            ParameterKind::Ramp { color } => Kind::Ramp {
+                color: *color,
+                interpolation: None,
             },
         }
     }
@@ -118,6 +112,7 @@ impl From<&ParameterKind> for Kind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sheet::ramp;
     use kinogaki_studio_api::params::{Parameter, Value};
 
     #[test]
@@ -151,8 +146,8 @@ mod tests {
             .parameter(Parameter::new(
                 "falloff",
                 "Falloff",
-                ParameterKind::Ramp { min: 0.0, max: 1.0 },
-                vec![2.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+                ParameterKind::Ramp { color: false },
+                ramp::encode(&ramp::Ramp::default_of(false), 4),
             ));
         let sheet = Schema::<String>::from(&schema);
         assert!(
@@ -178,10 +173,12 @@ mod tests {
         let mode = sheet.field(&"mode".to_owned()).unwrap();
         assert!(!mode.enabled && mode.tooltip.is_none());
         assert_eq!(sheet.index(&"mode".to_owned()), Some(1));
-        let Kind::Ramp { interpolations, .. } = &sheet.field(&"falloff".to_owned()).unwrap().kind
-        else {
-            panic!()
-        };
-        assert_eq!(interpolations.len(), 3);
+        assert_eq!(
+            sheet.field(&"falloff".to_owned()).unwrap().kind,
+            Kind::Ramp {
+                color: false,
+                interpolation: None
+            }
+        );
     }
 }
