@@ -17,7 +17,9 @@
 //! so several contexts can share one set ([`Shared::Of`]). The right-click
 //! menu and the menu bar ([`ViewMenus`]) are fixed: the context's as
 //! given, never edited by the user.
+use super::Popover;
 use crate::Key;
+use crate::gizmo::Pivot;
 use crate::input::Modifiers;
 use kinogaki_studio_api::ContextId;
 
@@ -352,6 +354,10 @@ pub struct ViewportSpec {
     pub snap_steps: bool,
     /// Where the transform pivot starts.
     pub default_pivot: Pivot,
+    /// The popovers among Gear, Components and Snap whose buttons show,
+    /// with the context's [rows](super::ViewportLayer::rows). Shading,
+    /// Viewport and Camera always show.
+    pub popovers: Vec<Popover>,
 }
 
 impl Default for ViewportSpec {
@@ -361,6 +367,7 @@ impl Default for ViewportSpec {
             analysis_modes: Vec::new(),
             snap_steps: true,
             default_pivot: Pivot::Centre,
+            popovers: Vec::new(),
         }
     }
 }
@@ -411,16 +418,6 @@ pub struct AnalysisMode {
     pub label: String,
     /// Its icon, by name.
     pub icon: String,
-}
-
-/// Where the transform pivot starts.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Pivot {
-    /// The selection's centre.
-    #[default]
-    Centre,
-    /// The space's origin (each object's own, at an object level).
-    Origin,
 }
 
 #[cfg(test)]

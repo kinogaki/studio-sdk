@@ -9,12 +9,14 @@
 //! so hits and drags agree with what the host draws.
 mod geometry;
 mod hit;
+mod pivot;
 
 pub use geometry::{
     GizmoFrame, Handle, MANIPULATOR_CUBE, MANIPULATOR_RING, angle_change, distance, inside, scale,
     stepped,
 };
 pub use hit::{ALL_AXES, hit, hit_axes};
+pub use pivot::{Pivot, PivotFrame};
 
 /// The viewport's transform mode (Q, W, E, R and T).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

@@ -17,10 +17,12 @@ use super::data::{
     Status, TimeDomain, ToolbarItem, Tools,
 };
 use super::edited::{Edited, TemplateMark};
+use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
+use crate::gizmo::PivotFrame;
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
 use crate::{Pos, Rect, Ui};
-use kinogaki_studio_api::ObjectKindId;
+use kinogaki_studio_api::{ObjectKindId, Vec3};
 use std::any::Any;
 use std::marker::PhantomData;
 
@@ -65,6 +67,17 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     ) {
         let _ = (s, cx, rect, pointer, shift, command);
     }
+    /// The selection as the transform pivot reads it, in the context's
+    /// space; `None`: nothing to pivot about (no pivot button). Called
+    /// once a frame while the numeric bar shows.
+    fn pivot(&self, s: &mut S, cx: &mut dyn Cx) -> Option<PivotFrame> {
+        let _ = (s, cx);
+        None
+    }
+    /// The user chose another pivot: a live tool takes it.
+    fn pivot_changed(&self, s: &mut S, cx: &mut dyn Cx) {
+        let _ = (s, cx);
+    }
 }
 
 /// What a context adds to the viewport: its toolbar, status, numeric bar,
@@ -87,10 +100,18 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn cancel(&self, s: &mut S, cx: &mut dyn Cx) {
         let _ = (s, cx);
     }
-    /// A drag in a view holds the views: no other view takes the pointer.
-    fn holds_views(&self, s: &S, cx: &dyn Cx) -> bool {
-        let _ = (s, cx);
+    /// A key or typed text over the viewport, before any binding (see
+    /// [`KeyPress`]): a live tool's own keys (Enter, Escape), a focused
+    /// value field's typing. `true`: the layer took it, and nothing else
+    /// sees it.
+    fn key(&self, s: &mut S, cx: &mut dyn Cx, press: &KeyPress) -> bool {
+        let _ = (s, cx, press);
         false
+    }
+    /// What a live gesture keeps from the rest of the viewport now.
+    fn holds(&self, s: &S, cx: &dyn Cx) -> Holds {
+        let _ = (s, cx);
+        Holds::default()
     }
     /// The left toolbar, in order; empty: no toolbar.
     fn toolbar(&self, s: &S, cx: &dyn Cx) -> Vec<ToolbarItem> {
@@ -105,6 +126,16 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn status(&self, s: &mut S, cx: &mut dyn Cx) -> Status {
         let _ = (s, cx);
         Status::default()
+    }
+    /// The context's rows of `popover`, called while it is open (and,
+    /// for the Gear, once a frame to know whether it has any).
+    fn rows(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
+        let _ = (s, cx, popover);
+        Vec::new()
+    }
+    /// An edit of one of [`rows`](Self::rows)'s rows.
+    fn apply_row(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
+        let _ = (s, cx, popover, edit);
     }
     /// The numeric bar for the current tool and selection.
     fn numeric_bar(&self, s: &mut S, cx: &mut dyn Cx) -> Option<NumericBar> {
@@ -161,6 +192,19 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     /// heads-up value fields.
     fn overlay(&self, s: &mut S, cx: &mut dyn ViewCx, ui: &mut dyn Ui) {
         let _ = (s, cx, ui);
+    }
+    /// The point a click at `at` in the view picks for the transform
+    /// pivot (snapped as the context snaps), in the space of its
+    /// [`Levels::pivot`]'s frame; `None` gives up picking.
+    fn pick_pivot(&self, s: &mut S, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
+        let _ = (s, cx, at);
+        None
+    }
+    /// Floating cards drawn once a frame over the views in `rect` (a
+    /// tool's card, a panel). The pointer over what they drew is theirs,
+    /// not the views'.
+    fn cards(&self, s: &mut S, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
+        let _ = (s, cx, ui, rect);
     }
     /// The context's own time, which the Timeline shows instead of the
     /// scene's; `None`: the scene's.
@@ -342,6 +386,12 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
         self.part
             .click(own_mut(s), cx, rect, pointer, shift, command)
     }
+    fn pivot(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<PivotFrame> {
+        self.part.pivot(own_mut(s), cx)
+    }
+    fn pivot_changed(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
+        self.part.pivot_changed(own_mut(s), cx)
+    }
 }
 
 impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
@@ -357,8 +407,11 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     fn cancel(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
         self.part.cancel(own_mut(s), cx)
     }
-    fn holds_views(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
-        self.part.holds_views(own(s), cx)
+    fn key(&self, s: &mut dyn Any, cx: &mut dyn Cx, press: &KeyPress) -> bool {
+        self.part.key(own_mut(s), cx, press)
+    }
+    fn holds(&self, s: &dyn Any, cx: &dyn Cx) -> Holds {
+        self.part.holds(own(s), cx)
     }
     fn toolbar(&self, s: &dyn Any, cx: &dyn Cx) -> Vec<ToolbarItem> {
         self.part.toolbar(own(s), cx)
@@ -368,6 +421,12 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn status(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Status {
         self.part.status(own_mut(s), cx)
+    }
+    fn rows(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
+        self.part.rows(own_mut(s), cx, popover)
+    }
+    fn apply_row(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
+        self.part.apply_row(own_mut(s), cx, popover, edit)
     }
     fn numeric_bar(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<NumericBar> {
         self.part.numeric_bar(own_mut(s), cx)
@@ -412,6 +471,12 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn overlay(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) {
         self.part.overlay(own_mut(s), cx, ui)
+    }
+    fn pick_pivot(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
+        self.part.pick_pivot(own_mut(s), cx, at)
+    }
+    fn cards(&self, s: &mut dyn Any, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
+        self.part.cards(own_mut(s), cx, ui, rect)
     }
     fn time(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<TimeDomain> {
         self.part.time(own_mut(s), cx)

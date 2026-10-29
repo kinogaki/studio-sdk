@@ -27,6 +27,7 @@ mod edited;
 mod library;
 mod parts;
 mod settings;
+mod view;
 
 pub use data::{
     BarField, BarValue, ContextObject, ContextView, Creation, FlagSide, FlagSpec, LevelSpec,
@@ -36,15 +37,15 @@ pub use data::{
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
-    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, Pivot, Places, Shared,
-    SharedRows, Shelf, ShelfEntry, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem,
-    When,
+    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, Places, Shared, SharedRows,
+    Shelf, ShelfEntry, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
 pub use parts::{
     Creations, Erased, Inspector, Levels, NetworkView, ObjectRows, OutlineRows, ViewportLayer,
     Vocabulary,
 };
 pub use settings::{Section, SettingsSection};
+pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 
 use crate::host::{Cx, Waker};
 use kinogaki_studio_api::{ContextId, PackageId, SessionSlot};
