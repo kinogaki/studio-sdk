@@ -4,6 +4,10 @@ The SDK has two crates:
 - `kinogaki-studio-api` (`crates/api`) is the headless API: everything a package registers and exchanges that has no UI.
 - `kinogaki-studio-ui-api` (`crates/ui-api`, library `studio_ui_api`) is the UI layer: how a plugin's panels, cards, overlays and settings pages ask the host to draw. It is described in [The UI layer](#the-ui-layer) below.
 
+Two leaf crates sit below them, so kernels can depend on a contract without depending on the API:
+- `kinogaki-render-api` (`crates/render-api`) is the render interface between a host and its engines (see [Rendering](#rendering)).
+- `kinogaki-viewport-api` (`crates/viewport-api`) is the viewport packet contract: what a data type hands the viewport to draw (see [The viewport](#the-viewport)).
+
 This page explains how their parts fit together and the rules packages follow. The rustdoc on each item is the reference.
 
 # The headless API
@@ -181,11 +185,13 @@ The host keeps engine scenes in step cheaply: a source with the last identity is
 
 ## The viewport
 
-Studio's core draws and picks. A data type describes what to draw as a `viewport::Surface`: points, polygon corners (point, face, normal), triangles over the corners, line segments with edge ids and point markers with point ids. During a drag it returns a surface `derived` from the last one, with the points that moved, and the host patches only those. Picks come back as `Hit`s and box selections as `Elements`, in the ids the surface gave.
+Studio's core draws and picks. What it draws is a packet behind `kinogaki-viewport-api`'s `SurfaceSource` trait: shared point positions, vertex shading records, triangles, line segments in line classes and point markers in point classes, each class with its own look and ids, and the ranges that changed since the packet it was derived from. A kernel that needs full control (smooth and authored normals, curvature, hulls and control vertices, see-through faces, live transform previews) makes its own packets and reads them back as their own type with `packet_as`. The contract's maths is plain arrays: vectors `[f64; 3]`, quaternions `[x, y, z, w]` and matrices `[[f64; 4]; 4]`, column by column.
+
+The simpler path is a `viewport::Surface`: points, polygon corners (point, face, normal), triangles over the corners, line segments with edge ids and point markers with point ids. During a drag it returns a surface `derived` from the last one, with the points that moved, and the host patches only those. Picks come back as `Hit`s and box selections as `Elements`, in the ids the surface gave.
 
 ## Self-contained
 
-The SDK depends on the standard library alone, but for `kinogaki-render-api`'s `wgpu` feature (the display contract), which brings wgpu 30.0.1 from crates.io; `kinogaki-studio-api`'s `wgpu` feature turns it on for packages' render engines (`Package::engines`), and is off by default. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
+The SDK depends on the standard library alone, but for two optional features: `kinogaki-render-api`'s `wgpu` (the display contract), which brings wgpu 30.0.1, and `kinogaki-viewport-api`'s `bytemuck` (byte casts of the records a renderer uploads), which brings bytemuck 1.25.2, both from crates.io. `kinogaki-studio-api`'s `wgpu` feature turns the first on for packages' render engines (`Package::engines`), and is off by default. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
 
 
 # The UI layer

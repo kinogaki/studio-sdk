@@ -13,6 +13,7 @@ publish = false
 kinogaki-studio-api = { path = "crates/api" }
 kinogaki-studio-ui-api = { path = "crates/ui-api" }
 kinogaki-render-api = { path = "crates/render-api" }
+kinogaki-viewport-api = { path = "crates/viewport-api" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
