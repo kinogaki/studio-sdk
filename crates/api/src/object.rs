@@ -112,10 +112,19 @@ pub trait RenderedKind: Send + Sync {
 /// A kind whose objects set up a render: which engine renders, at what
 /// size, through which camera, with which of the engine's settings and
 /// outputs. The host's Render mode and Render Image read the active one
-/// (the first at the scene's root with its Render flag on).
+/// (the first at the scene's root with its Render flag on), and its
+/// inspector draws the setup by the engine's description and writes an
+/// edit back.
 pub trait RenderSetupKind: Send + Sync {
     /// The render `body` sets up, when it is one of this kind's.
     fn setup(&self, body: &dyn ObjectBody) -> Option<RenderSetup>;
+
+    /// `body` setting up `setup` instead (an edit of what
+    /// [`setup`](Self::setup) answered, or a new object's engine and its
+    /// defaults), when it is one of this kind's and `setup` fits it. The
+    /// host checks the values and outputs against the engine's
+    /// description; the kind checks what it can without one.
+    fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>>;
 }
 
 /// What a render is set up as: what [`RenderSetupKind::setup`] answers.

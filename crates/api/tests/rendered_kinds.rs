@@ -97,6 +97,16 @@ impl RenderSetupKind for Setups {
             processing: Processing::Network { source: None },
         })
     }
+    fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>> {
+        body.downcast_ref::<Setup>()?;
+        let engine = ["toy", "other"]
+            .into_iter()
+            .find(|e| *e == &*setup.engine)?;
+        Some(Arc::new(Setup {
+            engine,
+            camera: setup.camera,
+        }))
+    }
 }
 
 impl ObjectKindSpec for Kind {
@@ -213,11 +223,39 @@ fn a_setup_kind_says_which_engine_renders_and_how() {
     };
     let setup = kind.render_setup().unwrap().setup(&body).unwrap();
     assert_eq!((&*setup.engine, setup.camera), ("toy", Some(ObjectRef(7))));
-    // Another kind's body is none of its.
-    assert_eq!(
-        kind.render_setup().unwrap().setup(&Lamp { intensity: 1.0 }),
-        None
+    // An edit comes back as a new body.
+    let edited = RenderSetup {
+        engine: "other".into(),
+        camera: None,
+        ..setup.clone()
+    };
+    let body = kind
+        .render_setup()
+        .unwrap()
+        .with_setup(&body, edited.clone())
+        .unwrap();
+    let back = kind.render_setup().unwrap().setup(&*body).unwrap();
+    assert_eq!((&*back.engine, back.camera), ("other", None));
+    // A setup it can't hold, or another kind's body, is refused.
+    let unknown = RenderSetup {
+        engine: "missing".into(),
+        ..edited.clone()
+    };
+    assert!(
+        kind.render_setup()
+            .unwrap()
+            .with_setup(&*body, unknown)
+            .is_none()
     );
+    let lamp = Lamp { intensity: 1.0 };
+    assert!(
+        kind.render_setup()
+            .unwrap()
+            .with_setup(&lamp, edited)
+            .is_none()
+    );
+    // Another kind's body is none of its.
+    assert_eq!(kind.render_setup().unwrap().setup(&lamp), None);
     assert!(kind.renders().is_none());
 }
 
