@@ -11,25 +11,29 @@
 //! per-node state lives in the core-owned scratch slot
 //! ([`CookCx::scratch`]).
 //!
-//! A node type's description (label, ports, parameters, where it appears)
-//! is the librarian's today; it moves beside this trait when the
-//! librarian's descriptions move into the SDK.
+//! A node type also says what it is ([`NodeType::description`]: its label,
+//! ports and parameters), which the environment reads once when the
+//! package registers.
 mod context;
+mod description;
 mod incremental;
 
 pub use context::CookCx;
+pub use description::{Description, Port};
 pub use incremental::{CookPlan, Incremental, Prepared};
 
 use crate::components::Components;
 use crate::data::Data;
 use crate::error::Error;
 use crate::id::NodeTypeId;
-use crate::params::Diagnostic;
+use crate::params::{Diagnostic, Parameters};
 use std::fmt;
 
 /// What, besides its inputs and parameters, a node's result depends on.
 /// Core recooks a node when one of these changes, and only then: a node
-/// that doesn't declare `time` cooks once for every frame.
+/// that doesn't declare `time` cooks once for every frame. What a node
+/// reads may follow from its parameters (a code node reads the time only
+/// when its code does).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Reads {
     /// The scene time ([`CookCx::time`]); otherwise the node sees a fixed
@@ -47,7 +51,8 @@ pub struct Reads {
 #[derive(Clone, Debug, Default)]
 pub struct Outputs {
     /// One value per output port, in port order; output 0 is the node's
-    /// result.
+    /// result. An output nothing reads ([`CookCx::wants`]) may hold any
+    /// value of its port's type (an empty one): core never hands it on.
     pub data: Vec<Data>,
     /// The component selection output 0 carries downstream (what the next
     /// node sees as [`CookCx::incoming`]).
@@ -120,9 +125,14 @@ pub trait NodeType: Send + Sync {
     /// Its id (`kinogaki.mesh.extrude`).
     fn id(&self) -> NodeTypeId;
 
-    /// What invalidates it besides its inputs and parameters; nothing by
-    /// default.
-    fn reads(&self) -> Reads {
+    /// Its label, ports and parameters, read once when its package
+    /// registers.
+    fn description(&self) -> Description;
+
+    /// What invalidates a node with `parameters` besides its inputs and
+    /// parameters; nothing by default.
+    fn reads(&self, parameters: &Parameters) -> Reads {
+        let _ = parameters;
         Reads::default()
     }
 

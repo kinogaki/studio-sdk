@@ -155,26 +155,25 @@ impl DataCodec for BoxType {
 /// The Box node: makes a box from its parameters.
 pub struct BoxNode;
 
-impl BoxNode {
-    /// Its parameters and their defaults: width, depth and height, in
-    /// scene units. The SDK's `NodeType` doesn't carry a node's
-    /// description (label, ports, parameters) yet; the tests cook with
-    /// these values.
-    pub fn parameters() -> Schema {
+impl NodeType for BoxNode {
+    fn id(&self) -> NodeTypeId {
+        NodeTypeId::declared("example.boxes.box_node")
+    }
+    /// No inputs, one box out, and its width, depth and height in scene
+    /// units.
+    fn description(&self) -> Description {
         let side = |name: &str, label: &str| {
             let length = ParameterKind::Number(Number::length().range(0.001, f64::INFINITY));
             Parameter::new(name, label, length, 1.0)
         };
-        Schema::default()
-            .parameter(side("width", "Width"))
-            .parameter(side("depth", "Depth"))
-            .parameter(side("height", "Height"))
-    }
-}
-
-impl NodeType for BoxNode {
-    fn id(&self) -> NodeTypeId {
-        NodeTypeId::declared("example.boxes.box_node")
+        Description::new("Box")
+            .output(Port::new("box", "Box", BOX.id()))
+            .parameters(
+                Schema::default()
+                    .parameter(side("width", "Width"))
+                    .parameter(side("depth", "Depth"))
+                    .parameter(side("height", "Height")),
+            )
     }
     fn cook(&self, cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {
         let size = [

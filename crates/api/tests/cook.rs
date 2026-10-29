@@ -44,6 +44,17 @@ impl NodeType for Scale {
     fn id(&self) -> NodeTypeId {
         NodeTypeId::declared("toy.numbers.scale")
     }
+    fn description(&self) -> Description {
+        Description::new("Scale")
+            .input(Port::new("numbers", "Numbers", NUMBERS.id()).multi())
+            .output(Port::new("numbers", "Numbers", NUMBERS.id()))
+            .parameters(Schema::default().parameter(params::Parameter::new(
+                "factor",
+                "Factor",
+                params::ParameterKind::Number(params::Number::plain()),
+                1.0,
+            )))
+    }
     fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError> {
         FULL_COOKS.set(FULL_COOKS.get() + 1);
         Self::compute(cx, inputs)
@@ -79,7 +90,9 @@ impl CookPlan for ScalePlan {
     }
 }
 
-/// Offsets: a held edit adding one authored offset per number.
+/// Offsets: a held edit adding one authored offset per number, and the
+/// first number of input 1 to every one when the delta is longer than the
+/// base.
 struct AddOffsets;
 impl HeldEdit for AddOffsets {
     fn base(&self) -> DataTypeId {
@@ -88,17 +101,34 @@ impl HeldEdit for AddOffsets {
     fn delta(&self) -> DataTypeId {
         OFFSETS.id()
     }
-    fn apply(&self, base: &Data, delta: &Data, cancel: &CancelToken) -> Result<Data, Error> {
-        cancel.check()?;
+    fn reads_input(&self, delta: &Data, port: usize) -> bool {
+        port == 1 && OFFSETS.get(delta).is_some_and(|d| d.len() > 2)
+    }
+    fn apply(
+        &self,
+        cx: &mut CookCx<'_>,
+        base: &Data,
+        delta: &Data,
+        inputs: &[Option<Data>],
+    ) -> Result<Outputs, CookError> {
+        cx.check()?;
         let (base, delta) = NUMBERS
             .get(base)
             .zip(OFFSETS.get(delta))
-            .ok_or_else(|| Error::invalid("not numbers and offsets"))?;
-        Ok(NUMBERS.wrap(
-            base.iter()
-                .enumerate()
-                .map(|(i, v)| v + delta.get(i).unwrap_or(&0.0))
-                .collect(),
+            .ok_or_else(|| CookError::message("not numbers and offsets"))?;
+        let lift = inputs
+            .first()
+            .and_then(Option::as_ref)
+            .and_then(|d| NUMBERS.get(d))
+            .and_then(|n| n.first())
+            .unwrap_or(&0.0);
+        Ok(Outputs::one(
+            NUMBERS.wrap(
+                base.iter()
+                    .enumerate()
+                    .map(|(i, v)| v + delta.get(i).unwrap_or(&0.0) + lift)
+                    .collect(),
+            ),
         ))
     }
 }
@@ -252,21 +282,33 @@ fn the_registry_holds_cooks_and_held_edits() {
     let scale = registry
         .node_type(NodeTypeId::declared("toy.numbers.scale"))
         .unwrap();
-    assert_eq!(scale.reads(), Reads::default());
+    assert_eq!(scale.reads(&factor(2.0)), Reads::default());
+    // Its description: what a new node holds.
+    let description = scale.description();
+    assert_eq!(description.label, "Scale");
+    assert!(description.inputs[0].multi && !description.outputs[0].multi);
+    assert_eq!(description.parameters.values(), factor(1.0));
     assert!(
         registry
             .node_type(NodeTypeId::declared("toy.numbers.other"))
             .is_none()
     );
     let held = registry.held_edit(NUMBERS.id()).unwrap();
+    let (cancel, mut scratch, none) = (CancelToken::default(), None, Parameters::new());
+    let mut cx = CookCx::new(&none, &cancel, &Serial, &mut scratch);
+    let short = OFFSETS.wrap(vec![0.5]);
+    assert!(!held.reads_input(&short, 1));
     let edited = held
-        .apply(
-            &numbers(&[1.0, 2.0]),
-            &OFFSETS.wrap(vec![0.5]),
-            &CancelToken::default(),
-        )
+        .apply(&mut cx, &numbers(&[1.0, 2.0]), &short, &[None])
         .unwrap();
-    assert_eq!(NUMBERS.get(&edited), Some(&vec![1.5, 2.0]));
+    assert_eq!(NUMBERS.get(&edited.data[0]), Some(&vec![1.5, 2.0]));
+    // A longer delta reads input 1 too.
+    let long = OFFSETS.wrap(vec![0.0; 3]);
+    assert!(held.reads_input(&long, 1));
+    let lifted = held
+        .apply(&mut cx, &numbers(&[1.0]), &long, &[Some(numbers(&[10.0]))])
+        .unwrap();
+    assert_eq!(NUMBERS.get(&lifted.data[0]), Some(&vec![11.0]));
     assert!(registry.held_edit(OFFSETS.id()).is_none());
     // A second package can't declare held edits of the same type.
     let again = Package::new(PackageId::declared("toy.again"), "Again").with_held_edit(AddOffsets);

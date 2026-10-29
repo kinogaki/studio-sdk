@@ -105,7 +105,9 @@ impl From<Vec<f64>> for Value {
 
 /// Values by parameter name (`"distance"`, `"merge_shells"`): a node's
 /// parameters when it cooks, a format's options when it reads or writes.
-/// Every declared parameter is present.
+/// Every declared parameter is present. A node may hold more than its
+/// description declares: what its interactive tools author (a stroke's
+/// points) and the parameters its code declares.
 pub type Parameters = BTreeMap<String, Value>;
 
 #[cfg(test)]

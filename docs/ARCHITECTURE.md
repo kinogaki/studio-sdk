@@ -15,7 +15,7 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 | Kind | Registers here | Example |
 |---|---|---|
 | Kernel | data types (`DataType`), how held edits apply to them (`HeldEdit`) and their session state (`SessionSlot`) | the mesh kernel adapter: `kinogaki.mesh.geometry` over lib-mesh |
-| Node package | node types' cooks (`NodeType`) and object kinds (`ObjectKindSpec`); node descriptions and contexts elsewhere | Mesh objects, the Mesh nodes and the Mesh context |
+| Node package | node types (`NodeType`: description and cook) and object kinds (`ObjectKindSpec`); contexts through the UI interface | Mesh objects, the Mesh nodes and the Mesh context |
 | Bridge | conversions (`Conversion`) between two kernels' types | Tessellate: `kinogaki.cad.body` → `kinogaki.mesh.geometry` |
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
 | Render | engines; they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
@@ -87,9 +87,10 @@ Studio's core owns the cooking DAG for every context:
 - latest-wins scheduling, cancellation, worker threads and wakes;
 - time dependency and held edits.
 
-A package owns only what a node computes. It implements `NodeType`:
-- `cook(cx, inputs)`: the outputs (`Outputs`: one `Data` per output port, the selection output 0 carries downstream, warnings) or a `CookError` (cancelled, or failed with diagnostics);
-- `reads()`: what besides inputs and parameters invalidates the node, as data (time, input names, selection). What a node doesn't declare, core withholds from its `CookCx`, so it can't depend on it by accident;
+A package owns only what a node is and computes. It implements `NodeType`:
+- `description()`: its label, its ports (`Port`: key, label, data type, multi, optional, why it can't cook unwired) and its parameters as a `params::Schema` at their defaults. The environment reads it once, when the package registers;
+- `cook(cx, inputs)`: the outputs (`Outputs`: one `Data` per output port, the selection output 0 carries downstream, warnings) or a `CookError` (cancelled, or failed with diagnostics). An output nothing reads (`cx.wants(k)` is false) needn't be made;
+- `reads(parameters)`: what besides inputs and parameters invalidates a node with those parameters, as data (time, input names, selection). What a node doesn't declare, core withholds from its `CookCx`, so it can't depend on it by accident;
 - `incremental()`, optionally: `prepare` returns the outputs and a `CookPlan`, and the plan's `update` produces outputs for new light parameters (a drag) until it returns `None`. This is lib-mesh's `cook_prepared` / `ToolPlan` as a capability. Plans live in core's cache, never in the project or undo.
 
 `CookCx` gives a cook:
@@ -103,9 +104,7 @@ Packages keep no evaluator, worker or private cache.
 
 ## Held edits
 
-Edit Mesh and Edit CAD hold an authored delta over their input. Core owns the mechanism: capturing the delta, applying it again when the input recooks, and undo. A package supplies `HeldEdit` for its data type: the delta's data type (so a delta saves, stamps and counts memory like any value) and `apply(base, delta)`.
-
-This part is a sketch. How deltas are authored interactively belongs to `studio-ui-api`, which is still to be designed.
+Edit Mesh and Edit CAD hold an authored delta over their input. Core owns the mechanism: capturing the input once as the base, keeping one result per held state that its copies (undo snapshots) share, applying the delta anew when it changes, and undo. A package supplies `HeldEdit` for its data type: the delta's data type (so a delta saves, stamps and counts memory like any value), which other inputs a delta reads (`reads_input`: what it projects onto), and `apply(cx, base, delta, inputs)`, which returns the node's outputs and may keep prepared work in the node's scratch slot. How deltas are authored interactively is the package's UI, through `studio-ui-api`.
 
 ## Saving
 

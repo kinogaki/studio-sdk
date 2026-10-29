@@ -24,6 +24,12 @@ impl CancelToken {
         Self(flag)
     }
 
+    /// The shared flag, for a kernel whose work polls a token of its own
+    /// over it.
+    pub fn shared_flag(&self) -> Arc<AtomicBool> {
+        self.0.clone()
+    }
+
     /// Raises the flag: every clone now reports cancelled.
     pub fn cancel(&self) {
         self.0.store(true, Ordering::Relaxed);

@@ -6,7 +6,7 @@ use kinogaki_studio_api::parallel::Serial;
 
 /// Cooks the Box node with `width`, `depth` and `height`.
 fn cook(width: f64, depth: f64, height: f64) -> Result<Outputs, CookError> {
-    let mut parameters = BoxNode::parameters().values();
+    let mut parameters = BoxNode.description().parameters.values();
     parameters.insert("width".into(), width.into());
     parameters.insert("depth".into(), depth.into());
     parameters.insert("height".into(), height.into());

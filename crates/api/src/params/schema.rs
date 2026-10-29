@@ -149,6 +149,16 @@ pub enum ParameterKind {
     Code,
     /// [`Value::Text`]: a file's path, with a browse button.
     File,
+    /// [`Value::Text`]: a path to another node or object of the scene,
+    /// with a picker of the scene's tree.
+    Path,
+    /// [`Value::Text`]: attribute names (a name or a pattern) on the
+    /// node's input, with a menu of the input's attributes.
+    Attribute,
+    /// [`Value::Text`]: a group, an expression over the input's components
+    /// in the node's own syntax, which a pick in the viewport can write.
+    /// The node resolves it when it cooks.
+    Group,
     /// [`Value::Numbers`]: three channels of the scene's working-space RGB,
     /// shown as a swatch.
     Color,
@@ -179,7 +189,10 @@ impl ParameterKind {
             (Self::Number(_) | Self::Integer { .. }, Value::Number(_)) => true,
             (Self::Toggle, Value::Bool(_)) => true,
             (Self::Choice(items), Value::Index(i)) => *i < items.len(),
-            (Self::Text | Self::Code | Self::File, Value::Text(_)) => true,
+            (
+                Self::Text | Self::Code | Self::File | Self::Path | Self::Attribute | Self::Group,
+                Value::Text(_),
+            ) => true,
             (Self::Color, Value::Numbers(v)) => v.len() == 3,
             (Self::Vector { components, .. }, Value::Numbers(v)) => v.len() == *components as usize,
             (Self::Ramp { .. }, Value::Numbers(v)) => !v.is_empty(),

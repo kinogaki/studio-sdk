@@ -22,6 +22,8 @@ pub struct CookCx<'a> {
     wires: &'a [usize],
     /// The names of the nodes behind the wires, flat like the inputs.
     names: &'a [String],
+    /// Whether anything reads each output; empty: every one.
+    wanted: &'a [bool],
     selection: Option<&'a Components>,
     incoming: Option<&'a Components>,
     cancel: &'a CancelToken,
@@ -50,6 +52,7 @@ impl<'a> CookCx<'a> {
             parameters,
             wires: &[],
             names: &[],
+            wanted: &[],
             selection: None,
             incoming: None,
             cancel,
@@ -72,6 +75,13 @@ impl<'a> CookCx<'a> {
         self
     }
 
+    /// With `wanted[k]` saying whether anything reads output `k`. Without
+    /// it every output is wanted.
+    pub fn with_wanted(mut self, wanted: &'a [bool]) -> Self {
+        self.wanted = wanted;
+        self
+    }
+
     /// With `selection` as the components the node acts on.
     pub fn with_selection(mut self, selection: &'a Components) -> Self {
         self.selection = Some(selection);
@@ -88,6 +98,11 @@ impl<'a> CookCx<'a> {
     pub fn with_time(mut self, time: Time) -> Self {
         self.time = time;
         self
+    }
+
+    /// Every parameter the node holds, by name.
+    pub fn parameters(&self) -> &'a Parameters {
+        self.parameters
     }
 
     /// Parameter `name`'s value; `None` when the node has no such
@@ -144,6 +159,13 @@ impl<'a> CookCx<'a> {
             .get(input)
             .map(String::as_str)
             .filter(|n| !n.is_empty())
+    }
+
+    /// Whether anything reads output `output`: a node may skip making an
+    /// output nobody reads (see [`Outputs::data`](crate::Outputs::data)).
+    /// Output 0, the node's result, is always wanted.
+    pub fn wants(&self, output: usize) -> bool {
+        output == 0 || self.wanted.get(output).copied().unwrap_or(true)
     }
 
     /// The components the node acts on (its group, or a held edit's

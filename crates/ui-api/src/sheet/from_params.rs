@@ -85,6 +85,19 @@ impl From<&ParameterKind> for Kind {
                 lines: None,
             },
             ParameterKind::File => Kind::Path,
+            // The host fills the pickers and menus from the scene and the
+            // node's input.
+            ParameterKind::Path => Kind::TreePath {
+                choices: Vec::new(),
+                relative: false,
+                tooltip: "Choose a node or object".into(),
+            },
+            ParameterKind::Attribute => Kind::Name {
+                names: Vec::new(),
+                list: false,
+                tooltip: "The input's attributes".into(),
+            },
+            ParameterKind::Group => Kind::Expression { pick: None },
             ParameterKind::Color => Kind::Color,
             ParameterKind::Vector { number, .. } => Kind::Vector {
                 number: number.into(),

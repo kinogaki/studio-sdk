@@ -14,7 +14,7 @@
 //!   optional [`facets`]: [`Displayable`], [`Pickable`], [`Tabular`] and
 //!   [`Renderable`]. [`Components`] is a component selection in a type's
 //!   own terms; [`Conversion`]s turn one type into another.
-//! - **Cooking** ([`cook`]): what a node type computes ([`NodeType`],
+//! - **Cooking** ([`cook`]): what a node type is and computes ([`NodeType`] with its [`Description`],
 //!   [`CookCx`], optional [`Incremental`] cooking); Studio's core owns the
 //!   cooking DAG, the caches and the [`parallel`] workers. [`HeldEdit`]s
 //!   apply a held node's authored delta to a data type.
@@ -68,7 +68,9 @@ pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec};
 pub use components::Components;
 pub use conversion::Conversion;
-pub use cook::{CookCx, CookError, CookPlan, Incremental, NodeType, Outputs, Prepared, Reads};
+pub use cook::{
+    CookCx, CookError, CookPlan, Description, Incremental, NodeType, Outputs, Port, Prepared, Reads,
+};
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
