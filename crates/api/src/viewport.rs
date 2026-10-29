@@ -10,7 +10,7 @@
 //! that moved.
 use crate::math::Vec3;
 use crate::render::Ranges;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -97,6 +97,64 @@ impl Surface {
         }
     }
 
+    /// Flat-shaded `polygons` over `points`: each polygon a face (its
+    /// index the face number), its corners sharing the polygon's normal,
+    /// fanned into triangles from its first corner, and every distinct
+    /// polygon edge a line (edge ids in first-seen order). `topology` is as
+    /// in [`new`](Self::new). Polygons are convex, wound counterclockwise
+    /// seen from outside, and index `points`; a degenerate polygon's
+    /// corners face +Z.
+    ///
+    /// ```
+    /// use kinogaki_studio_api::Surface;
+    ///
+    /// let square = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
+    /// let surface = Surface::polygons(square, [[0, 1, 2, 3]], 1);
+    /// assert_eq!((surface.faces(), surface.triangles().len()), (1, 2));
+    /// assert_eq!(surface.lines().len(), 8); // four edges, two vertices each
+    /// assert_eq!(surface.corners()[0].normal, [0.0, 0.0, 1.0]);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// When a polygon indexes past `points`.
+    pub fn polygons<P: AsRef<[u32]>>(
+        points: impl Into<Arc<[[f32; 3]]>>,
+        polygons: impl IntoIterator<Item = P>,
+        topology: u64,
+    ) -> Self {
+        let points = points.into();
+        let mut corners = Vec::new();
+        let mut triangles = Vec::new();
+        let mut edges = BTreeMap::new();
+        let mut lines = Vec::new();
+        let mut faces = 0;
+        for (face, polygon) in polygons.into_iter().enumerate() {
+            let polygon = polygon.as_ref();
+            let normal = newell_normal(&points, polygon);
+            let first = corners.len() as u32;
+            corners.extend(polygon.iter().map(|&point| Corner {
+                point,
+                face: face as u32,
+                normal,
+            }));
+            for i in 1..polygon.len().saturating_sub(1) as u32 {
+                triangles.push([first, first + i, first + i + 1]);
+            }
+            for (i, &a) in polygon.iter().enumerate() {
+                let b = polygon[(i + 1) % polygon.len()];
+                let next = edges.len() as u32;
+                let id = *edges.entry((a.min(b), a.max(b))).or_insert(next);
+                if id == next {
+                    lines.extend([[a, id], [b, id]]);
+                }
+            }
+            faces += 1;
+        }
+        Self::new(points, corners.into(), triangles.into(), faces, topology)
+            .with_lines(lines.into())
+    }
+
     /// With `lines`: line vertices, two a segment.
     pub fn with_lines(mut self, lines: Arc<[[u32; 2]]>) -> Self {
         debug_assert!(lines.len().is_multiple_of(2), "two line vertices a segment");
@@ -181,6 +239,24 @@ impl Surface {
     /// Whether `self` and `other` are the same surface.
     pub fn same(&self, other: &Surface) -> bool {
         Arc::ptr_eq(&self.identity, &other.identity)
+    }
+}
+
+/// `polygon`'s unit normal by Newell's method; +Z when it has no area.
+fn newell_normal(points: &[[f32; 3]], polygon: &[u32]) -> [f32; 3] {
+    let mut n = [0.0f32; 3];
+    for (i, &a) in polygon.iter().enumerate() {
+        let p = points[a as usize];
+        let q = points[polygon[(i + 1) % polygon.len()] as usize];
+        n[0] += (p[1] - q[1]) * (p[2] + q[2]);
+        n[1] += (p[2] - q[2]) * (p[0] + q[0]);
+        n[2] += (p[0] - q[0]) * (p[1] + q[1]);
+    }
+    let length = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
+    if length > 0.0 {
+        n.map(|c| c / length)
+    } else {
+        [0.0, 0.0, 1.0]
     }
 }
 
@@ -320,6 +396,37 @@ mod tests {
         assert_eq!(later.moved_since(base.identity()), None);
         assert_eq!(base.moved_since(base.identity()), None);
         assert!(format!("{base:?}").contains("segments: 1"));
+    }
+
+    #[test]
+    fn polygons_share_edges_and_face_their_normals() {
+        // Two squares sharing the edge 1-2: one in z = 0, one in x = 1.
+        let points = [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [1.0, 0.0, -1.0],
+            [1.0, 1.0, -1.0],
+        ];
+        let surface = Surface::polygons(points, [&[0, 1, 2, 3][..], &[1, 4, 5, 2]], 3);
+        assert_eq!((surface.faces(), surface.topology()), (2, 3));
+        assert_eq!(surface.corners().len(), 8);
+        assert_eq!(
+            &surface.triangles()[..],
+            &[[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]]
+        );
+        // Seven distinct edges: the shared one is drawn once.
+        assert_eq!(surface.lines().len(), 14);
+        let corner = surface.corners()[5];
+        assert_eq!(
+            (corner.point, corner.face, corner.normal),
+            (4, 1, [1.0, 0.0, 0.0])
+        );
+        assert_eq!(surface.corners()[0].normal, [0.0, 0.0, 1.0]);
+        // A degenerate polygon faces +Z.
+        let flat = Surface::polygons([[0.0; 3]; 3], [[0, 1, 2]], 0);
+        assert_eq!(flat.corners()[0].normal, [0.0, 0.0, 1.0]);
     }
 
     #[test]

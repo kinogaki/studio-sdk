@@ -88,7 +88,7 @@ pub use package::Package;
 pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};
 pub use registry::{Registry, RegistryError};
-pub use render::{RenderItem, TriangleSource};
+pub use render::{PlainTriangles, RenderItem, TriangleSource};
 pub use session::{SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use time::Time;
 pub use viewport::{Elements, Hit, Level, Surface};

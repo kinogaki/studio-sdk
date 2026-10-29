@@ -1,0 +1,25 @@
+[package]
+name = "example-box-node"
+description = "An example Kinogaki Studio plugin: a Box node and the box data type it makes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+# A Rust dylib: Studio and its plugins share one standard library and one
+# copy of the SDK.
+crate-type = ["dylib"]
+
+# The workspace's lints, but `deny` for unsafe code: the entry point's
+# `no_mangle` is allowed by name.
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+
+[dependencies]
+kinogaki-studio-api.workspace = true

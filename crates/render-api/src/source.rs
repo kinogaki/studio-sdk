@@ -100,3 +100,133 @@ pub trait TriangleSource: Send + Sync {
     /// the host treats as every point.
     fn moved_since(&self, previous: &Arc<()>) -> Option<Ranges>;
 }
+
+/// A [`TriangleSource`] of fixed points and triangles: flat-shaded, in the
+/// engine's default material, with no texture coordinates, attributes or
+/// drag history. It suits a data type whose renders need nothing more (a
+/// primitive, a preview); a type with materials, normals or interactive
+/// drags implements [`TriangleSource`] itself.
+///
+/// ```
+/// use kinogaki_render_api::{PlainTriangles, TriangleSource};
+///
+/// let points = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+/// let source = PlainTriangles::new(points, [[0, 1, 2]], 1);
+/// assert_eq!(source.triangle_count(), 1);
+/// assert_eq!(source.looks().0.len(), 1);
+/// ```
+#[derive(Clone, Debug)]
+pub struct PlainTriangles {
+    identity: Arc<()>,
+    topology: u64,
+    points: Arc<[[f32; 3]]>,
+    triangles: Arc<[[u32; 3]]>,
+}
+
+impl PlainTriangles {
+    /// `triangles`, three indices into `points` each, as a new snapshot.
+    /// `topology` is the caller's key for the triangles: sources with
+    /// equal keys must have identical triangles
+    /// ([`TriangleSource::topology`]), so a resized box keeps its key and
+    /// a box turned into another shape gets a new one.
+    pub fn new(
+        points: impl Into<Arc<[[f32; 3]]>>,
+        triangles: impl Into<Arc<[[u32; 3]]>>,
+        topology: u64,
+    ) -> Self {
+        Self {
+            identity: Arc::new(()),
+            topology,
+            points: points.into(),
+            triangles: triangles.into(),
+        }
+    }
+}
+
+impl TriangleSource for PlainTriangles {
+    fn identity(&self) -> &Arc<()> {
+        &self.identity
+    }
+
+    fn topology(&self) -> u64 {
+        self.topology
+    }
+
+    fn triangle_count(&self) -> usize {
+        self.triangles.len()
+    }
+
+    fn triangles(&self) -> Arc<[[u32; 3]]> {
+        self.triangles.clone()
+    }
+
+    fn points(&self) -> Arc<[[f32; 3]]> {
+        self.points.clone()
+    }
+
+    /// Flat.
+    fn corner_normals(&self) -> Option<Arc<[[f32; 3]]>> {
+        None
+    }
+
+    /// Zero.
+    fn corner_uvs(&self) -> Option<Arc<[[f32; 2]]>> {
+        None
+    }
+
+    /// The engine's default material on every triangle.
+    fn looks(&self) -> (Arc<[u16]>, Vec<Look>) {
+        (vec![u16::MAX; self.triangles.len()].into(), Vec::new())
+    }
+
+    /// None: looks and coordinates never change.
+    fn columns(&self) -> Vec<u64> {
+        Vec::new()
+    }
+
+    /// None: the source has no attributes.
+    fn attributes(
+        &self,
+        _names: &[Arc<str>],
+        _to_render: &dyn Fn([f32; 3]) -> [f32; 3],
+    ) -> Vec<MeshAttribute> {
+        Vec::new()
+    }
+
+    fn attribute_identity(&self, names: &[Arc<str>]) -> Vec<u64> {
+        vec![0; names.len()]
+    }
+
+    fn revision(&self) -> u64 {
+        0
+    }
+
+    /// Unknown: a new snapshot is every point moved.
+    fn moved_since(&self, _previous: &Arc<()>) -> Option<Ranges> {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_triangles_are_flat_and_default_material() {
+        let points = [[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0; 3]];
+        let source = PlainTriangles::new(points, [[0, 1, 2], [1, 3, 2]], 9);
+        assert_eq!((source.triangle_count(), source.topology()), (2, 9));
+        assert_eq!(source.points().len(), 4);
+        assert!(source.corner_normals().is_none() && source.corner_uvs().is_none());
+        let (looks, distinct) = source.looks();
+        assert_eq!((&looks[..], distinct.len()), (&[u16::MAX; 2][..], 0));
+        let names: [Arc<str>; 1] = [Arc::from("Cd")];
+        assert!(source.attributes(&names, &|c| c).is_empty());
+        assert_eq!(source.attribute_identity(&names), vec![0]);
+        // Each snapshot is new; a clone is the same snapshot.
+        let next = PlainTriangles::new(source.points(), source.triangles(), 9);
+        assert!(!Arc::ptr_eq(source.identity(), next.identity()));
+        assert!(Arc::ptr_eq(source.identity(), source.clone().identity()));
+        assert_eq!(next.moved_since(source.identity()), None);
+    }
+}

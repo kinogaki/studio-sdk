@@ -43,6 +43,12 @@ So a package written against the SDK compiles against nothing private, and the S
 
 Studio's `tools/check_architecture.py` enforces the rule: the SDK's crates depend on no Kinogaki crate but their own. Its one third-party dependency is wgpu 30.0.1, pinned exactly and resolved from crates.io as a normal dependency, only with the `wgpu` feature: a wgpu host and its engines share the device and display textures, so they must agree on the version. The default build has no dependencies at all.
 
+## Example plugin
+
+[`examples/box-node`](examples/box-node) is a whole plugin in one file: a box data type that shows in the viewport, renders as twelve triangles and saves its size, a Box node that makes one from its width, depth and height, and the package that registers both. Its tests cook the node the way Studio does. https://studiosdk.kinogaki.com walks through it.
+
+Studio does not load plugin libraries yet; the example builds the library a plugin will ship as.
+
 ## Building
 
 ```sh

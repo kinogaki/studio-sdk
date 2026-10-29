@@ -68,7 +68,7 @@ pub use settings::{
     SettingError, SettingGroup, SettingKind, SettingValue, SettingValues, Trailing, Unit,
     Visibility, ramp_color,
 };
-pub use source::{Look, TriangleSource};
+pub use source::{Look, PlainTriangles, TriangleSource};
 pub use update::{Change, SceneUpdate};
 pub use vocabulary::{
     Choice, InputEdit, Layout, NodeLayout, NodeType, ParamKind, ParamSpec, ParamValue, Params,

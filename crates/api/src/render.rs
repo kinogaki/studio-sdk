@@ -4,14 +4,17 @@
 //! Engines never see kernel types: a CAD body renders as its
 //! tessellation's triangles, a mesh as its display triangulation. The
 //! source contract ([`TriangleSource`], [`Ranges`], [`Look`],
-//! [`MeshAttribute`], [`AttributeDomain`]) is the render interface's
-//! (`kinogaki-render-api`), the crate engines build on; it is re-exported
+//! [`MeshAttribute`], [`AttributeDomain`]) and its plain source
+//! ([`PlainTriangles`]) are the render interface's
+//! (`kinogaki-render-api`), the crate engines build on; they are re-exported
 //! here, so a source a data type makes is what engines' hosts consume.
 use crate::math::Mat4;
 use std::fmt;
 use std::sync::Arc;
 
-pub use kinogaki_render_api::{AttributeDomain, Look, MeshAttribute, Ranges, TriangleSource};
+pub use kinogaki_render_api::{
+    AttributeDomain, Look, MeshAttribute, PlainTriangles, Ranges, TriangleSource,
+};
 
 /// What a value renders as.
 #[derive(Clone)]
