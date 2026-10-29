@@ -51,8 +51,19 @@ pub enum Order {
     Tooltip,
 }
 
-/// A borderless floating panel at a point, sized by its content: a
-/// picker, a hint, a chooser beside a handle.
+/// How a popover's panel is drawn.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum PopoverLook {
+    /// The host's popup: raised, with a shadow.
+    #[default]
+    Popup,
+    /// A flat panel on the views: the surface's fill, a one-point border,
+    /// control rounding and a gap's margin.
+    Panel,
+}
+
+/// A floating panel at a point, sized by its content: a picker, a hint, a
+/// chooser beside a handle, a list at the pointer.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PopoverSpec {
     /// Keeps its widget state apart from other panels'.
@@ -63,6 +74,8 @@ pub struct PopoverSpec {
     pub constrain: Option<Rect>,
     /// Its layer.
     pub order: Order,
+    /// How its panel is drawn.
+    pub look: PopoverLook,
 }
 
 impl PopoverSpec {
@@ -74,6 +87,7 @@ impl PopoverSpec {
             at,
             constrain: None,
             order: Order::Foreground,
+            look: PopoverLook::Popup,
         }
     }
 
@@ -86,6 +100,12 @@ impl PopoverSpec {
     /// In layer `order`.
     pub fn order(mut self, order: Order) -> Self {
         self.order = order;
+        self
+    }
+
+    /// Drawn as `look`.
+    pub fn look(mut self, look: PopoverLook) -> Self {
+        self.look = look;
         self
     }
 }

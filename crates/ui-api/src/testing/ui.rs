@@ -291,6 +291,7 @@ impl RecordingUi {
         let hovered = pointer.hover.is_some_and(|p| rect.contains(p));
         let mut response = Response::new(id, rect);
         response.hovered = hovered;
+        response.contains_pointer = hovered;
         response.interact_pos = pointer.interact.filter(|_| hovered);
         if self.enabled && hovered && sense.click {
             response.clicked = pointer.primary_released();

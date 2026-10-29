@@ -14,7 +14,7 @@ use crate::text::{Font, TextStyle};
 use crate::theme::Theme;
 use crate::ui::{Body, RowMenu, Ui};
 use crate::value_fields::ValueFields;
-use crate::widgets::{ButtonSpec, ChoiceLook, MenuItem, TextEditSpec};
+use crate::widgets::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};
 
 impl Ui for RecordingUi {
     fn input(&self) -> &Input {
@@ -246,8 +246,8 @@ impl Ui for RecordingUi {
         self.respond(id, rect, Sense::HOVER)
     }
 
-    fn scroll_vertical(&mut self, id: Id, _max_height: f32, body: Body<'_>) -> Response {
-        self.record(Call::Scroll(id));
+    fn scroll_vertical(&mut self, spec: &ScrollSpec, body: Body<'_>) -> Response {
+        self.record(Call::Scroll(spec.id));
         self.nest(false, body)
     }
 

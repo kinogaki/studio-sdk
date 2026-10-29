@@ -11,7 +11,7 @@ use crate::sheet::{self, Edits, FieldKey, Keyed, Schema, SheetStyle};
 use crate::text::TextStyle;
 use crate::theme::Theme;
 use crate::value_fields::ValueFields;
-use crate::widgets::{ButtonSpec, ChoiceLook, MenuItem, TextEditSpec};
+use crate::widgets::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};
 use std::hash::Hash;
 
 /// A body the host lays out: called with the `Ui` of the region it made.
@@ -131,9 +131,8 @@ pub trait Ui {
     /// layout (a custom-placed panel).
     fn child(&mut self, rect: Rect, body: Body<'_>) -> Response;
 
-    /// `body` in a vertical scroll area at most `max_height` tall (infinity
-    /// for no limit); `id` keeps its scroll position.
-    fn scroll_vertical(&mut self, id: Id, max_height: f32, body: Body<'_>) -> Response;
+    /// `body` in a vertical scroll area, as `spec` says.
+    fn scroll_vertical(&mut self, spec: &ScrollSpec, body: Body<'_>) -> Response;
 
     /// `body` with its widgets enabled or, when `enabled` is false, greyed
     /// and taking no input.
@@ -208,12 +207,11 @@ pub trait UiExt: Ui {
     /// [`Ui::scroll_vertical`] with a body that returns a value.
     fn scroll_with<R>(
         &mut self,
-        id: Id,
-        max_height: f32,
+        spec: &ScrollSpec,
         body: impl FnOnce(&mut dyn Ui) -> R,
     ) -> InnerResponse<R> {
         let mut run = Once::new(body);
-        let response = self.scroll_vertical(id, max_height, &mut |ui| run.call(ui));
+        let response = self.scroll_vertical(spec, &mut |ui| run.call(ui));
         InnerResponse {
             inner: run.take(),
             response,

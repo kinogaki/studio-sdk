@@ -231,3 +231,44 @@ pub enum ChoiceLook {
     /// A dropdown menu.
     Dropdown,
 }
+
+/// A vertical scroll area.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScrollSpec {
+    /// Keeps its scroll position.
+    pub id: Id,
+    /// Its greatest height (infinity for no limit).
+    pub max_height: f32,
+    /// Takes all the room it is given, though its content is smaller;
+    /// otherwise it shrinks around its content.
+    pub fill: bool,
+    /// `Some(width)`: a bar of that width beside the content, shown while
+    /// the content overflows; `None`: the host's bar, floating over the
+    /// content.
+    pub bar: Option<f32>,
+}
+
+impl ScrollSpec {
+    /// Scroll area `id`, at most `max_height` tall, shrinking around its
+    /// content, with the host's bar.
+    pub fn new(id: Id, max_height: f32) -> Self {
+        ScrollSpec {
+            id,
+            max_height,
+            fill: false,
+            bar: None,
+        }
+    }
+
+    /// Taking all the room it is given.
+    pub fn fill(mut self) -> Self {
+        self.fill = true;
+        self
+    }
+
+    /// With a bar `width` wide beside the content.
+    pub fn bar(mut self, width: f32) -> Self {
+        self.bar = Some(width);
+        self
+    }
+}

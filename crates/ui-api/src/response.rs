@@ -57,6 +57,9 @@ pub struct Response {
     pub rect: Rect,
     /// The pointer is over it (and nothing above it).
     pub hovered: bool,
+    /// The pointer is over it and nothing above it, though another widget
+    /// is being dragged (when `hovered` is false).
+    pub contains_pointer: bool,
     /// The primary button clicked it.
     pub clicked: bool,
     /// The secondary button clicked it.
@@ -97,6 +100,7 @@ impl Response {
             id: self.id,
             rect: self.rect.union(other.rect),
             hovered: self.hovered || other.hovered,
+            contains_pointer: self.contains_pointer || other.contains_pointer,
             clicked: self.clicked || other.clicked,
             secondary_clicked: self.secondary_clicked || other.secondary_clicked,
             double_clicked: self.double_clicked || other.double_clicked,

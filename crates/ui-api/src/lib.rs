@@ -66,7 +66,7 @@ pub mod value_fields;
 mod vec3;
 mod widgets;
 
-pub use card::{CardResponse, CardSpec, Order, PopoverSpec};
+pub use card::{CardResponse, CardSpec, Order, PopoverLook, PopoverSpec};
 pub use color::Color;
 pub use geom::{Align, Align2, Pos, Rect, Vec2, pos, vec2};
 pub use id::Id;
@@ -81,4 +81,4 @@ pub use text::{Font, FontRole, TextStyle};
 pub use theme::{Marks, Metrics, Radii, Theme};
 pub use ui::{Body, RowMenu, Ui, UiExt};
 pub use value_fields::{ValueField, ValueFields};
-pub use widgets::{ButtonSpec, ChoiceLook, MenuItem, TextEditSpec};
+pub use widgets::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};

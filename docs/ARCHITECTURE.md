@@ -201,7 +201,7 @@ From the most declarative to the most direct:
 | Part | What it is | Used for |
 |---|---|---|
 | `sheet::Schema<K>` | Sections and typed fields with their values, as data; the host draws it with `Ui::sheet` and reports `Edits` | inspectors, a tool's card body, settings pages (`page() -> Schema`, then apply the `Edits`) |
-| `CardSpec`, `PopoverSpec` | Floating panels the host frames around a body | a tool's parameters; a picker beside a handle |
+| `CardSpec`, `PopoverSpec` | Floating panels the host frames around a body (a popover as the host's raised popup or a flat panel) | a tool's parameters; a picker beside a handle; a list at the pointer |
 | `ValueFields` | The heads-up boxes a drawing tool types into; `type_events` is the whole keyboard behaviour, `Ui::value_fields` draws them | a line's length and angle while drawing |
 | `Ui` | Immediate widgets (labels, buttons, toggles, number fields, sliders, text fields, choices, swatches, menus) and layout | small panels the schema can't express |
 | `Painter` | Segments, circles, rectangles, polylines, text and icons, single or in batches; text measuring; reserved slots | viewport overlays: handles, guides, badges, labels |
