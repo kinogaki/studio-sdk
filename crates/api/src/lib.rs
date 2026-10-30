@@ -23,6 +23,8 @@
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
 //!   state of an editing session.
+//! - **Stored values** ([`Stored`], [`StoredValue`]): package-owned values
+//!   the project keeps, one for the project or one per view.
 //! - **Icons** ([`icon`]): the named icons a package adds to Studio's
 //!   icon set, under its own id.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
@@ -70,6 +72,7 @@ pub mod refs;
 pub mod registry;
 pub mod render;
 pub mod session;
+pub mod stored;
 pub mod time;
 pub mod viewport;
 
@@ -105,5 +108,6 @@ pub use refs::{NodeRef, ObjectRef};
 pub use registry::{Registry, RegistryError};
 pub use render::{PlainTriangles, RenderItem, TriangleSource};
 pub use session::{SessionSlot, SessionSlots, Slot, SlotDoc};
+pub use stored::{Scope, Stored, StoredValue, StoredValues};
 pub use time::Time;
 pub use viewport::{ElementKind, ElementSet, Hit, Surface, SurfaceSource};

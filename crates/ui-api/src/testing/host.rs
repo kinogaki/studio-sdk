@@ -107,6 +107,10 @@ pub struct FakeHost {
     pub prefs: HostPrefs,
     /// Settings sections' applied values, by context.
     pub sections: BTreeMap<ContextId, Arc<dyn Any + Send + Sync>>,
+    /// The project's stored values.
+    pub stored: kinogaki_studio_api::StoredValues,
+    /// Each view's stored values.
+    pub view_stored: Vec<kinogaki_studio_api::StoredValues>,
     /// A text field has the keyboard.
     pub keyboard_taken: bool,
     /// How many times the wake was called.
@@ -139,6 +143,8 @@ impl FakeHost {
             inspected: Inspected::default(),
             prefs: HostPrefs::default(),
             sections: BTreeMap::new(),
+            stored: Default::default(),
+            view_stored: Vec::new(),
             keyboard_taken: false,
             wakes: Arc::default(),
             undo: Vec::new(),
@@ -309,6 +315,26 @@ impl HostDoc for FakeHost {
             .filter(|(_, o)| o.kind == kind)
             .map(|(&id, _)| id)
             .collect()
+    }
+    fn stored_any(&self, id: &str, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)> {
+        match view {
+            None => self.stored.get_any(id),
+            Some(v) => self.view_stored.get(v)?.get_any(id),
+        }
+    }
+    fn set_stored_any(
+        &mut self,
+        id: &str,
+        view: Option<usize>,
+        value: Arc<dyn Any + Send + Sync>,
+    ) -> bool {
+        match view {
+            None => self.stored.set_any(id, value),
+            Some(v) => self
+                .view_stored
+                .get_mut(v)
+                .is_some_and(|s| s.set_any(id, value)),
+        }
     }
 }
 

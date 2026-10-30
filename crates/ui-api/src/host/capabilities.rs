@@ -11,6 +11,7 @@
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::TransformTool;
 use kinogaki_studio_api::session::Slot;
+use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{Bounds, ContextId, ObjectBody, ObjectKindId, SlotId};
 use std::any::Any;
 use std::sync::Arc;
@@ -132,6 +133,72 @@ pub trait HostDoc {
     fn object_body(&self, object: ObjectRef) -> Option<Arc<dyn ObjectBody>>;
     /// Every object of kind `kind`, in the scene's order.
     fn objects_of_kind(&self, kind: ObjectKindId) -> Vec<ObjectRef>;
+    /// Stored value `id` (a package's [`Stored`]): the project's (`view`
+    /// `None`), or view `view`'s. `None` when no package registered it in
+    /// that scope.
+    fn stored_any(&self, id: &str, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)>;
+    /// Sets stored value `id` (the project's, or view `view`'s) to
+    /// `value`: a project's value is a change to the project, saved with
+    /// it; a view's is not undone. `false`: no such value, or `value` is
+    /// not of its type.
+    fn set_stored_any(
+        &mut self,
+        id: &str,
+        view: Option<usize>,
+        value: Arc<dyn Any + Send + Sync>,
+    ) -> bool;
+}
+
+/// Typed access to the stored values.
+pub trait HostDocExt: HostDoc {
+    /// The project's value `T`.
+    ///
+    /// # Panics
+    /// When no package registered `T` for the project (a programming
+    /// error: a package registers its values with
+    /// [`Package::with_stored`](kinogaki_studio_api::Package::with_stored)).
+    fn stored<T: Stored>(&self) -> &T {
+        self.stored_any(T::id(), None)
+            .and_then(|v| v.downcast_ref())
+            .unwrap_or_else(|| unstored::<T>())
+    }
+    /// View `view`'s value `T`.
+    ///
+    /// # Panics
+    /// When no package registered `T` for views, or there is no such view.
+    fn view_stored<T: Stored>(&self, view: usize) -> &T {
+        self.stored_any(T::id(), Some(view))
+            .and_then(|v| v.downcast_ref())
+            .unwrap_or_else(|| unstored::<T>())
+    }
+    /// Sets the project's value `T`.
+    ///
+    /// # Panics
+    /// When no package registered `T` for the project.
+    fn set_stored<T: Stored>(&mut self, value: T) {
+        if !self.set_stored_any(T::id(), None, Arc::new(value)) {
+            unstored::<T>()
+        }
+    }
+    /// Sets view `view`'s value `T`.
+    ///
+    /// # Panics
+    /// When no package registered `T` for views, or there is no such view.
+    fn set_view_stored<T: Stored>(&mut self, view: usize, value: T) {
+        if !self.set_stored_any(T::id(), Some(view), Arc::new(value)) {
+            unstored::<T>()
+        }
+    }
+}
+
+impl<H: HostDoc + ?Sized> HostDocExt for H {}
+
+fn unstored<T: Stored>() -> ! {
+    panic!(
+        "stored value {} is not registered ({})",
+        T::id(),
+        std::any::type_name::<T>()
+    )
 }
 
 /// The viewport's views and cameras.

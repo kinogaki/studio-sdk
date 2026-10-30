@@ -8,14 +8,16 @@ use crate::icon::Icon;
 use crate::id::PackageId;
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
+use crate::stored::{Stored, StoredValue};
 use std::fmt;
 use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
 /// types (a kernel's), held edits over them, conversions (a bridge's),
-/// node types' cooks, object kinds, file formats, session slots and icons,
-/// and with the `wgpu` feature its render engines. Node descriptions, contexts
-/// and UI register through the librarian and the host UI interface.
+/// node types' cooks, object kinds, file formats, session slots, stored
+/// values and icons, and with the `wgpu` feature its render engines. Node
+/// descriptions, contexts and UI register through the librarian and the
+/// host UI interface.
 ///
 /// Every id it declares has its vendor (the first segment of its id):
 /// `acme.trees` registers `acme.trees.branch` or `acme.format.tree`, never
@@ -46,6 +48,8 @@ pub struct Package {
     pub formats: Vec<Arc<dyn FileFormat>>,
     /// Its session state.
     pub slots: Vec<SessionSlot>,
+    /// The values it keeps in projects.
+    pub stored: Vec<StoredValue>,
     /// The icons it adds to Studio's icon set, named under its id
     /// ([`icon`](crate::icon)).
     pub icons: Vec<Icon>,
@@ -73,10 +77,17 @@ impl Package {
             object_kinds: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
+            stored: Vec::new(),
             icons: Vec::new(),
             #[cfg(feature = "wgpu")]
             engines: Vec::new(),
         }
+    }
+
+    /// With stored value `T` too.
+    pub fn with_stored<T: Stored>(mut self) -> Self {
+        self.stored.push(StoredValue::of::<T>());
+        self
     }
 
     /// With data type `ty` too.
@@ -164,6 +175,10 @@ impl fmt::Debug for Package {
                     .iter()
                     .map(|s| s.id().as_str())
                     .collect::<Vec<_>>(),
+            )
+            .field(
+                "stored",
+                &self.stored.iter().map(|s| s.id()).collect::<Vec<_>>(),
             )
             .field(
                 "icons",

@@ -10,7 +10,7 @@
 //! | [`HostUndo`] | undo, redo and gestures |
 //! | [`HostSlots`] ([`HostSlotsExt`]) | the session's slots, typed |
 //! | [`HostSelection`] | selected objects, picked nodes |
-//! | [`HostDoc`] | where the user is, objects and their bodies |
+//! | [`HostDoc`] ([`HostDocExt`]) | where the user is, objects and their bodies, packages' stored values |
 //! | [`HostView`] | views, cameras, framing, redraws |
 //! | [`HostStatus`] | the error line and the Console |
 //! | [`HostShell`] | actions and the keyboard |
@@ -35,8 +35,8 @@ mod capabilities;
 mod data;
 
 pub use capabilities::{
-    HostDoc, HostSelection, HostSettings, HostSettingsExt, HostShell, HostSlots, HostSlotsExt,
-    HostStatus, HostTransform, HostUndo, HostView,
+    HostDoc, HostDocExt, HostSelection, HostSettings, HostSettingsExt, HostShell, HostSlots,
+    HostSlotsExt, HostStatus, HostTransform, HostUndo, HostView,
 };
 pub use data::{HostPrefs, Inspected, NodeRef, ObjectRef, Place, View, ViewCamera};
 
