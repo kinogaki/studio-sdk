@@ -1,5 +1,6 @@
 //! Fonts and icons by role and name: the host owns the faces and the
-//! icon set; a plugin says what it means.
+//! icon set (to which packages add their own icons); a plugin says what
+//! it means.
 use crate::color::Color;
 
 /// Which face text draws in.

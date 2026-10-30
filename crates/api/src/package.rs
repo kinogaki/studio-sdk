@@ -4,6 +4,7 @@ use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
+use crate::icon::Icon;
 use crate::id::PackageId;
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
@@ -12,8 +13,8 @@ use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
 /// types (a kernel's), held edits over them, conversions (a bridge's),
-/// node types' cooks, object kinds, file formats and session slots, and
-/// with the `wgpu` feature its render engines. Node descriptions, contexts
+/// node types' cooks, object kinds, file formats, session slots and icons,
+/// and with the `wgpu` feature its render engines. Node descriptions, contexts
 /// and UI register through the librarian and the host UI interface.
 ///
 /// Every id it declares has its vendor (the first segment of its id):
@@ -45,6 +46,9 @@ pub struct Package {
     pub formats: Vec<Arc<dyn FileFormat>>,
     /// Its session state.
     pub slots: Vec<SessionSlot>,
+    /// The icons it adds to Studio's icon set, named under its id
+    /// ([`icon`](crate::icon)).
+    pub icons: Vec<Icon>,
     /// The render engines it brings (the `wgpu` feature, which a host that
     /// renders enables).
     ///
@@ -69,6 +73,7 @@ impl Package {
             object_kinds: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
+            icons: Vec::new(),
             #[cfg(feature = "wgpu")]
             engines: Vec::new(),
         }
@@ -116,6 +121,13 @@ impl Package {
         self
     }
 
+    /// With icon `icon` too: others name it `"<package id>/<icon name>"`
+    /// ([`icon::qualified`](crate::icon::qualified)).
+    pub fn with_icon(mut self, icon: Icon) -> Self {
+        self.icons.push(icon);
+        self
+    }
+
     /// With render engine `engine` too.
     #[cfg(feature = "wgpu")]
     pub fn with_engine(
@@ -152,6 +164,10 @@ impl fmt::Debug for Package {
                     .iter()
                     .map(|s| s.id().as_str())
                     .collect::<Vec<_>>(),
+            )
+            .field(
+                "icons",
+                &self.icons.iter().map(|i| &i.name).collect::<Vec<_>>(),
             );
         #[cfg(feature = "wgpu")]
         out.field(

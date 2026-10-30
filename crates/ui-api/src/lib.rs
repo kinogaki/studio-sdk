@@ -26,8 +26,9 @@
 //! And the plain values they exchange: [`geom`] (points, vectors,
 //! rectangles, alignment, in `f32` screen points), [`Color`] (premultiplied
 //! sRGBA bytes), the host-filled [`Theme`], [`Font`]s by role and icons by
-//! name (names come from the host's icon set; an unknown name draws
-//! nothing), and [`Id`]s.
+//! name (Studio's own, `"cube"`, or a package's, `"acme.trees/leaf"`: see
+//! `kinogaki_studio_api::icon`; an unknown name draws Studio's neutral
+//! icon), and [`Id`]s.
 //!
 //! Pure viewport maths the host's own tools use is here too, so a
 //! plugin's tools behave exactly like Studio's: the transform gizmo's

@@ -175,6 +175,16 @@ Some state belongs to a package and lasts only for the session: a selection, pic
 
 Session state is never saved in the project.
 
+## Icons
+
+Studio owns a named icon set, and its icons are the default: wherever the API asks for an icon by name (`ObjectKindSpec::icon`, `Description::icon`, the UI layer's buttons, painter icons and library entries), a plain name such as `"cube"` is Studio's. A package adds icons of its own with `Package::with_icon`: an `Icon` is a name within the package and an SVG document the package embeds. Others name it by the package's id, a `/` and that name (`icon::qualified`): icon `leaf` of `acme.trees` is `"acme.trees/leaf"`. A package registers icons under its own id alone, so packages' names never meet each other's or Studio's.
+
+Studio draws a package's icon exactly as it draws its own: as pixel art, its `viewBox` its size in icon pixels (whole numbers, at most `icon::MAX_PIXELS` either way, the size of Studio's own), every pixel solid or clear and tinted by the widget that shows it, rasterized once per size and cached. So an icon is one color, drawn in white or `currentColor`.
+
+Studio checks each icon when the package registers: its name, its size (at most `icon::MAX_BYTES`), that its document reads and that its `viewBox` fits. An icon that fails is left out and the Console says why, once; the rest of the package registers as usual. A name that finds no icon draws Studio's neutral icon, and the Console names it once.
+
+Icons mark what has no text of its own: toolbar buttons, tab buttons, the kinds of objects and nodes in the outliner. Menus and marking menus show text alone, and a node tile shows its category by color.
+
 ## Cancellation and time
 
 Long work polls a `CancelToken`: preparing a display, converting, reading a file.
@@ -241,7 +251,7 @@ Meshes, CAD surfaces and wireframes never go through the painter. They are the d
 - **Bodies run once.** Layout methods take their body as `&mut dyn FnMut(&mut dyn Ui)` so the traits stay object-safe. The host calls it exactly once before returning; menu bodies run only while the menu is open. `UiExt` wraps the layouts for closures that return a value (`horizontal_with`, `card_with` and so on).
 - **Ids name what a widget is**, never where it is. Make them from stable keys with `Id::new` and `Id::with`. `UiExt::sheet_keyed` turns any hashable field key into a `FieldKey` by hashing it, so a row keeps its focus or open dropdown when rows above it come and go.
 - **Colors come from the theme.** `Theme` is filled in by the host. Use the token that names the role (`surface`, `muted`, `accent`), and ink a fill with `Theme::ink_on`, so a plugin follows the host's theme. `Color` is premultiplied sRGBA bytes; its arithmetic matches the host's to the bit.
-- **Icons are named**, from the host's icon set. An unknown name draws nothing.
+- **Icons are named.** A plain name (`"cube"`) is one of Studio's icons, the default set; a package adds icons of its own (`Package::with_icon`), named by its id, a `/` and the icon's name (`"acme.trees/leaf"`). An unknown name draws Studio's neutral icon, and the Console says so once.
 - **Values are edited in place.** A widget writes what it edits into the `&mut` the plugin passed and reports `changed`. A sheet writes new values into its schema and reports `Edits`: the fields changed, the actions taken, and the gesture's start and finish, which one undo step spans.
 
 ## Viewport maths

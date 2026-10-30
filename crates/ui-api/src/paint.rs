@@ -112,13 +112,13 @@ pub struct TextShape {
     pub color: Color,
 }
 
-/// An icon from the host's icon set, tinted.
+/// An icon, by name, tinted.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IconShape {
     /// Where (the icon fits it).
     pub rect: Rect,
-    /// The icon's name in the host's icon set (`"sketch-finish"`); an
-    /// unknown name draws nothing.
+    /// The icon's name: Studio's (`"sketch-finish"`) or a package's
+    /// (`"acme.trees/leaf"`); an unknown name draws Studio's neutral icon.
     pub name: String,
     /// The color its ink takes.
     pub tint: Color,
@@ -370,8 +370,8 @@ pub trait Painter {
         width: f32,
     ) -> Rect;
 
-    /// The icon `name` from the host's icon set fitted to `rect` and tinted
-    /// `tint`; an unknown name draws nothing.
+    /// The icon `name` (Studio's or a package's) fitted to `rect` and
+    /// tinted `tint`; an unknown name draws Studio's neutral icon.
     fn icon(&self, rect: Rect, name: &str, tint: Color);
 
     /// Many straight lines, in order.

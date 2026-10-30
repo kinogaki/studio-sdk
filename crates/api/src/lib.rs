@@ -23,6 +23,8 @@
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
 //!   state of an editing session.
+//! - **Icons** ([`icon`]): the named icons a package adds to Studio's
+//!   icon set, under its own id.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
 //!   and the environment's table of it all; a plugin library exports its
 //!   package through [`export_package!`] ([`entry`]).
@@ -57,6 +59,7 @@ pub mod error;
 pub mod facets;
 pub mod format;
 pub mod held;
+pub mod icon;
 pub mod id;
 pub mod math;
 pub mod object;
@@ -87,6 +90,7 @@ pub use facets::{
 };
 pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};
 pub use held::HeldEdit;
+pub use icon::{Icon, IconError};
 pub use id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };

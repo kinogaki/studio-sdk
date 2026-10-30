@@ -20,7 +20,7 @@ pub struct LevelSpec {
     pub id: String,
     /// What the row's tooltip calls it.
     pub label: String,
-    /// Its icon, by name in the host's icon set.
+    /// Its icon, by name (Studio's or a package's).
     pub icon: String,
     /// What it addresses.
     pub level: ElementKind,

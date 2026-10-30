@@ -5,7 +5,9 @@
 //! from its width, depth, height and center. The data type tells Studio how
 //! a box shows in the viewport, how it renders and how it saves; the node
 //! type binds a box handle to its parameters, so Studio draws the box in
-//! the viewport and drags its faces and center with no code here.
+//! the viewport and drags its faces and center with no code here. The
+//! package adds one icon to Studio's set, `example.boxes/box`, which the
+//! node shows by.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::params::{Number, Parameter, ParameterKind};
@@ -190,6 +192,10 @@ impl DataCodec for BoxType {
     }
 }
 
+/// The package's icon, embedded: 11 × 11 icon pixels, white, as Studio's
+/// own icons are drawn (Studio tints it with the widget showing it).
+const BOX_ICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11" width="11" height="11" shape-rendering="crispEdges" fill="#fff"><rect x="2" y="3" width="7" height="2"/><rect x="2" y="5" width="2" height="2"/><rect x="7" y="5" width="2" height="2"/><rect x="2" y="7" width="7" height="1"/></svg>"##;
+
 /// The Box node: makes a box from its parameters.
 pub struct BoxNode;
 
@@ -211,6 +217,7 @@ impl NodeType for BoxNode {
             number: Number::length(),
         };
         Description::new("Box")
+            .icon("example.boxes/box")
             .output(Port::new("box", "Box", BOX.id()))
             .parameters(
                 Schema::default()
@@ -248,6 +255,7 @@ pub fn package() -> Package {
     Package::new(PackageId::declared("example.boxes"), "Boxes")
         .with_data_type(BoxType)
         .with_node_type(BoxNode)
+        .with_icon(Icon::new("box", BOX_ICON))
 }
 
 // The entry point Studio looks up in the plugin's library.

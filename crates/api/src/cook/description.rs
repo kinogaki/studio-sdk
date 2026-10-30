@@ -1,13 +1,13 @@
 //! [`Description`]: what a node type is to the user and to a network: its
-//! label, its ports, its parameters and the viewport handles bound to
-//! them. The environment reads it once, when the package registers, and
+//! label and icon, its ports, its parameters and the viewport handles
+//! bound to them. The environment reads it once, when the package registers, and
 //! builds node creation, the network's ports, the inspector and the
 //! handles from it.
 use super::handle::Handle;
 use crate::id::DataTypeId;
 use crate::params::Schema;
 
-/// A node type's label, ports, parameters and handles.
+/// A node type's label, icon, ports, parameters and handles.
 ///
 /// ```
 /// use kinogaki_studio_api::cook::{Description, Port};
@@ -29,6 +29,10 @@ use crate::params::Schema;
 pub struct Description {
     /// What node creation and a new node call it ("Extrude").
     pub label: String,
+    /// Its icon's name, where Studio shows a node by an icon (its row in
+    /// the outliner): Studio's (`"cube"`) or a package's
+    /// (`"acme.trees/leaf"`, [`icon`](crate::icon)); empty for none.
+    pub icon: String,
     /// Its inputs, in port order.
     pub inputs: Vec<Port>,
     /// Its outputs, in port order; output 0 is its result.
@@ -43,15 +47,23 @@ pub struct Description {
 }
 
 impl Description {
-    /// A node type called `label`, with no ports, parameters or handles.
+    /// A node type called `label`, with no icon, ports, parameters or
+    /// handles.
     pub fn new(label: impl Into<String>) -> Self {
         Self {
             label: label.into(),
+            icon: String::new(),
             inputs: Vec::new(),
             outputs: Vec::new(),
             parameters: Schema::default(),
             handles: Vec::new(),
         }
+    }
+
+    /// With icon `name`.
+    pub fn icon(mut self, name: impl Into<String>) -> Self {
+        self.icon = name.into();
+        self
     }
 
     /// With input `port` next.

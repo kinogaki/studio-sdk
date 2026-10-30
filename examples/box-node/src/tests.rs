@@ -38,6 +38,17 @@ fn the_package_registers() {
 }
 
 #[test]
+fn the_node_shows_by_the_package_icon() {
+    let package = package();
+    let [icon] = &package.icons[..] else {
+        panic!("one icon")
+    };
+    assert!(icon.check().is_ok());
+    let name = kinogaki_studio_api::icon::qualified(package.id, &icon.name);
+    assert_eq!(BoxNode.description().icon, name);
+}
+
+#[test]
 fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
     let registry = {
         let mut registry = Registry::new();
