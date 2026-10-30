@@ -60,6 +60,13 @@ fn field(p: &params::Parameter) -> Field<String> {
         field.error = true;
         field.tooltip = Some(problem.clone().into());
     }
+    if p.read_only {
+        match &mut field.kind {
+            Kind::Palette { editable, .. } => *editable = false,
+            // What can't show read-only shows disabled.
+            _ => field.enabled = false,
+        }
+    }
     field
 }
 
@@ -398,5 +405,41 @@ mod tests {
         );
         assert!(field("group").error);
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
+    }
+
+    /// A read-only palette shows at full contrast, not editable; a kind
+    /// with no read-only look shows disabled.
+    #[test]
+    fn read_only_rows_show_without_editing() {
+        let schema = params::Schema::default()
+            .parameter(
+                Parameter::new(
+                    "palette",
+                    "Palette",
+                    ParameterKind::Palette { capacity: 4 },
+                    vec![0.1, 0.2, 0.3],
+                )
+                .read_only(true),
+            )
+            .parameter(
+                Parameter::new(
+                    "amount",
+                    "Amount",
+                    ParameterKind::Number(params::Number::plain()),
+                    1.0,
+                )
+                .read_only(true),
+            );
+        let sheet = Schema::<String>::from(&schema);
+        let palette = sheet.field(&"palette".to_owned()).unwrap();
+        assert!(palette.enabled);
+        assert!(matches!(
+            palette.kind,
+            Kind::Palette {
+                editable: false,
+                ..
+            }
+        ));
+        assert!(!sheet.field(&"amount".to_owned()).unwrap().enabled);
     }
 }

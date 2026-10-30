@@ -153,6 +153,10 @@ pub struct Parameter {
     /// The language a [`Code`](ParameterKind::Code) row's text is in, as
     /// the host's code editor names it; `None`: plain text.
     pub language: Option<String>,
+    /// Shown, not edited: at full contrast (unlike a disabled row), its
+    /// value something the node shows (a palette it read back). Hosts
+    /// show palettes so; a kind they can't show read-only shows disabled.
+    pub read_only: bool,
 }
 
 impl Parameter {
@@ -177,7 +181,14 @@ impl Parameter {
             problem: None,
             unavailable: Vec::new(),
             language: None,
+            read_only: false,
         }
+    }
+
+    /// Read-only (or editable again): shown, not edited.
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
     }
 
     /// With `help` as its tooltip.
