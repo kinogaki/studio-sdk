@@ -10,10 +10,13 @@
 //! ([`Results::hold`]); it may refuse to show a gesture's earlier state or
 //! a refinement for now ([`Results::takes`]); and it hears whenever what
 //! the open object shows changes ([`Results::shown`]), to drop or resume
-//! its gestures.
+//! its gestures. It may want nodes cooked besides what objects show (Poly
+//! Pen draws on its Edit Mesh's Reference input): the host cooks them
+//! with the scene ([`Results::wants`]) and hands their results over
+//! ([`Results::cooked`]).
 use super::parts::{Erased, own, own_mut};
-use crate::host::{Cx, ObjectRef};
-use kinogaki_studio_api::{Components, Data, Drawn};
+use crate::host::{Cx, NodeRef, ObjectRef};
+use kinogaki_studio_api::{Components, Data, Drawn, Stamp};
 use std::any::Any;
 
 /// How a context takes the host's cooks of its objects. Every method runs
@@ -35,6 +38,24 @@ pub trait Results<S: ?Sized>: Send + Sync {
     }
     /// What the open object shows changed (`change`).
     fn shown(&self, s: &mut S, cx: &mut dyn Cx, change: &Shown);
+    /// The nodes whose results it wants besides what the objects show,
+    /// each with its object; the host cooks them with the scene whenever
+    /// this changes or the document does. None by default.
+    fn wants(&self, s: &S, cx: &dyn Cx) -> Vec<(ObjectRef, NodeRef)> {
+        let _ = (s, cx);
+        Vec::new()
+    }
+    /// Wanted node `node` (with its object) cooked: its first output and
+    /// the stamp of what made it, or why it has no result.
+    fn cooked(
+        &self,
+        s: &mut S,
+        cx: &mut dyn Cx,
+        node: (ObjectRef, NodeRef),
+        result: Result<(&Data, Stamp), &str>,
+    ) {
+        let _ = (s, cx, node, result);
+    }
 }
 
 /// A change to what the open object shows.
@@ -82,5 +103,17 @@ impl<S: 'static> Results<dyn Any> for Erased<S, dyn Results<S>> {
     }
     fn shown(&self, s: &mut dyn Any, cx: &mut dyn Cx, change: &Shown) {
         self.part.shown(own_mut(s), cx, change);
+    }
+    fn wants(&self, s: &dyn Any, cx: &dyn Cx) -> Vec<(ObjectRef, NodeRef)> {
+        self.part.wants(own(s), cx)
+    }
+    fn cooked(
+        &self,
+        s: &mut dyn Any,
+        cx: &mut dyn Cx,
+        node: (ObjectRef, NodeRef),
+        result: Result<(&Data, Stamp), &str>,
+    ) {
+        self.part.cooked(own_mut(s), cx, node, result);
     }
 }
