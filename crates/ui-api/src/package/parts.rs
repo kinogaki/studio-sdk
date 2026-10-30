@@ -210,10 +210,24 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         None
     }
     /// Floating cards drawn once a frame over the views in `rect` (a
-    /// tool's card, a panel). The pointer over what they drew is theirs,
-    /// not the views'.
+    /// tool's card, a panel). Where they are is [`controls`](Self::controls).
     fn cards(&self, s: &mut S, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         let _ = (s, cx, ui, rect);
+    }
+    /// Whether the context's controls take the pointer over every view
+    /// now (a popup open over them): the views' tools see none of it.
+    fn blocks(&self, s: &S, cx: &dyn Cx) -> bool {
+        let _ = (s, cx);
+        false
+    }
+    /// Where the context's floating controls are over the view at `view`
+    /// this frame (its cards, its panels in the view): the pointer over
+    /// one is theirs, not the view's tools. Said from the state the
+    /// controls draw from, never recorded while drawing, so it holds for
+    /// the frame that draws them.
+    fn controls(&self, s: &S, cx: &dyn Cx, view: Rect) -> Vec<Rect> {
+        let _ = (s, cx, view);
+        Vec::new()
     }
     /// The context's own time, which the Timeline shows instead of the
     /// scene's; `None`: the scene's.
@@ -490,6 +504,12 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn cards(&self, s: &mut dyn Any, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         self.part.cards(own_mut(s), cx, ui, rect)
+    }
+    fn blocks(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
+        self.part.blocks(own(s), cx)
+    }
+    fn controls(&self, s: &dyn Any, cx: &dyn Cx, view: Rect) -> Vec<Rect> {
+        self.part.controls(own(s), cx, view)
     }
     fn time(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<TimeDomain> {
         self.part.time(own_mut(s), cx)
