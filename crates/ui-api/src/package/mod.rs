@@ -37,11 +37,13 @@ pub use data::{
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
-    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, Places, Shared, SharedRows,
-    Shelf, ShelfEntry, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
+    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, Places, REPEAT, Shared,
+    SharedRows, Shelf, ShelfEntry, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem,
+    When,
 };
 pub use parts::{
-    Creations, Erased, Inspector, Levels, ObjectRows, OutlineRows, ViewportLayer, Vocabulary,
+    Creations, Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, ViewportLayer,
+    Vocabulary,
 };
 pub use results::{Results, Shown, ShownKind};
 pub use settings::{Section, SettingsSection};

@@ -59,8 +59,10 @@ pub enum Shared<T> {
 /// shelf, key or Tab entry holds, by its stored name.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VocabularyItem {
-    /// Its stored name ("acme.trees.branch", "command:prune",
-    /// "node:acme.trees.branch"), unique in its context.
+    /// Its stored name ("acme.trees.branch", "command:prune"), unique in
+    /// its context. A node type's tool and its node are one item, named
+    /// by the node type's id: where it runs says which
+    /// ([`Invoked`](super::Invoked)).
     pub name: String,
     /// What menus call it.
     pub label: String,
@@ -81,12 +83,18 @@ pub struct VocabularyItem {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Places {
     /// Tab lists it where Tab adds nodes: over the network, and over the
-    /// views while they don't list tools ([`TabSpec::tools`]).
+    /// views while they don't list tools ([`TabSpec::tools`]). A node is
+    /// added at any level and whatever is selected: its [`When`]'s levels
+    /// and selection, and [`Vocabulary::shown`](super::Vocabulary::shown),
+    /// say only where its tool runs.
     pub nodes: bool,
     /// Tab lists it over the views while they list tools.
     pub tools: bool,
     /// Settings offers it for the marking menus, shelves and shortcuts.
     pub menus: bool,
+    /// Running it makes it the context's last item: Tab's Recent lists it
+    /// and the host's Repeat runs it again ([`Invoked::Repeat`](super::Invoked::Repeat)).
+    pub repeatable: bool,
 }
 
 /// Where an entry shows: every condition holds. The default shows always.
@@ -289,15 +297,21 @@ pub enum BarMenu {
     Transform,
 }
 
+/// The host's Repeat item: a context that offers Repeat (a
+/// [`MenuEntry::Repeat`], a marking menu's or shelf's Repeat) lists an
+/// item of this name, labelled "Repeat"; the host runs and names it.
+pub const REPEAT: &str = "command:repeat";
+
 /// An entry of a right-click or menu bar menu.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MenuEntry {
     /// An item, by name.
     Item(String),
-    /// Repeat: the item that repeats the last tool, by name. It leads the
-    /// menu, set off by a separator, and shows while
-    /// [`Vocabulary::shown`](super::Vocabulary::shown) keeps it.
-    Repeat(String),
+    /// The host's Repeat of the context's last repeatable item
+    /// ([`Places::repeatable`]), named after it ("Repeat Bevel"). It
+    /// leads the menu, set off by a separator, and shows while there is a
+    /// last item that [`Vocabulary::shown`](super::Vocabulary::shown) keeps.
+    Repeat,
 }
 
 /// How Tab lists a context's items.

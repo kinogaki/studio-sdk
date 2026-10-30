@@ -244,10 +244,12 @@ pub trait Inspector<S: ?Sized>: Send + Sync {
 pub trait Vocabulary<S: ?Sized>: Send + Sync {
     /// Its name, which actions carry ("acme.trees").
     fn name(&self) -> &str;
-    /// Runs `item`. An item can be run where it doesn't apply (a key, a
-    /// shelf tile): it then does nothing but say why
+    /// Runs `item`, as `how` says: a tool over the views, its node over
+    /// the network, or again with its last values (the host's Repeat). An
+    /// item can be run where it doesn't apply (a key, a shelf tile): it
+    /// then does nothing but say why
     /// ([`HostStatus::fail`](crate::host::HostStatus::fail)).
-    fn run(&self, s: &mut S, cx: &mut dyn Cx, item: &str);
+    fn run(&self, s: &mut S, cx: &mut dyn Cx, item: &str, how: Invoked);
     /// Whether `item` applies now: at the active level, to the selection,
     /// in this mode (Fillet needs edges selected; Repeat a last tool).
     /// Menus, Tab and the marking menus hide what doesn't apply; nothing
@@ -264,6 +266,20 @@ pub trait Vocabulary<S: ?Sized>: Send + Sync {
         let _ = (s, cx, item);
         None
     }
+}
+
+/// Where an item was run from: what running it means.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Invoked {
+    /// Over the views, from a menu, shelf, key or Tab listing tools: the
+    /// tool runs on what is selected.
+    #[default]
+    Views,
+    /// From Tab over the network: its node is added.
+    Network,
+    /// The host's Repeat: the item runs again with its last values (the
+    /// package keeps them; an item it has none for runs as from the views).
+    Repeat,
 }
 
 /// The inspector rows of the object kinds a context owns, below an
@@ -496,8 +512,8 @@ impl<S: 'static> Vocabulary<dyn Any> for Erased<S, dyn Vocabulary<S>> {
     fn name(&self) -> &str {
         self.part.name()
     }
-    fn run(&self, s: &mut dyn Any, cx: &mut dyn Cx, item: &str) {
-        self.part.run(own_mut(s), cx, item)
+    fn run(&self, s: &mut dyn Any, cx: &mut dyn Cx, item: &str, how: Invoked) {
+        self.part.run(own_mut(s), cx, item, how)
     }
     fn shown(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> bool {
         self.part.shown(own(s), cx, item)
