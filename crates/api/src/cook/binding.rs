@@ -8,6 +8,9 @@ use crate::params::{Parameters, Value};
 pub enum Scalar {
     /// A number parameter ([`Value::Number`]).
     Parameter(String),
+    /// Component `index` of a vector parameter ([`Value::Numbers`]): a
+    /// box's height is its size's y.
+    Component(String, usize),
     /// A fixed value.
     Fixed(f64),
 }
@@ -16,7 +19,7 @@ impl Scalar {
     /// The parameter it names (none when fixed).
     pub fn name(&self) -> Option<&str> {
         match self {
-            Self::Parameter(name) => Some(name),
+            Self::Parameter(name) | Self::Component(name, _) => Some(name),
             Self::Fixed(_) => None,
         }
     }
@@ -26,15 +29,32 @@ impl Scalar {
     pub fn read(&self, parameters: &Parameters) -> Option<f64> {
         match self {
             Self::Parameter(name) => parameters.get(name)?.number(),
+            Self::Component(name, index) => parameters.get(name)?.numbers()?.get(*index).copied(),
             Self::Fixed(value) => Some(*value),
         }
     }
 
-    /// Writes `value` into `parameters` (nothing when fixed).
+    /// Writes `value` into `parameters` (nothing when fixed, or when a
+    /// component's vector is missing or too short).
     pub fn write(&self, parameters: &mut Parameters, value: f64) {
-        if let Self::Parameter(name) = self {
-            parameters.insert(name.clone(), Value::Number(value));
+        match self {
+            Self::Parameter(name) => {
+                parameters.insert(name.clone(), Value::Number(value));
+            }
+            Self::Component(name, index) => {
+                if let Some(Value::Numbers(numbers)) = parameters.get_mut(name)
+                    && let Some(n) = numbers.get_mut(*index)
+                {
+                    *n = value;
+                }
+            }
+            Self::Fixed(_) => {}
         }
+    }
+
+    /// Component `index` of vector parameter `name`.
+    pub fn component(name: impl Into<String>, index: usize) -> Self {
+        Self::Component(name.into(), index)
     }
 }
 
@@ -175,5 +195,21 @@ mod tests {
         assert_eq!(top.read(&values), Some([0.0, 3.0, 0.0]));
         assert_eq!(Scalar::from(1.5).read(&values), Some(1.5));
         assert_eq!(Scalar::from("height").name(), Some("height"));
+    }
+
+    /// A component binds one number of a vector parameter: it reads and
+    /// writes that number alone.
+    #[test]
+    fn a_component_reads_and_writes_one_number_of_a_vector() {
+        let height = Scalar::component("size", 1);
+        let mut values = Parameters::new();
+        assert_eq!(height.read(&values), None);
+        values.insert("size".into(), Value::Numbers(vec![1.0, 2.0, 3.0]));
+        assert_eq!(height.read(&values), Some(2.0));
+        height.write(&mut values, 5.0);
+        assert_eq!(values["size"], Value::Numbers(vec![1.0, 5.0, 3.0]));
+        assert_eq!(height.name(), Some("size"));
+        Scalar::component("size", 7).write(&mut values, 9.0);
+        assert_eq!(values["size"], Value::Numbers(vec![1.0, 5.0, 3.0]));
     }
 }

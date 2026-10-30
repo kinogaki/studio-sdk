@@ -1,5 +1,5 @@
 //! [`Handle`]: a viewport handle a node type binds to its parameters.
-use super::binding::Vector;
+use super::binding::{Scalar, Vector};
 use super::frame::Frame;
 use crate::params::{Parameters, Value};
 
@@ -41,8 +41,8 @@ pub enum HandleKind {
     /// A dot `distance` along `direction` from `origin`, dragged along
     /// that line: a depth, a length.
     Distance {
-        /// The number parameter it sets.
-        distance: String,
+        /// The number it sets.
+        distance: Scalar,
         /// Where the line starts.
         origin: Vector,
         /// Which way the line runs (any length).
@@ -55,8 +55,8 @@ pub enum HandleKind {
     /// middle; an anchored ring grows from its anchor (a sphere resting on
     /// its base keeps the base where it is).
     Radius {
-        /// The number parameter it sets.
-        radius: String,
+        /// The number it sets.
+        radius: Scalar,
         /// The ring's middle.
         center: Vector,
     },
@@ -311,7 +311,7 @@ impl Handle {
     pub fn parameters(&self) -> Vec<&str> {
         let number = match &self.kind {
             HandleKind::Distance { distance: n, .. } | HandleKind::Radius { radius: n, .. } => {
-                Some(n.as_str())
+                n.name()
             }
             _ => None,
         };

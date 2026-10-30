@@ -270,6 +270,10 @@ pub struct Number {
     pub decimals: Option<u8>,
     /// How much it changes per point dragged; `None` leaves it to the host.
     pub speed: Option<f64>,
+    /// A length whose default is a real size in millimetres (a
+    /// primitive's dimensions): the host gives a new node, and a reset to
+    /// the default, that size in the document's unit.
+    pub real_size: bool,
 }
 
 impl Number {
@@ -283,6 +287,7 @@ impl Number {
             slider: false,
             decimals: None,
             speed: None,
+            real_size: false,
         }
     }
 
@@ -322,6 +327,14 @@ impl Number {
     /// Changing by `speed` per point dragged.
     pub fn speed(mut self, speed: f64) -> Self {
         self.speed = Some(speed);
+        self
+    }
+
+    /// A length whose default is a real size in millimetres
+    /// ([`Number::real_size`](Number#structfield.real_size)).
+    pub fn real_size(mut self) -> Self {
+        self.unit = Unit::Length;
+        self.real_size = true;
         self
     }
 
