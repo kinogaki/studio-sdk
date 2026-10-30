@@ -7,9 +7,15 @@
 //! the gizmo; a plugin's tool owns what a drag transforms and uses this
 //! geometry to turn pointer motion into it. The maths is the host's own,
 //! so hits and drags agree with what the host draws.
+//!
+//! A context whose selection the gizmo moves needs none of this: it says
+//! [`ViewportLayer::transforms`](crate::package::ViewportLayer::transforms)
+//! and the host runs the drag (handles, typed values, steps, snapping),
+//! handing it each [`TransformStep`] to apply.
 mod geometry;
 mod hit;
 mod pivot;
+mod step;
 
 pub use geometry::{
     GizmoFrame, Handle, MANIPULATOR_CUBE, MANIPULATOR_RING, angle_change, distance, inside, scale,
@@ -17,6 +23,7 @@ pub use geometry::{
 };
 pub use hit::{ALL_AXES, hit, hit_axes};
 pub use pivot::{Pivot, PivotFrame};
+pub use step::{TransformPhase, TransformSpace, TransformStep};
 
 /// The viewport's transform mode (Q, W, E, R and T).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

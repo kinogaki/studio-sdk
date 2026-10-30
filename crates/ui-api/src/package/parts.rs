@@ -18,7 +18,7 @@ use super::data::{
 };
 use super::edited::{Edited, TemplateMark};
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
-use crate::gizmo::PivotFrame;
+use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
 use crate::{Pos, Rect, Ui};
@@ -86,6 +86,12 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     /// The user chose another pivot: a live tool takes it.
     fn pivot_changed(&self, s: &mut S, cx: &mut dyn Cx) {
         let _ = (s, cx);
+    }
+    /// The selection's normal, in the context's space: the Normal
+    /// transform space's Y. `None`: Normal works as Object.
+    fn normal(&self, s: &mut S, cx: &mut dyn Cx) -> Option<Vec3> {
+        let _ = (s, cx);
+        None
     }
 }
 
@@ -208,6 +214,22 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn pick_pivot(&self, s: &mut S, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
         let _ = (s, cx, at);
         None
+    }
+    /// Whether the host's transform gizmo shows for the selection now,
+    /// at [`Levels::pivot`] and along the user's transform space. The
+    /// host runs its drags and hands each step to
+    /// [`transform`](Self::transform). `false`: no gizmo (nothing
+    /// selected, or a live tool has the pointer).
+    fn transforms(&self, s: &S, cx: &dyn Cx) -> bool {
+        let _ = (s, cx);
+        false
+    }
+    /// A transform drag of the selection, in the host's undo gesture:
+    /// show `step` (a preview, not yet an edit) while it `Began` or
+    /// `Moved`, make it the edit on `Released`, and put back what the
+    /// drag showed on `Cancelled` (the host cancels its gesture).
+    fn transform(&self, s: &mut S, cx: &mut dyn Cx, phase: TransformPhase, step: &TransformStep) {
+        let _ = (s, cx, phase, step);
     }
     /// Floating cards drawn once a frame over the views in `rect` (a
     /// tool's card, a panel). Where they are is [`controls`](Self::controls).
@@ -419,6 +441,9 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     fn pivot_changed(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
         self.part.pivot_changed(own_mut(s), cx)
     }
+    fn normal(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<Vec3> {
+        self.part.normal(own_mut(s), cx)
+    }
 }
 
 impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
@@ -501,6 +526,18 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn pick_pivot(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
         self.part.pick_pivot(own_mut(s), cx, at)
+    }
+    fn transforms(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
+        self.part.transforms(own(s), cx)
+    }
+    fn transform(
+        &self,
+        s: &mut dyn Any,
+        cx: &mut dyn Cx,
+        phase: TransformPhase,
+        step: &TransformStep,
+    ) {
+        self.part.transform(own_mut(s), cx, phase, step)
     }
     fn cards(&self, s: &mut dyn Any, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         self.part.cards(own_mut(s), cx, ui, rect)

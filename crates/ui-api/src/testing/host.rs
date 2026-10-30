@@ -2,7 +2,7 @@
 //! package asks of it; [`Hosting`]: a registered package with its state,
 //! called the way the host calls it (state taken out per call and put
 //! back, callbacks queued, never nested).
-use crate::gizmo::{GizmoFrame, Handle, TransformTool};
+use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
     HostSlots, HostStatus, HostTransform, HostUndo, HostView, Inspected, InspectorCx, NodeRef,
@@ -58,6 +58,8 @@ pub enum HostCall {
     SetTransformTool(TransformTool),
     /// [`HostTransform::set_snapping`].
     SetSnapping(bool),
+    /// [`HostTransform::set_transform_space`].
+    SetTransformSpace(TransformSpace),
     /// [`HostSettings::set_section_any`].
     SetSection(ContextId),
 }
@@ -119,6 +121,8 @@ pub struct FakeHost {
     pub keyboard_taken: bool,
     /// The open network displays a held edit.
     pub editing: bool,
+    /// The transform tool's space.
+    pub space: TransformSpace,
     /// How many times the wake was called.
     pub wakes: Arc<AtomicUsize>,
     undo: Vec<Step>,
@@ -153,6 +157,7 @@ impl FakeHost {
             view_stored: Vec::new(),
             keyboard_taken: false,
             editing: false,
+            space: TransformSpace::World,
             wakes: Arc::default(),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -421,6 +426,13 @@ impl HostTransform for FakeHost {
     fn set_snapping(&mut self, on: bool) {
         self.calls.push(HostCall::SetSnapping(on));
         self.prefs.snapping = on;
+    }
+    fn transform_space(&self) -> TransformSpace {
+        self.space
+    }
+    fn set_transform_space(&mut self, space: TransformSpace) {
+        self.calls.push(HostCall::SetTransformSpace(space));
+        self.space = space;
     }
 }
 

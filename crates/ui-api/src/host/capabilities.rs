@@ -9,7 +9,7 @@
 //! current call returns, so a package never sees its own state taken
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
-use crate::gizmo::TransformTool;
+use crate::gizmo::{TransformSpace, TransformTool};
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{Bounds, ContextId, Data, Drawn, ObjectBody, ObjectKindId, SlotId};
@@ -253,6 +253,10 @@ pub trait HostTransform {
     fn snapping(&self) -> bool;
     /// Turns snapping on or off (saved with the user's settings).
     fn set_snapping(&mut self, on: bool);
+    /// The space the transform tool works in (each tool's own).
+    fn transform_space(&self) -> TransformSpace;
+    /// Chooses the current tool's space (saved with the user's settings).
+    fn set_transform_space(&mut self, space: TransformSpace);
 }
 
 /// The user's settings sections of the installed packages (a package's
