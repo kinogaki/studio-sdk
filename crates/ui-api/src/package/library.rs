@@ -373,6 +373,12 @@ pub struct ViewportSpec {
     pub own_snapping: Option<bool>,
     /// Where the transform pivot starts.
     pub default_pivot: Pivot,
+    /// The host's transform tools for the context's selection: the left
+    /// toolbar's Select, Move, Rotate, Scale, Manipulator and Pivot, and
+    /// the Gear's tool settings (the tool's space) before the context's
+    /// own [rows](super::ViewportLayer::rows). The gizmo itself shows where
+    /// [`ViewportLayer::transforms`](super::ViewportLayer::transforms) says.
+    pub transform: bool,
     /// The popovers among Gear, Components and Snap whose buttons show,
     /// with the context's [rows](super::ViewportLayer::rows). Shading,
     /// Viewport and Camera always show.
@@ -387,6 +393,7 @@ impl Default for ViewportSpec {
             snap_steps: true,
             own_snapping: None,
             default_pivot: Pivot::Centre,
+            transform: false,
             popovers: Vec::new(),
         }
     }
