@@ -16,16 +16,22 @@
 //!   hold a delta, freeze). The host makes each edit one undo step and
 //!   checks the network once, when the edit is committed.
 //!
+//! - **Compiling** ([`NetworkCompiler`]): a context declared
+//!   `Evaluation::Compile` isn't cooked node by node; its package's
+//!   compiler turns the flattened network into a plan its executor runs.
+//!
 //! Every node of every context is one shape: its type, its
 //! [`Parameters`](crate::Parameters), its input wires, the core flags,
 //! and optionally a held delta (an Edit Mesh's) or the outputs it keeps
 //! while frozen. Projects store a node's parameters in one layout for
 //! every type; a held delta and kept outputs save through their data
 //! types' codecs.
+mod compile;
 mod context;
 mod edit;
 mod read;
 
+pub use compile::{CompileCx, CompileError, Flat, FlatNode, NetworkCompiler, Source};
 pub use context::{Evaluation, Flag, FlagSet, NetworkContext, NetworkStorage};
 pub use edit::{NetworkEdit, NewNode};
 pub use read::{NetworkRead, NodeFlags, NodeInfo, Wire};

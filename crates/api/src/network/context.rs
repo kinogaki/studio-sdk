@@ -54,6 +54,13 @@ impl NetworkContext {
         self
     }
 
+    /// Compiled, not cooked: its package's
+    /// [`NetworkCompiler`](super::NetworkCompiler) plans its networks.
+    pub fn compiled(mut self) -> Self {
+        self.evaluation = Evaluation::Compile;
+        self
+    }
+
     /// Healing deleted nodes' chains or not.
     pub fn heals(mut self, heals: bool) -> Self {
         self.heals = heals;

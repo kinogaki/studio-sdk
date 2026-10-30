@@ -20,6 +20,7 @@ mod description;
 mod frame;
 mod handle;
 mod incremental;
+mod sheet;
 
 pub use binding::{Scalar, Vector};
 pub use context::CookCx;
@@ -27,6 +28,7 @@ pub use description::{Description, NodeRole, Port, Ports};
 pub use frame::Frame;
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
+pub use sheet::SchemaCx;
 
 use crate::components::Components;
 use crate::data::Data;
@@ -222,6 +224,19 @@ pub trait NodeType: Send + Sync {
     fn spares(&self, parameters: &Parameters) -> Option<Schema> {
         let _ = parameters;
         None
+    }
+
+    /// The rows a node with `parameters` shows, shaped from `rows` (its
+    /// description's parameters and its spares, at their values) by what
+    /// `cx` says: rows enabled or disabled (with the reason) by what is
+    /// wired, choices filled from what an input held (its attributes, its
+    /// groups). It shapes rows only: it never changes a parameter, and the
+    /// same parameters and `cx` give the same rows. Core asks only while
+    /// the node's rows are shown, so it must be quick. `rows` unchanged by
+    /// default.
+    fn schema(&self, rows: Schema, parameters: &Parameters, cx: &SchemaCx<'_>) -> Schema {
+        let _ = (parameters, cx);
+        rows
     }
 
     /// The data type of the delta it holds when it is a held edit (an Edit

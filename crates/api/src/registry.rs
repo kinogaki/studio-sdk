@@ -13,7 +13,7 @@ use crate::held::HeldEdit;
 use crate::id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
-use crate::network::NetworkContext;
+use crate::network::{Evaluation, NetworkCompiler, NetworkContext};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::{SessionSlot, SessionSlots};
@@ -77,6 +77,21 @@ pub enum RegistryError {
         /// The conversion registered first.
         first: ConversionId,
     },
+    /// `package` declares compiled context `context` without its compiler.
+    NoCompiler {
+        /// The refused package.
+        package: PackageId,
+        /// The context.
+        context: ContextId,
+    },
+    /// `package` brings a compiler for `context`, which isn't a compiled
+    /// context it declares (or already has one from it).
+    StrayCompiler {
+        /// The refused package.
+        package: PackageId,
+        /// The context.
+        context: ContextId,
+    },
 }
 
 impl fmt::Display for RegistryError {
@@ -115,6 +130,16 @@ impl fmt::Display for RegistryError {
                 f,
                 "{package} converts {from} to {to}, which {first} already does"
             ),
+            Self::NoCompiler { package, context } => {
+                write!(
+                    f,
+                    "{package} declares compiled context {context} without its compiler"
+                )
+            }
+            Self::StrayCompiler { package, context } => write!(
+                f,
+                "{package} brings a compiler for {context}, which isn't one of its compiled contexts or has one"
+            ),
         }
     }
 }
@@ -148,6 +173,8 @@ pub struct Registry {
     held_edits: BTreeMap<DataTypeId, Entry<dyn HeldEdit>>,
     node_types: BTreeMap<NodeTypeId, Entry<dyn NodeType>>,
     contexts: BTreeMap<ContextId, Entry<NetworkContext>>,
+    /// Each compiled context's compiler.
+    compilers: BTreeMap<ContextId, Entry<dyn NetworkCompiler>>,
     conversions: BTreeMap<ConversionId, Entry<dyn Conversion>>,
     /// Each (from, to) pair's conversion.
     routes: BTreeMap<(DataTypeId, DataTypeId), ConversionId>,
@@ -181,6 +208,10 @@ impl Registry {
         for context in package.contexts {
             self.contexts
                 .insert(context.id, Entry::new(id, Arc::new(context)));
+        }
+        for compiler in package.compilers {
+            self.compilers
+                .insert(compiler.context(), Entry::new(id, compiler));
         }
         for conversion in package.conversions {
             self.routes
@@ -281,7 +312,37 @@ impl Registry {
                 owner(self.slots.get(&s.id())),
             )?;
         }
+        self.check_compilers(package)?;
         self.check_references(package)
+    }
+
+    /// Each compiled context `package` declares has one compiler from it,
+    /// and each compiler it brings is for one of them.
+    fn check_compilers(&self, package: &Package) -> Result<(), RegistryError> {
+        let id = package.id;
+        let compiled: BTreeSet<ContextId> = package
+            .contexts
+            .iter()
+            .filter(|c| c.evaluation == Evaluation::Compile)
+            .map(|c| c.id)
+            .collect();
+        let mut given = BTreeSet::new();
+        for c in &package.compilers {
+            let context = c.context();
+            if !compiled.contains(&context) || !given.insert(context) {
+                return Err(RegistryError::StrayCompiler {
+                    package: id,
+                    context,
+                });
+            }
+        }
+        match compiled.difference(&given).next() {
+            Some(&context) => Err(RegistryError::NoCompiler {
+                package: id,
+                context,
+            }),
+            None => Ok(()),
+        }
     }
 
     /// Every data type `package` names is registered, by it or before it,
@@ -353,6 +414,11 @@ impl Registry {
     /// Network context `id`; `None` when no package registered it.
     pub fn network_context(&self, id: ContextId) -> Option<&NetworkContext> {
         self.contexts.get(&id).map(|e| &*e.item)
+    }
+
+    /// Compiled context `context`'s compiler.
+    pub fn compiler(&self, context: ContextId) -> Option<&dyn NetworkCompiler> {
+        self.compilers.get(&context).map(|e| &*e.item)
     }
 
     /// The registered packages' ids and labels, in registration order.

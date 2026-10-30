@@ -6,7 +6,7 @@ use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::icon::Icon;
 use crate::id::PackageId;
-use crate::network::NetworkContext;
+use crate::network::{NetworkCompiler, NetworkContext};
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
@@ -46,6 +46,8 @@ pub struct Package {
     /// The network contexts it declares, whose networks core keeps in the
     /// objects of kinds naming them.
     pub contexts: Vec<NetworkContext>,
+    /// The compilers of its compiled contexts, one each.
+    pub compilers: Vec<Arc<dyn NetworkCompiler>>,
     /// The object kinds it contributes.
     pub object_kinds: Vec<Arc<dyn ObjectKindSpec>>,
     /// The file formats it reads and writes.
@@ -79,6 +81,7 @@ impl Package {
             conversions: Vec::new(),
             node_types: Vec::new(),
             contexts: Vec::new(),
+            compilers: Vec::new(),
             object_kinds: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
@@ -116,6 +119,12 @@ impl Package {
     /// With network context `context` too.
     pub fn with_context(mut self, context: NetworkContext) -> Self {
         self.contexts.push(context);
+        self
+    }
+
+    /// With `compiler`, the compiler of a compiled context it declares.
+    pub fn with_compiler(mut self, compiler: impl NetworkCompiler + 'static) -> Self {
+        self.compilers.push(Arc::new(compiler));
         self
     }
 
