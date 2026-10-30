@@ -165,6 +165,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-pin-board"
+version = "0.1.0"
+dependencies = [
+ "kinogaki-studio-api",
+ "kinogaki-studio-ui-api",
+]
+
+[[package]]
 name = "foldhash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

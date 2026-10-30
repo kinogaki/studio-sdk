@@ -108,7 +108,7 @@ pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     ObjectBody, ObjectKindSpec, Processing, RenderSetup, RenderSetupKind, RenderedKind,
 };
-pub use package::Package;
+pub use package::{Package, PackageUi};
 pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};

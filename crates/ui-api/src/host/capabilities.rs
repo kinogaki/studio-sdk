@@ -63,7 +63,7 @@ pub trait HostSlotsExt: HostSlots {
     ///
     /// # Panics
     /// When no package registered `T` (a programming error: a package
-    /// registers its slots in [`UiPackage::slots`](crate::package::UiPackage::slots)).
+    /// registers its slots with [`Package::with_slot`](kinogaki_studio_api::Package::with_slot)).
     fn slot<T: Slot>(&self) -> &T {
         self.slot_any(T::id())
             .and_then(|v| v.downcast_ref())

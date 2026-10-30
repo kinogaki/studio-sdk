@@ -24,11 +24,13 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
 | Render | engines (`Package::engines`, the `wgpu` feature); they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
 
-The environment registers packages into a `Registry` in dependency order. The librarian resolves that order from the packages' manifests, so a kernel always comes before the packages that build on it. Node types, contexts and UI register through the librarian and the host UI interface (the host traits of `kinogaki-studio-ui-api`, to come), not through this crate. The two share the ids defined here.
+The environment registers packages into a `Registry` in dependency order. The loader resolves that order from the plugins' manifests, so a kernel always comes before the packages that build on it. Every package goes through the registry's checks (`Registry::check`, `Registry::register`): its id and every id it declares are new and under its vendor, each data type it names is registered, each compiled context has one compiler, no node type declares a parameter named as spares are (`cook::SPARE`), and its UI's contexts are its own. A package that fails is refused whole: Studio lists it as unavailable in Settings ▸ Plugins, says why in the Console, and keeps running.
+
+A package with a UI carries it: `Package::ui` holds the parts the host UI interface (`kinogaki-studio-ui-api`) made, added with its `WithUi::with_ui`. The package's id, label and session slots are the `Package`'s alone.
 
 ## Plugin libraries
 
-A plugin is a Rust dylib that exports its `Package` through `export_package!(make)`: the macro writes the entry Studio looks up (`entry::SYMBOL`, of type `entry::Entry`), catches a panic in `make`, and keeps `unsafe` out of the plugin's own code, so its crate keeps `unsafe_code = "forbid"`. Studio and its plugins share one standard library and one build of each shared crate, so values cross as plain Rust types and `TypeId`s agree. A plugin is therefore built with the exact compiler this repository pins (`rust-toolchain.toml`) against the build of the SDK its Studio release ships; Studio reads the plugin's manifest and refuses one built for another build before loading it, and never unloads a plugin it loaded.
+A plugin is a Rust dylib that exports its one `Package`, UI included, through `export_package!(make)`: the macro writes the entry Studio looks up (`entry::SYMBOL`, of type `entry::Entry`), catches a panic in `make`, and keeps `unsafe` out of the plugin's own code, so its crate keeps `unsafe_code = "forbid"`. Studio and its plugins share one standard library and one build of each shared crate, so values cross as plain Rust types and `TypeId`s agree. A plugin is therefore built with the exact compiler this repository pins (`rust-toolchain.toml`) against the build of the SDK its Studio release ships; Studio reads the plugin's manifest and refuses one built for another build before loading it, and never unloads a plugin it loaded.
 
 ## Ids
 
@@ -63,7 +65,7 @@ When identity is not enough, a cache keys on content instead, using `DataType::s
 
 A kernel reads its own values through a `Typed<T>` handle. The handle pairs the id with the Rust type, so `get` returns `None` for any other type. This works across packages because Studio and its plugins are built by one compiler and share one copy of each kernel crate, so a type's `TypeId` is the same everywhere.
 
-The environment never looks inside a `Data`. It only calls the `DataType` registered for the value's id. A value whose type is not registered is kept and saved back unchanged, and nothing else happens to it.
+The environment never looks inside a `Data`. It only calls the `DataType` registered for the value's id. A value whose type is not registered is skipped when a project is read, and the Console says so (see Saving).
 
 ## Data types and facets
 
@@ -113,7 +115,7 @@ Packages keep no evaluator, worker or private cache.
 
 ## Held edits
 
-Edit Mesh and Edit CAD hold an authored delta over their input. Core owns the mechanism: capturing the input once as the base, keeping one result per held state that its copies (undo snapshots) share, applying the delta anew when it changes, and undo. A package supplies `HeldEdit` for its data type: the delta's data type (so a delta saves, stamps and counts memory like any value), which other inputs a delta reads (`reads_input`: what it projects onto), and `apply(cx, base, delta, inputs)`, which returns the node's outputs and may keep prepared work in the node's scratch slot. How deltas are authored interactively is the package's UI, through `studio-ui-api`.
+Edit Mesh and Edit CAD hold an authored delta over their input. Core owns the mechanism: capturing the input once as the base, keeping one result per held state that its copies (undo snapshots) share, applying the delta anew when it changes, and undo. A package supplies `HeldEdit` for its deltas: the registry keys it by the deltas' data type, which a held node's type names (`NodeType::held`), so one package declares how one type of delta applies. It gives the base data type, the delta's data type (so a delta saves, stamps and counts memory like any value), which other inputs a delta reads (`reads_input`: what it projects onto), and `apply(cx, base, delta, inputs)`, which returns the node's outputs and may keep prepared work in the node's scratch slot. How deltas are authored interactively is the package's UI, through `studio-ui-api`.
 
 ## Saving
 
@@ -165,7 +167,7 @@ To import, the environment passes each value to the first object kind that `adop
 
 ## Session slots
 
-Some state belongs to a package and lasts only for the session: a selection, picks, an open sketch. A package declares each such piece of state as a value type implementing `Slot` and registers it (`SessionSlot::of::<T>()`, `Package::with_slot`, `UiPackage::slots`):
+Some state belongs to a package and lasts only for the session: a selection, picks, an open sketch. A package declares each such piece of state as a value type implementing `Slot` and registers it (`SessionSlot::of::<T>()`, `Package::with_slot`):
 - `id`, `initial`, and whether undo keeps it (`UNDOABLE`);
 - `PLACE_BOUND`: another level starts it over (a selection belongs to the level it was made at);
 - `restored`: after an undo, a redo or an edit, the value brought in line with where the user is (`SlotDoc`);
@@ -267,7 +269,7 @@ Some pure maths the host's own tools use lives here, so a plugin's tools hit, dr
 
 A package's UI never sees the editor. Each call into it gets a context, `&mut dyn host::Cx`, reaching the host's capabilities, one trait each: `HostUndo` (gestures, undo, redo), `HostSlots` (typed through `HostSlotsExt`), `HostSelection`, `HostDoc` (where the user is, objects and their bodies), `HostView`, `HostStatus`, `HostShell`, `HostTransform` and `HostSettings` (typed through `HostSettingsExt`); plus the plain `HostPrefs`, the wake for the package's workers, and two services over the host's drawing: `GizmoService` (a view's transform gizmo) and `UnitsService` (numbers in the user's units). A view's parts get a `ViewCx` (the view as data: rectangle, response, pointer, modifiers, camera), the inspector an `InspectorCx`.
 
-**A package** (`package::UiPackage`) is a state type, its contexts (`ContextPart<S>`: a `Library` and optional `Levels`, `ViewportLayer`, `Inspector`, `Vocabulary`, `ObjectRows`, `OutlineRows`, `Creations`), its session slots and its settings sections (`Section`, `SettingsSection`). The host keeps the state: `register` erases its type, and for each call the host takes the state out, lends it to the part with the call's context, and puts it back. Host methods never call back into a package; what would (an undo ending a live tool, an action) is queued until the call returns. Undo never holds a package's state: it restores the document and the slots.
+**A package's UI** (`package::UiPackage`) is a state type, its contexts (`ContextPart<S>`: a `Library` and optional `Levels`, `ViewportLayer`, `Inspector`, `Vocabulary`, `ObjectRows`, `OutlineRows`, `Creations`) and its settings sections (`Section`, `SettingsSection`); its id, label and slots are its `Package`'s. `Package::with_ui` (`package::WithUi`) adds it to the package and erases the state's type, and the host reads it back with `Registered::of`. The host keeps the state, and for each call the host takes the state out, lends it to the part with the call's context, and puts it back. Host methods never call back into a package; what would (an undo ending a live tool, an action) is queued until the call returns. Undo never holds a package's state: it restores the document and the slots.
 
 **The library.** What a context offers the host's menus is data, read once when the package registers: its items (each tool, command or node by its stored name, with its label, family, search words, Tab section, the levels it applies at and which surfaces offer it), its key store and default bindings, its A/S/D marking menus and shelves (the user's to edit, kept under the menus' store name), its right-click menus and menu bar sections (each for a level, a selection or none, inside a held edit or outside one), how Tab lists its items (tools over the views while it edits, else nodes; a Suggested category) and the viewport chrome it takes (the shared Shading rows, its own analysis modes, the snap steps, the starting pivot). A context may share another's keys or menus (`Shared::Of`). The host builds every one of those surfaces from it. An entry that can't apply is left out, never greyed: its `When` (level, selection, held edit) and the vocabulary's `shown` decide; `label` renames an item by its state ("Repeat Bevel"). The vocabulary runs the items.
 

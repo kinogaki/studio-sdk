@@ -4,9 +4,12 @@
 //! resolves it: kernels before the packages that build on them), so a
 //! package may name data types that it or an earlier package registered,
 //! never a later one's. A package is checked whole before anything of it
-//! is kept: a refused package leaves the registry as it was.
+//! is kept: a refused package leaves the registry as it was. A host
+//! admits every package through these checks ([`Registry::check`],
+//! [`Registry::register`]) and turns a refusal into a plugin it doesn't
+//! load, never a crash.
 use crate::conversion::Conversion;
-use crate::cook::NodeType;
+use crate::cook::{NodeType, SPARE};
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
@@ -55,13 +58,13 @@ pub enum RegistryError {
         /// The missing type.
         data: DataTypeId,
     },
-    /// `package` declares how deltas apply to `base`, which `first`
+    /// `package` declares how deltas of type `delta` apply, which `first`
     /// already declares.
     DuplicateHeldEdit {
         /// The refused package.
         package: PackageId,
-        /// The data type the edits apply to.
-        base: DataTypeId,
+        /// The data type of the deltas.
+        delta: DataTypeId,
         /// The package that declared it first.
         first: PackageId,
     },
@@ -91,6 +94,16 @@ pub enum RegistryError {
         package: PackageId,
         /// The context.
         context: ContextId,
+    },
+    /// `package`'s node type `node` declares parameter `parameter`, whose
+    /// name starts with [`SPARE`], which spares take.
+    SpareName {
+        /// The refused package.
+        package: PackageId,
+        /// The node type.
+        node: NodeTypeId,
+        /// The parameter.
+        parameter: String,
     },
     /// `package` brings a runner for `context`, which isn't a compiled
     /// context it declares (or already has one from it).
@@ -123,11 +136,19 @@ impl fmt::Display for RegistryError {
             }
             Self::DuplicateHeldEdit {
                 package,
-                base,
+                delta,
                 first,
             } => write!(
                 f,
-                "{package} declares held edits of {base}, which {first} declares"
+                "{package} declares how {delta} deltas apply, which {first} declares"
+            ),
+            Self::SpareName {
+                package,
+                node,
+                parameter,
+            } => write!(
+                f,
+                "{package}'s node type {node} declares parameter {parameter}, a name spares take"
             ),
             Self::DuplicateConversion {
                 package,
@@ -181,7 +202,7 @@ fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
 pub struct Registry {
     packages: Vec<(PackageId, String)>,
     data_types: BTreeMap<DataTypeId, Entry<dyn DataType>>,
-    /// Each base data type's held edits.
+    /// Held edits by the data type of their deltas.
     held_edits: BTreeMap<DataTypeId, Entry<dyn HeldEdit>>,
     node_types: BTreeMap<NodeTypeId, Entry<dyn NodeType>>,
     contexts: BTreeMap<ContextId, Entry<NetworkContext>>,
@@ -193,6 +214,9 @@ pub struct Registry {
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
     formats: BTreeMap<FormatId, Entry<dyn FileFormat>>,
     slots: BTreeMap<SlotId, Entry<SessionSlot>>,
+    /// The contexts packages' UIs give parts to (with whether it is the
+    /// context's mode), and the package giving them.
+    ui_contexts: BTreeMap<(ContextId, bool), PackageId>,
 }
 
 impl Registry {
@@ -201,18 +225,19 @@ impl Registry {
         Self::default()
     }
 
-    /// Registers `package`, after checking that its id and every id it
-    /// declares are new, under its vendor, and that every data type it
-    /// names is registered (by it or an earlier package). On an error
-    /// nothing of the package is kept.
+    /// Registers `package` once [`check`](Self::check) passes. On an
+    /// error nothing of the package is kept.
     pub fn register(&mut self, package: Package) -> Result<(), RegistryError> {
         self.check(&package)?;
         let id = package.id;
+        for &context in package.ui.iter().flat_map(|ui| ui.contexts()) {
+            self.ui_contexts.insert(context, id);
+        }
         for ty in package.data_types {
             self.data_types.insert(ty.id(), Entry::new(id, ty));
         }
         for held in package.held_edits {
-            self.held_edits.insert(held.base(), Entry::new(id, held));
+            self.held_edits.insert(held.delta(), Entry::new(id, held));
         }
         for node in package.node_types {
             self.node_types.insert(node.id(), Entry::new(id, node));
@@ -244,9 +269,13 @@ impl Registry {
         Ok(())
     }
 
-    /// Every check [`register`](Self::register) makes, without changing
-    /// anything.
-    fn check(&self, package: &Package) -> Result<(), RegistryError> {
+    /// Whether `package` may register: its id and every id it declares
+    /// (its UI's contexts too) are new and under its vendor, no node type
+    /// declares a parameter named as spares are ([`SPARE`]), each compiled
+    /// context it declares has one compiler from it, and every data type
+    /// it names is registered (by it or an earlier package). Changes
+    /// nothing.
+    pub fn check(&self, package: &Package) -> Result<(), RegistryError> {
         let id = package.id;
         if self.packages.iter().any(|(p, _)| *p == id) {
             return Err(RegistryError::DuplicatePackage(id));
@@ -324,6 +353,28 @@ impl Registry {
                 owner(self.slots.get(&s.id())),
             )?;
         }
+        for &(context, mode) in package.ui.iter().flat_map(|ui| ui.contexts()) {
+            let what = if mode { "mode's UI" } else { "context's UI" };
+            declare(
+                what,
+                context.as_str(),
+                self.ui_contexts.get(&(context, mode)).copied(),
+            )?;
+        }
+        for n in &package.node_types {
+            let description = n.description();
+            if let Some(p) = description
+                .parameters
+                .parameters()
+                .find(|p| p.name.starts_with(SPARE))
+            {
+                return Err(RegistryError::SpareName {
+                    package: id,
+                    node: n.id(),
+                    parameter: p.name.clone(),
+                });
+            }
+        }
         self.check_compilers(package)?;
         self.check_references(package)
     }
@@ -385,16 +436,16 @@ impl Registry {
                 })
             }
         };
-        let mut bases = BTreeSet::new();
+        let mut deltas = BTreeSet::new();
         for h in &package.held_edits {
             known("held edit", h.base())?;
             known("held edit", h.delta())?;
             if let Some(first) =
-                owner(self.held_edits.get(&h.base())).or((!bases.insert(h.base())).then_some(id))
+                owner(self.held_edits.get(&h.delta())).or((!deltas.insert(h.delta())).then_some(id))
             {
                 return Err(RegistryError::DuplicateHeldEdit {
                     package: id,
-                    base: h.base(),
+                    delta: h.delta(),
                     first,
                 });
             }
@@ -445,6 +496,11 @@ impl Registry {
         self.compilers.get(&context).map(|e| &*e.item)
     }
 
+    /// Whether package `id` is registered.
+    pub fn has_package(&self, id: PackageId) -> bool {
+        self.packages.iter().any(|(p, _)| *p == id)
+    }
+
     /// The registered packages' ids and labels, in registration order.
     pub fn packages(&self) -> impl Iterator<Item = (PackageId, &str)> {
         self.packages
@@ -452,8 +508,8 @@ impl Registry {
             .map(|(id, label)| (*id, label.as_str()))
     }
 
-    /// Data type `id`; `None` when no package registered it (its values
-    /// are kept as they were, never shown).
+    /// Data type `id`; `None` when no package registered it (a host skips
+    /// its values when it reads a project, and says so).
     pub fn data_type(&self, id: DataTypeId) -> Option<&dyn DataType> {
         self.data_types.get(&id).map(|e| &*e.item)
     }
@@ -463,13 +519,14 @@ impl Registry {
         self.data_types.values().map(|e| &*e.item)
     }
 
-    /// How deltas apply to values of `base`, when a package says.
-    pub fn held_edit(&self, base: DataTypeId) -> Option<&dyn HeldEdit> {
-        self.held_edits.get(&base).map(|e| &*e.item)
+    /// How deltas of type `delta` apply, when a package says: a held
+    /// node's type names its deltas' type ([`NodeType::held`]).
+    pub fn held_edit(&self, delta: DataTypeId) -> Option<&dyn HeldEdit> {
+        self.held_edits.get(&delta).map(|e| &*e.item)
     }
 
     /// What node type `id` computes; `None` when no package registered it
-    /// (its nodes are kept as placeholders and never cooked).
+    /// (a host skips its nodes when it reads a project, and says so).
     pub fn node_type(&self, id: NodeTypeId) -> Option<&dyn NodeType> {
         self.node_types.get(&id).map(|e| &*e.item)
     }

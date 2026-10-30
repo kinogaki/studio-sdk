@@ -3,7 +3,7 @@
 //! the host interface; its slot is undone with the document; its
 //! settings section round-trips; and a nested call is refused.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
-use kinogaki_studio_api::{ContextId, Error, ObjectKindId, PackageId, SessionSlot, Slot, SlotId};
+use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
 use studio_ui_api::gizmo::TransformTool;
 use studio_ui_api::host::{
     Cx, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef, Place,
@@ -11,8 +11,9 @@ use studio_ui_api::host::{
 };
 use studio_ui_api::package::{
     ContextPart, Creation, Creations, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec,
-    Levels, Library, MarkingDefault, MenuDefaults, Places, Section, SettingsSection, Shared, Start,
-    Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem, When, register,
+    Levels, Library, MarkingDefault, MenuDefaults, Places, Registered, Section, SettingsSection,
+    Shared, Start, Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem, When,
+    WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -57,12 +58,6 @@ struct Trees;
 
 impl UiPackage for Trees {
     type State = Forest;
-    fn id(&self) -> PackageId {
-        PackageId::declared("toy.trees")
-    }
-    fn label(&self) -> &str {
-        "Trees"
-    }
     fn state(&self, wake: Waker) -> Forest {
         Forest {
             wake: Some(wake),
@@ -78,9 +73,6 @@ impl UiPackage for Trees {
                 .with_inspector(TreeInspector)
                 .with_creations(TreeCreations),
         ]
-    }
-    fn slots(&self) -> Vec<SessionSlot> {
-        vec![SessionSlot::of::<Picked>()]
     }
     fn settings(&self) -> Vec<SettingsSection> {
         vec![SettingsSection::of::<Density>()]
@@ -294,7 +286,7 @@ impl Section for Density {
 }
 
 fn host() -> FakeHost {
-    let mut host = FakeHost::new(scene(), [SessionSlot::of::<Picked>()]);
+    let mut host = FakeHost::new(scene(), package().slots);
     host.place = Place {
         context: forest(),
         object: Some(ObjectRef(7)),
@@ -305,8 +297,15 @@ fn host() -> FakeHost {
     host
 }
 
+/// The package: its slot, and its UI.
+fn package() -> Package {
+    Package::new(PackageId::declared("toy.trees"), "Trees")
+        .with_slot::<Picked>()
+        .with_ui(Trees)
+}
+
 fn hosted(host: &FakeHost) -> Hosting {
-    Hosting::new(register(Trees), host)
+    Hosting::new(package(), host)
 }
 
 fn rect() -> Rect {
@@ -341,14 +340,19 @@ fn view(pointer: Option<Pos>, modifiers: Modifiers) -> View {
 
 #[test]
 fn registering_reads_the_contexts_once_and_erases_the_state() {
-    let package = register(Trees);
-    assert_eq!(package.id, PackageId::declared("toy.trees"));
-    assert_eq!(package.label, "Trees");
+    let whole = package();
+    // One id, label and set of slots: the package's.
+    assert_eq!(whole.id, PackageId::declared("toy.trees"));
+    assert_eq!(whole.label, "Trees");
+    assert_eq!(whole.slots[0].id(), Picked::id());
+    // Its UI names the contexts it gives parts to, for the registry.
+    assert_eq!(whole.ui.as_ref().unwrap().contexts(), [(forest(), false)]);
+    let package = Registered::of(&whole).unwrap();
+    assert!(Registered::of(&Package::new(PackageId::declared("toy.bare"), "Bare")).is_none());
     let context = package.context(forest(), false).unwrap();
     assert!(context.levels.is_some() && context.viewport.is_some());
     assert!(context.vocabulary.is_none());
     assert!(package.context(forest(), true).is_none());
-    assert_eq!(package.slots[0].id(), Picked::id());
     assert_eq!(package.settings[0].context(), forest());
     let levels = context.levels.as_ref().unwrap().levels();
     assert_eq!(levels.len(), 2);
@@ -512,4 +516,31 @@ fn a_settings_section_edits_its_draft_and_round_trips() {
     assert_eq!(host.section::<Density>(forest()), Some(&Density(0.8)));
     let empty = MemoryElement::new("forest");
     assert!(empty.read(|r| section.read(r)).is_err());
+}
+
+/// The registry checks a UI's contexts like every id a package declares:
+/// under the package's vendor, and given parts by one package alone.
+#[test]
+fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
+    use kinogaki_studio_api::{Registry, RegistryError};
+    let mut registry = Registry::new();
+    registry.register(package()).unwrap();
+    let groves = PackageId::declared("toy.groves");
+    assert_eq!(
+        registry.check(&Package::new(groves, "Groves").with_ui(Trees)),
+        Err(RegistryError::DuplicateId {
+            package: groves,
+            what: "context's UI",
+            id: "toy.trees.forest",
+            first: PackageId::declared("toy.trees"),
+        })
+    );
+    let acme = PackageId::declared("acme.trees");
+    assert_eq!(
+        Registry::new().check(&Package::new(acme, "Trees").with_ui(Trees)),
+        Err(RegistryError::ForeignId {
+            package: acme,
+            id: "toy.trees.forest",
+        })
+    );
 }

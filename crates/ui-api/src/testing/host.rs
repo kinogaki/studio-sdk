@@ -14,8 +14,8 @@ use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, SessionSlot, SessionSlots,
-    SlotId,
+    Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, Package, SessionSlot,
+    SessionSlots, SlotId,
 };
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -524,20 +524,23 @@ impl InspectorCx for FakeHost {
     }
 }
 
-/// A registered package with its state on a [`FakeHost`], called as the
-/// host calls it: the state is taken out for the call and put back after,
+/// A package's UI with its state on a [`FakeHost`], called as the host
+/// calls it: the state is taken out for the call and put back after,
 /// and a call while it is out (a nested call, which a host never makes)
 /// panics.
 pub struct Hosting {
     /// The package.
-    pub package: Registered,
+    pub package: Package,
     state: Option<State>,
 }
 
 impl Hosting {
-    /// `package` with a new state, its wake `host`'s.
-    pub fn new(package: Registered, host: &FakeHost) -> Self {
-        let state = package.state(host.wake());
+    /// `package` with a new state of its UI, its wake `host`'s.
+    ///
+    /// # Panics
+    /// When `package` has no UI ([`WithUi`](crate::package::WithUi)).
+    pub fn new(package: Package, host: &FakeHost) -> Self {
+        let state = Self::ui(&package).state(host.wake());
         Hosting {
             package,
             state: Some(state),
@@ -553,9 +556,19 @@ impl Hosting {
             .state
             .take()
             .expect("a package call nested in another: hosts queue callbacks instead");
-        let out = call(&self.package, &mut *state);
+        let out = call(Self::ui(&self.package), &mut *state);
         self.state = Some(state);
         out
+    }
+
+    /// `package`'s UI.
+    fn ui(package: &Package) -> &Registered {
+        Registered::of(package).expect("a package with a UI")
+    }
+
+    /// The UI, as the host reads it.
+    pub fn registered(&self) -> &Registered {
+        Self::ui(&self.package)
     }
 
     /// The state, as its package's type (to check it in a test).

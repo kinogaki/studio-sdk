@@ -1,17 +1,17 @@
-//! [`Package`]: what one package registers with the environment.
+//! [`Package`]: what one package registers with the environment, and
+//! [`PackageUi`], the UI it carries when it has one.
 use crate::conversion::Conversion;
 use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::icon::Icon;
-#[cfg(feature = "wgpu")]
-use crate::id::ContextId;
-use crate::id::PackageId;
+use crate::id::{ContextId, PackageId};
 use crate::network::{NetworkCompiler, NetworkContext};
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
+use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
@@ -19,8 +19,8 @@ use std::sync::Arc;
 /// types (a kernel's), held edits over them, conversions (a bridge's),
 /// node types' cooks, the network contexts its object kinds hold, object
 /// kinds, file formats, session slots, stored values and icons, and with
-/// the `wgpu` feature its render engines. Its contexts' UI registers
-/// through the host UI interface.
+/// the `wgpu` feature its render engines; and its UI, when it has one
+/// ([`PackageUi`], which the host UI interface makes).
 ///
 /// Every id it declares has its vendor (the first segment of its id):
 /// `acme.trees` registers `acme.trees.branch` or `acme.format.tree`, never
@@ -74,6 +74,52 @@ pub struct Package {
     /// feature): how the host shows what a compiled network makes.
     #[cfg(feature = "wgpu")]
     pub runners: Vec<(ContextId, Arc<dyn kinogaki_render_api::display::PlanRunner>)>,
+    /// Its UI: its contexts' parts and settings sections, made by the
+    /// host UI interface (`kinogaki-studio-ui-api`'s `WithUi::with_ui`).
+    /// `None`: a headless package (a kernel's data types, a render
+    /// engine), shown through Studio's own UI alone.
+    pub ui: Option<PackageUi>,
+}
+
+/// A package's UI as the headless API carries it: the contexts it gives
+/// parts to, which the [`Registry`](crate::Registry) checks like every
+/// other id, and the parts themselves, opaque here. The host UI interface
+/// (`kinogaki-studio-ui-api`) makes it and reads the parts back; this
+/// crate can't name its types.
+#[derive(Clone)]
+pub struct PackageUi {
+    contexts: Vec<(ContextId, bool)>,
+    parts: Arc<dyn Any + Send + Sync>,
+}
+
+impl PackageUi {
+    /// The UI giving parts to `contexts` (each with whether it is its
+    /// context's mode on a node rather than the network itself), the
+    /// parts being `parts`.
+    pub fn new(contexts: Vec<(ContextId, bool)>, parts: impl Any + Send + Sync) -> Self {
+        Self {
+            contexts,
+            parts: Arc::new(parts),
+        }
+    }
+
+    /// The contexts it gives parts to, each with whether it is a mode.
+    pub fn contexts(&self) -> &[(ContextId, bool)] {
+        &self.contexts
+    }
+
+    /// Its parts, as the UI interface made them.
+    pub fn parts(&self) -> &(dyn Any + Send + Sync) {
+        &*self.parts
+    }
+}
+
+impl fmt::Debug for PackageUi {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PackageUi")
+            .field("contexts", &self.contexts)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Package {
@@ -97,6 +143,7 @@ impl Package {
             engines: Vec::new(),
             #[cfg(feature = "wgpu")]
             runners: Vec::new(),
+            ui: None,
         }
     }
 
@@ -199,7 +246,7 @@ impl fmt::Debug for Package {
         out.field("id", &self.id)
             .field("label", &self.label)
             .field("data_types", &ids(&self.data_types, |t| t.id().as_str()))
-            .field("held_edits", &ids(&self.held_edits, |h| h.base().as_str()))
+            .field("held_edits", &ids(&self.held_edits, |h| h.delta().as_str()))
             .field("conversions", &ids(&self.conversions, |c| c.id().as_str()))
             .field("node_types", &ids(&self.node_types, |n| n.id().as_str()))
             .field(
@@ -230,7 +277,8 @@ impl fmt::Debug for Package {
             .field(
                 "icons",
                 &self.icons.iter().map(|i| &i.name).collect::<Vec<_>>(),
-            );
+            )
+            .field("ui", &self.ui);
         #[cfg(feature = "wgpu")]
         out.field(
             "engines",

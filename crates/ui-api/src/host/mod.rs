@@ -71,15 +71,6 @@ pub trait Cx:
     fn wake(&self) -> Waker;
     /// Numbers typed and shown in the user's units.
     fn units(&self) -> &dyn UnitsService;
-    /// The host's own object behind this context, for Studio's in-tree
-    /// contexts while they are ported to this interface part by part.
-    /// Only Studio's build enables the `in-tree` feature, and it goes when
-    /// the last in-tree context is ported; packages never use it.
-    #[cfg(feature = "in-tree")]
-    #[doc(hidden)]
-    fn in_tree_host(&mut self) -> Option<&mut dyn std::any::Any> {
-        None
-    }
 }
 
 /// The context of a call about one view (a viewport layer's pointer

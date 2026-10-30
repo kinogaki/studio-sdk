@@ -1,5 +1,33 @@
-//! A package's UI: its contexts, session slots and settings sections, and
-//! how the host keeps its state ([`UiPackage`], [`register`]).
+//! A package's UI: its contexts and settings sections, and how the host
+//! keeps its state ([`UiPackage`], added to a package with
+//! [`WithUi::with_ui`]).
+//!
+//! **One package.** The UI is part of the package it belongs to: the
+//! package's id, label and session slots are its
+//! [`Package`]'s, and the plugin exports that one package
+//! ([`export_package!`](kinogaki_studio_api::export_package)):
+//!
+//! ```
+//! use kinogaki_studio_api::{ContextId, Package, PackageId};
+//! use studio_ui_api::host::Waker;
+//! use studio_ui_api::package::{ContextPart, UiPackage, WithUi};
+//!
+//! struct TreesUi;
+//! impl UiPackage for TreesUi {
+//!     type State = ();
+//!     fn state(&self, _wake: Waker) {}
+//!     fn contexts(&self) -> Vec<ContextPart<()>> {
+//!         vec![ContextPart::new(ContextId::declared("acme.trees.forest"))]
+//!     }
+//! }
+//!
+//! fn package() -> Package {
+//!     Package::new(PackageId::declared("acme.trees"), "Trees").with_ui(TreesUi)
+//! }
+//! # let package = package();
+//! # assert!(studio_ui_api::package::Registered::of(&package).is_some());
+//! // kinogaki_studio_api::export_package!(package);
+//! ```
 //!
 //! **State lives with the host.** A package's UI state (`UiPackage::State`:
 //! live tools, caches, its workers' handles) is made once
@@ -19,9 +47,10 @@
 //! and [`Results`], how it takes the host's cooks of its objects. A part a context leaves out is nothing there, never another
 //! context's.
 //!
-//! **Registering** ([`register`]) erases the state's type: the host holds
-//! every package as a [`Registered`], whose parts take the state as
-//! `dyn Any` and downcast it back.
+//! **Adding the UI** ([`WithUi::with_ui`]) erases the state's type: the
+//! host reads every package's UI as a [`Registered`]
+//! ([`Registered::of`]), whose parts take the state as `dyn Any` and
+//! downcast it back.
 mod data;
 mod edited;
 mod library;
@@ -50,12 +79,13 @@ pub use settings::{Section, SettingsSection};
 pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 
 use crate::host::{Cx, Waker};
-use kinogaki_studio_api::{ContextId, PackageId, SessionSlot};
+use kinogaki_studio_api::{ContextId, Package, PackageUi};
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-/// A package's UI, as the package writes it.
+/// A package's UI, as the package writes it. Its id, label and session
+/// slots are its [`Package`]'s.
 ///
 /// The host calls every method on its UI thread. `state` once per host
 /// (one editor window), when the package is first needed; `poll` after
@@ -66,22 +96,11 @@ pub trait UiPackage: Send + Sync + 'static {
     /// The package's UI state.
     type State: Any;
 
-    /// Its id (`acme.trees`).
-    fn id(&self) -> PackageId;
-
-    /// What the UI calls it ("Trees").
-    fn label(&self) -> &str;
-
     /// A new host's state; `wake` is for its workers.
     fn state(&self, wake: Waker) -> Self::State;
 
     /// Its contexts.
     fn contexts(&self) -> Vec<ContextPart<Self::State>>;
-
-    /// Its session slots.
-    fn slots(&self) -> Vec<SessionSlot> {
-        Vec::new()
-    }
 
     /// Its settings sections (one per context that has user settings).
     fn settings(&self) -> Vec<SettingsSection> {
@@ -262,16 +281,11 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
 /// The host's state of one package (`UiPackage::State`, erased).
 pub type State = Box<dyn Any>;
 
-/// A registered package, its state's type erased: what the host keeps.
+/// A package's UI, its state's type erased: what the host reads from the
+/// package ([`Registered::of`]).
 pub struct Registered {
-    /// Its id.
-    pub id: PackageId,
-    /// What the UI calls it.
-    pub label: String,
     /// Its contexts, over the erased state.
     pub contexts: Vec<ContextPart<dyn Any>>,
-    /// Its session slots.
-    pub slots: Vec<SessionSlot>,
     /// Its settings sections.
     pub settings: Vec<SettingsSection>,
     package: Arc<dyn Calls>,
@@ -302,6 +316,11 @@ fn own<S: 'static>(s: &mut dyn Any) -> &mut S {
 }
 
 impl Registered {
+    /// `package`'s UI; `None`: a headless package.
+    pub fn of(package: &Package) -> Option<&Registered> {
+        package.ui.as_ref()?.parts().downcast_ref()
+    }
+
     /// A new host's state of the package.
     pub fn state(&self, wake: Waker) -> State {
         self.package.state(wake)
@@ -326,28 +345,29 @@ impl Registered {
 impl fmt::Debug for Registered {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Registered")
-            .field("id", &self.id)
-            .field("label", &self.label)
             .field("contexts", &self.contexts)
-            .field("slots", &self.slots)
             .field("settings", &self.settings)
             .finish()
     }
 }
 
-/// `package` as the host keeps it: its contexts read once and its state's
-/// type erased.
-pub fn register<P: UiPackage>(package: P) -> Registered {
-    Registered {
-        id: package.id(),
-        label: package.label().to_owned(),
-        contexts: package
-            .contexts()
-            .into_iter()
-            .map(ContextPart::erase)
-            .collect(),
-        slots: package.slots(),
-        settings: package.settings(),
-        package: Arc::new(package),
+/// A [`Package`] with its UI.
+pub trait WithUi {
+    /// With UI `ui`: its contexts read once and its state's type erased.
+    /// The registry checks its contexts' ids like the package's others
+    /// (under the package's vendor, each given parts by one package).
+    fn with_ui(self, ui: impl UiPackage) -> Self;
+}
+
+impl WithUi for Package {
+    fn with_ui(mut self, ui: impl UiPackage) -> Self {
+        let registered = Registered {
+            contexts: ui.contexts().into_iter().map(ContextPart::erase).collect(),
+            settings: ui.settings(),
+            package: Arc::new(ui),
+        };
+        let contexts = registered.contexts.iter().map(|c| (c.id, c.mode)).collect();
+        self.ui = Some(PackageUi::new(contexts, registered));
+        self
     }
 }

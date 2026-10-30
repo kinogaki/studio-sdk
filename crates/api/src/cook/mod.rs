@@ -30,6 +30,11 @@ pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
 pub use sheet::{NewCx, SchemaCx};
 
+/// The prefix of the names a node's spares take ([`NodeType::spares`]): no
+/// node type's description declares a parameter so named (the
+/// [`Registry`](crate::Registry) refuses one that does).
+pub const SPARE: &str = "spare-";
+
 use crate::components::Components;
 use crate::data::Data;
 use crate::data_type::Stamp;

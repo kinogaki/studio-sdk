@@ -22,7 +22,8 @@ pub type Entry = fn() -> std::thread::Result<Package>;
 
 /// Exports `make` (a `fn() -> Package`) as the plugin's entry point
 /// ([`SYMBOL`](crate::entry::SYMBOL), of type [`Entry`]), catching a panic
-/// in it.
+/// in it. The package is the plugin's one package, its UI included
+/// ([`Package::ui`], added with the UI interface's `WithUi::with_ui`).
 ///
 /// ```ignore
 /// fn package() -> kinogaki_studio_api::Package {

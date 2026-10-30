@@ -1,0 +1,19 @@
+[package]
+name = "example-pin-board"
+description = "An example Kinogaki Studio plugin with UI: a Pin Board object, opening into a context with two selection levels, a Pin command and an inspector row"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+# A Rust dylib: Studio and its plugins share one standard library and one
+# copy of the SDK.
+crate-type = ["dylib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+kinogaki-studio-api.workspace = true
+kinogaki-studio-ui-api.workspace = true

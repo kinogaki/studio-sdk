@@ -6,7 +6,7 @@
 //! Each method gets the package's state and the call's context (`cx`);
 //! a query gets them shared (`&S`, `&dyn Cx`) and cannot change anything.
 //! Parts are stateless values: their state is `S`, which the host lends
-//! for one call at a time ([`register`](super::register)). Every method
+//! for one call at a time ([`WithUi`](super::WithUi)). Every method
 //! runs on the UI thread and returns at once.
 //!
 //! The host erases `S` when a package registers: [`Erased`] turns each

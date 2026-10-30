@@ -293,7 +293,7 @@ fn the_registry_holds_cooks_and_held_edits() {
             .node_type(NodeTypeId::declared("toy.numbers.other"))
             .is_none()
     );
-    let held = registry.held_edit(NUMBERS.id()).unwrap();
+    let held = registry.held_edit(OFFSETS.id()).unwrap();
     let (cancel, mut scratch, none) = (CancelToken::default(), None, Parameters::new());
     let mut cx = CookCx::new(&none, &cancel, &Serial, &mut scratch);
     let short = OFFSETS.wrap(vec![0.5]);
@@ -309,14 +309,14 @@ fn the_registry_holds_cooks_and_held_edits() {
         .apply(&mut cx, &numbers(&[1.0]), &long, &[Some(numbers(&[10.0]))])
         .unwrap();
     assert_eq!(NUMBERS.get(&lifted.data[0]), Some(&vec![11.0]));
-    assert!(registry.held_edit(OFFSETS.id()).is_none());
-    // A second package can't declare held edits of the same type.
+    assert!(registry.held_edit(NUMBERS.id()).is_none());
+    // A second package can't declare how the same deltas apply.
     let again = Package::new(PackageId::declared("toy.again"), "Again").with_held_edit(AddOffsets);
     assert_eq!(
         registry.register(again).unwrap_err(),
         RegistryError::DuplicateHeldEdit {
             package: PackageId::declared("toy.again"),
-            base: NUMBERS.id(),
+            delta: OFFSETS.id(),
             first: PackageId::declared("toy.numbers"),
         }
     );
@@ -342,4 +342,32 @@ fn held_edits_need_their_types_registered() {
             ..
         })
     ));
+}
+
+/// A node type declaring a parameter named as spares are is refused.
+#[test]
+fn a_parameter_named_as_spares_are_is_refused() {
+    struct Spare;
+    impl NodeType for Spare {
+        fn id(&self) -> NodeTypeId {
+            NodeTypeId::declared("toy.spare.node")
+        }
+        fn description(&self) -> Description {
+            Description::new("Spare").parameters(Schema::default().parameter(
+                params::Parameter::new("spare-1", "One", params::ParameterKind::Toggle, false),
+            ))
+        }
+        fn cook(&self, _cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {
+            Ok(Outputs::default())
+        }
+    }
+    let package = Package::new(PackageId::declared("toy.spare"), "Spare").with_node_type(Spare);
+    assert_eq!(
+        Registry::new().register(package),
+        Err(RegistryError::SpareName {
+            package: PackageId::declared("toy.spare"),
+            node: NodeTypeId::declared("toy.spare.node"),
+            parameter: "spare-1".into(),
+        })
+    );
 }
