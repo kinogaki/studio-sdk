@@ -24,11 +24,11 @@ mod sheet;
 
 pub use binding::{Scalar, Vector};
 pub use context::CookCx;
-pub use description::{Description, NodeRole, Port, Ports};
+pub use description::{Category, Description, Listing, NodeRole, Port, Ports};
 pub use frame::Frame;
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
-pub use sheet::SchemaCx;
+pub use sheet::{NewCx, SchemaCx};
 
 use crate::components::Components;
 use crate::data::Data;
@@ -250,6 +250,19 @@ pub trait NodeType: Send + Sync {
     fn edited(&self, before: &Parameters, after: Parameters, cx: &SchemaCx<'_>) -> Parameters {
         let _ = (before, cx);
         after
+    }
+
+    /// The parameters a new node starts with, from its description's
+    /// defaults (`parameters`) and what `cx` says of the network it is
+    /// added to (a Render Out lists the outputs its render writes);
+    /// `parameters` by default. Like [`edited`](Self::edited) it must be
+    /// pure and deterministic: core calls it inside the creation's own
+    /// transaction (the same undo step), on every path that creates a
+    /// node (Tab, menus, `NetworkEdit`'s add), never on paste or load,
+    /// which keep the parameters they bring.
+    fn created(&self, parameters: Parameters, cx: &NewCx<'_>) -> Parameters {
+        let _ = cx;
+        parameters
     }
 
     /// The parameters pressing button `button` of its rows leaves (Fit to

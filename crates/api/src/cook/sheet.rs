@@ -1,4 +1,5 @@
-//! [`SchemaCx`]: what a node's rows may depend on besides its parameters.
+//! [`SchemaCx`]: what a node's rows may depend on besides its parameters;
+//! [`NewCx`]: what a new node's parameters may.
 use crate::data::Data;
 
 /// What [`NodeType::schema`](super::NodeType::schema) may shape a node's
@@ -59,6 +60,29 @@ impl<'a> SchemaCx<'a> {
     }
 }
 
+/// What [`NodeType::created`](super::NodeType::created) may start a new
+/// node's parameters from: what the host knows of the network it is added
+/// to.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NewCx<'a> {
+    outputs: &'a [String],
+}
+
+impl<'a> NewCx<'a> {
+    /// A node added where the render writes `outputs` (its output ids, the
+    /// beauty first; none outside a render's network).
+    pub fn new(outputs: &'a [String]) -> Self {
+        Self { outputs }
+    }
+
+    /// The outputs the network's render writes, by id, the beauty first
+    /// (what [`CompileCx::outputs`](crate::network::CompileCx::outputs)
+    /// says when it compiles).
+    pub fn outputs(&self) -> &'a [String] {
+        self.outputs
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,5 +101,12 @@ mod tests {
         assert!(named.input_names(1).is_empty());
         let palette = [0.1, 0.2, 0.3];
         assert_eq!(cx.with_kept(Some(&palette)).kept(), Some(&palette[..]));
+    }
+
+    #[test]
+    fn a_new_node_reads_the_render_outputs() {
+        let outputs = ["beauty".to_owned(), "depth".to_owned()];
+        assert_eq!(NewCx::new(&outputs).outputs(), outputs);
+        assert!(NewCx::default().outputs().is_empty());
     }
 }

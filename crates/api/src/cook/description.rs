@@ -49,6 +49,9 @@ pub struct Description {
     pub contexts: Vec<ContextId>,
     /// What part it plays in its network beyond what it computes.
     pub role: NodeRole,
+    /// Where Tab, menus and shelves list it in its contexts; `None`: not
+    /// listed (a node only code or a file adds).
+    pub listing: Option<Listing>,
 }
 
 impl Description {
@@ -64,6 +67,7 @@ impl Description {
             handles: Vec::new(),
             contexts: Vec::new(),
             role: NodeRole::Plain,
+            listing: None,
         }
     }
 
@@ -108,6 +112,58 @@ impl Description {
         self.role = role;
         self
     }
+
+    /// Listed in Tab, menus and shelves under `section` ("Filter", its
+    /// tile colored as `category`), in `family` within it, found by search
+    /// under its label and `aliases` too (other applications' names).
+    pub fn listed(
+        mut self,
+        section: impl Into<String>,
+        category: Category,
+        family: impl Into<String>,
+        aliases: &[&str],
+    ) -> Self {
+        self.listing = Some(Listing {
+            section: section.into(),
+            category,
+            family: family.into(),
+            aliases: aliases.iter().map(|&a| a.to_owned()).collect(),
+        });
+        self
+    }
+}
+
+/// Where Tab, menus and shelves list a node type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Listing {
+    /// Its heading in Tab and the menus ("Filter").
+    pub section: String,
+    /// What it does, as its tile's color says.
+    pub category: Category,
+    /// Its family within the section ("Blur").
+    pub family: String,
+    /// More words search finds it by.
+    pub aliases: Vec<String>,
+}
+
+/// What a node does, as its tile's color says; every context's sections
+/// map onto these.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Category {
+    /// Makes something from nothing (a primitive, a render's image).
+    Create,
+    /// Reads without changing (a measure, a viewer).
+    Inspect,
+    /// Changes what it reads.
+    Modify,
+    /// Builds from what it reads (a loft, a merge).
+    Construct,
+    /// Moves, turns or scales.
+    Transform,
+    /// Shapes a surface's look (normals, UVs, a grade).
+    Surface,
+    /// Plumbing: switches, nulls, outputs.
+    Utility,
 }
 
 /// The part a node plays in its network beyond what it computes.
@@ -223,5 +279,26 @@ impl Port {
             Some((name, value)) => parameters.get(name) == Some(value),
             None => !self.optional,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_listed_type_says_where_tab_shows_it() {
+        let blur =
+            Description::new("Blur").listed("Filter", Category::Modify, "Blur", &["Defocus"]);
+        assert_eq!(
+            blur.listing,
+            Some(Listing {
+                section: "Filter".into(),
+                category: Category::Modify,
+                family: "Blur".into(),
+                aliases: vec!["Defocus".into()],
+            })
+        );
+        assert_eq!(Description::new("Internal").listing, None);
     }
 }

@@ -85,8 +85,8 @@ pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
 pub use conversion::Conversion;
 pub use cook::{
-    CookCx, CookError, CookPlan, Description, Incremental, NodeRole, NodeType, Outputs, Port,
-    Ports, Prepared, Project, Reads, Resolved, SchemaCx,
+    Category, CookCx, CookError, CookPlan, Description, Incremental, Listing, NewCx, NodeRole,
+    NodeType, Outputs, Port, Ports, Prepared, Project, Reads, Resolved, SchemaCx,
 };
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp};
