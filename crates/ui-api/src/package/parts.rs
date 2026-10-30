@@ -22,7 +22,7 @@ use crate::gizmo::PivotFrame;
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
 use crate::{Pos, Rect, Ui};
-use kinogaki_studio_api::{ObjectKindId, Vec3};
+use kinogaki_studio_api::{Components, ObjectKindId, Vec3};
 use std::any::Any;
 use std::marker::PhantomData;
 
@@ -46,6 +46,15 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     /// The library's entries are held against it, else against the
     /// primary level ([`When`](super::When)).
     fn selected(&self, s: &S, cx: &dyn Cx) -> Option<usize> {
+        let _ = (s, cx);
+        None
+    }
+    /// The open object and its selected components, as components of the
+    /// value it shows ([`HostDoc::shown`](crate::host::HostDoc::shown)):
+    /// what a Material dropped on that object takes, and the selection the
+    /// spreadsheet shows (an empty set while nothing is). `None`: the
+    /// context keeps no component selection there.
+    fn components(&self, s: &S, cx: &dyn Cx) -> Option<(ObjectRef, Components)> {
         let _ = (s, cx);
         None
     }
@@ -370,6 +379,9 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     }
     fn selected(&self, s: &dyn Any, cx: &dyn Cx) -> Option<usize> {
         self.part.selected(own(s), cx)
+    }
+    fn components(&self, s: &dyn Any, cx: &dyn Cx) -> Option<(ObjectRef, Components)> {
+        self.part.components(own(s), cx)
     }
     fn hover(&self, s: &mut dyn Any, cx: &mut dyn Cx, rect: Rect, pointer: Option<Pos>) {
         self.part.hover(own_mut(s), cx, rect, pointer)
