@@ -12,7 +12,7 @@ use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::TransformTool;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
-use kinogaki_studio_api::{Bounds, ContextId, ObjectBody, ObjectKindId, SlotId};
+use kinogaki_studio_api::{Bounds, ContextId, Data, Drawn, ObjectBody, ObjectKindId, SlotId};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -147,6 +147,14 @@ pub trait HostDoc {
         view: Option<usize>,
         value: Arc<dyn Any + Send + Sync>,
     ) -> bool;
+    /// Object `object`'s shown result: the value its network yields (the
+    /// open object: what it displays) and its draw pieces, as the host
+    /// last published them.
+    fn shown(&self, object: ObjectRef) -> Option<(Data, Drawn)>;
+    /// Whether the node the open network displays is a held edit (an Edit
+    /// Mesh): the library's entries for editing show, and a key store
+    /// active while editing applies.
+    fn editing(&self) -> bool;
 }
 
 /// Typed access to the stored values.

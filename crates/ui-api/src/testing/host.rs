@@ -13,7 +13,7 @@ use crate::{Pos, Projection, Rect};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
-    Bounds, ContextId, ObjectBody, ObjectKindId, SessionSlot, SessionSlots, SlotId,
+    Bounds, ContextId, Data, Drawn, ObjectBody, ObjectKindId, SessionSlot, SessionSlots, SlotId,
 };
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -69,6 +69,8 @@ pub struct FakeObject {
     pub kind: ObjectKindId,
     /// Its package-owned body, if any.
     pub body: Option<Arc<dyn ObjectBody>>,
+    /// Its shown result, if any.
+    pub shown: Option<(Data, Drawn)>,
 }
 
 /// One undo step: its label and the slots before and after it.
@@ -113,6 +115,8 @@ pub struct FakeHost {
     pub view_stored: Vec<kinogaki_studio_api::StoredValues>,
     /// A text field has the keyboard.
     pub keyboard_taken: bool,
+    /// The open network displays a held edit.
+    pub editing: bool,
     /// How many times the wake was called.
     pub wakes: Arc<AtomicUsize>,
     undo: Vec<Step>,
@@ -146,6 +150,7 @@ impl FakeHost {
             stored: Default::default(),
             view_stored: Vec::new(),
             keyboard_taken: false,
+            editing: false,
             wakes: Arc::default(),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -335,6 +340,12 @@ impl HostDoc for FakeHost {
                 .get_mut(v)
                 .is_some_and(|s| s.set_any(id, value)),
         }
+    }
+    fn shown(&self, object: ObjectRef) -> Option<(Data, Drawn)> {
+        self.scene.get(&object)?.shown.clone()
+    }
+    fn editing(&self) -> bool {
+        self.editing
     }
 }
 

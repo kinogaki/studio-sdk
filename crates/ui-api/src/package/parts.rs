@@ -327,7 +327,7 @@ pub trait Creations<S: ?Sized>: Send + Sync {
 /// A part over `S` as the same part over `dyn Any`: the host's state,
 /// lent as `dyn Any`, is downcast back to `S` for each call.
 pub struct Erased<S, P: ?Sized> {
-    part: Box<P>,
+    pub(super) part: Box<P>,
     state: PhantomData<fn() -> S>,
 }
 
@@ -342,12 +342,12 @@ impl<S, P: ?Sized> Erased<S, P> {
 }
 
 /// The state the host lent, as the package's own.
-fn own<S: 'static>(s: &dyn Any) -> &S {
+pub(super) fn own<S: 'static>(s: &dyn Any) -> &S {
     s.downcast_ref()
         .expect("the host lends each package its own state")
 }
 
-fn own_mut<S: 'static>(s: &mut dyn Any) -> &mut S {
+pub(super) fn own_mut<S: 'static>(s: &mut dyn Any) -> &mut S {
     s.downcast_mut()
         .expect("the host lends each package its own state")
 }

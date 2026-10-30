@@ -15,8 +15,8 @@
 //! set of optional parts: the selection [`Levels`], the [`ViewportLayer`],
 //! the [`Inspector`], the [`Vocabulary`] that runs its items, the
 //! [`NetworkView`], [`ObjectRows`] and [`OutlineRows`] for the object
-//! kinds it owns, and the [`Creations`] it adds to an object level's
-//! Create. A part a context leaves out is nothing there, never another
+//! kinds it owns, the [`Creations`] it adds to an object level's Create
+//! and [`Results`], how it takes the host's cooks of its objects. A part a context leaves out is nothing there, never another
 //! context's.
 //!
 //! **Registering** ([`register`]) erases the state's type: the host holds
@@ -26,6 +26,7 @@ mod data;
 mod edited;
 mod library;
 mod parts;
+mod results;
 mod settings;
 mod view;
 
@@ -44,6 +45,7 @@ pub use parts::{
     Creations, Erased, Inspector, Levels, NetworkView, ObjectRows, OutlineRows, ViewportLayer,
     Vocabulary,
 };
+pub use results::{Results, Shown, ShownKind};
 pub use settings::{Section, SettingsSection};
 pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 
@@ -122,6 +124,8 @@ pub struct ContextPart<S: ?Sized> {
     pub outline: Option<Box<dyn OutlineRows<S>>>,
     /// What it adds to an object level's Create.
     pub creations: Option<Box<dyn Creations<S>>>,
+    /// How it takes the host's cooks of its objects.
+    pub results: Option<Box<dyn Results<S>>>,
 }
 
 impl<S: ?Sized> ContextPart<S> {
@@ -139,6 +143,7 @@ impl<S: ?Sized> ContextPart<S> {
             objects: None,
             outline: None,
             creations: None,
+            results: None,
         }
     }
 
@@ -201,6 +206,12 @@ impl<S: ?Sized> ContextPart<S> {
         self.creations = Some(Box::new(part));
         self
     }
+
+    /// With how it takes the host's cooks.
+    pub fn with_results(mut self, part: impl Results<S> + 'static) -> Self {
+        self.results = Some(Box::new(part));
+        self
+    }
 }
 
 impl<S: 'static> ContextPart<S> {
@@ -234,6 +245,9 @@ impl<S: 'static> ContextPart<S> {
             creations: self
                 .creations
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Creations<dyn Any>>),
+            results: self
+                .results
+                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Results<dyn Any>>),
         }
     }
 }
@@ -253,6 +267,7 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("objects", &has(self.objects.is_some()))
             .field("outline", &has(self.outline.is_some()))
             .field("creations", &has(self.creations.is_some()))
+            .field("results", &has(self.results.is_some()))
             .finish()
     }
 }
