@@ -11,7 +11,7 @@
 //! and nothing fails.
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::facets::{Displayable, Look, ObjectPicking, Pickable, Renderable, Tabular};
+use crate::facets::{Displayable, Look, ObjectPicking, Pickable, Renderable, Snappable, Tabular};
 use crate::id::DataTypeId;
 use crate::math::Bounds;
 
@@ -111,6 +111,11 @@ pub trait DataType: Send + Sync {
 
     /// How values look against the scene's materials, when they take any.
     fn look(&self) -> Option<&dyn Look> {
+        None
+    }
+
+    /// What gizmo moves may land on in values, when anything.
+    fn snapping(&self) -> Option<&dyn Snappable> {
         None
     }
 
