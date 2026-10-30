@@ -13,6 +13,7 @@
 //! something no installed package provides (a light of a type no engine
 //! declares) reads as [`Error::NotInstalled`]: the host skips that object
 //! and says why, and the rest of the project opens.
+use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter};
 use crate::error::Error;
@@ -39,6 +40,31 @@ pub trait DataCodec: Send + Sync {
     /// Reads the value [`write`](Self::write) wrote into `element`; `base`
     /// is the value read for the base it was written against.
     fn read(&self, element: &dyn ElementReader, base: Option<&Data>) -> Result<Data, Error>;
+
+    /// Writes `components` (a selection of `data`'s components, in this
+    /// type's representation) into `out`: what a kept result carries
+    /// downstream beside its value. `Ok(false)` by default: the type
+    /// doesn't save selections, and a kept result loads without one.
+    fn write_components(
+        &self,
+        components: &Components,
+        data: &Data,
+        out: &mut dyn ElementWriter,
+    ) -> Result<bool, Error> {
+        let _ = (components, data, out);
+        Ok(false)
+    }
+
+    /// Reads the components [`write_components`](Self::write_components)
+    /// wrote into `element`, of `data`.
+    fn read_components(
+        &self,
+        element: &dyn ElementReader,
+        data: &Data,
+    ) -> Result<Components, Error> {
+        let _ = (element, data);
+        Err(Error::invalid("this data type saves no selections"))
+    }
 }
 
 /// Writes and reads the bodies of one object kind.

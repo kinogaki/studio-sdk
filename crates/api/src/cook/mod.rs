@@ -30,6 +30,7 @@ pub use incremental::{CookPlan, Incremental, Prepared};
 
 use crate::components::Components;
 use crate::data::Data;
+use crate::data_type::Stamp;
 use crate::error::Error;
 use crate::id::{DataTypeId, NodeTypeId};
 use crate::params::{Diagnostic, Parameters, Schema};
@@ -51,6 +52,40 @@ pub struct Reads {
     /// The component selection it acts on ([`CookCx::selection`]);
     /// otherwise it sees none and a selection change doesn't recook it.
     pub selection: bool,
+    /// What its path parameters name ([`CookCx::object`],
+    /// [`CookCx::path`]): core resolves each of its
+    /// [`Path`](crate::params::ParameterKind::Path) and
+    /// [`Reference`](crate::params::ParameterKind::Reference) parameters,
+    /// cooks what they name first, and recooks the node when what they
+    /// resolve to changes.
+    pub objects: bool,
+    /// The project it cooks in ([`CookCx::project`]: its units, its
+    /// directory and its packages' stored values); otherwise it sees none
+    /// and a change of the project doesn't recook it.
+    pub project: bool,
+}
+
+/// What core resolved one of a node's path parameters to
+/// ([`Reads::objects`]).
+#[derive(Clone, Debug)]
+pub enum Resolved {
+    /// What the path names: an object's result, or a node's.
+    Object(Data),
+    /// The path itself, as core resolved it from the node (absolute), for
+    /// a path the node writes rather than reads (a Material's).
+    Path(String),
+}
+
+/// The project a cook reads ([`Reads::project`]).
+#[derive(Clone, Copy, Debug)]
+pub struct Project<'a> {
+    /// The project's units.
+    pub units: crate::math::Units,
+    /// The directory relative paths resolve against; `None` for a project
+    /// not saved yet.
+    pub directory: Option<&'a std::path::Path>,
+    /// The project's stored values ([`crate::Stored`]).
+    pub stored: &'a crate::StoredValues,
 }
 
 /// What a cook produced.
@@ -202,5 +237,14 @@ pub trait NodeType: Send + Sync {
     fn validate(&self, parameters: &Parameters) -> Result<(), Diagnostic> {
         let _ = parameters;
         Ok(())
+    }
+
+    /// A stamp of what a cook with `parameters` reads outside the network
+    /// and the project (a file's size and modification time): core asks
+    /// it before reusing the node's last cook and recooks when it differs.
+    /// It must be quick. `None` by default: nothing outside.
+    fn external(&self, parameters: &Parameters, project: Option<&Project<'_>>) -> Option<Stamp> {
+        let _ = (parameters, project);
+        None
     }
 }

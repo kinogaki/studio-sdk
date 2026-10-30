@@ -112,4 +112,11 @@ pub trait DataType: Send + Sync {
     fn renderable(&self) -> Option<&dyn Renderable> {
         None
     }
+
+    /// The type's empty value (an empty mesh), when it has one: what a
+    /// bypassed node gives on outputs it doesn't pass its input to.
+    /// `None` by default: reading such an output then fails.
+    fn empty(&self) -> Option<Data> {
+        None
+    }
 }

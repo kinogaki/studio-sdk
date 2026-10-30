@@ -1,7 +1,8 @@
 //! [`CookCx`]: everything one cook may read besides its inputs.
 use crate::cancel::CancelToken;
 use crate::components::Components;
-use crate::cook::CookError;
+use crate::cook::{CookError, Project, Resolved};
+use crate::data::Data;
 use crate::parallel::{self, Workers};
 use crate::params::{Parameters, Value};
 use crate::time::Time;
@@ -30,6 +31,8 @@ pub struct CookCx<'a> {
     workers: &'a dyn Workers,
     time: Time,
     node: u64,
+    resolved: &'a [(String, Resolved)],
+    project: Option<&'a Project<'a>>,
     scratch: &'a mut Option<Box<dyn Any + Send>>,
 }
 
@@ -60,6 +63,8 @@ impl<'a> CookCx<'a> {
             workers,
             time: Time::default(),
             node: 0,
+            resolved: &[],
+            project: None,
             scratch,
         }
     }
@@ -100,6 +105,42 @@ impl<'a> CookCx<'a> {
     pub fn with_time(mut self, time: Time) -> Self {
         self.time = time;
         self
+    }
+
+    /// With what core resolved the node's path parameters to, by parameter
+    /// name ([`Reads::objects`](crate::cook::Reads::objects)).
+    pub fn with_resolved(mut self, resolved: &'a [(String, Resolved)]) -> Self {
+        self.resolved = resolved;
+        self
+    }
+
+    /// In `project` ([`Reads::project`](crate::cook::Reads::project)).
+    pub fn with_project(mut self, project: &'a Project<'a>) -> Self {
+        self.project = Some(project);
+        self
+    }
+
+    /// What path parameter `name` names (an object's result, a node's),
+    /// when the node reads objects and core resolved it.
+    pub fn object(&self, name: &str) -> Option<&Data> {
+        self.resolved.iter().find_map(|(n, r)| match r {
+            Resolved::Object(data) if n == name => Some(data),
+            _ => None,
+        })
+    }
+
+    /// Path parameter `name` as core resolved it (absolute), when the node
+    /// reads objects and core resolved it to a path.
+    pub fn path(&self, name: &str) -> Option<&str> {
+        self.resolved.iter().find_map(|(n, r)| match r {
+            Resolved::Path(path) if n == name => Some(path.as_str()),
+            _ => None,
+        })
+    }
+
+    /// The project the node cooks in, when it reads the project.
+    pub fn project(&self) -> Option<&Project<'a>> {
+        self.project
     }
 
     /// Cooking the node the host knows as `node`.
@@ -259,5 +300,35 @@ impl<'a> CookCx<'a> {
         work: impl Fn(Range<usize>) -> Result<T, E> + Sync,
     ) -> Result<Vec<T>, E> {
         parallel::map_blocks(self.workers, Location::caller(), len, block, work)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data::Typed;
+    use crate::id::DataTypeId;
+    use crate::parallel::Serial;
+
+    /// A node sees what core resolved its path parameters to, by name: an
+    /// object's result, or a path.
+    #[test]
+    fn resolved_paths_are_read_by_parameter_name() {
+        let number = Typed::<f64>::new(DataTypeId::declared("test.cx.number"));
+        let resolved = [
+            ("source".to_owned(), Resolved::Object(number.wrap(2.0))),
+            (
+                "material".to_owned(),
+                Resolved::Path("/Materials/Red".into()),
+            ),
+        ];
+        let parameters = Parameters::new();
+        let cancel = CancelToken::default();
+        let mut scratch = None;
+        let cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch).with_resolved(&resolved);
+        assert_eq!(cx.object("source").and_then(|d| number.get(d)), Some(&2.0));
+        assert_eq!(cx.path("material"), Some("/Materials/Red"));
+        assert!(cx.object("material").is_none() && cx.path("source").is_none());
+        assert!(cx.project().is_none());
     }
 }
