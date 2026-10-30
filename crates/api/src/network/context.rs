@@ -30,6 +30,8 @@ pub struct NetworkContext {
     pub flags: FlagSet,
     /// How its networks are stored in a project.
     pub storage: NetworkStorage,
+    /// How its nodes are drawn in the network pane.
+    pub layout: NodeLayout,
 }
 
 impl NetworkContext {
@@ -45,7 +47,14 @@ impl NetworkContext {
             storage: NetworkStorage {
                 element: element.into(),
             },
+            layout: NodeLayout::Vertical,
         }
+    }
+
+    /// Its nodes drawn as `layout` says.
+    pub fn layout(mut self, layout: NodeLayout) -> Self {
+        self.layout = layout;
+        self
     }
 
     /// Offering `flags`.
@@ -66,6 +75,18 @@ impl NetworkContext {
         self.heals = heals;
         self
     }
+}
+
+/// How a context's nodes are drawn in the network pane.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NodeLayout {
+    /// Tiles with their inputs on top and outputs below, wires running
+    /// down (Houdini's SOPs: Mesh, Comp).
+    #[default]
+    Vertical,
+    /// A header and one row per port, outputs then inputs, wires running
+    /// right (shader nodes: Material).
+    Horizontal,
 }
 
 /// How a context's networks produce their results.
