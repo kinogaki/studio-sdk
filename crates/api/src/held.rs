@@ -13,6 +13,7 @@
 use crate::cook::{CookCx, CookError, Outputs};
 use crate::data::Data;
 use crate::id::DataTypeId;
+use crate::params::Diagnostic;
 
 /// How authored deltas apply to values of one data type.
 pub trait HeldEdit: Send + Sync {
@@ -47,4 +48,12 @@ pub trait HeldEdit: Send + Sync {
         delta: &Data,
         inputs: &[Option<Data>],
     ) -> Result<Outputs, CookError>;
+
+    /// Checks of `delta` beyond its data type's: whether these edits can
+    /// hold it (a host edit or a project may hand any value of the type).
+    /// Core asks whenever it checks the node. Anything goes by default.
+    fn validate(&self, delta: &Data) -> Result<(), Diagnostic> {
+        let _ = delta;
+        Ok(())
+    }
 }
