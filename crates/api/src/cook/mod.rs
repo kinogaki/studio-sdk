@@ -303,9 +303,12 @@ pub trait NodeType: Send + Sync {
     }
 
     /// A stamp of what a cook with `parameters` reads outside the network
-    /// and the project (a file's size and modification time): core asks
-    /// it before reusing the node's last cook and recooks when it differs.
-    /// It must be quick. `None` by default: nothing outside.
+    /// and the project (a file's size and modification time); the node
+    /// recooks when it differs. Core doesn't ask it on every cook: it asks
+    /// when the parameters or the project change, when the node is told to
+    /// reload, and when the outside may have changed unseen (a project
+    /// opens, the window is focused again). `None` by default: nothing
+    /// outside.
     fn external(&self, parameters: &Parameters, project: Option<&Project<'_>>) -> Option<Stamp> {
         let _ = (parameters, project);
         None

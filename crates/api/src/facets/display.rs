@@ -100,9 +100,6 @@ pub enum WhenOpen {
     Hidden,
     /// As it does anywhere.
     Drawn,
-    /// Shaded and unmarked (a smooth surface beside the cage the context
-    /// draws).
-    Shaded,
 }
 
 /// One packet a value draws.
