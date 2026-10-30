@@ -152,13 +152,11 @@ pub enum Kind {
     },
     /// `Value::Numbers`: a palette, r, g, b a color (display code values,
     /// 0–1, drawn as they are), at most `capacity` colors; drawn as a
-    /// swatch grid. Editable: a click on a swatch edits its color, and
-    /// colors can be added and removed; otherwise read-only.
+    /// swatch grid. A click on a swatch edits its color, and colors can
+    /// be added and removed; read-only, the swatches only.
     Palette {
         /// The most colors it holds.
         capacity: usize,
-        /// Colors can be edited, added and removed.
-        editable: bool,
     },
 }
 

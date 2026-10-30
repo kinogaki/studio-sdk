@@ -60,13 +60,7 @@ fn field(p: &params::Parameter) -> Field<String> {
         field.error = true;
         field.tooltip = Some(problem.clone().into());
     }
-    if p.read_only {
-        match &mut field.kind {
-            Kind::Palette { editable, .. } => *editable = false,
-            // What can't show read-only shows disabled.
-            _ => field.enabled = false,
-        }
-    }
+    field.read_only = p.read_only;
     field
 }
 
@@ -185,7 +179,6 @@ impl From<&ParameterKind> for Kind {
             },
             ParameterKind::Palette { capacity } => Kind::Palette {
                 capacity: *capacity,
-                editable: true,
             },
             // Apart until the host says the node keeps them linked (its
             // view, not the value).
@@ -340,10 +333,7 @@ mod tests {
         assert_eq!(channels[1].tint, Some([1.0, 0.0, 0.0]));
         assert!(matches!(
             field("palette").kind,
-            Kind::Palette {
-                capacity: 16,
-                editable: true
-            }
+            Kind::Palette { capacity: 16 }
         ));
         assert!(matches!(
             field("gain").kind,
@@ -407,8 +397,8 @@ mod tests {
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
     }
 
-    /// A read-only palette shows at full contrast, not editable; a kind
-    /// with no read-only look shows disabled.
+    /// Read-only parameters are read-only fields, enabled: the host draws
+    /// them at full contrast, taking no input.
     #[test]
     fn read_only_rows_show_without_editing() {
         let schema = params::Schema::default()
@@ -431,15 +421,9 @@ mod tests {
                 .read_only(true),
             );
         let sheet = Schema::<String>::from(&schema);
-        let palette = sheet.field(&"palette".to_owned()).unwrap();
-        assert!(palette.enabled);
-        assert!(matches!(
-            palette.kind,
-            Kind::Palette {
-                editable: false,
-                ..
-            }
-        ));
-        assert!(!sheet.field(&"amount".to_owned()).unwrap().enabled);
+        for key in ["palette", "amount"] {
+            let field = sheet.field(&key.to_owned()).unwrap();
+            assert!(field.enabled && field.read_only, "{key}");
+        }
     }
 }

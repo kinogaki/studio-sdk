@@ -59,6 +59,10 @@ pub struct Field<K> {
     /// A disabled field shows its value greyed and takes no input; the
     /// reason is its tooltip.
     pub enabled: bool,
+    /// A read-only field shows its value at full contrast and takes no
+    /// input (no hover or press, no buttons that would change it). Kinds
+    /// with no read-only look (code, tone curves, buttons) show disabled.
+    pub read_only: bool,
     /// Hover text (the reason, while disabled).
     pub tooltip: Option<Text>,
     /// Extra words a settings search accepts.
@@ -82,6 +86,7 @@ impl<K> Field<K> {
             kind,
             value,
             enabled: true,
+            read_only: false,
             tooltip: None,
             keywords: Text::Borrowed(""),
             error: false,
@@ -145,18 +150,12 @@ impl<K> Field<K> {
     }
 
     /// A palette of `colors` (display code values), holding at most
-    /// `capacity`; `editable` lets its colors be edited, added and removed.
-    pub fn palette(
-        key: K,
-        label: impl Into<Text>,
-        colors: &[[f64; 3]],
-        capacity: usize,
-        editable: bool,
-    ) -> Self {
+    /// `capacity`.
+    pub fn palette(key: K, label: impl Into<Text>, colors: &[[f64; 3]], capacity: usize) -> Self {
         Self::new(
             key,
             label,
-            Kind::Palette { capacity, editable },
+            Kind::Palette { capacity },
             Some(Value::Numbers(colors.iter().flatten().copied().collect())),
         )
     }
@@ -271,6 +270,12 @@ impl<K> Field<K> {
         self
     }
 
+    /// Read-only (see [`Field::read_only`]).
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+
     /// With hover text `tooltip`.
     pub fn tooltip(mut self, tooltip: impl Into<Text>) -> Self {
         self.tooltip = Some(tooltip.into());
@@ -315,6 +320,7 @@ impl<K> Field<K> {
             kind: self.kind,
             value: self.value,
             enabled: self.enabled,
+            read_only: self.read_only,
             tooltip: self.tooltip,
             keywords: self.keywords,
             error: self.error,

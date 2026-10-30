@@ -155,7 +155,8 @@ pub struct Parameter {
     pub language: Option<String>,
     /// Shown, not edited: at full contrast (unlike a disabled row), its
     /// value something the node shows (a palette it read back). Hosts
-    /// show palettes so; a kind they can't show read-only shows disabled.
+    /// show numbers, vectors, text, choices, toggles, colors, ramps, paths
+    /// and palettes so; other kinds (code, tone curves) show disabled.
     pub read_only: bool,
 }
 
