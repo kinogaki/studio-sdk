@@ -397,10 +397,11 @@ fn settings_fit_their_descriptors() {
 
 #[test]
 fn colors_and_color_ramps_fit_their_descriptors_and_ramps_blend() {
-    let stops: Arc<[ColorStop]> = Arc::from(vec![
-        ColorStop::new(0.0, [0.0, 0.0, 1.0]),
-        ColorStop::new(0.5, [1.0, 1.0, 1.0]),
-        ColorStop::new(1.0, [1.0, 0.0, 0.0]),
+    let key = |p, rgb, i| ramp::Key::color(p, rgb, i);
+    let stops: Arc<[ramp::Key]> = Arc::from(vec![
+        key(0.0, [0.0, 0.0, 1.0], ramp::Interpolation::Linear),
+        key(0.5, [1.0, 1.0, 1.0], ramp::Interpolation::Constant),
+        key(1.0, [1.0, 0.0, 0.0], ramp::Interpolation::Linear),
     ]);
     let ramp = SettingKind::ColorRamp {
         default: stops.clone(),
@@ -434,11 +435,27 @@ fn colors_and_color_ramps_fit_their_descriptors_and_ramps_blend() {
     ] {
         assert!(settings::validate(&ds, &vec![bad]).is_err());
     }
-    // Linear between stops, the ends' colors beyond them.
-    assert_eq!(ramp_color(&stops, 0.25), [0.5, 0.5, 1.0]);
-    assert_eq!(ramp_color(&stops, -1.0), [0.0, 0.0, 1.0]);
-    assert_eq!(ramp_color(&stops, 2.0), [1.0, 0.0, 0.0]);
-    assert_eq!(ramp_color(&stops[..1], 0.7), [0.0, 0.0, 1.0]);
+    // Each key's interpolation runs to the next (linear, then constant),
+    // the ends' colors beyond them.
+    assert_eq!(ramp::color_at(&stops, 0.25), [0.5, 0.5, 1.0]);
+    assert_eq!(ramp::color_at(&stops, 0.75), [1.0, 1.0, 1.0]);
+    assert_eq!(ramp::color_at(&stops, -1.0), [0.0, 0.0, 1.0]);
+    assert_eq!(ramp::color_at(&stops, 2.0), [1.0, 0.0, 0.0]);
+    assert_eq!(ramp::color_at(&stops[..1], 0.7), [0.0, 0.0, 1.0]);
+    assert_eq!(ramp::color_at(&[], 0.7), [0.0; 3]);
+    // A negative color is no color ramp.
+    let negative = Arc::from(vec![key(
+        0.0,
+        [-0.1, 0.0, 0.0],
+        ramp::Interpolation::Linear,
+    )]);
+    assert!(
+        settings::validate(
+            &ds,
+            &vec![(Arc::from("ramp"), SettingValue::ColorRamp(negative))]
+        )
+        .is_err()
+    );
 }
 
 #[test]

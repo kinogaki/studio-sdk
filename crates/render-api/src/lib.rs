@@ -67,9 +67,8 @@ pub use prim::{
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
 pub use settings::{
-    ColorStop, Condition, MAX_RAMP_STOPS, RenderSettings, Requirement, SettingDescriptor,
-    SettingError, SettingGroup, SettingKind, SettingValue, SettingValues, Trailing, Unit,
-    Visibility, ramp_color,
+    Condition, MAX_RAMP_STOPS, RenderSettings, Requirement, SettingDescriptor, SettingError,
+    SettingGroup, SettingKind, SettingValue, SettingValues, Trailing, Unit, Visibility,
 };
 pub use source::{Look, PlainTriangles, TriangleSource};
 pub use update::{Change, SceneUpdate};

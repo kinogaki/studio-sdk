@@ -4,8 +4,9 @@
 //! numbers. This is the one definition: a node's ramp parameter (the
 //! API's `params::ramp`, a `Value::Numbers` of `ParameterKind::Ramp`),
 //! Studio's ramp widget (`sheet::ramp`) and a render engine's color ramps
-//! evaluate a ramp with [`Ramp::evaluate`] or [`Keys::evaluate_channel`]
-//! and get the same values.
+//! (a `SettingValue::ColorRamp`'s keys, [`color_at`]) evaluate a ramp with
+//! [`Ramp::evaluate`] or [`Keys::evaluate_channel`] and get the same
+//! values.
 //!
 //! Keys sit at positions in 0–1, sorted. Each key's [`Interpolation`] says
 //! how the ramp runs from it to the next key; before the first key and past
@@ -205,6 +206,26 @@ impl Keys for Ramp {
     fn interpolation(&self, k: usize) -> Interpolation {
         self.keys[k].interpolation
     }
+}
+
+impl Keys for [Key] {
+    fn count(&self) -> usize {
+        self.len()
+    }
+    fn position(&self, k: usize) -> f64 {
+        self[k].position
+    }
+    fn value(&self, k: usize, channel: usize) -> f64 {
+        self[k].value[channel]
+    }
+    fn interpolation(&self, k: usize) -> Interpolation {
+        self[k].interpolation
+    }
+}
+
+/// Color ramp `keys` (by position) at `t`: black when there are none.
+pub fn color_at(keys: &[Key], t: f64) -> [f64; 3] {
+    [0, 1, 2].map(|c| keys.evaluate_channel(t, c))
 }
 
 /// The channels a key of a color (3) or float (1) ramp holds.

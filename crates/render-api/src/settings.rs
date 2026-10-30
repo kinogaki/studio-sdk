@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use crate::id::{PrimId, TextureId};
+use crate::ramp;
 use crate::vocabulary::Choice;
 
 /// A setting's value.
@@ -23,8 +24,9 @@ pub enum SettingValue {
     Choice(Arc<str>),
     /// A color, linear ACEScg.
     Color([f64; 3]),
-    /// A color ramp's stops, by ascending position.
-    ColorRamp(Arc<[ColorStop]>),
+    /// A color ramp's keys, by ascending position (each key's value its
+    /// color).
+    ColorRamp(Arc<[ramp::Key]>),
     /// Two numbers (an offset across a plane).
     Vector2([f64; 2]),
     /// An image the host decoded and sent as a Texture prim (none: no
@@ -90,57 +92,17 @@ impl SettingValue {
     }
 }
 
-/// The most stops a color ramp holds.
+/// The most keys a color ramp holds.
 pub const MAX_RAMP_STOPS: usize = 16;
 
-/// A color ramp's stop: a color (linear ACEScg) at a position in 0..=1.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ColorStop {
-    /// Where it sits, 0 to 1.
-    pub position: f64,
-    /// Its color.
-    pub color: [f64; 3],
-}
-
-impl ColorStop {
-    /// The stop `color` at `position`.
-    pub const fn new(position: f64, color: [f64; 3]) -> ColorStop {
-        ColorStop { position, color }
-    }
-}
-
-/// Ramp `stops` (ascending, at least one) at `t`: linear between the stops
-/// around it, the end stops' colors beyond them.
-pub fn ramp_color(stops: &[ColorStop], t: f64) -> [f64; 3] {
-    let Some(first) = stops.first() else {
-        return [0.0; 3];
-    };
-    if t.is_nan() || t <= first.position {
-        return first.color;
-    }
-    for pair in stops.windows(2) {
-        let (a, b) = (pair[0], pair[1]);
-        if t <= b.position {
-            let span = b.position - a.position;
-            let u = if span > 0.0 {
-                (t - a.position) / span
-            } else {
-                1.0
-            };
-            return [0, 1, 2].map(|i| a.color[i] + (b.color[i] - a.color[i]) * u);
-        }
-    }
-    stops[stops.len() - 1].color
-}
-
-/// Whether `stops` make a ramp: 1 to [`MAX_RAMP_STOPS`] stops, positions
-/// ascending in 0..=1, colors finite and not negative.
-fn is_ramp(stops: &[ColorStop]) -> bool {
-    (1..=MAX_RAMP_STOPS).contains(&stops.len())
-        && stops.windows(2).all(|p| p[0].position <= p[1].position)
-        && stops
+/// Whether `keys` make a color ramp: 1 to [`MAX_RAMP_STOPS`] keys,
+/// positions ascending in 0..=1, colors finite and not negative.
+fn is_ramp(keys: &[ramp::Key]) -> bool {
+    (1..=MAX_RAMP_STOPS).contains(&keys.len())
+        && keys.windows(2).all(|p| p[0].position <= p[1].position)
+        && keys
             .iter()
-            .all(|s| (0.0..=1.0).contains(&s.position) && is_color(&s.color))
+            .all(|k| (0.0..=1.0).contains(&k.position) && is_color(&k.value))
 }
 
 fn is_color(c: &[f64; 3]) -> bool {
@@ -273,10 +235,11 @@ pub enum SettingKind {
         /// Its default.
         default: [f64; 3],
     },
-    /// A color ramp: stops from 0 to 1 ([`ramp_color`] reads it).
+    /// A color ramp: keys from 0 to 1, each with its interpolation
+    /// ([`ramp::color_at`] reads it).
     ColorRamp {
-        /// Its default stops.
-        default: Arc<[ColorStop]>,
+        /// Its default keys.
+        default: Arc<[ramp::Key]>,
     },
 }
 
@@ -508,7 +471,7 @@ impl SettingDescriptor {
                 choices.iter().any(|c| c.name == *name)
             }
             (SettingKind::Color { .. }, SettingValue::Color(c)) => is_color(c),
-            (SettingKind::ColorRamp { .. }, SettingValue::ColorRamp(stops)) => is_ramp(stops),
+            (SettingKind::ColorRamp { .. }, SettingValue::ColorRamp(keys)) => is_ramp(keys),
             (SettingKind::Vector2 { min, max, .. }, SettingValue::Vector2(v)) => {
                 v.iter().all(|c| c.is_finite() && (min..=max).contains(&c))
             }
