@@ -6,8 +6,8 @@ use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryEl
 use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
 use studio_ui_api::gizmo::TransformTool;
 use studio_ui_api::host::{
-    Cx, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef, Place,
-    View, ViewCamera, ViewCx, Waker,
+    Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef,
+    Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
     ContextPart, Creation, Creations, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec,
@@ -334,6 +334,11 @@ fn view(pointer: Option<Pos>, modifiers: Modifiers) -> View {
             eye: kinogaki_studio_api::Vec3::new(0.0, 0.0, 10.0),
             target: kinogaki_studio_api::Vec3::ZERO,
             orthographic: false,
+            ground: Ground {
+                origin: kinogaki_studio_api::Vec3::ZERO,
+                normal: kinogaki_studio_api::Vec3::new(0.0, 1.0, 0.0),
+                step: 1.0,
+            },
         },
     }
 }

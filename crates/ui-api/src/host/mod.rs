@@ -40,7 +40,7 @@ pub use capabilities::{
     HostDoc, HostDocExt, HostSelection, HostSettings, HostSettingsExt, HostShell, HostSlots,
     HostSlotsExt, HostStatus, HostTransform, HostUndo, HostView,
 };
-pub use data::{HostPrefs, Inspected, NodeRef, ObjectRef, Place, View, ViewCamera};
+pub use data::{Ground, HostPrefs, Inspected, NodeRef, ObjectRef, Place, View, ViewCamera};
 pub use network::HostNetwork;
 
 use crate::gizmo::{GizmoFrame, Handle, TransformTool};
