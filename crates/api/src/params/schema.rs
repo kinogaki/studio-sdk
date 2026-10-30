@@ -1,6 +1,6 @@
 //! [`Schema`]: how parameters are presented, as data. The host turns it
 //! into its inspector's rows; edits come back as new [`Value`]s.
-use super::{Parameters, Value};
+use super::{Diagnostic, Parameters, Value};
 
 /// What a parameter dialog or inspector shows, top to bottom: sections and
 /// parameters.
@@ -124,6 +124,59 @@ impl Parameter {
         self.enabled = enabled;
         self
     }
+
+    /// Whether `value` is one this parameter takes, as core checks every
+    /// node's parameters (when a node is made, edited or loaded): of its
+    /// kind's variant ([`ParameterKind::accepts`]), every number finite,
+    /// a [`Number`] (alone, a vector's or channels' component) within its
+    /// limits, an integer whole and within its limits. Other kinds declare
+    /// no limits, so only their numbers' finiteness is checked. The error
+    /// says why, naming the parameter by its label.
+    pub fn check(&self, value: &Value) -> Result<(), Diagnostic> {
+        let refuse = |why: &str| Err(Diagnostic::error(format!("{} {why}", self.label)));
+        if !self.kind.accepts(value) {
+            return refuse("doesn't take that value");
+        }
+        let numbers = match value {
+            Value::Number(v) => std::slice::from_ref(v),
+            Value::Numbers(v) => v.as_slice(),
+            _ => return Ok(()),
+        };
+        if numbers.iter().any(|v| !v.is_finite()) {
+            return refuse("must be a finite number");
+        }
+        let (min, max, whole) = match &self.kind {
+            ParameterKind::Number(n)
+            | ParameterKind::Vector { number: n, .. }
+            | ParameterKind::Channels(n) => (n.min, n.max, false),
+            // The widest integers are no limits.
+            &ParameterKind::Integer { min, max } => (
+                if min == i64::MIN {
+                    f64::NEG_INFINITY
+                } else {
+                    min as f64
+                },
+                if max == i64::MAX {
+                    f64::INFINITY
+                } else {
+                    max as f64
+                },
+                true,
+            ),
+            _ => return Ok(()),
+        };
+        let within = |v: &f64| *v >= min && *v <= max && !(whole && v.fract() != 0.0);
+        if numbers.iter().all(within) {
+            return Ok(());
+        }
+        let what = if whole { "a whole number" } else { "a number" };
+        refuse(&match (min.is_finite(), max.is_finite()) {
+            (true, true) => format!("must be {what} from {min} to {max}"),
+            (true, false) => format!("must be {what} of at least {min}"),
+            (false, true) => format!("must be {what} of at most {max}"),
+            (false, false) => format!("must be {what}"),
+        })
+    }
 }
 
 /// What a parameter holds and how it shows.
@@ -132,7 +185,7 @@ pub enum ParameterKind {
     /// [`Value::Number`]: a real number with a unit and limits.
     Number(Number),
     /// [`Value::Number`] holding a whole number in `min..=max`, with step
-    /// arrows.
+    /// arrows; core refuses any other ([`Parameter::check`]).
     Integer {
         /// The smallest value.
         min: i64,
@@ -257,9 +310,10 @@ impl ParameterKind {
 pub struct Number {
     /// What it measures.
     pub unit: Unit,
-    /// The smallest value; typed and dragged values clamp to it.
+    /// The smallest value, in stored units: typed and dragged values
+    /// clamp to it, and core refuses a smaller one ([`Parameter::check`]).
     pub min: f64,
-    /// The largest value.
+    /// The largest value, in stored units, likewise.
     pub max: f64,
     /// The span dragging and the slider cover, when narrower than the
     /// limits; typing may leave it.
@@ -271,8 +325,9 @@ pub struct Number {
     /// How much it changes per point dragged; `None` leaves it to the host.
     pub speed: Option<f64>,
     /// A length whose default is a real size in millimetres (a
-    /// primitive's dimensions): the host gives a new node, and a reset to
-    /// the default, that size in the document's unit.
+    /// primitive's dimensions): the host gives every new node, and a reset
+    /// to the default, that size in the document's unit. Its limits are
+    /// in stored units, as its values are.
     pub real_size: bool,
 }
 
@@ -387,6 +442,62 @@ mod tests {
         assert_eq!(names, ["distance", "cap"]);
         assert_eq!(schema.values()["distance"], Value::Number(1.5));
         assert!(schema.parameters().all(|p| p.kind.accepts(&p.value)));
+    }
+
+    #[test]
+    fn a_parameter_takes_finite_numbers_within_its_limits() {
+        let length = Parameter::new(
+            "distance",
+            "Distance",
+            ParameterKind::Number(Number::length().range(0.0, 10.0)),
+            1.0,
+        );
+        assert!(length.check(&Value::Number(10.0)).is_ok());
+        let refused = |p: &Parameter, v: Value| p.check(&v).unwrap_err().message;
+        assert_eq!(
+            refused(&length, Value::Number(-1.0)),
+            "Distance must be a number from 0 to 10"
+        );
+        assert_eq!(
+            refused(&length, Value::Number(f64::NAN)),
+            "Distance must be a finite number"
+        );
+        assert_eq!(
+            refused(&length, Value::Bool(true)),
+            "Distance doesn't take that value"
+        );
+        let count = Parameter::new(
+            "count",
+            "Count",
+            ParameterKind::Integer {
+                min: 1,
+                max: i64::MAX,
+            },
+            2.0,
+        );
+        assert!(count.check(&Value::Number(1e9)).is_ok());
+        assert_eq!(
+            refused(&count, Value::Number(2.5)),
+            "Count must be a whole number of at least 1"
+        );
+        let size = Parameter::new(
+            "size",
+            "Size",
+            ParameterKind::Vector {
+                components: 3,
+                number: Number::length().range(0.0, f64::INFINITY),
+            },
+            vec![1.0; 3],
+        );
+        assert!(size.check(&Value::Numbers(vec![1.0, 0.0, 2.0])).is_ok());
+        assert!(size.check(&Value::Numbers(vec![1.0, -0.5, 2.0])).is_err());
+        // A color declares no limits: any finite channels.
+        let tint = Parameter::new("tint", "Tint", ParameterKind::Color, vec![0.0; 3]);
+        assert!(tint.check(&Value::Numbers(vec![4.0, -1.0, 0.0])).is_ok());
+        assert!(
+            tint.check(&Value::Numbers(vec![f64::INFINITY, 0.0, 0.0]))
+                .is_err()
+        );
     }
 
     #[test]

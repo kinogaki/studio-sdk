@@ -9,14 +9,16 @@ use crate::refs::NodeRef;
 
 /// A network a package edits through the host, inside one undo step. Each
 /// call refuses what doesn't fit (an unknown node, a wire into a port the
-/// node hasn't got, a value its parameter doesn't take, a flag its
+/// node hasn't got, a value its parameter doesn't take
+/// ([`Parameter::check`](crate::params::Parameter::check)), a flag its
 /// context doesn't offer) and changes nothing then; the host checks the
 /// whole network again when the step is committed (no cycles, required
 /// values) and drops the step when that fails.
 pub trait NetworkEdit: NetworkRead {
     /// Adds `node` on the top level at `position`, named as nothing there
     /// is: a new node of its type with its parameters set over the type's
-    /// defaults, displayed when `node.display` says so.
+    /// defaults (a [real size](crate::params::Number::real_size) in the
+    /// document's unit), displayed when `node.display` says so.
     fn add_node(&mut self, node: NewNode, position: [f32; 2]) -> Result<NodeRef, Error>;
 
     /// Sets parameter `name` of `node` to `value`.

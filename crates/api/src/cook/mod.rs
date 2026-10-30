@@ -217,10 +217,12 @@ pub trait NodeType: Send + Sync {
     }
 
     /// The parameters a node with `parameters` holds beyond its
-    /// description's (a code node's, declared by its code): the inspector
-    /// shows them after the declared ones, and their values live in the
-    /// node's parameters under their own names. Core asks again whenever
-    /// the node's parameters change.
+    /// description's (a code node's, declared by its code), each at its
+    /// declared default as a description's are: a spare the node holds no
+    /// value for yet starts at it, and a reset (a promoted row's too)
+    /// returns to it. The inspector shows them after the declared ones,
+    /// and their values live in the node's parameters under their own
+    /// names. Core asks again whenever the node's parameters change.
     fn spares(&self, parameters: &Parameters) -> Option<Schema> {
         let _ = parameters;
         None
@@ -247,8 +249,10 @@ pub trait NodeType: Send + Sync {
         None
     }
 
-    /// Checks of `parameters` beyond what its schema says (each value is
-    /// of its parameter's kind and within its range, which core checks).
+    /// Checks of `parameters` beyond what its description and its spares
+    /// declare: core checks each declared value first with
+    /// [`Parameter::check`](crate::params::Parameter::check) (of its kind,
+    /// finite, within a number's or an integer's limits).
     fn validate(&self, parameters: &Parameters) -> Result<(), Diagnostic> {
         let _ = parameters;
         Ok(())
