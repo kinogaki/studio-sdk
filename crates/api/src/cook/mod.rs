@@ -241,6 +241,17 @@ pub trait NodeType: Send + Sync {
         rows
     }
 
+    /// The parameters an edit from `before` to `after` leaves, when the
+    /// type answers it (locking a live palette keeps what `cx` says its
+    /// runner read back); `after` by default. It must be pure and
+    /// deterministic: core calls it inside the edit's own transaction
+    /// (the same undo step), on every path an edit takes (the inspector,
+    /// `NetworkEdit`, paste), so undo, redo and remote edits agree.
+    fn edited(&self, before: &Parameters, after: Parameters, cx: &SchemaCx<'_>) -> Parameters {
+        let _ = (before, cx);
+        after
+    }
+
     /// The data type of the delta it holds when it is a held edit (an Edit
     /// Mesh holds `kinogaki.mesh.action`); `None` otherwise. Core applies
     /// the delta through the [`HeldEdit`](crate::HeldEdit) registered for

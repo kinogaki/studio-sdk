@@ -206,3 +206,46 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
         (Some(9), "no such node".into())
     );
 }
+
+/// A runner of `acme.trees.network`'s plans (never made here).
+#[cfg(feature = "wgpu")]
+struct Runs;
+
+#[cfg(feature = "wgpu")]
+impl kinogaki_render_api::display::PlanRunner for Runs {
+    fn make(
+        &self,
+        _: &kinogaki_render_api::display::wgpu::Device,
+        _: &kinogaki_render_api::display::wgpu::Queue,
+    ) -> Box<dyn kinogaki_render_api::display::Runner> {
+        unreachable!("not made in this test")
+    }
+}
+
+#[cfg(feature = "wgpu")]
+#[test]
+fn a_runner_runs_a_compiled_context_its_package_declares() {
+    let compiled = || context("acme.trees.network").compiled();
+    let trees = |runs: &[&str]| {
+        runs.iter().fold(
+            Package::new(PackageId::declared("acme.trees"), "Trees")
+                .with_context(compiled())
+                .with_compiler(Chain),
+            |p, c| p.with_runner(ContextId::declared(c), Runs),
+        )
+    };
+    assert!(
+        Registry::new()
+            .register(trees(&["acme.trees.network"]))
+            .is_ok()
+    );
+    for stray in [
+        &["acme.rocks.network"][..],
+        &["acme.trees.network", "acme.trees.network"],
+    ] {
+        assert!(matches!(
+            Registry::new().register(trees(stray)),
+            Err(RegistryError::StrayRunner { .. })
+        ));
+    }
+}

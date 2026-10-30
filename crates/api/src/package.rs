@@ -5,6 +5,8 @@ use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::icon::Icon;
+#[cfg(feature = "wgpu")]
+use crate::id::ContextId;
 use crate::id::PackageId;
 use crate::network::{NetworkCompiler, NetworkContext};
 use crate::object::ObjectKindSpec;
@@ -68,6 +70,10 @@ pub struct Package {
     /// is refused before it is loaded.
     #[cfg(feature = "wgpu")]
     pub engines: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
+    /// The runners of its compiled contexts' plans, by context (the `wgpu`
+    /// feature): how the host shows what a compiled network makes.
+    #[cfg(feature = "wgpu")]
+    pub runners: Vec<(ContextId, Arc<dyn kinogaki_render_api::display::PlanRunner>)>,
 }
 
 impl Package {
@@ -89,6 +95,8 @@ impl Package {
             icons: Vec::new(),
             #[cfg(feature = "wgpu")]
             engines: Vec::new(),
+            #[cfg(feature = "wgpu")]
+            runners: Vec::new(),
         }
     }
 
@@ -166,6 +174,17 @@ impl Package {
         engine: impl kinogaki_render_api::display::Engine + 'static,
     ) -> Self {
         self.engines.push(Arc::new(engine));
+        self
+    }
+
+    /// With `runner`, which runs compiled context `context`'s plans.
+    #[cfg(feature = "wgpu")]
+    pub fn with_runner(
+        mut self,
+        context: ContextId,
+        runner: impl kinogaki_render_api::display::PlanRunner + 'static,
+    ) -> Self {
+        self.runners.push((context, Arc::new(runner)));
         self
     }
 }

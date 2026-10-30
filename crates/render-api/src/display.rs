@@ -17,10 +17,21 @@
 //! and how to make it on the host's device and queue, waking the host once
 //! per result, with the [`Options`] it gives.
 //!
+//! A compiled context (Comp) runs its plans on the film through a
+//! [`Runner`] its package makes on the host's device ([`PlanRunner`]): the
+//! host gives it the film ([`RunFilm`]) and its view transforms as WGSL
+//! ([`ViewTransforms`]: the host keeps the color maths), and shows the
+//! [`RunImage`] it returns; what the runner reads back (a palette) the host
+//! asks for with [`Runner::kept`].
+//!
 //! This module is the crate's `wgpu` feature (wgpu 30.0.1).
 
 use std::path::PathBuf;
 use std::sync::Arc;
+
+/// The wgpu this contract's types are (30.0.1): what a host and its
+/// engines and runners build against.
+pub use wgpu;
 
 use crate::{Aov, EngineDescription, Frame, RenderEngine, Wake};
 
@@ -210,4 +221,114 @@ pub trait Engine: Send + Sync {
         wake: Wake,
         options: &Options,
     ) -> Result<Made, String>;
+}
+
+/// Which display and view a view transform is for.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ViewChoice {
+    /// The viewer's display and view.
+    Viewer,
+    /// A display and view of the host's color configuration, by name.
+    Pinned {
+        /// The display.
+        display: Arc<str>,
+        /// The view.
+        view: Arc<str>,
+    },
+}
+
+/// A view transform (scene-referred ACEScg to display code values, without
+/// the viewer's exposure and gamma) as the host's color management writes
+/// it for a compute shader: WGSL declaring its data buffer at the group and
+/// binding asked for, with helpers and a function `fn <function>(c:
+/// vec3<f32>) -> vec3<f32>`, and the buffer's contents. The host holds the
+/// color maths; a package only embeds the shader.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewTransform {
+    /// The WGSL: the buffer's declaration, helpers and the function.
+    pub source: String,
+    /// The function's name.
+    pub function: String,
+    /// The buffer's contents (f32s).
+    pub data: Vec<f32>,
+}
+
+/// The host's view transforms, for a runner that shows display code
+/// values (Comp's To Display).
+pub trait ViewTransforms {
+    /// `view`'s transform as WGSL named `name` (`[A-Za-z0-9_]`) reading its
+    /// data at `group`, `binding`; none when the configuration lacks it.
+    fn transform(
+        &self,
+        view: &ViewChoice,
+        name: &str,
+        group: u32,
+        binding: u32,
+    ) -> Option<ViewTransform>;
+    /// Changes whenever a transform would.
+    fn revision(&self) -> u64;
+}
+
+/// What an image means.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Referred {
+    /// Scene light, linear ACEScg: the host still applies its view.
+    Scene,
+    /// Display code values, 0 to 1: shown as they are.
+    Display,
+}
+
+/// The film a plan runs on: a frame's images at the film's size.
+#[derive(Clone, Copy, Debug)]
+pub struct RunFilm<'a> {
+    /// The film's size, in film pixels.
+    pub size: [u32; 2],
+    /// Display pixels a film pixel covers.
+    pub block: u32,
+    /// Changes whenever the film's contents do (a new frame).
+    pub stamp: u64,
+    /// Its images, the beauty first.
+    pub images: &'a [FilmImage],
+}
+
+/// The image a run shows.
+#[derive(Clone, Debug)]
+pub struct RunImage {
+    /// A view of it, at the film's size.
+    pub view: wgpu::TextureView,
+    /// Which texture it is (the same key is the same texture, unchanged).
+    pub key: u64,
+    /// What it holds.
+    pub referred: Referred,
+}
+
+/// A compiled context's executor on one device: it runs its package's
+/// plans (`NetworkCompiler::compile`'s values, opaque to the host) on a
+/// film in the host's encoder, keeping what it can reuse.
+pub trait Runner: Send {
+    /// Encodes `plan` on `film` into `encoder` (the host submits it), only
+    /// what changed since the last run; the image it shows, or why it
+    /// can't run on this film (an output the engine doesn't keep).
+    fn run(
+        &mut self,
+        plan: &(dyn std::any::Any + Send + Sync),
+        film: &RunFilm<'_>,
+        transforms: &dyn ViewTransforms,
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> Result<RunImage, String>;
+    /// The host submitted the last run as `index`: what it reads back (a
+    /// palette it made) is read once that work is done, waking `wake` once.
+    fn submitted(&mut self, index: wgpu::SubmissionIndex, wake: Wake);
+    /// What node `node` made that the runner keeps for the host to read
+    /// (its last read-back palette, r, g, b a color); none when it keeps
+    /// nothing for it.
+    fn kept(&self, node: u64) -> Option<Arc<[f64]>>;
+    /// Drops what it keeps (the network was closed).
+    fn clear(&mut self);
+}
+
+/// How a compiled context's runner is made on a host's device.
+pub trait PlanRunner: Send + Sync {
+    /// One on `device` and `queue`.
+    fn make(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Box<dyn Runner>;
 }

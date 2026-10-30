@@ -92,6 +92,14 @@ pub enum RegistryError {
         /// The context.
         context: ContextId,
     },
+    /// `package` brings a runner for `context`, which isn't a compiled
+    /// context it declares (or already has one from it).
+    StrayRunner {
+        /// The refused package.
+        package: PackageId,
+        /// The context.
+        context: ContextId,
+    },
 }
 
 impl fmt::Display for RegistryError {
@@ -136,6 +144,10 @@ impl fmt::Display for RegistryError {
                     "{package} declares compiled context {context} without its compiler"
                 )
             }
+            Self::StrayRunner { package, context } => write!(
+                f,
+                "{package} brings a runner for {context}, which isn't one of its compiled contexts or has one"
+            ),
             Self::StrayCompiler { package, context } => write!(
                 f,
                 "{package} brings a compiler for {context}, which isn't one of its compiled contexts or has one"
@@ -336,13 +348,25 @@ impl Registry {
                 });
             }
         }
-        match compiled.difference(&given).next() {
-            Some(&context) => Err(RegistryError::NoCompiler {
+        if let Some(&context) = compiled.difference(&given).next() {
+            return Err(RegistryError::NoCompiler {
                 package: id,
                 context,
-            }),
-            None => Ok(()),
+            });
         }
+        #[cfg(feature = "wgpu")]
+        {
+            let mut run = BTreeSet::new();
+            for (context, _) in &package.runners {
+                if !compiled.contains(context) || !run.insert(*context) {
+                    return Err(RegistryError::StrayRunner {
+                        package: id,
+                        context: *context,
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Every data type `package` names is registered, by it or before it,

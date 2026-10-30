@@ -8,13 +8,30 @@ use crate::data::Data;
 pub struct SchemaCx<'a> {
     wired: &'a [bool],
     inputs: &'a [Option<Data>],
+    kept: Option<&'a [f64]>,
 }
 
 impl<'a> SchemaCx<'a> {
     /// Ports `wired` (one a port), and the value each input held at the
     /// node's last cook (`None`: not cooked yet, or nothing wired).
     pub fn new(wired: &'a [bool], inputs: &'a [Option<Data>]) -> Self {
-        Self { wired, inputs }
+        Self {
+            wired,
+            inputs,
+            kept: None,
+        }
+    }
+
+    /// With what the node's compiled context's runner keeps for it
+    /// (`display::Runner::kept`: a palette it read back).
+    pub fn with_kept(mut self, kept: Option<&'a [f64]>) -> Self {
+        self.kept = kept;
+        self
+    }
+
+    /// What the node's runner keeps for it, if anything.
+    pub fn kept(&self) -> Option<&'a [f64]> {
+        self.kept
     }
 
     /// Whether input `port` has a wire.
@@ -38,5 +55,8 @@ mod tests {
         assert!(cx.wired(0) && !cx.wired(1) && !cx.wired(5));
         assert!(cx.input(0).is_none() && cx.input(9).is_none());
         assert!(!SchemaCx::default().wired(0));
+        assert_eq!(cx.kept(), None);
+        let palette = [0.1, 0.2, 0.3];
+        assert_eq!(cx.with_kept(Some(&palette)).kept(), Some(&palette[..]));
     }
 }
