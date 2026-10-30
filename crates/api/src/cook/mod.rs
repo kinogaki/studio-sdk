@@ -23,7 +23,7 @@ mod incremental;
 
 pub use binding::{Scalar, Vector};
 pub use context::CookCx;
-pub use description::{Description, Port};
+pub use description::{Description, NodeRole, Port, Ports};
 pub use frame::Frame;
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
@@ -31,8 +31,8 @@ pub use incremental::{CookPlan, Incremental, Prepared};
 use crate::components::Components;
 use crate::data::Data;
 use crate::error::Error;
-use crate::id::NodeTypeId;
-use crate::params::{Diagnostic, Parameters};
+use crate::id::{DataTypeId, NodeTypeId};
+use crate::params::{Diagnostic, Parameters, Schema};
 use std::fmt;
 
 /// What, besides its inputs and parameters, a node's result depends on.
@@ -152,5 +152,55 @@ pub trait NodeType: Send + Sync {
     /// parameter then reuses prepared work).
     fn incremental(&self) -> Option<&dyn Incremental> {
         None
+    }
+
+    /// Whether a cook with `parameters` reads wire `wire` of input `port`,
+    /// which holds `wires` wires: a Switch reads its chosen wire only.
+    /// Core leaves the wires it doesn't read out of the cook (nothing
+    /// upstream of them cooks for it) and out of the required checks.
+    /// Every wire by default. Core asks only types whose
+    /// [`partial_reads`](Self::partial_reads) says so.
+    fn reads_wire(&self, parameters: &Parameters, port: usize, wire: usize, wires: usize) -> bool {
+        let _ = (parameters, port, wire, wires);
+        true
+    }
+
+    /// Whether [`reads_wire`](Self::reads_wire) ever leaves a wire out:
+    /// core asks it again whenever such a node's parameters change.
+    fn partial_reads(&self) -> bool {
+        false
+    }
+
+    /// Its ports when they follow its parameters (a render output's
+    /// outputs follow its engine's); `None`: its description's. Core asks
+    /// again whenever the node's parameters change.
+    fn ports(&self, parameters: &Parameters) -> Option<Ports> {
+        let _ = parameters;
+        None
+    }
+
+    /// The parameters a node with `parameters` holds beyond its
+    /// description's (a code node's, declared by its code): the inspector
+    /// shows them after the declared ones, and their values live in the
+    /// node's parameters under their own names. Core asks again whenever
+    /// the node's parameters change.
+    fn spares(&self, parameters: &Parameters) -> Option<Schema> {
+        let _ = parameters;
+        None
+    }
+
+    /// The data type of the delta it holds when it is a held edit (an Edit
+    /// Mesh holds `kinogaki.mesh.action`); `None` otherwise. Core applies
+    /// the delta through the [`HeldEdit`](crate::HeldEdit) registered for
+    /// that type, over the input it captured once.
+    fn held(&self) -> Option<DataTypeId> {
+        None
+    }
+
+    /// Checks of `parameters` beyond what its schema says (each value is
+    /// of its parameter's kind and within its range, which core checks).
+    fn validate(&self, parameters: &Parameters) -> Result<(), Diagnostic> {
+        let _ = parameters;
+        Ok(())
     }
 }

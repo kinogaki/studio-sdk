@@ -6,6 +6,7 @@ use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::icon::Icon;
 use crate::id::PackageId;
+use crate::network::NetworkContext;
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
@@ -14,10 +15,10 @@ use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
 /// types (a kernel's), held edits over them, conversions (a bridge's),
-/// node types' cooks, object kinds, file formats, session slots, stored
-/// values and icons, and with the `wgpu` feature its render engines. Node
-/// descriptions, contexts and UI register through the librarian and the
-/// host UI interface.
+/// node types' cooks, the network contexts its object kinds hold, object
+/// kinds, file formats, session slots, stored values and icons, and with
+/// the `wgpu` feature its render engines. Its contexts' UI registers
+/// through the host UI interface.
 ///
 /// Every id it declares has its vendor (the first segment of its id):
 /// `acme.trees` registers `acme.trees.branch` or `acme.format.tree`, never
@@ -42,6 +43,9 @@ pub struct Package {
     pub conversions: Vec<Arc<dyn Conversion>>,
     /// What its node types compute.
     pub node_types: Vec<Arc<dyn NodeType>>,
+    /// The network contexts it declares, whose networks core keeps in the
+    /// objects of kinds naming them.
+    pub contexts: Vec<NetworkContext>,
     /// The object kinds it contributes.
     pub object_kinds: Vec<Arc<dyn ObjectKindSpec>>,
     /// The file formats it reads and writes.
@@ -74,6 +78,7 @@ impl Package {
             held_edits: Vec::new(),
             conversions: Vec::new(),
             node_types: Vec::new(),
+            contexts: Vec::new(),
             object_kinds: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
@@ -105,6 +110,12 @@ impl Package {
     /// With node type `node` too.
     pub fn with_node_type(mut self, node: impl NodeType + 'static) -> Self {
         self.node_types.push(Arc::new(node));
+        self
+    }
+
+    /// With network context `context` too.
+    pub fn with_context(mut self, context: NetworkContext) -> Self {
+        self.contexts.push(context);
         self
     }
 
@@ -163,6 +174,14 @@ impl fmt::Debug for Package {
             .field("held_edits", &ids(&self.held_edits, |h| h.base().as_str()))
             .field("conversions", &ids(&self.conversions, |c| c.id().as_str()))
             .field("node_types", &ids(&self.node_types, |n| n.id().as_str()))
+            .field(
+                "contexts",
+                &self
+                    .contexts
+                    .iter()
+                    .map(|c| c.id.as_str())
+                    .collect::<Vec<_>>(),
+            )
             .field(
                 "object_kinds",
                 &ids(&self.object_kinds, |k| k.id().as_str()),

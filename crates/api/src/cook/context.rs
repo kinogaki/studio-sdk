@@ -29,6 +29,7 @@ pub struct CookCx<'a> {
     cancel: &'a CancelToken,
     workers: &'a dyn Workers,
     time: Time,
+    node: u64,
     scratch: &'a mut Option<Box<dyn Any + Send>>,
 }
 
@@ -58,6 +59,7 @@ impl<'a> CookCx<'a> {
             cancel,
             workers,
             time: Time::default(),
+            node: 0,
             scratch,
         }
     }
@@ -98,6 +100,19 @@ impl<'a> CookCx<'a> {
     pub fn with_time(mut self, time: Time) -> Self {
         self.time = time;
         self
+    }
+
+    /// Cooking the node the host knows as `node`.
+    pub fn with_node(mut self, node: u64) -> Self {
+        self.node = node;
+        self
+    }
+
+    /// The host's id for the node cooking: stable while the node exists
+    /// and unique in its network, so what the cook names after it (a CAD
+    /// node's faces) keeps its names across cooks. 0 outside a network.
+    pub fn node(&self) -> u64 {
+        self.node
     }
 
     /// Every parameter the node holds, by name.

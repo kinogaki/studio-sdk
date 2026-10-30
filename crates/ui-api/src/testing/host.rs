@@ -4,16 +4,18 @@
 //! back, callbacks queued, never nested).
 use crate::gizmo::{GizmoFrame, Handle, TransformTool};
 use crate::host::{
-    Cx, GizmoService, HostDoc, HostPrefs, HostSelection, HostSettings, HostShell, HostSlots,
-    HostStatus, HostTransform, HostUndo, HostView, Inspected, InspectorCx, NodeRef, ObjectRef,
-    Place, UnitsService, View, ViewCamera, ViewCx, Waker,
+    Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
+    HostSlots, HostStatus, HostTransform, HostUndo, HostView, Inspected, InspectorCx, NodeRef,
+    ObjectRef, Place, UnitsService, View, ViewCamera, ViewCx, Waker,
 };
 use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
+use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, ObjectBody, ObjectKindId, SessionSlot, SessionSlots, SlotId,
+    Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, SessionSlot, SessionSlots,
+    SlotId,
 };
 use std::any::Any;
 use std::collections::BTreeMap;
@@ -346,6 +348,25 @@ impl HostDoc for FakeHost {
     }
     fn editing(&self) -> bool {
         self.editing
+    }
+}
+
+/// The fake holds no networks: core owns them, so a package's network
+/// edits are tested against Studio's own host.
+impl HostNetwork for FakeHost {
+    fn network(&self, _object: ObjectRef) -> Option<&dyn NetworkRead> {
+        None
+    }
+    fn edit_network(
+        &mut self,
+        object: ObjectRef,
+        _label: &str,
+        _edit: &mut dyn FnMut(&mut dyn NetworkEdit) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        Err(Error::invalid(format_args!(
+            "object {} holds no network in the fake host",
+            object.0
+        )))
     }
 }
 

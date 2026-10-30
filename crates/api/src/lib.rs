@@ -20,6 +20,9 @@
 //!   apply a held node's authored delta to a data type.
 //! - **Objects** ([`ObjectKindSpec`], [`ObjectBody`]): kinds of scene
 //!   objects a package adds and their package-owned state.
+//! - **Networks** ([`network`]): the contexts a package declares
+//!   ([`NetworkContext`]) and how a package reads and edits a network,
+//!   which core owns ([`NetworkRead`], [`NetworkEdit`]).
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
 //!   state of an editing session.
@@ -64,6 +67,7 @@ pub mod held;
 pub mod icon;
 pub mod id;
 pub mod math;
+pub mod network;
 pub mod object;
 pub mod package;
 pub mod parallel;
@@ -81,7 +85,8 @@ pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
 pub use conversion::Conversion;
 pub use cook::{
-    CookCx, CookError, CookPlan, Description, Incremental, NodeType, Outputs, Port, Prepared, Reads,
+    CookCx, CookError, CookPlan, Description, Incremental, NodeRole, NodeType, Outputs, Port,
+    Ports, Prepared, Reads,
 };
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp};
@@ -98,6 +103,7 @@ pub use id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
+pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     ObjectBody, ObjectKindSpec, Processing, RenderSetup, RenderSetupKind, RenderedKind,
 };

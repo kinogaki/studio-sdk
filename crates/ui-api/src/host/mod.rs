@@ -11,6 +11,7 @@
 //! | [`HostSlots`] ([`HostSlotsExt`]) | the session's slots, typed |
 //! | [`HostSelection`] | selected objects, picked nodes |
 //! | [`HostDoc`] ([`HostDocExt`]) | where the user is, objects and their bodies, packages' stored values |
+//! | [`HostNetwork`] | objects' networks, read and edited |
 //! | [`HostView`] | views, cameras, framing, redraws |
 //! | [`HostStatus`] | the error line and the Console |
 //! | [`HostShell`] | actions and the keyboard |
@@ -33,12 +34,14 @@
 //! [`poll`](crate::package::UiPackage::poll). No timers.
 mod capabilities;
 mod data;
+mod network;
 
 pub use capabilities::{
     HostDoc, HostDocExt, HostSelection, HostSettings, HostSettingsExt, HostShell, HostSlots,
     HostSlotsExt, HostStatus, HostTransform, HostUndo, HostView,
 };
 pub use data::{HostPrefs, Inspected, NodeRef, ObjectRef, Place, View, ViewCamera};
+pub use network::HostNetwork;
 
 use crate::gizmo::{GizmoFrame, Handle, TransformTool};
 use crate::{Pos, Projection, Rect};
@@ -55,6 +58,7 @@ pub trait Cx:
     + HostSlots
     + HostSelection
     + HostDoc
+    + HostNetwork
     + HostView
     + HostStatus
     + HostShell

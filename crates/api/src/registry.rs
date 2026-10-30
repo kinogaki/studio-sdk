@@ -10,7 +10,10 @@ use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
-use crate::id::{ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId};
+use crate::id::{
+    ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
+};
+use crate::network::NetworkContext;
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::{SessionSlot, SessionSlots};
@@ -135,8 +138,8 @@ fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
     entry.map(|e| e.package)
 }
 
-/// Every package's registered data types, conversions, object kinds,
-/// formats and session slots.
+/// Every package's registered data types, held edits, node types, network
+/// contexts, conversions, object kinds, formats and session slots.
 #[derive(Default)]
 pub struct Registry {
     packages: Vec<(PackageId, String)>,
@@ -144,6 +147,7 @@ pub struct Registry {
     /// Each base data type's held edits.
     held_edits: BTreeMap<DataTypeId, Entry<dyn HeldEdit>>,
     node_types: BTreeMap<NodeTypeId, Entry<dyn NodeType>>,
+    contexts: BTreeMap<ContextId, Entry<NetworkContext>>,
     conversions: BTreeMap<ConversionId, Entry<dyn Conversion>>,
     /// Each (from, to) pair's conversion.
     routes: BTreeMap<(DataTypeId, DataTypeId), ConversionId>,
@@ -173,6 +177,10 @@ impl Registry {
         }
         for node in package.node_types {
             self.node_types.insert(node.id(), Entry::new(id, node));
+        }
+        for context in package.contexts {
+            self.contexts
+                .insert(context.id, Entry::new(id, Arc::new(context)));
         }
         for conversion in package.conversions {
             self.routes
@@ -242,6 +250,13 @@ impl Registry {
                 owner(self.node_types.get(&n.id())),
             )?;
         }
+        for c in &package.contexts {
+            declare(
+                "network context",
+                c.id.as_str(),
+                owner(self.contexts.get(&c.id)),
+            )?;
+        }
         for c in &package.conversions {
             declare(
                 "conversion",
@@ -299,6 +314,11 @@ impl Registry {
                 });
             }
         }
+        for n in &package.node_types {
+            if let Some(delta) = n.held() {
+                known(n.id().as_str(), delta)?;
+            }
+        }
         let mut routes = BTreeMap::new();
         for c in &package.conversions {
             known(c.id().as_str(), c.from())?;
@@ -328,6 +348,11 @@ impl Registry {
             }
         }
         Ok(())
+    }
+
+    /// Network context `id`; `None` when no package registered it.
+    pub fn network_context(&self, id: ContextId) -> Option<&NetworkContext> {
+        self.contexts.get(&id).map(|e| &*e.item)
     }
 
     /// The registered packages' ids and labels, in registration order.

@@ -4,8 +4,8 @@
 //! builds node creation, the network's ports, the inspector and the
 //! handles from it.
 use super::handle::Handle;
-use crate::id::DataTypeId;
-use crate::params::Schema;
+use crate::id::{ContextId, DataTypeId};
+use crate::params::{Schema, Value};
 
 /// A node type's label, icon, ports, parameters and handles.
 ///
@@ -44,6 +44,11 @@ pub struct Description {
     /// The viewport handles Studio shows while a node of this type is
     /// selected, each bound to some of its parameters.
     pub handles: Vec<Handle>,
+    /// The contexts whose networks offer it (Tab, menus): a Mesh tool's
+    /// `kinogaki.mesh.network`, and CAM's too when CAM cooks it.
+    pub contexts: Vec<ContextId>,
+    /// What part it plays in its network beyond what it computes.
+    pub role: NodeRole,
 }
 
 impl Description {
@@ -57,6 +62,8 @@ impl Description {
             outputs: Vec::new(),
             parameters: Schema::default(),
             handles: Vec::new(),
+            contexts: Vec::new(),
+            role: NodeRole::Plain,
         }
     }
 
@@ -89,6 +96,42 @@ impl Description {
         self.handles.push(handle);
         self
     }
+
+    /// Offered in networks of `context` too.
+    pub fn context(mut self, context: ContextId) -> Self {
+        self.contexts.push(context);
+        self
+    }
+
+    /// Playing `role`.
+    pub fn role(mut self, role: NodeRole) -> Self {
+        self.role = role;
+        self
+    }
+}
+
+/// The part a node plays in its network beyond what it computes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NodeRole {
+    /// An ordinary node.
+    #[default]
+    Plain,
+    /// Its context's Merge: its first input gathers branches, and growing
+    /// a network adds one where branches join.
+    Merge,
+    /// What its network yields to its object, whatever the display flag
+    /// shows; it stays on the network's top level.
+    Output,
+}
+
+/// A node type's inputs and outputs, when they follow its parameters
+/// ([`NodeType::ports`](crate::NodeType::ports)).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Ports {
+    /// Its inputs, in port order.
+    pub inputs: Vec<Port>,
+    /// Its outputs, in port order; output 0 is its result.
+    pub outputs: Vec<Port>,
 }
 
 /// One input or output of a node type.
@@ -109,6 +152,15 @@ pub struct Port {
     /// Why the node can't cook while nothing is wired into a required
     /// input; empty says it plainly.
     pub missing: String,
+    /// An optional input that is required while parameter `.0` holds
+    /// `.1` (a Boolean's Tools while its operation subtracts).
+    pub required_when: Option<(String, Value)>,
+    /// An input that, unwired, reads the parameter of the same name
+    /// instead (a shader socket's constant).
+    pub constant: bool,
+    /// An input taking another branch's whole result: a branch picked in
+    /// the viewport while the node's tool is live wires into it.
+    pub operand: bool,
 }
 
 impl Port {
@@ -121,6 +173,9 @@ impl Port {
             multi: false,
             optional: false,
             missing: String::new(),
+            required_when: None,
+            constant: false,
+            operand: false,
         }
     }
 
@@ -140,5 +195,33 @@ impl Port {
     pub fn missing(mut self, missing: impl Into<String>) -> Self {
         self.missing = missing.into();
         self
+    }
+
+    /// Optional, but required while parameter `parameter` holds `value`.
+    pub fn required_when(mut self, parameter: impl Into<String>, value: impl Into<Value>) -> Self {
+        self.optional = true;
+        self.required_when = Some((parameter.into(), value.into()));
+        self
+    }
+
+    /// Reading the parameter of its own name while unwired.
+    pub fn constant(mut self) -> Self {
+        self.constant = true;
+        self
+    }
+
+    /// Taking another branch's whole result, wired by a branch picked in
+    /// the viewport while the node's tool is live.
+    pub fn operand(mut self) -> Self {
+        self.operand = true;
+        self
+    }
+
+    /// Whether a node with `parameters` needs a wire here.
+    pub fn required(&self, parameters: &crate::Parameters) -> bool {
+        match &self.required_when {
+            Some((name, value)) => parameters.get(name) == Some(value),
+            None => !self.optional,
+        }
     }
 }
