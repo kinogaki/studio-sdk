@@ -5,13 +5,13 @@
 //! compiler, which plans a flattened network.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::network::{
-    CompileCx, CompileError, Flag, FlagSet, Flat, FlatNode, NetworkCompiler, NetworkContext, Source,
+    CompileCx, CompileError, Compiled, Flag, FlagSet, Flat, FlatNode, NetworkCompiler,
+    NetworkContext, Source,
 };
 use kinogaki_studio_api::{
     ContextId, CookCx, CookError, Data, DataTypeId, NodeType, NodeTypeId, Outputs, Package,
     PackageId, Parameters, Registry, RegistryError, Value,
 };
-use std::any::Any;
 use std::sync::Arc;
 
 fn context(id: &str) -> NetworkContext {
@@ -112,7 +112,7 @@ impl NetworkCompiler for Chain {
         flat: &Flat<'_>,
         target: Source,
         cx: &CompileCx<'_>,
-    ) -> Result<Arc<dyn Any + Send + Sync>, CompileError> {
+    ) -> Result<Compiled, CompileError> {
         let mut names = Vec::new();
         let mut at = Some(target);
         while let Some(source) = at {
@@ -125,7 +125,10 @@ impl NetworkCompiler for Chain {
             at = node.input(0);
         }
         names.push(cx.outputs().first().cloned().unwrap_or_default());
-        Ok(Arc::new(names))
+        Ok(Compiled {
+            plan: Arc::new(names),
+            reads: cx.outputs().to_vec(),
+        })
     }
 }
 
@@ -196,7 +199,8 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
             &CompileCx::new(&outputs),
         )
         .unwrap();
-    let names = plan.downcast_ref::<Vec<String>>().unwrap();
+    assert_eq!(plan.reads, ["beauty"]);
+    let names = plan.plan.downcast_ref::<Vec<String>>().unwrap();
     assert_eq!(names, &["leaf", "trunk", "beauty"]);
     let missing = compiler
         .compile(&flat, Source { node: 9, output: 0 }, &CompileCx::default())

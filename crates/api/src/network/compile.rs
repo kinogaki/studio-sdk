@@ -108,6 +108,25 @@ impl fmt::Display for CompileError {
 
 impl std::error::Error for CompileError {}
 
+/// What a compile made: the package's plan, opaque to the host (its runner
+/// runs it), and the render outputs it reads, which the host asks the
+/// render for before running it.
+#[derive(Clone)]
+pub struct Compiled {
+    /// The package's own plan.
+    pub plan: Arc<dyn Any + Send + Sync>,
+    /// The render outputs it reads, by id.
+    pub reads: Vec<String>,
+}
+
+impl fmt::Debug for Compiled {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Compiled")
+            .field("reads", &self.reads)
+            .finish_non_exhaustive()
+    }
+}
+
 /// A compiled context's compiler: one for each context declared
 /// `Evaluation::Compile`, registered by the package declaring the context
 /// ([`Package::with_compiler`](crate::Package::with_compiler)). Its node
@@ -117,12 +136,12 @@ pub trait NetworkCompiler: Send + Sync {
     /// The context it compiles.
     fn context(&self) -> ContextId;
 
-    /// `flat`'s plan for showing output `target`: the package's own value,
-    /// which its executor downcasts and runs.
+    /// `flat`'s plan for showing output `target` (the package's own value,
+    /// which its runner downcasts and runs) and what it reads.
     fn compile(
         &self,
         flat: &Flat<'_>,
         target: Source,
         cx: &CompileCx<'_>,
-    ) -> Result<Arc<dyn Any + Send + Sync>, CompileError>;
+    ) -> Result<Compiled, CompileError>;
 }
