@@ -33,5 +33,5 @@ mod read;
 
 pub use compile::{CompileCx, CompileError, Flat, FlatNode, NetworkCompiler, Source};
 pub use context::{Evaluation, Flag, FlagSet, NetworkContext, NetworkStorage};
-pub use edit::{NetworkEdit, NewNode};
+pub use edit::{Growth, NetworkEdit, NewNode, Place};
 pub use read::{NetworkRead, NodeFlags, NodeInfo, Wire};

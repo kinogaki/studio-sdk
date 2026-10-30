@@ -1,4 +1,5 @@
 //! [`NetworkRead`]: a network as packages read it.
+use crate::data::Data;
 use crate::id::{ContextId, NodeTypeId};
 use crate::params::Parameters;
 use crate::refs::NodeRef;
@@ -42,6 +43,11 @@ pub struct NodeInfo<'a> {
     pub flags: NodeFlags,
     /// The subnet holding it, or `None` on the top level.
     pub level: Option<NodeRef>,
+    /// Where its tile is.
+    pub position: [f32; 2],
+    /// The delta it holds over its input (a held edit's,
+    /// [`NetworkEdit::set_delta`](super::NetworkEdit::set_delta)).
+    pub delta: Option<&'a Data>,
 }
 
 /// A wire into a node: the node it leaves and which of its outputs.

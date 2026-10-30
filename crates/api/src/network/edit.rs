@@ -15,11 +15,32 @@ use crate::refs::NodeRef;
 /// whole network again when the step is committed (no cycles, required
 /// values) and drops the step when that fails.
 pub trait NetworkEdit: NetworkRead {
-    /// Adds `node` on the top level at `position`, named as nothing there
+    /// Adds `node` on the level inside `subnet` (`None`: the top level),
+    /// placed and wired as `place` says, named as nothing on that level
     /// is: a new node of its type with its parameters set over the type's
     /// defaults (a [real size](crate::params::Number::real_size) in the
-    /// document's unit), displayed when `node.display` says so.
-    fn add_node(&mut self, node: NewNode, position: [f32; 2]) -> Result<NodeRef, Error>;
+    /// document's unit), displayed when `node.display` says so (a grown
+    /// node where the growth rule puts the flag).
+    fn add_node_in(
+        &mut self,
+        subnet: Option<NodeRef>,
+        node: NewNode,
+        place: Place,
+    ) -> Result<NodeRef, Error>;
+
+    /// Adds `node` on the top level at `position`, wired to nothing
+    /// ([`add_node_in`](Self::add_node_in) with [`Place::At`]).
+    fn add_node(&mut self, node: NewNode, position: [f32; 2]) -> Result<NodeRef, Error> {
+        self.add_node_in(None, node, Place::At(position))
+    }
+
+    /// Renames `node` to `name`, numbered when its level has a node so
+    /// named. Paths naming it follow.
+    fn rename(&mut self, node: NodeRef, name: &str) -> Result<(), Error>;
+
+    /// Moves `node`'s tile (or a subnet's) to `position`; nothing it
+    /// computes changes.
+    fn set_position(&mut self, node: NodeRef, position: [f32; 2]) -> Result<(), Error>;
 
     /// Sets parameter `name` of `node` to `value`.
     fn set_parameter(&mut self, node: NodeRef, name: &str, value: Value) -> Result<(), Error>;
@@ -60,7 +81,39 @@ pub trait NetworkEdit: NetworkRead {
     fn freeze(&mut self, node: NodeRef, outputs: Outputs) -> Result<(), Error>;
 }
 
-/// A node to add ([`NetworkEdit::add_node`]).
+/// Where [`NetworkEdit::add_node_in`] puts a new node, and what it wires.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Place {
+    /// At `position`, wired to nothing.
+    At([f32; 2]),
+    /// At `position`, after `node`: the new node reads `node`'s first
+    /// output into its first input (when it has inputs), and every wire
+    /// that read that output reads the new node instead.
+    After {
+        /// The node it follows.
+        node: NodeRef,
+        /// Where its tile goes.
+        position: [f32; 2],
+    },
+    /// By the host's growth rule from what the level displays, placed on
+    /// the host's grid (as the viewport's tools grow a network).
+    Grow(Growth),
+}
+
+/// How a node added by [`Place::Grow`] joins what its level displays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Growth {
+    /// It reads the displayed result: inserted after the displayed node,
+    /// it takes the display flag and that node's readers.
+    Modify,
+    /// It reads nothing of the displayed result: it starts a branch that
+    /// the level's Merge gathers (the displayed Merge, else a new one
+    /// after the displayed node), and the flag ends on what shows
+    /// everything shown before plus the new node.
+    Create,
+}
+
+/// A node to add ([`NetworkEdit::add_node_in`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct NewNode {
     /// Its type.
