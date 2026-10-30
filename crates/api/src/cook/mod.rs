@@ -252,6 +252,21 @@ pub trait NodeType: Send + Sync {
         after
     }
 
+    /// The parameters pressing button `button` of its rows leaves (Fit to
+    /// Group reads the input `cx` gives and writes the bounds it found);
+    /// `None`: nothing changes. It must be pure and deterministic, like
+    /// [`edited`](Self::edited): core applies the answer as one edit
+    /// through the inspector's own path, so `edited` answers it too.
+    fn pressed(
+        &self,
+        button: &str,
+        parameters: &Parameters,
+        cx: &SchemaCx<'_>,
+    ) -> Option<Parameters> {
+        let _ = (button, parameters, cx);
+        None
+    }
+
     /// The data type of the delta it holds when it is a held edit (an Edit
     /// Mesh holds `kinogaki.mesh.action`); `None` otherwise. Core applies
     /// the delta through the [`HeldEdit`](crate::HeldEdit) registered for

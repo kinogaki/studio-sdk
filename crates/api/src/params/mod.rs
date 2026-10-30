@@ -16,7 +16,8 @@ pub use diagnostic::{Diagnostic, Severity, Span};
 pub use kinogaki_render_api::ramp;
 pub use reference::{Fits, RefFilter};
 pub use schema::{
-    CurveChannel, Number, Parameter, ParameterKind, Schema, SchemaItem, Section, Unit,
+    Button, CurveChannel, Number, Parameter, ParameterKind, Schema, SchemaItem, Section, Unit,
+    segments,
 };
 
 use std::collections::BTreeMap;

@@ -11,7 +11,7 @@
 //! and nothing fails.
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::facets::{Displayable, Pickable, Renderable, Tabular};
+use crate::facets::{Displayable, Look, ObjectPicking, Pickable, Renderable, Tabular};
 use crate::id::DataTypeId;
 use crate::math::Bounds;
 
@@ -100,6 +100,17 @@ pub trait DataType: Send + Sync {
     /// How viewport picks become component selections, when values can
     /// be picked below the object level.
     fn pickable(&self) -> Option<&dyn Pickable> {
+        None
+    }
+
+    /// How objects holding values of this type are picked and framed at
+    /// the object levels, when they are.
+    fn picking(&self) -> Option<&dyn ObjectPicking> {
+        None
+    }
+
+    /// How values look against the scene's materials, when they take any.
+    fn look(&self) -> Option<&dyn Look> {
         None
     }
 

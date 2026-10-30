@@ -93,8 +93,9 @@ pub use data_type::{Color, DataType, InfoRow, Stamp};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use error::Error;
 pub use facets::{
-    CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, Drawn, Pickable, Piece,
-    Renderable, Role, Table, TableColumn, Tabular, WhenOpen,
+    CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, Drawn, Look, Materials,
+    ObjectPicking, Pickable, Piece, Renderable, Role, Table, TableColumn, Tabular, Tally, WhenOpen,
+    WorldRay,
 };
 pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};
 pub use held::HeldEdit;

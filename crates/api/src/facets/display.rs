@@ -3,6 +3,7 @@ use crate::cancel::CancelToken;
 use crate::components::Components;
 use crate::data::Data;
 use crate::error::Error;
+use crate::math::Bounds;
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
 use crate::viewport::{ElementKind, ElementSet, SurfaceSource};
@@ -241,4 +242,35 @@ pub trait Displayable: Send + Sync {
     /// as the faces they bound wholly. `None` when the type can't express
     /// the selection at that level.
     fn convert(&self, data: &Data, components: &Components, to: ElementKind) -> Option<Components>;
+
+    /// The status bar's counts for `data`: per level, how many components
+    /// `selection` holds and how many there are (Points 4/8). The level a
+    /// selection is of counts its own components; the others count those
+    /// whose points it holds wholly. Empty by default. Core asks again only
+    /// when the value or the selection changes.
+    fn tally(&self, data: &Data, selection: Option<&Components>) -> Vec<Tally> {
+        let _ = (data, selection);
+        Vec::new()
+    }
+
+    /// The box around `components` of `data`, in the value's own space:
+    /// the pivot's box for a component selection. `None` when it holds
+    /// nothing (or the type can't say).
+    fn bounds_of(&self, data: &Data, components: &Components) -> Option<Bounds> {
+        let _ = (data, components);
+        None
+    }
+}
+
+/// One level's count for the status bar ([`Displayable::tally`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tally {
+    /// What the bar calls them ("Points").
+    pub label: String,
+    /// The level counted.
+    pub level: ElementKind,
+    /// How many the selection holds.
+    pub selected: usize,
+    /// How many there are.
+    pub total: usize,
 }

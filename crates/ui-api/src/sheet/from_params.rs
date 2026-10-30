@@ -18,26 +18,83 @@ impl From<&params::Schema> for Schema<String> {
                     open: s.open,
                     sub: false,
                 }),
-                SchemaItem::Parameter(p) => {
-                    // Texts show as one read-only line of their names.
-                    let value = match &p.value {
-                        params::Value::Texts(names) => params::Value::Text(names.join(", ")),
-                        other => other.clone(),
-                    };
+                SchemaItem::Parameter(p) => Item::Field(field(p)),
+                SchemaItem::Button(b) => {
                     let mut field = Field::new(
-                        p.name.clone(),
-                        p.label.clone(),
-                        Kind::from(&p.kind),
-                        Some(value),
+                        b.name.clone(),
+                        "",
+                        Kind::Button {
+                            text: b.label.clone().into(),
+                            icon: None,
+                        },
+                        None,
                     );
-                    field.enabled = p.enabled;
-                    field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
-                    field.keywords = p.keywords.clone().into();
+                    field.enabled = b.enabled;
+                    field.tooltip = (!b.help.is_empty()).then(|| b.help.clone().into());
                     Item::Field(field)
                 }
             })
             .collect();
         Schema { items }
+    }
+}
+
+/// Parameter `p`'s field: its kind as [`kind`] shapes it, its help as
+/// the tooltip (or its problem, shown as an error), its keywords for
+/// search.
+fn field(p: &params::Parameter) -> Field<String> {
+    let value = match (&p.value, &p.kind) {
+        // Texts show as one read-only line of their names.
+        (params::Value::Texts(names), _) => params::Value::Text(names.join(", ")),
+        // A wire chosen from a menu shows as the menu's index.
+        (params::Value::Number(at), ParameterKind::Integer { .. }) if !p.menu.is_empty() => {
+            params::Value::Index((at.max(0.0) as usize).min(p.menu.len() - 1))
+        }
+        (other, _) => other.clone(),
+    };
+    let mut field = Field::new(p.name.clone(), p.label.clone(), kind(p), Some(value));
+    field.enabled = p.enabled;
+    field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
+    field.keywords = p.keywords.clone().into();
+    if let Some(problem) = &p.problem {
+        field.error = true;
+        field.tooltip = Some(problem.clone().into());
+    }
+    field
+}
+
+/// Parameter `p`'s field kind: its kind's, with what its schema filled
+/// in (an attribute row's menu, a wire menu, unavailable choices).
+fn kind(p: &params::Parameter) -> Kind {
+    match &p.kind {
+        ParameterKind::Choice(items) => choice(items, &p.unavailable),
+        ParameterKind::Integer { .. } if !p.menu.is_empty() => Kind::Dropdown {
+            items: p.menu.iter().map(|n| n.clone().into()).collect(),
+            available: vec![true; p.menu.len()],
+            info: None,
+        },
+        ParameterKind::Attribute => Kind::Name {
+            names: p.menu.clone(),
+            list: p.list,
+            tooltip: "The input's attributes".into(),
+        },
+        other => Kind::from(other),
+    }
+}
+
+/// A choice of `items`, those at `unavailable` greyed: segments or a menu
+/// ([`params::segments`]).
+fn choice(items: &[String], unavailable: &[usize]) -> Kind {
+    let names = items.iter().map(|i| i.clone().into()).collect();
+    if params::segments(items, unavailable) {
+        return Kind::Choice(names);
+    }
+    Kind::Dropdown {
+        items: names,
+        available: (0..items.len())
+            .map(|i| !unavailable.contains(&i))
+            .collect(),
+        info: None,
     }
 }
 
@@ -78,9 +135,7 @@ impl From<&ParameterKind> for Kind {
                 Kind::Number(Number::integer(*min as f64..=*max as f64))
             }
             ParameterKind::Toggle => Kind::Toggle,
-            ParameterKind::Choice(items) => {
-                Kind::Choice(items.iter().map(|i| i.clone().into()).collect())
-            }
+            ParameterKind::Choice(items) => choice(items, &[]),
             ParameterKind::Text => Kind::Text,
             ParameterKind::Code => Kind::Code {
                 diagnostics: Vec::new(),
@@ -296,5 +351,52 @@ mod tests {
             !ParameterKind::Channels(params::Number::plain())
                 .accepts(&Value::Numbers(vec![0.0; 3]))
         );
+    }
+
+    /// What a node type's `schema` fills in shows: an attribute menu, a
+    /// wire menu over the indices, greyed choices as a menu, a problem as
+    /// an error, and a button.
+    #[test]
+    fn shaped_rows_show_their_menus_problems_and_buttons() {
+        let schema = params::Schema::default()
+            .parameter(
+                Parameter::new("attr", "Attribute", ParameterKind::Attribute, "P")
+                    .menu(vec!["P".into(), "N".into()], true),
+            )
+            .parameter(
+                Parameter::new(
+                    "index",
+                    "Index",
+                    ParameterKind::Integer { min: 0, max: 9 },
+                    5.0,
+                )
+                .menu(vec!["Box 1".into(), "Tube 1".into()], false),
+            )
+            .parameter(
+                Parameter::new(
+                    "mode",
+                    "Mode",
+                    ParameterKind::Choice(vec!["A".into(), "B".into()]),
+                    params::Value::Index(0),
+                )
+                .unavailable(vec![1]),
+            )
+            .parameter(
+                Parameter::new("group", "Group", ParameterKind::Group, "0-")
+                    .problem("expected a number"),
+            )
+            .button(params::Button::new("fit", "Fit").enabled(false));
+        let sheet = Schema::<String>::from(&schema);
+        let field = |name: &str| sheet.field(&name.to_owned()).unwrap();
+        assert!(
+            matches!(&field("attr").kind, Kind::Name { names, list: true, .. } if names.len() == 2)
+        );
+        assert!(matches!(&field("index").kind, Kind::Dropdown { items, .. } if items.len() == 2));
+        assert_eq!(field("index").value, Some(Value::Index(1)));
+        assert!(
+            matches!(&field("mode").kind, Kind::Dropdown { available, .. } if available == &[true, false])
+        );
+        assert!(field("group").error);
+        assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
     }
 }

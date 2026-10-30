@@ -29,11 +29,17 @@ impl Schema {
         self
     }
 
+    /// With `button` next.
+    pub fn button(mut self, button: Button) -> Self {
+        self.items.push(SchemaItem::Button(button));
+        self
+    }
+
     /// The parameters, in order.
     pub fn parameters(&self) -> impl Iterator<Item = &Parameter> {
         self.items.iter().filter_map(|item| match item {
             SchemaItem::Parameter(p) => Some(p),
-            SchemaItem::Section(_) => None,
+            SchemaItem::Section(_) | SchemaItem::Button(_) => None,
         })
     }
 
@@ -46,6 +52,9 @@ impl Schema {
 }
 
 /// One row of a [`Schema`].
+// Rows are few and short-lived (a sheet's, while it shows): a parameter
+// kept inline is simpler to match than a boxed one.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum SchemaItem {
     /// A collapsible section band; the parameters after it, up to the next
@@ -53,6 +62,46 @@ pub enum SchemaItem {
     Section(Section),
     /// A parameter.
     Parameter(Parameter),
+    /// A button: it holds no value; pressing it asks the node's type
+    /// ([`NodeType::pressed`](crate::NodeType::pressed)).
+    Button(Button),
+}
+
+/// A button row of a [`Schema`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct Button {
+    /// What the node's type is told was pressed, unique in its schema.
+    pub name: String,
+    /// What the button says.
+    pub label: String,
+    /// Its tooltip; empty for none.
+    pub help: String,
+    /// Whether it can be pressed now; a disabled button's help says why.
+    pub enabled: bool,
+}
+
+impl Button {
+    /// Button `name` saying `label`: enabled, with no help.
+    pub fn new(name: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            label: label.into(),
+            help: String::new(),
+            enabled: true,
+        }
+    }
+
+    /// With `help` as its tooltip.
+    pub fn help(mut self, help: impl Into<String>) -> Self {
+        self.help = help.into();
+        self
+    }
+
+    /// Disabled (or enabled again).
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
 }
 
 /// A collapsible section band.
@@ -85,6 +134,25 @@ pub struct Parameter {
     /// Whether it takes input; a disabled row shows its value greyed and
     /// its help says why.
     pub enabled: bool,
+    /// What the row offers as a menu, filled by
+    /// [`NodeType::schema`](crate::NodeType::schema): an
+    /// [`Attribute`](ParameterKind::Attribute) row's names on the input; an
+    /// [`Integer`](ParameterKind::Integer) row choosing a wire, the names
+    /// of the nodes behind its wires (the host shows a menu of them over
+    /// the indices). Empty: no menu.
+    pub menu: Vec<String>,
+    /// Whether the row holds several names, space-separated, so a menu
+    /// pick adds one rather than replacing the text.
+    pub list: bool,
+    /// Why its value is faulty (a group expression that doesn't parse):
+    /// the row shows as an error with this as its tooltip. `None`: it isn't.
+    pub problem: Option<String>,
+    /// The entries of a [`Choice`](ParameterKind::Choice) that can't apply
+    /// now, by index: the host shows them greyed.
+    pub unavailable: Vec<usize>,
+    /// The language a [`Code`](ParameterKind::Code) row's text is in, as
+    /// the host's code editor names it; `None`: plain text.
+    pub language: Option<String>,
 }
 
 impl Parameter {
@@ -104,6 +172,11 @@ impl Parameter {
             help: String::new(),
             keywords: String::new(),
             enabled: true,
+            menu: Vec::new(),
+            list: false,
+            problem: None,
+            unavailable: Vec::new(),
+            language: None,
         }
     }
 
@@ -122,6 +195,31 @@ impl Parameter {
     /// Disabled (or enabled again).
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
+        self
+    }
+
+    /// Offering `menu` (see [`menu`](Self::menu)); `list`: picks add.
+    pub fn menu(mut self, menu: Vec<String>, list: bool) -> Self {
+        self.menu = menu;
+        self.list = list;
+        self
+    }
+
+    /// Faulty, `why` (see [`problem`](Self::problem)).
+    pub fn problem(mut self, why: impl Into<String>) -> Self {
+        self.problem = Some(why.into());
+        self
+    }
+
+    /// With the choices at `unavailable` greyed.
+    pub fn unavailable(mut self, unavailable: Vec<usize>) -> Self {
+        self.unavailable = unavailable;
+        self
+    }
+
+    /// Code in `language`.
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
         self
     }
 
@@ -177,6 +275,13 @@ impl Parameter {
             (false, false) => format!("must be {what}"),
         })
     }
+}
+
+/// Whether a [`Choice`](ParameterKind::Choice) of `items`, those at
+/// `unavailable` greyed, shows as segments: three at most, 18 characters
+/// together at most and none unavailable. Otherwise it shows as a menu.
+pub fn segments(items: &[String], unavailable: &[usize]) -> bool {
+    items.len() <= 3 && items.iter().map(String::len).sum::<usize>() <= 18 && unavailable.is_empty()
 }
 
 /// What a parameter holds and how it shows.

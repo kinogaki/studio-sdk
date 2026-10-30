@@ -10,10 +10,11 @@
 //! saves, stamps and counts memory through that type. How a delta is
 //! authored (the interactive tools that record moves, inserts and
 //! deletions) is the package's UI, through the host UI interface.
+use crate::cook::SchemaCx;
 use crate::cook::{CookCx, CookError, Outputs};
 use crate::data::Data;
 use crate::id::DataTypeId;
-use crate::params::Diagnostic;
+use crate::params::{Diagnostic, Parameters, Schema};
 
 /// How authored deltas apply to values of one data type.
 pub trait HeldEdit: Send + Sync {
@@ -55,5 +56,30 @@ pub trait HeldEdit: Send + Sync {
     fn validate(&self, delta: &Data) -> Result<(), Diagnostic> {
         let _ = delta;
         Ok(())
+    }
+
+    /// The rows `delta` shows in the inspector of the node holding it (an
+    /// Edit Mesh's latest action's), at their values; `cx.input(0)` is
+    /// the node's held result. `None`: the delta shows no rows. Like
+    /// [`NodeType::schema`](crate::NodeType::schema), it must be quick.
+    fn rows(&self, delta: &Data, cx: &SchemaCx<'_>) -> Option<Schema> {
+        let _ = (delta, cx);
+        None
+    }
+
+    /// `delta` with its [`rows`](Self::rows) at `values` (by parameter
+    /// name): core writes it as the node's delta in one undo step. `None`:
+    /// nothing changed.
+    fn apply_rows(&self, delta: &Data, values: &Parameters, cx: &SchemaCx<'_>) -> Option<Data> {
+        let _ = (delta, values, cx);
+        None
+    }
+
+    /// `delta` after pressing button `button` of its rows (`cx` as for
+    /// [`rows`](Self::rows)); `None`: nothing changes. Pure, as
+    /// [`NodeType::pressed`](crate::NodeType::pressed).
+    fn pressed(&self, delta: &Data, button: &str, cx: &SchemaCx<'_>) -> Option<Data> {
+        let _ = (delta, button, cx);
+        None
     }
 }

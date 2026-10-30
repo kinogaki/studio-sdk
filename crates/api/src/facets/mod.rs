@@ -12,11 +12,15 @@
 //! method; a facet it doesn't return is absent and the surface leaves its
 //! values out.
 mod display;
+mod object;
 mod pick;
 mod render;
 mod table;
 
-pub use display::{DisplayQuality, DisplayRequest, Displayable, Drawn, Piece, Role, WhenOpen};
+pub use display::{
+    DisplayQuality, DisplayRequest, Displayable, Drawn, Piece, Role, Tally, WhenOpen,
+};
+pub use object::{Look, Materials, Matrix, ObjectPicking, WorldRay};
 pub use pick::{Combine, Pickable};
 pub use render::Renderable;
 pub use table::{CellKind, Cells, Table, TableColumn, Tabular};
