@@ -1,6 +1,6 @@
 //! A node's or format's parameter [`params::Schema`] as a sheet, keyed by
 //! parameter name: what the host shows for a node's parameters.
-use super::{Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
+use super::{CurveChannel, Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
 use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
@@ -19,11 +19,16 @@ impl From<&params::Schema> for Schema<String> {
                     sub: false,
                 }),
                 SchemaItem::Parameter(p) => {
+                    // Texts show as one read-only line of their names.
+                    let value = match &p.value {
+                        params::Value::Texts(names) => params::Value::Text(names.join(", ")),
+                        other => other.clone(),
+                    };
                     let mut field = Field::new(
                         p.name.clone(),
                         p.label.clone(),
                         Kind::from(&p.kind),
-                        Some(p.value.clone()),
+                        Some(value),
                     );
                     field.enabled = p.enabled;
                     field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
@@ -106,6 +111,27 @@ impl From<&ParameterKind> for Kind {
                 color: *color,
                 interpolation: None,
             },
+            ParameterKind::ToneCurves { channels, capacity } => Kind::ToneCurves {
+                channels: channels
+                    .iter()
+                    .map(|c| CurveChannel {
+                        label: c.label.clone().into(),
+                        tint: c.tint,
+                    })
+                    .collect(),
+                capacity: *capacity,
+            },
+            ParameterKind::Palette { capacity } => Kind::Palette {
+                capacity: *capacity,
+                editable: true,
+            },
+            // Apart until the host says the node keeps them linked (its
+            // view, not the value).
+            ParameterKind::Channels(number) => Kind::Channels {
+                number: number.into(),
+                linked: false,
+            },
+            ParameterKind::Texts => Kind::Info,
         }
     }
 }
@@ -190,6 +216,85 @@ mod tests {
         assert_eq!(
             sheet.field(&"source".to_owned()).unwrap().kind,
             Kind::Reference(RefFilter::material(false))
+        );
+    }
+
+    #[test]
+    fn curves_palettes_channels_and_texts_become_their_fields() {
+        use kinogaki_studio_api::params::{CurveChannel as Channel, tone_curve};
+        let curves = tone_curve::encode(&vec![tone_curve::ToneCurve::identity(); 2], 8);
+        let channels = vec![
+            Channel {
+                label: "Master".into(),
+                tint: None,
+            },
+            Channel {
+                label: "Red".into(),
+                tint: Some([1.0, 0.0, 0.0]),
+            },
+        ];
+        let schema = params::Schema::default()
+            .parameter(Parameter::new(
+                "curves",
+                "Curves",
+                ParameterKind::ToneCurves {
+                    channels,
+                    capacity: 8,
+                },
+                curves.clone(),
+            ))
+            .parameter(Parameter::new(
+                "palette",
+                "Palette",
+                ParameterKind::Palette { capacity: 16 },
+                vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            ))
+            .parameter(Parameter::new(
+                "gain",
+                "Gain",
+                ParameterKind::Channels(params::Number::plain().range(0.0, 4.0)),
+                vec![1.0; 4],
+            ))
+            .parameter(Parameter::new(
+                "outputs",
+                "Outputs",
+                ParameterKind::Texts,
+                vec!["beauty".to_owned(), "depth".to_owned()],
+            ));
+        for item in &schema.items {
+            let SchemaItem::Parameter(p) = item else {
+                continue;
+            };
+            assert!(p.kind.accepts(&p.value), "{}", p.name);
+        }
+        let sheet = Schema::<String>::from(&schema);
+        let field = |name: &str| sheet.field(&name.to_owned()).unwrap();
+        let curves_field = field("curves");
+        assert_eq!(curves_field.value, Some(Value::Numbers(curves)));
+        let Kind::ToneCurves { channels, capacity } = &curves_field.kind else {
+            panic!("{:?}", curves_field.kind)
+        };
+        assert_eq!((channels.len(), *capacity), (2, 8));
+        assert_eq!(channels[1].tint, Some([1.0, 0.0, 0.0]));
+        assert!(matches!(
+            field("palette").kind,
+            Kind::Palette {
+                capacity: 16,
+                editable: true
+            }
+        ));
+        assert!(matches!(
+            field("gain").kind,
+            Kind::Channels { linked: false, .. }
+        ));
+        let outputs = field("outputs");
+        assert!(matches!(outputs.kind, Kind::Info));
+        assert_eq!(outputs.value, Some(Value::Text("beauty, depth".into())));
+        // A palette past its capacity, or three channels, isn't accepted.
+        assert!(!ParameterKind::Palette { capacity: 1 }.accepts(&Value::Numbers(vec![0.0; 6])));
+        assert!(
+            !ParameterKind::Channels(params::Number::plain())
+                .accepts(&Value::Numbers(vec![0.0; 3]))
         );
     }
 }

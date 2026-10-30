@@ -1,7 +1,8 @@
 //! Parameters: what a node's or a format's settings hold ([`Value`],
 //! [`Parameters`]), how the host presents them ([`Schema`]), and the
 //! [`Diagnostic`]s cooks and readers report; [`ramp`] holds the ramps'
-//! maths and encoding, [`RefFilter`] what a reference may name.
+//! maths and encoding, [`tone_curve`] the tone curves' encoding,
+//! [`RefFilter`] what a reference may name.
 //!
 //! These are the API's own types. Studio draws a [`Schema`] with its
 //! inspector and stores [`Value`]s in projects; a package never sees the
@@ -9,11 +10,14 @@
 mod diagnostic;
 mod reference;
 mod schema;
+pub mod tone_curve;
 
 pub use diagnostic::{Diagnostic, Severity, Span};
 pub use kinogaki_render_api::ramp;
 pub use reference::{Fits, RefFilter};
-pub use schema::{Number, Parameter, ParameterKind, Schema, SchemaItem, Section, Unit};
+pub use schema::{
+    CurveChannel, Number, Parameter, ParameterKind, Schema, SchemaItem, Section, Unit,
+};
 
 use std::collections::BTreeMap;
 
@@ -33,6 +37,8 @@ pub enum Value {
     Index(usize),
     /// Text: a name, an expression, code, a file path.
     Text(String),
+    /// Several texts: a list of names (the outputs a node writes).
+    Texts(Vec<String>),
 }
 
 impl Value {
@@ -75,6 +81,14 @@ impl Value {
             _ => None,
         }
     }
+
+    /// The texts, when they are several.
+    pub fn texts(&self) -> Option<&[String]> {
+        match self {
+            Self::Texts(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 impl From<f64> for Value {
@@ -98,6 +112,12 @@ impl From<&str> for Value {
 impl From<String> for Value {
     fn from(v: String) -> Self {
         Self::Text(v)
+    }
+}
+
+impl From<Vec<String>> for Value {
+    fn from(v: Vec<String>) -> Self {
+        Self::Texts(v)
     }
 }
 
@@ -127,5 +147,8 @@ mod tests {
         assert_eq!(Value::from(vec![1.0, 2.0]).numbers(), Some(&[1.0, 2.0][..]));
         assert_eq!(Value::from(2.5).text(), None);
         assert_eq!(Value::from("a").number(), None);
+        let texts = Value::from(vec!["beauty".to_owned(), "depth".to_owned()]);
+        assert_eq!(texts.texts().map(<[String]>::len), Some(2));
+        assert_eq!(texts.text(), None);
     }
 }

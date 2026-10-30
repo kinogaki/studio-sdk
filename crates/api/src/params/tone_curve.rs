@@ -1,6 +1,7 @@
-//! Tone curves as a [`Kind::ToneCurves`](super::Kind::ToneCurves) field
-//! holds them: [`ToneCurve`]s encoded in a `Value::Numbers` with
-//! [`encode`], read back with [`decode`].
+//! Tone curves as a [`ParameterKind::ToneCurves`](super::ParameterKind::ToneCurves)
+//! parameter holds them (and the sheet's `Kind::ToneCurves` field):
+//! [`ToneCurve`]s encoded in a [`Value::Numbers`](super::Value::Numbers)
+//! with [`encode`], read back with [`decode`].
 //!
 //! A curve maps 0–1 to 0–1 through its keys, sorted by x: a monotone cubic
 //! between them (smooth, never overshooting) or straight lines, going on

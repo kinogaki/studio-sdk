@@ -29,7 +29,7 @@ mod keyed;
 mod kind;
 mod number;
 mod schema;
-pub mod tone_curve;
+pub use kinogaki_studio_api::params::tone_curve;
 
 pub use kinogaki_studio_api::params::ramp;
 

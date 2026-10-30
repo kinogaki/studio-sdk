@@ -181,6 +181,38 @@ pub enum ParameterKind {
         /// A color ramp (r, g, b a key) rather than a float ramp.
         color: bool,
     },
+    /// [`Value::Numbers`]: tone curves, one a channel, as
+    /// [`tone_curve::encode`](super::tone_curve::encode) writes them with
+    /// `capacity` keys a curve.
+    ToneCurves {
+        /// The channels, in curve order.
+        channels: Vec<CurveChannel>,
+        /// The most keys a curve holds.
+        capacity: usize,
+    },
+    /// [`Value::Numbers`]: a palette, r, g, b a color (display code values,
+    /// 0–1), at most `capacity` colors.
+    Palette {
+        /// The most colors it holds.
+        capacity: usize,
+    },
+    /// [`Value::Numbers`] (4): R, G, B and A, each shown and moved as
+    /// `number`. The host may show them as one value while they are
+    /// linked (sheet state it keeps, not a value).
+    Channels(Number),
+    /// [`Value::Texts`]: names the node keeps (the outputs it writes),
+    /// listed, not edited.
+    Texts,
+}
+
+/// One channel of [`ParameterKind::ToneCurves`]: its name and its curve's
+/// tint.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CurveChannel {
+    /// What its tab says ("Red").
+    pub label: String,
+    /// The curve's tint, linear RGB; `None` draws it in the text color.
+    pub tint: Option<[f64; 3]>,
 }
 
 impl ParameterKind {
@@ -207,6 +239,14 @@ impl ParameterKind {
                 let stride = super::ramp::stride(*color);
                 v.len() > stride && (v.len() - 1) % stride == 0
             }
+            (Self::ToneCurves { channels, capacity }, Value::Numbers(v)) => {
+                v.len() == channels.len() * super::tone_curve::stride(*capacity)
+            }
+            (Self::Palette { capacity }, Value::Numbers(v)) => {
+                v.len().is_multiple_of(3) && v.len() / 3 <= *capacity
+            }
+            (Self::Channels(_), Value::Numbers(v)) => v.len() == 4,
+            (Self::Texts, Value::Texts(_)) => true,
             _ => false,
         }
     }
