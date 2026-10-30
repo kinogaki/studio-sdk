@@ -14,7 +14,7 @@
 //! offers the host's menus, keys, Tab and viewport chrome, as data) and a
 //! set of optional parts: the selection [`Levels`], the [`ViewportLayer`],
 //! the [`Inspector`], the [`Vocabulary`] that runs its items, the
-//! [`NetworkView`], [`ObjectRows`] and [`OutlineRows`] for the object
+//! [`ObjectRows`] and [`OutlineRows`] for the object
 //! kinds it owns, the [`Creations`] it adds to an object level's Create
 //! and [`Results`], how it takes the host's cooks of its objects. A part a context leaves out is nothing there, never another
 //! context's.
@@ -31,9 +31,8 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, ContextObject, ContextView, Creation, FlagSide, FlagSpec, LevelSpec,
-    NetworkNode, NetworkWire, NumericBar, OutlineRow, Start, Status, TimeDomain, TimeMark,
-    TimeUnits, ToolbarItem, Tools,
+    BarField, BarValue, ContextObject, ContextView, Creation, LevelSpec, NumericBar, OutlineRow,
+    Start, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
 };
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use library::{
@@ -42,8 +41,7 @@ pub use library::{
     Shelf, ShelfEntry, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
 pub use parts::{
-    Creations, Erased, Inspector, Levels, NetworkView, ObjectRows, OutlineRows, ViewportLayer,
-    Vocabulary,
+    Creations, Erased, Inspector, Levels, ObjectRows, OutlineRows, ViewportLayer, Vocabulary,
 };
 pub use results::{Results, Shown, ShownKind};
 pub use settings::{Section, SettingsSection};
@@ -116,8 +114,6 @@ pub struct ContextPart<S: ?Sized> {
     pub inspector: Option<Box<dyn Inspector<S>>>,
     /// Its tools and commands.
     pub vocabulary: Option<Box<dyn Vocabulary<S>>>,
-    /// Its network, as the network view draws it.
-    pub network: Option<Box<dyn NetworkView<S>>>,
     /// Inspector rows of the object kinds it owns.
     pub objects: Option<Box<dyn ObjectRows<S>>>,
     /// Outliner rows inside the object kinds it owns.
@@ -139,7 +135,6 @@ impl<S: ?Sized> ContextPart<S> {
             viewport: None,
             inspector: None,
             vocabulary: None,
-            network: None,
             objects: None,
             outline: None,
             creations: None,
@@ -180,12 +175,6 @@ impl<S: ?Sized> ContextPart<S> {
     /// With a vocabulary.
     pub fn with_vocabulary(mut self, part: impl Vocabulary<S> + 'static) -> Self {
         self.vocabulary = Some(Box::new(part));
-        self
-    }
-
-    /// With a network view.
-    pub fn with_network(mut self, part: impl NetworkView<S> + 'static) -> Self {
-        self.network = Some(Box::new(part));
         self
     }
 
@@ -233,9 +222,6 @@ impl<S: 'static> ContextPart<S> {
             vocabulary: self
                 .vocabulary
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Vocabulary<dyn Any>>),
-            network: self
-                .network
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn NetworkView<dyn Any>>),
             objects: self
                 .objects
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn ObjectRows<dyn Any>>),
@@ -263,7 +249,6 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("viewport", &has(self.viewport.is_some()))
             .field("inspector", &has(self.inspector.is_some()))
             .field("vocabulary", &has(self.vocabulary.is_some()))
-            .field("network", &has(self.network.is_some()))
             .field("objects", &has(self.objects.is_some()))
             .field("outline", &has(self.outline.is_some()))
             .field("creations", &has(self.creations.is_some()))

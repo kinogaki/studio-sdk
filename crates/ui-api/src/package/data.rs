@@ -3,7 +3,6 @@
 //! of the context's own, its time, its network's tiles, its creations and
 //! its outliner rows. The host draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
-use crate::Color;
 use crate::host::{NodeRef, ObjectRef};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::viewport::{ElementKind, SurfaceSource};
@@ -198,61 +197,6 @@ pub struct TimeDomain {
     pub current: f64,
     /// The playback speeds offered; none: 1×.
     pub speeds: Vec<f64>,
-}
-
-/// A flag button the network's tiles carry (Display, Bypass…).
-#[derive(Clone, Debug, PartialEq)]
-pub struct FlagSpec {
-    /// What it does, shown on hover.
-    pub label: String,
-    /// The tile's edge it sits on.
-    pub side: FlagSide,
-    /// Its color when lit.
-    pub color: Color,
-}
-
-/// The edge of a tile a flag sits on.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FlagSide {
-    /// The left edge (Bypass).
-    Left,
-    /// The right edge (Display).
-    Right,
-}
-
-/// One tile of a context's network.
-#[derive(Clone, Debug, PartialEq)]
-pub struct NetworkNode {
-    /// The node.
-    pub node: NodeRef,
-    /// Its top-left corner, in network units.
-    pub position: [f32; 2],
-    /// The user's name for it.
-    pub title: String,
-    /// Its type ("Merge"), drawn inside the tile.
-    pub kind: String,
-    /// The line under the title (its state); empty for none.
-    pub detail: String,
-    /// Its inputs' and outputs' labels.
-    pub inputs: Vec<String>,
-    /// Its outputs' labels.
-    pub outputs: Vec<String>,
-    /// It is picked.
-    pub picked: bool,
-    /// Bit `i` lights flag `i` of [`NetworkView::flags`](super::NetworkView::flags).
-    pub flags: u32,
-    /// Why it has no result (hover), and whether that is an error.
-    pub problem: Option<(String, bool)>,
-}
-
-/// A wire from `from`'s output into `to`'s input (at a place among a
-/// multi-input's wires; 0 otherwise).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NetworkWire {
-    /// The node and output it leaves.
-    pub from: (NodeRef, usize),
-    /// The node, input and place it enters.
-    pub to: (NodeRef, usize, usize),
 }
 
 /// A kind of object an object level can create, contributed by the

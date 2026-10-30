@@ -13,8 +13,8 @@
 //! part over `S` into the same part over `dyn Any`, downcasting the state
 //! the host lends back to `S`.
 use super::data::{
-    ContextView, Creation, FlagSpec, LevelSpec, NetworkNode, NetworkWire, NumericBar, OutlineRow,
-    Status, TimeDomain, ToolbarItem, Tools,
+    ContextView, Creation, LevelSpec, NumericBar, OutlineRow, Status, TimeDomain, ToolbarItem,
+    Tools,
 };
 use super::edited::{Edited, TemplateMark};
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
@@ -266,21 +266,6 @@ pub trait Vocabulary<S: ?Sized>: Send + Sync {
     }
 }
 
-/// The context's network as the one network view draws it: its tiles,
-/// wires and flags, and what picking and flagging do.
-pub trait NetworkView<S: ?Sized>: Send + Sync {
-    /// The flags its tiles can light, by index. Read once.
-    fn flags(&self) -> Vec<FlagSpec>;
-    /// The open level's tiles.
-    fn nodes(&self, s: &mut S, cx: &mut dyn Cx) -> Vec<NetworkNode>;
-    /// The open level's wires.
-    fn wires(&self, s: &mut S, cx: &mut dyn Cx) -> Vec<NetworkWire>;
-    /// Picks `node` (`None` clears); `add` is Shift, `toggle` Command.
-    fn pick(&self, s: &mut S, cx: &mut dyn Cx, node: Option<NodeRef>, add: bool, toggle: bool);
-    /// Toggles flag `flag` of `node` (one undo step).
-    fn flag(&self, s: &mut S, cx: &mut dyn Cx, node: NodeRef, flag: usize);
-}
-
 /// The inspector rows of the object kinds a context owns, below an
 /// object's Name and Type.
 pub trait ObjectRows<S: ?Sized>: Send + Sync {
@@ -519,31 +504,6 @@ impl<S: 'static> Vocabulary<dyn Any> for Erased<S, dyn Vocabulary<S>> {
     }
     fn label(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> Option<String> {
         self.part.label(own(s), cx, item)
-    }
-}
-
-impl<S: 'static> NetworkView<dyn Any> for Erased<S, dyn NetworkView<S>> {
-    fn flags(&self) -> Vec<FlagSpec> {
-        self.part.flags()
-    }
-    fn nodes(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Vec<NetworkNode> {
-        self.part.nodes(own_mut(s), cx)
-    }
-    fn wires(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Vec<NetworkWire> {
-        self.part.wires(own_mut(s), cx)
-    }
-    fn pick(
-        &self,
-        s: &mut dyn Any,
-        cx: &mut dyn Cx,
-        node: Option<NodeRef>,
-        add: bool,
-        toggle: bool,
-    ) {
-        self.part.pick(own_mut(s), cx, node, add, toggle)
-    }
-    fn flag(&self, s: &mut dyn Any, cx: &mut dyn Cx, node: NodeRef, flag: usize) {
-        self.part.flag(own_mut(s), cx, node, flag)
     }
 }
 

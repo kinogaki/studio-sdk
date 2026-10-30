@@ -346,7 +346,7 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     assert_eq!(package.label, "Trees");
     let context = package.context(forest(), false).unwrap();
     assert!(context.levels.is_some() && context.viewport.is_some());
-    assert!(context.vocabulary.is_none() && context.network.is_none());
+    assert!(context.vocabulary.is_none());
     assert!(package.context(forest(), true).is_none());
     assert_eq!(package.slots[0].id(), Picked::id());
     assert_eq!(package.settings[0].context(), forest());
