@@ -14,6 +14,8 @@ workspace = true
 wgpu = ["dep:wgpu"]
 
 [dependencies]
+# The standard geometry values (Detail; the values prims are made from).
+kinogaki-geometry.workspace = true
 # The host's GPU API, from crates.io at the exact version hosts and engines
 # share (a host and its engines must agree on it).
 wgpu = { version = "=30.0.1", optional = true }

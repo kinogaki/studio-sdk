@@ -10,6 +10,7 @@
 //! [`Pickable`](crate::Pickable) to make one from a pick.
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
+use kinogaki_geometry::Selection;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
@@ -72,6 +73,13 @@ impl Components {
     /// Whether `self` and `other` are the same selection value.
     pub fn ptr_eq(&self, other: &Components) -> bool {
         Arc::ptr_eq(&self.set, &other.set)
+    }
+
+    /// The standard [`Selection`] inside, when it holds one: the
+    /// standard data types' components always do
+    /// ([`standard::components`](crate::standard::components)).
+    pub fn selection(&self) -> Option<&Selection> {
+        self.get()
     }
 }
 

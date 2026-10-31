@@ -9,6 +9,10 @@
 //! - **Ids** ([`id`]): declared, interned, one type per kind of thing.
 //! - **Data** ([`Data`], [`Typed`]): type-erased shared values on wires
 //!   and in object results, read by their kernel through a typed handle.
+//! - **Standard data types** ([`standard`], [`geometry`]): the geometry
+//!   values every package shares (polygons, curves, attributes,
+//!   selections), which core registers, displays and saves; kernels
+//!   operate on them.
 //! - **Data types** ([`DataType`]): what the environment may ask of a
 //!   value it can't look inside (bounds, info, a stamp, saving) and the
 //!   optional [`facets`]: [`Displayable`], [`Pickable`], [`Tabular`] and
@@ -43,8 +47,8 @@
 //! and nodes) and [`render`] (neutral render items).
 //!
 //! **Self-contained.** The crate depends on the standard library and the
-//! SDK's leaf crates alone (the render interface, the viewport packet
-//! contract), never on Studio, a kernel or any other Kinogaki library:
+//! SDK's leaf crates alone (the standard geometry values, the render
+//! interface, the viewport packet contract), never on Studio, a kernel or any other Kinogaki library:
 //! every type it exposes is the SDK's own, and Studio converts between
 //! these types and its own libraries' at the boundary. So the SDK builds
 //! from a plain clone, and a package written against it compiles against
@@ -56,6 +60,7 @@
 pub mod cancel;
 pub mod codec;
 pub mod components;
+pub mod conformance;
 pub mod conversion;
 pub mod cook;
 pub mod data;
@@ -78,9 +83,13 @@ pub mod refs;
 pub mod registry;
 pub mod render;
 pub mod session;
+pub mod standard;
 pub mod stored;
 pub mod time;
 pub mod viewport;
+
+/// The standard geometry values: what the [`standard`] data types are.
+pub use kinogaki_geometry as geometry;
 
 pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};

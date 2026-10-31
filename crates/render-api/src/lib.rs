@@ -22,12 +22,12 @@
 //! The `wgpu` feature adds the `display` module: how a wgpu host
 //! shows an engine's frames as textures on its own device and makes
 //! engines there (wgpu 30.0.1, on every platform wgpu supports). Without
-//! it the crate depends on the standard library alone.
+//! it the crate depends on the standard library and the SDK's standard
+//! geometry values (`geometry`, which also holds [`Detail`]) alone.
 
 pub mod aov;
 pub mod declared;
 pub mod description;
-pub mod detail;
 pub mod dirty;
 #[cfg(feature = "wgpu")]
 pub mod display;
@@ -51,7 +51,6 @@ pub use declared::{AppliedSchema, Declared, PrimType, Role};
 pub use description::{
     EngineDescription, Engines, MaterialPreset, MaterialRules, PreviewSetup, Tint,
 };
-pub use detail::Detail;
 pub use dirty::Dirty;
 pub use engine::{
     Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
@@ -59,6 +58,10 @@ pub use engine::{
 };
 pub use exchange::{Extra, ImportedMaterial, PreviewSurface};
 pub use id::{IdAllocator, MaterialId, PrimId, TextureId};
+/// The standard geometry values, which engines read prims' data as.
+pub use kinogaki_geometry as geometry;
+/// How fine to make geometry for a render: the standard geometry values'.
+pub use kinogaki_geometry::Detail;
 pub use material::{
     Constant, ImageUse, Link, MaterialNetwork, NetworkError, NodeIndex, ShaderNode,
 };

@@ -1,0 +1,78 @@
+//! The standard data types: the geometry values every package shares
+//! ([`geometry`](crate::geometry)), as data types.
+//!
+//! Studio's core registers them, so they exist with no package installed;
+//! a kernel never registers a type of its own for the same data. A node
+//! reads and writes them through the handles here:
+//!
+//! ```
+//! use kinogaki_studio_api::geometry::Polygons;
+//! use kinogaki_studio_api::standard;
+//!
+//! let data = standard::polygons().wrap(Polygons::empty());
+//! assert_eq!(data.ty().as_str(), standard::POLYGONS);
+//! assert!(standard::polygons().get(&data).is_some());
+//! assert!(standard::curves().get(&data).is_none());
+//! ```
+//!
+//! **Saving.** The project encoding of each type is the SDK's: the codecs
+//! here ([`PolygonsCodec`], [`CurvesCodec`]) are the ones core registers,
+//! and they also save the standard [`Selection`]s a kept result carries.
+//! Project files save only frozen and held results, never cooked ones.
+//! [`Tolerances`](crate::geometry::Tolerances) is the project value core
+//! keeps ([`Stored`](crate::Stored), `tolerances` in the project's
+//! settings).
+mod attributes;
+mod curves;
+mod polygons;
+mod selection;
+mod tolerances;
+
+pub use curves::CurvesCodec;
+pub use polygons::PolygonsCodec;
+
+use crate::components::Components;
+use crate::data::Typed;
+use crate::error::Error;
+use crate::id::DataTypeId;
+use crate::viewport::ElementKind;
+use kinogaki_geometry::{Class, Curves, GeometryError, Polygons, Selection};
+
+/// The id of [`Polygons`] values.
+pub const POLYGONS: &str = "kinogaki.standard.polygons";
+/// The id of [`Curves`] values.
+pub const CURVES: &str = "kinogaki.standard.curves";
+
+/// The handle on [`Polygons`] values ([`POLYGONS`]).
+pub fn polygons() -> Typed<Polygons> {
+    Typed::new(DataTypeId::declared(POLYGONS))
+}
+
+/// The handle on [`Curves`] values ([`CURVES`]).
+pub fn curves() -> Typed<Curves> {
+    Typed::new(DataTypeId::declared(CURVES))
+}
+
+/// `selection` of a value of data type `ty` with `count` elements of its
+/// class, as the [`Components`] the host keeps, shows and counts.
+pub fn components(ty: DataTypeId, selection: Selection, count: usize) -> Components {
+    let level = level(selection.class());
+    Components::new(ty, level, selection.len(count), selection)
+}
+
+/// The viewport's element kind that shows elements of `class`: Primitive
+/// and Piece are faces, Detail and Object whole objects.
+pub fn level(class: Class) -> ElementKind {
+    match class {
+        Class::Point => ElementKind::Point,
+        Class::Edge => ElementKind::Edge,
+        Class::Vertex => ElementKind::Vertex,
+        Class::Primitive | Class::Piece => ElementKind::Face,
+        _ => ElementKind::Object,
+    }
+}
+
+/// A refused value read from `at`, as the API's error.
+fn invalid(at: &str, error: GeometryError) -> Error {
+    Error::invalid(format_args!("{at}: {error}"))
+}
