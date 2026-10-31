@@ -12,8 +12,8 @@ use studio_ui_api::host::{
 use studio_ui_api::package::{
     ContextPart, Creation, Creations, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec,
     Levels, Library, MarkingDefault, MenuDefaults, Places, Registered, Section, SettingsSection,
-    Shared, Start, Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem, When,
-    WithUi,
+    Shared, Situation, Start, Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem,
+    When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -364,8 +364,14 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     // The library is data, kept as given.
     assert_eq!(context.library, library());
     let grow = &context.library.items[0];
-    assert!(grow.when.holds(Some("Branch"), false, false));
-    assert!(!grow.when.holds(Some("Tree"), false, false));
+    assert!(grow.when.holds(&Situation {
+        level: Some("Branch"),
+        ..Situation::default()
+    }));
+    assert!(!grow.when.holds(&Situation {
+        level: Some("Tree"),
+        ..Situation::default()
+    }));
 }
 
 #[test]

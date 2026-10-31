@@ -111,6 +111,35 @@ pub struct When {
     /// Only while the displayed node is a held edit (`Some(true)`, Edit
     /// Mesh), or only outside one (`Some(false)`).
     pub editing: Option<bool>,
+    /// With nothing selected, it shows at every level (a tool that then
+    /// works on the whole value), whatever `levels` says.
+    pub unselected_any_level: bool,
+    /// Only while the open object's shown value is (`Some(true)`) or isn't
+    /// (`Some(false)`) its data type's empty value ("Create geometry
+    /// first").
+    pub shown_empty: Option<bool>,
+    /// Only while input `.0` of the displayed node is (`.1` true) or isn't
+    /// wired (a held edit's Surface input).
+    pub displayed_input: Option<(usize, bool)>,
+}
+
+/// What an entry's [`When`] is held against: the open context now, as the
+/// host sees it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Situation<'a> {
+    /// The level of what is selected, else the primary level, by id;
+    /// `None`: a context without levels.
+    pub level: Option<&'a str>,
+    /// Something is selected.
+    pub selected: bool,
+    /// The displayed node is a held edit.
+    pub editing: bool,
+    /// Whether the open object's shown value is its type's empty value;
+    /// `None`: no object is open, or its type has no empty value.
+    pub shown_empty: Option<bool>,
+    /// The displayed node's inputs, each wired or not; empty: no node is
+    /// displayed.
+    pub displayed_inputs: &'a [bool],
 }
 
 impl When {
@@ -122,14 +151,20 @@ impl When {
         }
     }
 
-    /// Whether it holds at level `level` (`None`: a context without
-    /// levels), with something `selected` or not, `editing` or not.
-    pub fn holds(&self, level: Option<&str>, selected: bool, editing: bool) -> bool {
-        let level =
-            self.levels.is_empty() || level.is_some_and(|l| self.levels.iter().any(|x| x == l));
+    /// Whether it holds in situation `now`.
+    pub fn holds(&self, now: &Situation<'_>) -> bool {
+        let level = self.levels.is_empty()
+            || self.unselected_any_level && !now.selected
+            || now
+                .level
+                .is_some_and(|l| self.levels.iter().any(|x| x == l));
         level
-            && self.selected.is_none_or(|s| s == selected)
-            && self.editing.is_none_or(|e| e == editing)
+            && self.selected.is_none_or(|s| s == now.selected)
+            && self.editing.is_none_or(|e| e == now.editing)
+            && self.shown_empty.is_none_or(|e| now.shown_empty == Some(e))
+            && self
+                .displayed_input
+                .is_none_or(|(port, wired)| now.displayed_inputs.get(port) == Some(&wired))
     }
 }
 
@@ -451,23 +486,70 @@ pub struct AnalysisMode {
 mod tests {
     use super::*;
 
+    /// At level `level`, `selected` or not, `editing` or not.
+    fn at(level: Option<&str>, selected: bool, editing: bool) -> Situation<'_> {
+        Situation {
+            level,
+            selected,
+            editing,
+            ..Situation::default()
+        }
+    }
+
     #[test]
     fn when_holds_where_every_condition_does() {
         let any = When::default();
-        assert!(any.holds(None, false, false) && any.holds(Some("Face"), true, true));
+        assert!(any.holds(&at(None, false, false)) && any.holds(&at(Some("Face"), true, true)));
         let faces = When::levels(["Face"]);
-        assert!(faces.holds(Some("Face"), false, false));
-        assert!(!faces.holds(Some("Edge"), false, false));
-        assert!(!faces.holds(None, false, false), "a context without levels");
+        assert!(faces.holds(&at(Some("Face"), false, false)));
+        assert!(!faces.holds(&at(Some("Edge"), false, false)));
+        assert!(
+            !faces.holds(&at(None, false, false)),
+            "a context without levels"
+        );
         let selected = When {
             selected: Some(true),
             ..When::default()
         };
-        assert!(selected.holds(None, true, false) && !selected.holds(None, false, false));
+        assert!(selected.holds(&at(None, true, false)) && !selected.holds(&at(None, false, false)));
         let outside = When {
             editing: Some(false),
             ..When::default()
         };
-        assert!(outside.holds(None, false, false) && !outside.holds(None, false, true));
+        assert!(outside.holds(&at(None, false, false)) && !outside.holds(&at(None, false, true)));
+    }
+
+    #[test]
+    fn the_data_conditions_hold_against_the_situation() {
+        // Faces when something is selected; any level with nothing selected.
+        let whole = When {
+            unselected_any_level: true,
+            ..When::levels(["Face"])
+        };
+        assert!(whole.holds(&at(Some("Edge"), false, false)));
+        assert!(!whole.holds(&at(Some("Edge"), true, false)));
+        assert!(whole.holds(&at(Some("Face"), true, false)));
+        // Not while the shown value is empty (or there is none).
+        let geometry = When {
+            shown_empty: Some(false),
+            ..When::default()
+        };
+        let shown = |empty| Situation {
+            shown_empty: empty,
+            ..Situation::default()
+        };
+        assert!(geometry.holds(&shown(Some(false))));
+        assert!(!geometry.holds(&shown(Some(true))) && !geometry.holds(&shown(None)));
+        // Only while the displayed node's input 1 is wired.
+        let surface = When {
+            displayed_input: Some((1, true)),
+            ..When::default()
+        };
+        let inputs = |wired: &'static [bool]| Situation {
+            displayed_inputs: wired,
+            ..Situation::default()
+        };
+        assert!(surface.holds(&inputs(&[false, true])));
+        assert!(!surface.holds(&inputs(&[true, false])) && !surface.holds(&inputs(&[true])));
     }
 }
