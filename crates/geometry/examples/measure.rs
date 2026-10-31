@@ -118,7 +118,7 @@ fn main() {
     let attributes = attributes(points, vertices.len(), faces);
     let positions = Column::new(positions);
     report(
-        "Polygons::new (topology, positions, attributes)",
+        "Polygons::new (positions, attributes checked)",
         best(
             || {
                 (
