@@ -86,6 +86,108 @@ impl Group {
         })
     }
 
+    /// The set of all `elements` elements.
+    pub fn all(elements: usize) -> Self {
+        let mut words = vec![u64::MAX; elements.div_ceil(64)];
+        clear_tail(&mut words, elements);
+        Self {
+            elements,
+            words: Column::new(words),
+        }
+    }
+
+    /// The set over `elements` elements holding each `i` for which `f(i)`.
+    ///
+    /// ```
+    /// use kinogaki_geometry::Group;
+    ///
+    /// let every_third = Group::from_fn(10, |i| i % 3 == 0);
+    /// assert_eq!(every_third.iter().collect::<Vec<_>>(), [0, 3, 6, 9]);
+    /// ```
+    pub fn from_fn(elements: usize, mut f: impl FnMut(usize) -> bool) -> Self {
+        let mut words = vec![0u64; elements.div_ceil(64)];
+        for i in (0..elements).filter(|&i| f(i)) {
+            words[i / 64] |= 1 << (i % 64);
+        }
+        Self {
+            elements,
+            words: Column::new(words),
+        }
+    }
+
+    /// The elements in either set.
+    ///
+    /// ```
+    /// use kinogaki_geometry::Group;
+    ///
+    /// let a = Group::from_indices(5, [0, 1]).unwrap();
+    /// let b = Group::from_indices(5, [1, 4]).unwrap();
+    /// assert_eq!(a.union(&b).unwrap().iter().collect::<Vec<_>>(), [0, 1, 4]);
+    /// assert_eq!(a.intersection(&b).unwrap().iter().collect::<Vec<_>>(), [1]);
+    /// assert_eq!(a.difference(&b).unwrap().iter().collect::<Vec<_>>(), [0]);
+    /// assert_eq!(a.symmetric_difference(&b).unwrap().iter().collect::<Vec<_>>(), [0, 4]);
+    /// assert_eq!(a.complement().iter().collect::<Vec<_>>(), [2, 3, 4]);
+    /// assert!(a.union(&Group::none(6)).is_err());
+    /// ```
+    ///
+    /// # Errors
+    /// When the sets are over different numbers of elements.
+    pub fn union(&self, other: &Group) -> Result<Group, GeometryError> {
+        self.combine(other, |a, b| a | b)
+    }
+
+    /// The elements in both sets.
+    ///
+    /// # Errors
+    /// When the sets are over different numbers of elements.
+    pub fn intersection(&self, other: &Group) -> Result<Group, GeometryError> {
+        self.combine(other, |a, b| a & b)
+    }
+
+    /// The elements of this set not in `other`.
+    ///
+    /// # Errors
+    /// When the sets are over different numbers of elements.
+    pub fn difference(&self, other: &Group) -> Result<Group, GeometryError> {
+        self.combine(other, |a, b| a & !b)
+    }
+
+    /// The elements in exactly one of the sets.
+    ///
+    /// # Errors
+    /// When the sets are over different numbers of elements.
+    pub fn symmetric_difference(&self, other: &Group) -> Result<Group, GeometryError> {
+        self.combine(other, |a, b| a ^ b)
+    }
+
+    /// The elements not in this set.
+    pub fn complement(&self) -> Group {
+        let mut words: Vec<u64> = self.words.iter().map(|w| !w).collect();
+        clear_tail(&mut words, self.elements);
+        Self {
+            elements: self.elements,
+            words: Column::new(words),
+        }
+    }
+
+    /// Word by word; every `op` keeps the bits past the last element clear.
+    fn combine(&self, other: &Group, op: impl Fn(u64, u64) -> u64) -> Result<Group, GeometryError> {
+        if self.elements != other.elements {
+            return Err(GeometryError::whole(
+                ErrorKind::Attribute,
+                format!(
+                    "a group of {} elements combined with one of {}",
+                    self.elements, other.elements
+                ),
+            ));
+        }
+        let words = self.words.iter().zip(other.words.iter());
+        Ok(Self {
+            elements: self.elements,
+            words: words.map(|(&a, &b)| op(a, b)).collect(),
+        })
+    }
+
     /// How many elements it is over (the class's count).
     pub fn elements(&self) -> usize {
         self.elements
@@ -130,5 +232,14 @@ impl Group {
                 .map(|i| i - range.start as u32),
         )
         .expect("members within the range")
+    }
+}
+
+/// Clears the bits past the last of `elements` elements.
+fn clear_tail(words: &mut [u64], elements: usize) {
+    if let Some(last) = words.last_mut()
+        && !elements.is_multiple_of(64)
+    {
+        *last &= (1 << (elements % 64)) - 1;
     }
 }

@@ -234,3 +234,43 @@ fn classes_and_kinds_name_themselves() {
     }
     assert_eq!(Class::from_name("face"), None);
 }
+
+#[test]
+fn group_set_algebra_matches_the_per_index_definitions() {
+    // Sizes on, below and past word boundaries; members spread across words.
+    for elements in [0usize, 1, 63, 64, 65, 130, 200] {
+        let a = Group::from_fn(elements, |i| i % 3 == 0 || i == 64);
+        let b = Group::from_fn(elements, |i| i % 5 == 1 || i + 1 == elements);
+        let per_index = |f: &dyn Fn(bool, bool) -> bool| -> Vec<u32> {
+            (0..elements)
+                .filter(|&i| f(a.contains(i), b.contains(i)))
+                .map(|i| i as u32)
+                .collect()
+        };
+        let members = |g: Group| {
+            assert_eq!(g.elements(), elements);
+            // The rule `Group::new` checks: no bit past the last element.
+            assert!(Group::new(elements, g.words().clone()).is_ok());
+            g.iter().collect::<Vec<_>>()
+        };
+        assert_eq!(members(a.union(&b).unwrap()), per_index(&|x, y| x || y));
+        assert_eq!(
+            members(a.intersection(&b).unwrap()),
+            per_index(&|x, y| x && y)
+        );
+        assert_eq!(
+            members(a.difference(&b).unwrap()),
+            per_index(&|x, y| x && !y)
+        );
+        assert_eq!(
+            members(a.symmetric_difference(&b).unwrap()),
+            per_index(&|x, y| x != y)
+        );
+        assert_eq!(members(a.complement()), per_index(&|x, _| !x));
+        assert_eq!(members(Group::all(elements)), per_index(&|_, _| true));
+        assert_eq!(Group::all(elements).members(), elements);
+        assert_eq!(Group::all(elements).complement(), Group::none(elements));
+    }
+    let refused = Group::none(3).union(&Group::none(4)).unwrap_err();
+    assert_eq!(refused.kind(), ErrorKind::Attribute);
+}
