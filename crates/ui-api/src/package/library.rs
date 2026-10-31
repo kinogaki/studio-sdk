@@ -95,6 +95,10 @@ pub struct Places {
     /// Running it makes it the context's last item: Tab's Recent lists it
     /// and the host's Repeat runs it again ([`Invoked::Repeat`](super::Invoked::Repeat)).
     pub repeatable: bool,
+    /// The object levels (the scene root, a Part) offer it too, in their
+    /// menus and shelves: it runs on the selected objects
+    /// ([`Invoked::Objects`](super::Invoked::Objects)).
+    pub objects: bool,
 }
 
 /// Where an entry shows: every condition holds. The default shows always.
@@ -224,6 +228,19 @@ pub struct MenuDefaults {
     /// "Objects"). A menu and level not listed starts empty.
     pub marking: Vec<MarkingDefault>,
     /// The shelves; empty: no shelf.
+    pub shelves: Vec<Shelf>,
+    /// What it adds to the object levels' menus and shelves (its items
+    /// that are [`Places::objects`]), merged by the host with every
+    /// package's; `None`: nothing.
+    pub objects: Option<ObjectMenus>,
+}
+
+/// What a package adds to the object levels' menus and shelves.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ObjectMenus {
+    /// Items added to each held-key menu's list there, by menu.
+    pub marking: Vec<(Held, Vec<String>)>,
+    /// Shelves added after the object levels' own.
     pub shelves: Vec<Shelf>,
 }
 

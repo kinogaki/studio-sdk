@@ -371,6 +371,10 @@ pub enum Invoked {
     /// The host's Repeat: the item runs again with its last values (the
     /// package keeps them; an item it has none for runs as from the views).
     Repeat,
+    /// At an object level (the scene root, a Part), from its menus and
+    /// shelves: the item runs on the selected objects it takes
+    /// ([`Places::objects`](super::Places::objects)).
+    Objects,
 }
 
 /// The inspector rows of the object kinds a context owns, below an

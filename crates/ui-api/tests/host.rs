@@ -128,6 +128,7 @@ fn library() -> Library {
                 list: Vec::new(),
             }],
             shelves: Vec::new(),
+            objects: None,
         })),
         ..Library::default()
     }

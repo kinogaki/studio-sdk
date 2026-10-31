@@ -66,8 +66,8 @@ pub use data::{
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
-    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, Places, REPEAT, Shared,
-    SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec,
+    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT,
+    Shared, SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec,
     VocabularyItem, When,
 };
 pub use parts::{

@@ -161,6 +161,7 @@ fn library() -> Library {
             menus: true,
             tools: false,
             repeatable: false,
+            objects: false,
         },
         ..VocabularyItem::default()
     };
