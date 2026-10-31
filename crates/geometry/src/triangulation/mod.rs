@@ -1,0 +1,357 @@
+//! Polygons as triangles: the display [`Triangulation`] every viewport,
+//! render engine and kernel shares, and the strict triangulation modeling
+//! uses ([`Polygons::triangulate_strict`]). Both clip ears with one
+//! clipper; they differ in what they do with a polygon that doesn't clip.
+mod clip;
+
+use crate::column::Column;
+use crate::error::{ErrorKind, GeometryError};
+use crate::kept::Kept;
+use crate::parallel;
+use crate::polygons::Polygons;
+use crate::topology::Topology;
+use crate::vector::V3;
+use clip::{Outline, clip};
+use std::ops::Range;
+use std::sync::Arc;
+
+/// Polygons per parallel block.
+const BLOCK: usize = 8192;
+
+/// One triangle of a polygon: its corners as polygon-vertex ids (the
+/// polygon's first vertex id plus the corner's place in it), their points,
+/// and the polygon. It winds as the polygon does, so its normal agrees
+/// with the polygon's area normal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Triangle {
+    /// The polygon vertices at its corners.
+    pub vertices: [u32; 3],
+    /// The points at its corners.
+    pub points: [u32; 3],
+    /// The polygon it is part of.
+    pub primitive: u32,
+}
+
+/// A polygons value's **display triangulation**: every polygon as exactly
+/// n − 2 triangles (polylines have none), in primitive order.
+///
+/// Each polygon is ear clipped in the plane facing it most. Where that
+/// fails it is clipped again tolerantly: outlines whose points coincide
+/// within rounding or run straight, as cuts make them, still triangulate
+/// exactly. A polygon that can't be clipped either way (a crossing or
+/// collapsed outline) is shown as a fan from its first vertex and listed
+/// in [`fans`](Self::fans). So the triangle layout depends on the topology
+/// alone: polygon `p`'s triangles are [`of(p)`](Self::of).
+///
+/// It is the one triangulation the viewport, render engines and kernels
+/// show polygons with, so Solid and Render views always agree. Modeling
+/// that must refuse a damaged polygon uses
+/// [`Polygons::triangulate_strict`] instead.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Triangulation {
+    triangles: Column<[u32; 3]>,
+    corners: Column<[u32; 3]>,
+    primitives: Column<u32>,
+    fans: Column<u32>,
+    /// The topology's polygon offsets (shared), which place each polygon's
+    /// triangles.
+    offsets: Column<u32>,
+    polygons: usize,
+}
+
+impl Triangulation {
+    /// Each triangle's corner points.
+    pub fn triangles(&self) -> &Column<[u32; 3]> {
+        &self.triangles
+    }
+
+    /// Each triangle's corner polygon vertices (what per-vertex values,
+    /// such as shading normals and texture coordinates, are read through).
+    pub fn corners(&self) -> &Column<[u32; 3]> {
+        &self.corners
+    }
+
+    /// Each triangle's polygon.
+    pub fn primitives(&self) -> &Column<u32> {
+        &self.primitives
+    }
+
+    /// Polygon `polygon`'s triangles: its n − 2, wherever its outline
+    /// moves. Empty for a polyline or a primitive out of range.
+    pub fn of(&self, polygon: usize) -> Range<usize> {
+        if polygon >= self.polygons {
+            return 0..0;
+        }
+        let before = |p: usize| self.offsets[p] as usize - 2 * p;
+        before(polygon)..before(polygon + 1)
+    }
+
+    /// The polygons shown as a fan (approximately), in order: their
+    /// outlines cross or collapse. For checks that flag damaged polygons.
+    pub fn fans(&self) -> &Column<u32> {
+        &self.fans
+    }
+
+    /// How many triangles.
+    pub fn len(&self) -> usize {
+        self.triangles.len()
+    }
+
+    /// Whether it has none.
+    pub fn is_empty(&self) -> bool {
+        self.triangles.is_empty()
+    }
+}
+
+/// How many triangles the polygons before `polygon` have: n − 2 each.
+fn triangles_before(topology: &Topology, polygon: usize) -> usize {
+    topology.offsets()[polygon] as usize - 2 * polygon
+}
+
+/// What a positions column keeps: the triangulation over each topology.
+type Triangulations = Kept<Arc<Topology>, Triangulation>;
+
+impl Polygons {
+    /// The display [`Triangulation`]. It is derived from the topology and
+    /// the positions and kept on the positions column, so asking again
+    /// costs nothing; a value with other positions triangulates anew
+    /// (after a drag, [`triangulation_after`](Self::triangulation_after)
+    /// does so for the moved polygons alone).
+    pub fn triangulation(&self) -> Arc<Triangulation> {
+        let kept = self.positions().derived(|_| Triangulations::default());
+        if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.topology())) {
+            return t;
+        }
+        let built = Arc::new(build(self, 0..self.topology().polygons()));
+        kept.keep(self.topology().clone(), built.clone());
+        built
+    }
+
+    /// The same as [`triangulation`](Self::triangulation), made from
+    /// `before`'s (when `before` has the same topology and has been
+    /// triangulated) by clipping again only the polygons through the
+    /// points `moved`, which must include every point whose position
+    /// differs. Otherwise it is built whole.
+    pub fn triangulation_after(&self, before: &Polygons, moved: &[u32]) -> Arc<Triangulation> {
+        let kept = self.positions().derived(|_| Triangulations::default());
+        if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.topology())) {
+            return t;
+        }
+        let previous = Arc::ptr_eq(before.topology(), self.topology())
+            .then(|| before.positions().derived(|_| Triangulations::default()))
+            .and_then(|k| k.find(|k| Arc::ptr_eq(k, self.topology())));
+        let built = Arc::new(match previous {
+            Some(previous) => rebuilt(self, &previous, moved),
+            None => build(self, 0..self.topology().polygons()),
+        });
+        kept.keep(self.topology().clone(), built.clone());
+        built
+    }
+
+    /// The **strict** (modeling) triangulation of polygon `primitive` with
+    /// its points at `position(point)`: exactly n − 2 [`Triangle`]s
+    /// appended to `out`, winding as the polygon does. Unlike the display
+    /// [`triangulation`](Self::triangulation) it never falls back to a
+    /// fan, and refuses a polygon that doesn't clip, leaving `out` as it
+    /// was.
+    ///
+    /// # Errors
+    /// In this order: `primitive` out of range or a polyline
+    /// ([`ErrorKind::Selection`]); a position among the polygon's points
+    /// that isn't finite ([`ErrorKind::Position`], naming the point); an
+    /// outline that clips in no plane ([`ErrorKind::Triangulation`]).
+    pub fn triangulate_strict_at(
+        &self,
+        primitive: usize,
+        position: &impl Fn(u32) -> [f64; 3],
+        out: &mut Vec<Triangle>,
+    ) -> Result<(), GeometryError> {
+        let topology = self.topology();
+        if primitive >= topology.polygons() {
+            let what = if primitive < topology.primitives() {
+                "is a polyline"
+            } else {
+                "is not a primitive"
+            };
+            return Err(GeometryError::at(
+                ErrorKind::Selection,
+                primitive,
+                format!("primitive {primitive} {what}"),
+            ));
+        }
+        let points = topology.primitive(primitive);
+        if let Some(&p) = points
+            .iter()
+            .find(|&&p| !position(p).iter().all(|c| c.is_finite()))
+        {
+            return Err(GeometryError::at(
+                ErrorKind::Position,
+                p as usize,
+                format!("point {p} is not finite"),
+            ));
+        }
+        clip(&outline(topology, primitive), position, false, out).map_err(|()| {
+            GeometryError::at(
+                ErrorKind::Triangulation,
+                primitive,
+                format!("polygon {primitive} can't be triangulated"),
+            )
+        })
+    }
+
+    /// [`triangulate_strict_at`](Self::triangulate_strict_at) at the
+    /// value's own positions.
+    ///
+    /// # Errors
+    /// As [`triangulate_strict_at`](Self::triangulate_strict_at).
+    pub fn triangulate_strict(
+        &self,
+        primitive: usize,
+        out: &mut Vec<Triangle>,
+    ) -> Result<(), GeometryError> {
+        let positions = self.positions();
+        self.triangulate_strict_at(primitive, &|p| positions[p as usize], out)
+    }
+
+    /// Every polygon, strictly, in order.
+    ///
+    /// # Errors
+    /// The first polygon that doesn't clip.
+    pub fn triangulate_all_strict(&self) -> Result<Vec<Triangle>, GeometryError> {
+        let topology = self.topology();
+        let count = topology.polygon_vertices() - 2 * topology.polygons();
+        let mut out = Vec::with_capacity(count);
+        for p in 0..topology.polygons() {
+            self.triangulate_strict(p, &mut out)?;
+        }
+        Ok(out)
+    }
+}
+
+fn outline(topology: &Topology, polygon: usize) -> Outline<'_> {
+    Outline {
+        points: topology.primitive(polygon),
+        first: topology.offsets()[polygon],
+        primitive: polygon as u32,
+    }
+}
+
+/// Polygon `polygon` for display, appended to `out`: strictly, else
+/// tolerantly, else as a fan. Whether it fell back to the fan.
+fn display(
+    topology: &Topology,
+    polygon: usize,
+    position: &impl Fn(u32) -> V3,
+    out: &mut Vec<Triangle>,
+) -> bool {
+    let o = outline(topology, polygon);
+    let start = out.len();
+    if clip(&o, position, false, out).is_ok() {
+        return false;
+    }
+    out.truncate(start);
+    if clip(&o, position, true, out).is_ok() {
+        return false;
+    }
+    out.truncate(start);
+    for i in 1..o.points.len() - 1 {
+        out.push(Triangle {
+            vertices: [o.first, o.first + i as u32, o.first + i as u32 + 1],
+            points: [o.points[0], o.points[i], o.points[i + 1]],
+            primitive: o.primitive,
+        });
+    }
+    true
+}
+
+/// The triangles of `polygons` (a range of polygon ids), in order, with
+/// the fans among them.
+fn triangles_of(value: &Polygons, polygons: Range<usize>) -> (Vec<Triangle>, Vec<u32>) {
+    let topology = value.topology();
+    let positions = value.positions();
+    let position = |p: u32| positions[p as usize];
+    let count =
+        triangles_before(topology, polygons.end) - triangles_before(topology, polygons.start);
+    let mut out = Vec::with_capacity(count);
+    let mut fans = Vec::new();
+    for p in polygons {
+        if display(topology, p, &position, &mut out) {
+            fans.push(p as u32);
+        }
+    }
+    (out, fans)
+}
+
+/// The triangulation of every polygon, in parallel blocks.
+fn build(value: &Polygons, polygons: Range<usize>) -> Triangulation {
+    let len = polygons.len();
+    let blocks = parallel::map_blocks(len, BLOCK, |r| {
+        triangles_of(value, polygons.start + r.start..polygons.start + r.end)
+    });
+    let total = blocks.iter().map(|(t, _)| t.len()).sum();
+    let (mut triangles, mut corners, mut primitives) = (
+        Vec::with_capacity(total),
+        Vec::with_capacity(total),
+        Vec::with_capacity(total),
+    );
+    let mut fans = Vec::new();
+    for (block, block_fans) in blocks {
+        for t in block {
+            triangles.push(t.points);
+            corners.push(t.vertices);
+            primitives.push(t.primitive);
+        }
+        fans.extend(block_fans);
+    }
+    Triangulation {
+        triangles: triangles.into(),
+        corners: corners.into(),
+        primitives: primitives.into(),
+        fans: fans.into(),
+        offsets: value.topology().offsets().clone(),
+        polygons: value.topology().polygons(),
+    }
+}
+
+/// `previous` (over the same topology) with the polygons through `moved`
+/// clipped again at `value`'s positions; the layout is the topology's, so
+/// each polygon's triangles stay where they were.
+fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangulation {
+    let topology = value.topology();
+    let point_faces = topology.index().point_faces();
+    let mut polygons: Vec<u32> = moved
+        .iter()
+        .filter(|&&p| (p as usize) < topology.points())
+        .flat_map(|&p| point_faces[p as usize].iter().copied())
+        .collect();
+    polygons.sort_unstable();
+    polygons.dedup();
+    let mut triangles = previous.triangles.to_vec();
+    let mut corners = previous.corners.to_vec();
+    let mut fans: Vec<u32> = previous
+        .fans
+        .iter()
+        .copied()
+        .filter(|f| polygons.binary_search(f).is_err())
+        .collect();
+    for &p in &polygons {
+        let range = previous.of(p as usize);
+        let (one, fanned) = triangles_of(value, p as usize..p as usize + 1);
+        if !fanned.is_empty() {
+            fans.push(p);
+        }
+        for (i, t) in range.zip(&one) {
+            triangles[i] = t.points;
+            corners[i] = t.vertices;
+        }
+    }
+    fans.sort_unstable();
+    Triangulation {
+        triangles: triangles.into(),
+        corners: corners.into(),
+        primitives: previous.primitives.clone(),
+        fans: fans.into(),
+        offsets: previous.offsets.clone(),
+        polygons: previous.polygons,
+    }
+}

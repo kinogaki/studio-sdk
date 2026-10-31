@@ -38,8 +38,16 @@ pub const NAME: &str = "name";
 pub const PART: &str = "part";
 /// Which prototype an instance places (Integer).
 pub const INSTANCE: &str = "instance";
-/// The hard edges (an [`Class::Edge`] group): shading breaks across them.
+/// The hard edges (an [`Class::Edge`] group): shading always breaks
+/// across them, whatever the angle between their faces. An edge in both
+/// this and [`SMOOTH`] is sharp. An edge in neither follows the 60° cusp
+/// rule ([`ShadingNormals`](crate::ShadingNormals)).
 pub const SHARP: &str = "sharp";
+/// The soft edges (an [`Class::Edge`] group): shading always joins the
+/// two faces of such an edge, whatever the angle between them (Soft
+/// Edges). Only an edge with exactly two faces joins; open and
+/// non-manifold edges stay split. [`SHARP`] wins over it.
+pub const SMOOTH: &str = "smooth";
 /// The hidden primitives (a [`Class::Primitive`] group): Hide.
 pub const HIDDEN: &str = ".hidden";
 
@@ -63,7 +71,7 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
         ALPHA | WIDTH => Standard::Attribute(Float, TypeInfo::None),
         MATERIAL | NAME | PART => Standard::Attribute(Text, TypeInfo::None),
         INSTANCE => Standard::Attribute(Integer, TypeInfo::None),
-        SHARP => Standard::Group(Class::Edge),
+        SHARP | SMOOTH => Standard::Group(Class::Edge),
         HIDDEN => Standard::Group(Class::Primitive),
         _ => return None,
     })

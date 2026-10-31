@@ -30,6 +30,9 @@ pub enum ErrorKind {
     Selection,
     /// A tolerance or a render detail is out of its range.
     Range,
+    /// A polygon can't be triangulated strictly: its outline crosses or
+    /// collapses ([`crate::Polygons::triangulate_strict`]).
+    Triangulation,
 }
 
 impl GeometryError {

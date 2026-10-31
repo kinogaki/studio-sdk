@@ -12,6 +12,7 @@
 //! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves ([`Basis`]) |
 //! | [`Attributes`] | named [`Attribute`] columns and [`Group`]s per [`Class`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`] | selected elements of one class, with the active one |
+//! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
 //! | [`Detail`] | how fine geometry is made for a render |
 //! | [`Tolerances`] | the project's modeling tolerances |
 //!
@@ -94,13 +95,17 @@ mod curves;
 mod derived;
 mod detail;
 mod error;
+mod kept;
 pub mod limits;
 mod parallel;
 mod polygons;
 mod positions;
 mod selection;
+mod shading;
 mod tolerances;
 mod topology;
+mod triangulation;
+mod vector;
 
 pub use attributes::names;
 pub use attributes::{
@@ -113,5 +118,7 @@ pub use detail::Detail;
 pub use error::{ErrorKind, GeometryError};
 pub use polygons::Polygons;
 pub use selection::Selection;
+pub use shading::ShadingNormals;
 pub use tolerances::{CURVATURE, FIT_OF_POSITIONAL, POSITIONAL_MM, TANGENT_DEGREES, Tolerances};
 pub use topology::{Adjacency, Edge, Index, Topology};
+pub use triangulation::{Triangle, Triangulation};
