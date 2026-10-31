@@ -177,7 +177,9 @@ impl Package {
         self
     }
 
-    /// With `compiler`, the compiler of a compiled context it declares.
+    /// With `compiler`, the compiler of a compiled context it or a package
+    /// registered before it declares (Studio's Comp and Shading): one a
+    /// context.
     pub fn with_compiler(mut self, compiler: impl NetworkCompiler + 'static) -> Self {
         self.compilers.push(Arc::new(compiler));
         self
@@ -224,7 +226,9 @@ impl Package {
         self
     }
 
-    /// With `runner`, which runs compiled context `context`'s plans.
+    /// With `runner`, which runs compiled context `context`'s plans (a
+    /// context it or a package registered before it declares): one a
+    /// context.
     #[cfg(feature = "wgpu")]
     pub fn with_runner(
         mut self,

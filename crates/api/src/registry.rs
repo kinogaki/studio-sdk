@@ -80,15 +80,8 @@ pub enum RegistryError {
         /// The conversion registered first.
         first: ConversionId,
     },
-    /// `package` declares compiled context `context` without its compiler.
-    NoCompiler {
-        /// The refused package.
-        package: PackageId,
-        /// The context.
-        context: ContextId,
-    },
-    /// `package` brings a compiler for `context`, which isn't a compiled
-    /// context it declares (or already has one from it).
+    /// `package` brings a compiler for `context`, which neither it nor a
+    /// registered package declares as a compiled context.
     StrayCompiler {
         /// The refused package.
         package: PackageId,
@@ -105,13 +98,33 @@ pub enum RegistryError {
         /// The parameter.
         parameter: String,
     },
-    /// `package` brings a runner for `context`, which isn't a compiled
-    /// context it declares (or already has one from it).
+    /// `package` brings a runner for `context`, which neither it nor a
+    /// registered package declares as a compiled context.
     StrayRunner {
         /// The refused package.
         package: PackageId,
         /// The context.
         context: ContextId,
+    },
+    /// `package` brings a compiler for `context`, which `first` already
+    /// brought (or `package` brings twice): one a context.
+    DuplicateCompiler {
+        /// The refused package.
+        package: PackageId,
+        /// The context.
+        context: ContextId,
+        /// The package that brought it first.
+        first: PackageId,
+    },
+    /// `package` brings a runner for `context`, which `first` already
+    /// brought (or `package` brings twice): one a context.
+    DuplicateRunner {
+        /// The refused package.
+        package: PackageId,
+        /// The context.
+        context: ContextId,
+        /// The package that brought it first.
+        first: PackageId,
     },
 }
 
@@ -159,19 +172,29 @@ impl fmt::Display for RegistryError {
                 f,
                 "{package} converts {from} to {to}, which {first} already does"
             ),
-            Self::NoCompiler { package, context } => {
-                write!(
-                    f,
-                    "{package} declares compiled context {context} without its compiler"
-                )
-            }
             Self::StrayRunner { package, context } => write!(
                 f,
-                "{package} brings a runner for {context}, which isn't one of its compiled contexts or has one"
+                "{package} brings a runner for {context}, which no package declares as a compiled context"
             ),
             Self::StrayCompiler { package, context } => write!(
                 f,
-                "{package} brings a compiler for {context}, which isn't one of its compiled contexts or has one"
+                "{package} brings a compiler for {context}, which no package declares as a compiled context"
+            ),
+            Self::DuplicateCompiler {
+                package,
+                context,
+                first,
+            } => write!(
+                f,
+                "{package} brings a compiler for {context}, which {first} already brought"
+            ),
+            Self::DuplicateRunner {
+                package,
+                context,
+                first,
+            } => write!(
+                f,
+                "{package} brings a runner for {context}, which {first} already brought"
             ),
         }
     }
@@ -208,6 +231,9 @@ pub struct Registry {
     contexts: BTreeMap<ContextId, Entry<NetworkContext>>,
     /// Each compiled context's compiler.
     compilers: BTreeMap<ContextId, Entry<dyn NetworkCompiler>>,
+    /// The package bringing each compiled context's runner.
+    #[cfg(feature = "wgpu")]
+    runners: BTreeMap<ContextId, PackageId>,
     conversions: BTreeMap<ConversionId, Entry<dyn Conversion>>,
     /// Each (from, to) pair's conversion.
     routes: BTreeMap<(DataTypeId, DataTypeId), ConversionId>,
@@ -250,6 +276,10 @@ impl Registry {
             self.compilers
                 .insert(compiler.context(), Entry::new(id, compiler));
         }
+        #[cfg(feature = "wgpu")]
+        for (context, _) in &package.runners {
+            self.runners.insert(*context, id);
+        }
         for conversion in package.conversions {
             self.routes
                 .insert((conversion.from(), conversion.to()), conversion.id());
@@ -271,8 +301,9 @@ impl Registry {
 
     /// Whether `package` may register: its id and every id it declares
     /// (its UI's contexts too) are new and under its vendor, no node type
-    /// declares a parameter named as spares are ([`SPARE`]), each compiled
-    /// context it declares has one compiler from it, and every data type
+    /// declares a parameter named as spares are ([`SPARE`]), each compiler
+    /// and runner it brings serves a compiled context (its own or a
+    /// registered package's) that has no other, and every data type
     /// it names is registered (by it or an earlier package). Changes
     /// nothing.
     pub fn check(&self, package: &Package) -> Result<(), RegistryError> {
@@ -379,40 +410,59 @@ impl Registry {
         self.check_references(package)
     }
 
-    /// Each compiled context `package` declares has one compiler from it,
-    /// and each compiler it brings is for one of them.
+    /// Each compiler and runner `package` brings serves a compiled context
+    /// it or a registered package declares (core's Comp and Shading), and
+    /// no context gets a second of either. A compiled context may have
+    /// none: its plans then aren't shown.
     fn check_compilers(&self, package: &Package) -> Result<(), RegistryError> {
         let id = package.id;
-        let compiled: BTreeSet<ContextId> = package
-            .contexts
-            .iter()
-            .filter(|c| c.evaluation == Evaluation::Compile)
-            .map(|c| c.id)
-            .collect();
+        let compiled = |context: ContextId| {
+            package
+                .contexts
+                .iter()
+                .chain(self.contexts.values().map(|e| &*e.item))
+                .any(|c| c.id == context && c.evaluation == Evaluation::Compile)
+        };
         let mut given = BTreeSet::new();
         for c in &package.compilers {
             let context = c.context();
-            if !compiled.contains(&context) || !given.insert(context) {
+            if !compiled(context) {
                 return Err(RegistryError::StrayCompiler {
                     package: id,
                     context,
                 });
             }
-        }
-        if let Some(&context) = compiled.difference(&given).next() {
-            return Err(RegistryError::NoCompiler {
-                package: id,
-                context,
-            });
+            let first =
+                owner(self.compilers.get(&context)).or((!given.insert(context)).then_some(id));
+            if let Some(first) = first {
+                return Err(RegistryError::DuplicateCompiler {
+                    package: id,
+                    context,
+                    first,
+                });
+            }
         }
         #[cfg(feature = "wgpu")]
         {
             let mut run = BTreeSet::new();
             for (context, _) in &package.runners {
-                if !compiled.contains(context) || !run.insert(*context) {
+                let context = *context;
+                if !compiled(context) {
                     return Err(RegistryError::StrayRunner {
                         package: id,
-                        context: *context,
+                        context,
+                    });
+                }
+                let first = self
+                    .runners
+                    .get(&context)
+                    .copied()
+                    .or((!run.insert(context)).then_some(id));
+                if let Some(first) = first {
+                    return Err(RegistryError::DuplicateRunner {
+                        package: id,
+                        context,
+                        first,
                     });
                 }
             }

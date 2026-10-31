@@ -135,14 +135,13 @@ impl NetworkCompiler for Chain {
 #[test]
 fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
     let compiled = || context("acme.trees.network").compiled();
-    // Without its compiler, or a compiler for a context it doesn't
-    // compile, the package is refused.
+    // A compiled context may come without its compiler (its plans aren't
+    // shown); a compiler for a context no one compiles, or a second one,
+    // is refused.
     let mut r = Registry::new();
-    let lonely = Package::new(PackageId::declared("acme.trees"), "Trees").with_context(compiled());
-    assert!(matches!(
-        r.register(lonely),
-        Err(RegistryError::NoCompiler { .. })
-    ));
+    let lonely = Package::new(PackageId::declared("acme.rocks"), "Rocks")
+        .with_context(context("acme.rocks.network").compiled());
+    r.register(lonely).unwrap();
     let stray = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(context("acme.trees.network"))
         .with_compiler(Chain);
@@ -156,7 +155,7 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
         .with_compiler(Chain);
     assert!(matches!(
         r.register(twice),
-        Err(RegistryError::StrayCompiler { .. })
+        Err(RegistryError::DuplicateCompiler { .. })
     ));
     let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(compiled())
@@ -243,13 +242,37 @@ fn a_runner_runs_a_compiled_context_its_package_declares() {
             .register(trees(&["acme.trees.network"]))
             .is_ok()
     );
-    for stray in [
-        &["acme.rocks.network"][..],
-        &["acme.trees.network", "acme.trees.network"],
-    ] {
-        assert!(matches!(
-            Registry::new().register(trees(stray)),
-            Err(RegistryError::StrayRunner { .. })
-        ));
-    }
+    assert!(matches!(
+        Registry::new().register(trees(&["acme.rocks.network"])),
+        Err(RegistryError::StrayRunner { .. })
+    ));
+    assert!(matches!(
+        Registry::new().register(trees(&["acme.trees.network", "acme.trees.network"])),
+        Err(RegistryError::DuplicateRunner { .. })
+    ));
+}
+
+/// A compiled context one package declares (Studio's Comp) takes its
+/// compiler from another; a second compiler, from anyone, is refused.
+#[test]
+fn a_compiled_context_takes_its_compiler_from_another_package() {
+    let mut r = Registry::new();
+    let declares = Package::new(PackageId::declared("acme.trees"), "Trees")
+        .with_context(context("acme.trees.network").compiled());
+    r.register(declares).unwrap();
+    assert!(
+        r.compiler(ContextId::declared("acme.trees.network"))
+            .is_none()
+    );
+    let compiles = Package::new(PackageId::declared("acme.forest"), "Forest").with_compiler(Chain);
+    r.register(compiles).unwrap();
+    assert!(
+        r.compiler(ContextId::declared("acme.trees.network"))
+            .is_some()
+    );
+    let again = Package::new(PackageId::declared("acme.grove"), "Grove").with_compiler(Chain);
+    assert!(matches!(
+        r.register(again),
+        Err(RegistryError::DuplicateCompiler { first, .. }) if first == PackageId::declared("acme.forest")
+    ));
 }
