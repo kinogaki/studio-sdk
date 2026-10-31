@@ -308,3 +308,28 @@ fn a_group_builder_makes_the_group_of_its_members() {
     );
     assert!(!b.contains(3));
 }
+
+#[test]
+fn texts_are_equal_by_their_values_whatever_their_tables() {
+    let table: Arc<[Arc<str>]> = ["a", "b", "c"].map(Arc::from).into();
+    // A gather keeping its source's table, unused and reordered entries included.
+    let gathered = Text::new(vec![2, 0, Text::NONE].into(), table.clone()).unwrap();
+    let fresh = Text::from_strs(["c", "a", ""]);
+    assert_eq!(gathered, fresh);
+    assert_eq!(gathered.compacted(), fresh);
+    // Other values differ, over one table or two.
+    let other = Text::new(vec![2, 1, Text::NONE].into(), table.clone()).unwrap();
+    assert_ne!(gathered, other);
+    assert_ne!(other, fresh);
+    assert_ne!(Text::from_strs(["c", "a"]), fresh);
+    // No value is not a value, and the empty texts are equal.
+    assert_ne!(Text::from_strs(["", "a"]), Text::from_strs(["b", "a"]));
+    assert_eq!(
+        Text::from_strs(["", ""]),
+        Text::new(vec![Text::NONE; 2].into(), table).unwrap()
+    );
+    assert_eq!(Text::from_strs([]), TextBuilder::new().finish());
+    // A compact text compacts to itself, sharing everything.
+    let compact = fresh.compacted();
+    assert!(compact.indices().ptr_eq(fresh.indices()));
+}

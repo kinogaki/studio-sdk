@@ -136,3 +136,32 @@ fn the_tolerances_save_as_a_project_value() {
         .unwrap();
     assert!(wrong.read(|r| value.read(r)).is_err());
 }
+
+#[test]
+fn equal_texts_save_alike_whatever_their_tables() {
+    use kinogaki_studio_api::geometry::{Attribute, Attributes, Text};
+    let quad = |text: Text| {
+        let t = kinogaki_studio_api::geometry::Topology::new(
+            4,
+            vec![0, 4].into(),
+            vec![0, 1, 2, 3].into(),
+            1,
+        )
+        .unwrap();
+        let attributes = Attributes::new()
+            .with(Class::Point, "label", Attribute::text(text))
+            .unwrap();
+        standard::polygons().wrap(Polygons::new(vec![[0.0; 3]; 4].into(), t, attributes).unwrap())
+    };
+    let save = |data: &Data| {
+        let mut saved = MemoryElement::new("result");
+        saved.write(|w| PolygonsCodec.write(data, None, w)).unwrap();
+        saved
+    };
+    // A gather keeping a larger, reordered table, and its compact twin.
+    let table: Arc<[Arc<str>]> = ["unused", "b", "a"].map(Arc::from).into();
+    let gathered = Text::new(vec![2, 1, 2, Text::NONE].into(), table).unwrap();
+    let compact = Text::from_strs(["a", "b", "a", ""]);
+    assert_eq!(gathered, compact);
+    assert_eq!(save(&quad(gathered)), save(&quad(compact)));
+}

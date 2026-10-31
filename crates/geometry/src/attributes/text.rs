@@ -29,7 +29,7 @@ use std::sync::Arc;
 /// assert_eq!(text.get(3), Some("/Materials/Blue"));
 /// assert_eq!(text.get(1), None);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Text {
     indices: Column<u32>,
     table: Arc<[Arc<str>]>,
@@ -135,12 +135,65 @@ impl Text {
             .map(|&i| self.table.get(i as usize).map(|s| &**s))
     }
 
+    /// The same values over a table of only the strings used, in the order
+    /// of first use: what saving writes, so equal texts save alike. The
+    /// text itself when its table already is so.
+    ///
+    /// ```
+    /// use kinogaki_geometry::Text;
+    ///
+    /// let full = Text::from_strs(["a", "b", "c"]);
+    /// // A gather keeping the table: "b" is unused and "c" comes first.
+    /// let gathered = Text::new(vec![2, 0, Text::NONE].into(), full.table().clone()).unwrap();
+    /// let compact = gathered.compacted();
+    /// assert_eq!(&**compact.indices(), &[0, 1, Text::NONE]);
+    /// assert_eq!(compact.table().len(), 2);
+    /// assert_eq!(compact, gathered);
+    /// ```
+    pub fn compacted(&self) -> Text {
+        let mut remap = vec![Self::NONE; self.table.len()];
+        let mut used = Vec::new();
+        let indices: Vec<u32> = self
+            .indices
+            .iter()
+            .map(|&i| match remap.get_mut(i as usize) {
+                Some(r) if *r == Self::NONE => {
+                    *r = used.len() as u32;
+                    used.push(self.table[i as usize].clone());
+                    *r
+                }
+                Some(r) => *r,
+                None => Self::NONE,
+            })
+            .collect();
+        if used.len() == self.table.len() && indices.iter().eq(self.indices.iter()) {
+            return self.clone();
+        }
+        Self {
+            indices: Column::new(indices),
+            table: used.into(),
+        }
+    }
+
     /// The elements in `range`, sharing the indices' buffer and the table.
     pub(crate) fn slice(&self, range: std::ops::Range<usize>) -> Self {
         Self {
             indices: self.indices.slice(range),
             table: self.table.clone(),
         }
+    }
+}
+
+/// Texts are equal when every element's text is, whatever their tables.
+impl PartialEq for Text {
+    fn eq(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+        if Arc::ptr_eq(&self.table, &other.table) || self.table == other.table {
+            return self.indices == other.indices;
+        }
+        self.iter().eq(other.iter())
     }
 }
 

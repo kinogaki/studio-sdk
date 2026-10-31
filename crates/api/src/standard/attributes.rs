@@ -5,7 +5,8 @@
 //! An attribute's element has `name`, `class`, `kind` and `info` (their
 //! names: [`Class::name`], [`AttributeKind::name`], [`TypeInfo::name`]) and
 //! its `values`: reals, whole numbers, vectors as rows of 3, or text as
-//! `values` (indices, `u32::MAX` for no value) plus `table`. A group's
+//! `values` (indices, `u32::MAX` for no value) plus `table`, the strings
+//! used in the order of first use ([`Text::compacted`]). A group's
 //! element has `name`, `class`, `elements` and its bit `words` (each `u64`
 //! as the `i64` with the same bits).
 use super::invalid;
@@ -28,6 +29,8 @@ pub(super) fn write(attributes: &Attributes, out: &mut dyn ElementWriter) -> Res
             AttributeValues::Integer(c) => child.set("values", Field::I64s(c.to_vec()))?,
             AttributeValues::Vector(c) => child.set_rows("values", 3, Field::F64s(flat(c)))?,
             AttributeValues::Text(t) => {
+                // The canonical table, so equal texts save alike.
+                let t = t.compacted();
                 child.set("values", Field::U32s(t.indices().to_vec()))?;
                 let table = t.table().iter().map(|s| s.to_string()).collect();
                 child.set("table", Field::Texts(table))?;
