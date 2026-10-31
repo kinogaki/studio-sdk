@@ -44,8 +44,14 @@
 //! the [`Inspector`], the [`Vocabulary`] that runs its items, the
 //! [`ObjectRows`] and [`OutlineRows`] for the object
 //! kinds it owns, the [`Creations`] it adds to an object level's Create
-//! and [`Results`], how it takes the host's cooks of its objects. A part a context leaves out is nothing there, never another
-//! context's.
+//! and [`Results`], how it takes the host's cooks of its objects. A part a
+//! context leaves out is never another context's. In a context whose
+//! networks are core's, the host's own UI is there without a part: its
+//! network pane, Tab and menus listing the context's listed node types,
+//! and its node inspector. A part adds to them or replaces them: the
+//! library's items come first and what it sets wins, the vocabulary runs
+//! the library's items, an inspector replaces the node sheet. Elsewhere a
+//! part left out is nothing there.
 //!
 //! **Adding the UI** ([`WithUi::with_ui`]) erases the state's type: the
 //! host reads every package's UI as a [`Registered`]

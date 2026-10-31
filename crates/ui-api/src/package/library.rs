@@ -62,7 +62,10 @@ pub struct VocabularyItem {
     /// Its stored name ("acme.trees.branch", "command:prune"), unique in
     /// its context. A node type's tool and its node are one item, named
     /// by the node type's id: where it runs says which
-    /// ([`Invoked`](super::Invoked)).
+    /// ([`Invoked`](super::Invoked)). An item named `command:select_all`
+    /// (core's id for Select All) is how the context answers Edit ▸
+    /// Select All: the host runs it through the context's vocabulary as
+    /// [`Invoked::Views`](super::Invoked::Views).
     pub name: String,
     /// What menus call it.
     pub label: String,

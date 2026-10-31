@@ -142,7 +142,7 @@ The pinning context is one `ContextId` with two halves, both the package's:
 - **Its networks**, declared as data with a `NetworkContext` (step 7 registers it): every Pin Board holds one network of the context, which Studio keeps, cooks, undoes and saves. Node types offered in the context (`Description::context`) are added to it; this plugin offers none, so its networks stay empty.
 - **Its UI**, a `ContextPart` of the package's `UiPackage`: what follows.
 
-A context with only the first half is served by Studio's own UI, as the Boxes context of the node walkthrough is. A `ContextPart` is the context's id, its `Library` and any optional parts; a part it leaves out is nothing there. The smallest is `ContextPart::new(id)`: an empty library, no levels, no commands.
+A context with only the first half is served by Studio's own UI, as the Boxes context of the node walkthrough is: the network pane, Tab and the menus listing the node types offered in it, and the node inspector. A `ContextPart` is the context's id, its `Library` and any optional parts. It adds to Studio's UI or replaces it: the library's items come first and what it sets wins, its vocabulary runs its own items, and an inspector replaces the node sheet. Studio's UI stays for what the part leaves out, and a part leaves out nothing it has to supply. The smallest is `ContextPart::new(id)`: an empty library, no levels, no commands of its own.
 
 The UI's state lives with the host. `UiPackage::state` makes it once; for each call Studio takes it out, lends it to the part with the call's context, and puts it back. Host methods never call back into the package, so a package never meets its state missing.
 
@@ -187,7 +187,7 @@ fn library() -> Library {
         label: label.into(),
         family: "Pins".into(),
         section: "Pins".into(),
-        places: Places { nodes: true, menus: true, tools: false, repeatable: false },
+        places: Places { nodes: true, menus: true, tools: false, repeatable: false, objects: false },
         ..VocabularyItem::default()
     };
     Library {
@@ -236,6 +236,19 @@ impl Vocabulary<Pinning> for PinVocabulary {
     }
 }
 ```
+
+Some of Studio's own menu entries run in whichever context is open, and the context answers them. **Edit ▸ Select All** is one: a context answers it by holding a library item named `command:select_all`, which is core's id for Select All. Studio then runs that item through the context's vocabulary (`Invoked::Views`). A context that selects things lists the item (here also offered in Settings for the marking menus, shelves and shortcuts) and selects everything at its active level when `run` gets it:
+
+```rust
+VocabularyItem {
+    name: "command:select_all".into(),
+    label: "Select All".into(),
+    places: Places { menus: true, ..Places::default() },
+    ..VocabularyItem::default()
+}
+```
+
+Without that item Edit ▸ Select All is unavailable in the context. The pinning context selects nothing, so it doesn't list it.
 
 ## 6. Levels, the inspector and Create
 
