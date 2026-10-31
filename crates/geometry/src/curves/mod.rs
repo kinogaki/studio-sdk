@@ -305,5 +305,5 @@ fn check_attributes(
     attributes: &Attributes,
     count: impl FnMut(Class) -> Option<usize>,
 ) -> Result<(), GeometryError> {
-    attributes.check_counts("curves", count)
+    attributes.check("curves", count)
 }

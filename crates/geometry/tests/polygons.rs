@@ -156,6 +156,35 @@ fn attributes_are_sized_to_their_class() {
         p.with_attributes(group).unwrap_err().message(),
         "edge group sharp has 5 values for 6 elements"
     );
+    let nan = Attributes::new()
+        .with(
+            Class::Point,
+            "w",
+            Attribute::float(vec![0.0, f64::NAN, 0.0, 0.0, 0.0]),
+        )
+        .unwrap();
+    let e = p.with_attributes(nan).unwrap_err();
+    assert_eq!((e.kind(), e.element()), (ErrorKind::Attribute, Some(1)));
+    assert_eq!(e.message(), "point attribute w's value 1 is not finite");
+    let infinite = Attributes::new()
+        .with(
+            Class::Edge,
+            "dir",
+            Attribute::vector(
+                vec![
+                    [0.0; 3],
+                    [0.0; 3],
+                    [0.0, f64::INFINITY, 0.0],
+                    [0.0; 3],
+                    [0.0; 3],
+                    [0.0; 3],
+                ],
+                TypeInfo::None,
+            ),
+        )
+        .unwrap();
+    assert_eq!(p.with_attributes(infinite).unwrap_err().element(), Some(2));
+    // Integer and Text values have no non-finite value to refuse.
     for class in [Class::Object, Class::Instance] {
         let refused = Attributes::new()
             .with(class, "x", Attribute::float(vec![0.0]))

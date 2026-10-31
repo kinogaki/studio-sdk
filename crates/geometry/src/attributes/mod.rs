@@ -378,10 +378,11 @@ impl Attributes {
         self.get(class, name)?.as_text()
     }
 
-    /// Checks every entry's length against `count(class)`; `None` for a
-    /// class the value doesn't have, which no entry may use. `what` names
-    /// the value in messages.
-    pub(crate) fn check_counts(
+    /// Checks every entry's length against `count(class)` (`None` for a
+    /// class the value doesn't have, which no entry may use) and that every
+    /// Float and Vector value is finite. `what` names the value in
+    /// messages.
+    pub(crate) fn check(
         &self,
         what: &str,
         mut count: impl FnMut(Class) -> Option<usize>,
@@ -398,6 +399,16 @@ impl Attributes {
             for (name, a) in attributes {
                 if a.len() != expected {
                     return Err(missized(class, name, "attribute", a.len(), expected));
+                }
+                if let Some(i) = first_not_finite(a.values()) {
+                    return Err(GeometryError::at(
+                        ErrorKind::Attribute,
+                        i,
+                        format!(
+                            "{} attribute {name}'s value {i} is not finite",
+                            class.name()
+                        ),
+                    ));
                 }
             }
             for (name, g) in self.groups.get(&class).into_iter().flatten() {
@@ -416,6 +427,15 @@ fn remove<T>(map: &mut Named<T>, class: Class, name: &str) {
         if named.is_empty() {
             map.remove(&class);
         }
+    }
+}
+
+/// The first element whose value is NaN or infinite.
+fn first_not_finite(values: &AttributeValues) -> Option<usize> {
+    match values {
+        AttributeValues::Float(v) => v.iter().position(|x| !x.is_finite()),
+        AttributeValues::Vector(v) => v.iter().position(|x| !x.iter().all(|c| c.is_finite())),
+        AttributeValues::Integer(_) | AttributeValues::Text(_) => None,
     }
 }
 

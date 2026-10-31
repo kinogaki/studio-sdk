@@ -18,7 +18,8 @@ use std::sync::Arc;
 /// **Rules** ([`Polygons::new`] checks them, beside the topology's own):
 /// - one position per point of the topology, each finite and at most
 ///   1e100 in each component;
-/// - every attribute and group has one entry per element of its class;
+/// - every attribute and group has one entry per element of its class,
+///   and every Float and Vector attribute value is finite;
 /// - no Object or Instance attributes.
 ///
 /// **Sharing.** A value is immutable and cheap to clone. The `with_*`
@@ -194,5 +195,5 @@ fn check_positions(positions: &Column<[f64; 3]>, topology: &Topology) -> Result<
 }
 
 fn check_attributes(attributes: &Attributes, topology: &Topology) -> Result<(), GeometryError> {
-    attributes.check_counts("polygons", |class| count(topology, class))
+    attributes.check("polygons", |class| count(topology, class))
 }
