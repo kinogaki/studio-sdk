@@ -1,7 +1,9 @@
 //! [`FakeHost`]: the host interface without Studio, recording what a
-//! package asks of it; [`Hosting`]: a registered package with its state,
+//! package asks of it, its objects' networks [`FakeNetwork`]s;
+//! [`Hosting`]: a registered package with its state,
 //! called the way the host calls it (state taken out per call and put
 //! back, callbacks queued, never nested).
+use super::FakeNetwork;
 use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
@@ -62,6 +64,9 @@ pub enum HostCall {
     SetTransformSpace(TransformSpace),
     /// [`HostSettings::set_section_any`].
     SetSection(ContextId),
+    /// [`HostNetwork::edit_network`], by object and step label, whether or
+    /// not the edit held.
+    EditNetwork(ObjectRef, String),
 }
 
 /// An object of a [`FakeHost`]'s scene.
@@ -77,17 +82,36 @@ pub struct FakeObject {
     pub shown: Option<(Data, Drawn)>,
 }
 
-/// One undo step: its label and the slots before and after it.
+/// What undo restores: the slots and the networks.
+#[derive(Clone, Debug)]
+struct Kept {
+    slots: SessionSlots,
+    networks: BTreeMap<ObjectRef, FakeNetwork>,
+}
+
+impl Kept {
+    /// Whether `self` and `other` hold the same: equal slots, and the
+    /// same networks at the same revisions.
+    fn same(&self, other: &Kept) -> bool {
+        let revisions = |k: &Kept| -> Vec<(ObjectRef, u64)> {
+            k.networks.iter().map(|(&o, n)| (o, n.revision())).collect()
+        };
+        self.slots == other.slots && revisions(self) == revisions(other)
+    }
+}
+
+/// One undo step: its label and what it changed from and to.
 #[derive(Clone, Debug)]
 struct Step {
     label: String,
-    before: SessionSlots,
-    after: SessionSlots,
+    before: Kept,
+    after: Kept,
 }
 
-/// The host interface without Studio: slots with a real undo history,
-/// selections, a place, views and settings sections, all plain fields a
-/// test sets and reads; every request is recorded ([`FakeHost::calls`]).
+/// The host interface without Studio: slots and objects' networks with a
+/// real undo history, selections, a place, views and settings sections,
+/// all plain fields a test sets and reads; every request is recorded
+/// ([`FakeHost::calls`]).
 pub struct FakeHost {
     /// Every request so far.
     pub calls: Vec<HostCall>,
@@ -103,6 +127,9 @@ pub struct FakeHost {
     pub revision: u64,
     /// The scene's objects.
     pub scene: BTreeMap<ObjectRef, FakeObject>,
+    /// The objects' networks, which [`HostNetwork`] reads and edits (one
+    /// undo step an edit).
+    pub networks: BTreeMap<ObjectRef, FakeNetwork>,
     /// The views' cameras; the active one first.
     pub cameras: Vec<ViewCamera>,
     /// The view a view call is about.
@@ -127,7 +154,7 @@ pub struct FakeHost {
     pub wakes: Arc<AtomicUsize>,
     undo: Vec<Step>,
     redo: Vec<Step>,
-    gesture: Option<(String, SessionSlots)>,
+    gesture: Option<(String, Kept)>,
 }
 
 impl FakeHost {
@@ -148,6 +175,7 @@ impl FakeHost {
             },
             revision: 1,
             scene: BTreeMap::new(),
+            networks: BTreeMap::new(),
             cameras: Vec::new(),
             view: None,
             inspected: Inspected::default(),
@@ -175,16 +203,31 @@ impl FakeHost {
         self.undo.iter().map(|s| s.label.as_str()).collect()
     }
 
+    /// What undo would restore now.
+    fn kept(&self) -> Kept {
+        Kept {
+            slots: self.slots.clone(),
+            networks: self.networks.clone(),
+        }
+    }
+
+    /// Puts back what `kept` holds.
+    fn restore(&mut self, kept: Kept) {
+        self.slots = kept.slots;
+        self.networks = kept.networks;
+    }
+
     /// Records the change from `before` as a step named `label` (inside an
     /// open gesture, nothing yet).
-    fn record(&mut self, label: &str, before: SessionSlots) {
-        if self.gesture.is_some() || before == self.slots {
+    fn record(&mut self, label: &str, before: Kept) {
+        let after = self.kept();
+        if self.gesture.is_some() || before.same(&after) {
             return;
         }
         self.undo.push(Step {
             label: label.to_owned(),
             before,
-            after: self.slots.clone(),
+            after,
         });
         self.redo.clear();
     }
@@ -213,7 +256,7 @@ impl HostUndo for FakeHost {
     fn begin_gesture(&mut self, label: &str) {
         self.calls.push(HostCall::BeginGesture(label.into()));
         if self.gesture.is_none() {
-            self.gesture = Some((label.into(), self.slots.clone()));
+            self.gesture = Some((label.into(), self.kept()));
         }
     }
     fn finish_gesture(&mut self) {
@@ -225,7 +268,7 @@ impl HostUndo for FakeHost {
     fn cancel_gesture(&mut self) {
         self.calls.push(HostCall::CancelGesture);
         if let Some((_, before)) = self.gesture.take() {
-            self.slots = before;
+            self.restore(before);
         }
     }
     fn in_gesture(&self) -> bool {
@@ -234,7 +277,7 @@ impl HostUndo for FakeHost {
     fn undo(&mut self) {
         self.calls.push(HostCall::Undo);
         if let Some(step) = self.undo.pop() {
-            self.slots = step.before.clone();
+            self.restore(step.before.clone());
             self.redo.push(step);
             self.keep();
         }
@@ -242,7 +285,7 @@ impl HostUndo for FakeHost {
     fn redo(&mut self) {
         self.calls.push(HostCall::Redo);
         if let Some(step) = self.redo.pop() {
-            self.slots = step.after.clone();
+            self.restore(step.after.clone());
             self.undo.push(step);
             self.keep();
         }
@@ -264,7 +307,7 @@ impl HostSlots for FakeHost {
     }
     fn set_slot_any(&mut self, id: SlotId, label: &str, value: Arc<dyn Any + Send + Sync>) -> bool {
         self.calls.push(HostCall::SetSlot(id, label.into()));
-        let before = self.slots.clone();
+        let before = self.kept();
         let set = self.slots.set_any(id, value);
         if set {
             self.record(label, before);
@@ -356,22 +399,30 @@ impl HostDoc for FakeHost {
     }
 }
 
-/// The fake holds no networks: core owns them, so a package's network
-/// edits are tested against Studio's own host.
+/// The objects' networks are [`FakeHost::networks`]: an edit runs on a
+/// copy, which replaces the network only when the edit and the commit
+/// check ([`FakeNetwork::check`]) pass, as one undo step.
 impl HostNetwork for FakeHost {
-    fn network(&self, _object: ObjectRef) -> Option<&dyn NetworkRead> {
-        None
+    fn network(&self, object: ObjectRef) -> Option<&dyn NetworkRead> {
+        self.networks.get(&object).map(|n| n as &dyn NetworkRead)
     }
     fn edit_network(
         &mut self,
         object: ObjectRef,
-        _label: &str,
-        _edit: &mut dyn FnMut(&mut dyn NetworkEdit) -> Result<(), Error>,
+        label: &str,
+        edit: &mut dyn FnMut(&mut dyn NetworkEdit) -> Result<(), Error>,
     ) -> Result<(), Error> {
-        Err(Error::invalid(format_args!(
-            "object {} holds no network in the fake host",
-            object.0
-        )))
+        self.calls.push(HostCall::EditNetwork(object, label.into()));
+        let mut edited =
+            self.networks.get(&object).cloned().ok_or_else(|| {
+                Error::invalid(format_args!("object {} holds no network", object.0))
+            })?;
+        edit(&mut edited)?;
+        edited.check()?;
+        let before = self.kept();
+        self.networks.insert(object, edited);
+        self.record(label, before);
+        Ok(())
     }
 }
 
