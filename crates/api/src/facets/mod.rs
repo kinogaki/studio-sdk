@@ -8,11 +8,13 @@
 //! | [`Tabular`] | the spreadsheet |
 //! | [`Renderable`] | render sync: neutral prims for every engine |
 //! | [`Snappable`] | gizmo moves: what they may land on |
+//! | [`Glyphs`] | the viewport: an object kind's line glyphs (lights) |
 //!
 //! A type offers a facet by returning it from the matching `DataType`
 //! method; a facet it doesn't return is absent and the surface leaves its
 //! values out.
 mod display;
+mod glyph;
 mod object;
 mod pick;
 mod render;
@@ -22,6 +24,7 @@ mod table;
 pub use display::{
     DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally, WhenOpen,
 };
+pub use glyph::{GlyphScale, Glyphs};
 pub use object::{Look, Materials, Matrix, ObjectPicking, WorldRay};
 pub use pick::{Combine, Pickable};
 pub use render::Renderable;

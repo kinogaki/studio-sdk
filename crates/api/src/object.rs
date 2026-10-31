@@ -88,6 +88,23 @@ pub trait ObjectKindSpec: Send + Sync {
     fn render_setup(&self) -> Option<&dyn RenderSetupKind> {
         None
     }
+
+    /// The lines its objects draw as where they are (a light's shape),
+    /// when they draw so.
+    fn glyphs(&self) -> Option<&dyn crate::facets::Glyphs> {
+        None
+    }
+
+    /// The viewport handles `body`'s object shows while it is selected
+    /// alone (a spot's cone, an area light's size), each bound by name to
+    /// a number of its first declared prim's values ([`RenderedKind`]).
+    /// Studio draws and drags them as it does node types' handles, each
+    /// drag one undo step written through [`RenderedKind::with_declared`].
+    /// None by default.
+    fn handles(&self, body: &dyn ObjectBody) -> Vec<crate::cook::Handle> {
+        let _ = body;
+        Vec::new()
+    }
 }
 
 /// A kind whose objects are render prims of their own: a light or fog,

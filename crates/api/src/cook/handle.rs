@@ -101,6 +101,23 @@ pub enum HandleKind {
         /// The frame it turns.
         frame: Frame,
     },
+    /// A ring on the cone of half-angle `angle` (degrees) about `axis`
+    /// from `origin`, `length` along it, with a dot on it: dragging the dot
+    /// sets the angle (a spot light's cone). With `within`, `angle` holds
+    /// a fraction of that cone instead, as a light's softness does: the
+    /// ring sits at `within × (1 − angle)` and writes `1 − θ / within`.
+    Angle {
+        /// The number it sets.
+        angle: Scalar,
+        /// The cone's apex.
+        origin: Vector,
+        /// The cone's axis (any length).
+        axis: Vector,
+        /// How far along the axis the ring sits.
+        length: f64,
+        /// The cone `angle` is a fraction of; `None`: `angle` is the angle.
+        within: Option<Scalar>,
+    },
 }
 
 impl HandleKind {
@@ -118,6 +135,7 @@ impl HandleKind {
             Self::Direction { direction, origin } => vec![direction, origin],
             Self::Box { center, size } | Self::Sphere { center, size } => vec![center, size],
             Self::Orient { frame } => vec![&frame.position, &frame.up],
+            Self::Angle { origin, axis, .. } => vec![origin, axis],
         }
     }
 }
@@ -310,9 +328,15 @@ impl Handle {
     /// The parameters it reads and writes, in order, then its frame's.
     pub fn parameters(&self) -> Vec<&str> {
         let number = match &self.kind {
-            HandleKind::Distance { distance: n, .. } | HandleKind::Radius { radius: n, .. } => {
-                n.name()
-            }
+            HandleKind::Distance { distance: n, .. }
+            | HandleKind::Radius { radius: n, .. }
+            | HandleKind::Angle { angle: n, .. } => n.name(),
+            _ => None,
+        };
+        let within = match &self.kind {
+            HandleKind::Angle {
+                within: Some(cone), ..
+            } => cone.name(),
             _ => None,
         };
         let turn = match &self.kind {
@@ -321,6 +345,7 @@ impl Handle {
         };
         number
             .into_iter()
+            .chain(within)
             .chain(self.kind.vectors().into_iter().flat_map(Vector::names))
             .chain(turn)
             .chain(self.frame.iter().flat_map(Frame::names))
@@ -354,6 +379,29 @@ mod tests {
         assert_eq!(handle.parameters(), ["radius"]);
         assert_eq!(handle.constraint, Constraint::Plane(2));
         assert_eq!(handle.range, Some([0.0, 10.0]));
+    }
+
+    /// A softness ring reads its fraction, then the cone it is a fraction
+    /// of, then its apex and axis.
+    #[test]
+    fn an_angle_reads_its_angle_and_the_cone_it_is_a_fraction_of() {
+        let cone = |angle: &str, within: Option<&str>| {
+            Handle::new(
+                angle,
+                HandleKind::Angle {
+                    angle: angle.into(),
+                    origin: Vector::fixed([0.0; 3]),
+                    axis: Vector::fixed([0.0, 0.0, -1.0]),
+                    length: 1.0,
+                    within: within.map(Into::into),
+                },
+            )
+        };
+        assert_eq!(cone("cone", None).parameters(), ["cone"]);
+        assert_eq!(
+            cone("softness", Some("cone")).parameters(),
+            ["softness", "cone"]
+        );
     }
 
     /// A handle in a frame reads the frame's parameters after its own; an
