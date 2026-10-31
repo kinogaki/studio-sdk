@@ -6,14 +6,17 @@
 //! [`ElementWriter`] to fill it, or an [`ElementReader`] to read it back.
 //! The environment stores nothing of its own inside that element. A
 //! project holding values of a type no installed package registers still
-//! opens: those values, and what holds them, are skipped, the Console
-//! says what was skipped and why, and saving writes only what loaded.
+//! opens: those values, and what holds them, are kept as they were read
+//! and written back unchanged on save. A node holding them shows grey and
+//! doesn't cook, and an object holding them shows grey. The Console says
+//! once which package is missing. Once the package is installed, the
+//! project opens them as they are.
 //!
 //! Codecs follow the project's rules: strict reading (no defaults for
 //! missing values, no fallbacks) and no version fields. A body that needs
 //! something no installed package provides (a light of a type no engine
-//! declares) reads as [`Error::NotInstalled`]: the host skips that object
-//! and says why, and the rest of the project opens.
+//! declares) reads as [`Error::NotInstalled`]: the host keeps that object
+//! as it was read, says why, and opens the rest of the project.
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter};

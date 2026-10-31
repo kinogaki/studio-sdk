@@ -10,7 +10,8 @@
 //! ([`ObjectKindSpec::context`]), the network inside the object: core
 //! creates, edits, cooks, undoes and saves it beside the body. The body is
 //! the rest, owned and read by the package. A project that names a kind no
-//! package provides still opens: its objects are skipped and reported.
+//! package provides still opens: its objects are kept as they were read,
+//! shown grey, written back unchanged on save, and reported.
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, ObjectKindId};

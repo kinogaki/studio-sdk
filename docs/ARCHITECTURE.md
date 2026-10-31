@@ -69,7 +69,7 @@ When identity is not enough, a cache keys on content instead, using `DataType::s
 
 A kernel reads its own values through a `Typed<T>` handle. The handle pairs the id with the Rust type, so `get` returns `None` for any other type. This works across packages because Studio and its plugins are built by one compiler and share one copy of each kernel crate, so a type's `TypeId` is the same everywhere.
 
-The environment never looks inside a `Data`. It only calls the `DataType` registered for the value's id. A value whose type is not registered is skipped when a project is read, and the Console says so (see Saving).
+The environment never looks inside a `Data`. It only calls the `DataType` registered for the value's id. A value whose type is not registered is kept as it was read when a project is read, and written back unchanged; the Console says so (see Saving).
 
 ## Data types and facets
 
@@ -161,7 +161,12 @@ Codecs follow the project rules:
 
 `ObjectCodec::read` also receives a `ReadCx`, a read-only view of what is installed (the render engines' descriptions, `engines()`). A body that needs something no installed package provides, such as a light of a type no installed engine declares, reads as `Error::NotInstalled` with a plain message saying what is missing.
 
-If a project uses a package that is not installed, it still opens: the objects that package's kinds hold, and the bodies that read as `NotInstalled`, are skipped, and the Console says what was skipped and why. Saving writes only what loaded.
+If a project uses a package that is not installed, it still opens, and nothing of it is lost. Everything no installed package reads is kept as it was read:
+- the nodes of that package's types: they show grey with their type's name, don't cook (nothing after them cooks), and their parameters are read-only, though they can be moved, wired around and deleted;
+- the objects of its kinds, and the bodies that read as `NotInstalled`: they show grey, and can be renamed, moved in the tree and deleted;
+- its stored values, and values of its data types.
+
+The Console says once per missing package what it kept ("Couldn't load 3 nodes and 1 object: acme.trees isn't installed"). Saving writes all of it back unchanged, so once the package is installed the project opens as it was.
 
 ## Objects
 

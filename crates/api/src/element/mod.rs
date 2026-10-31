@@ -219,6 +219,11 @@ pub trait ElementReader {
     /// Field `name`, when it is set.
     fn field(&self, name: &str) -> Option<FieldRef<'_>>;
 
+    /// Every field's name, in name order: what a codec keeps of fields it
+    /// doesn't read (values another package declares, kept as read so a
+    /// save writes them back).
+    fn fields(&self) -> Vec<String>;
+
     /// Metadata `key`, when it is set.
     fn metadata(&self, key: &str) -> Option<&str>;
 

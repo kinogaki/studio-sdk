@@ -187,6 +187,10 @@ impl ElementReader for Reader<'_> {
         self.element.fields.get(name).map(Field::as_ref)
     }
 
+    fn fields(&self) -> Vec<String> {
+        self.element.fields.keys().cloned().collect()
+    }
+
     fn metadata(&self, key: &str) -> Option<&str> {
         self.element.metadata.get(key).map(String::as_str)
     }
