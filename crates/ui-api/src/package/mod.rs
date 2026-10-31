@@ -60,8 +60,8 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, ContextObject, ContextView, Creation, LevelSpec, NumericBar, OutlineRow,
-    Start, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
+    BarField, BarValue, Candidate, ContextObject, ContextView, Creation, LevelPreset, LevelSpec,
+    NumericBar, OutlineRow, Start, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
 };
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use library::{

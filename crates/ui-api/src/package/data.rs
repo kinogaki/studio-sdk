@@ -27,6 +27,35 @@ pub struct LevelSpec {
     pub combines: bool,
 }
 
+/// A button after a context's levels that turns several of them on at
+/// once (Mesh's Smart: faces, edges and points), on the number key after
+/// the last level's. Which levels it turns on is the context's own
+/// [`active`](super::Levels::active) while it is on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LevelPreset {
+    /// Its stable name for settings keys ("Smart").
+    pub id: String,
+    /// Its tooltip ("Smart selection").
+    pub label: String,
+    /// Its icon, by name.
+    pub icon: String,
+}
+
+/// One thing under the pointer, a row of the stacked list
+/// (Ctrl+Shift+click): what a click on it would select.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Candidate {
+    /// Its level, by index.
+    pub level: usize,
+    /// The context's own handle for it, meaningful only to the context
+    /// that gave it ([`Levels::pick_candidate`](super::Levels::pick_candidate)
+    /// gets it back): an element id, or an index into the context's own
+    /// list.
+    pub id: u32,
+    /// The row's text ("Edge 412").
+    pub label: String,
+}
+
 /// A button of the viewport's left toolbar.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ToolbarItem {

@@ -13,8 +13,8 @@
 //! part over `S` into the same part over `dyn Any`, downcasting the state
 //! the host lends back to `S`.
 use super::data::{
-    ContextView, Creation, LevelSpec, NumericBar, OutlineRow, Status, TimeDomain, ToolbarItem,
-    Tools,
+    Candidate, ContextView, Creation, LevelPreset, LevelSpec, NumericBar, OutlineRow, Status,
+    TimeDomain, ToolbarItem, Tools,
 };
 use super::edited::{Edited, TemplateMark};
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
@@ -92,6 +92,44 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     fn normal(&self, s: &mut S, cx: &mut dyn Cx) -> Option<Vec3> {
         let _ = (s, cx);
         None
+    }
+    /// Its preset after its levels, if it has one (read once, as
+    /// [`levels`](Self::levels)).
+    fn preset(&self) -> Option<LevelPreset> {
+        None
+    }
+    /// Whether its preset is on.
+    fn preset_on(&self, s: &S, cx: &dyn Cx) -> bool {
+        let _ = (s, cx);
+        false
+    }
+    /// Turns its preset on or off (the button, or its number key).
+    fn toggle_preset(&self, s: &mut S, cx: &mut dyn Cx) {
+        let _ = (s, cx);
+    }
+    /// What lies under `pointer` in view `rect` at the active levels,
+    /// nearest first: the stacked list's rows. Empty: the list holds
+    /// objects only.
+    fn candidates(&self, s: &S, cx: &dyn Cx, rect: Rect, pointer: Pos) -> Vec<Candidate> {
+        let _ = (s, cx, rect, pointer);
+        Vec::new()
+    }
+    /// The user picked `candidate` in the stacked list: select it as a
+    /// click on it would (Shift adds, Command removes).
+    fn pick_candidate(
+        &self,
+        s: &mut S,
+        cx: &mut dyn Cx,
+        candidate: &Candidate,
+        shift: bool,
+        command: bool,
+    ) {
+        let _ = (s, cx, candidate, shift, command);
+    }
+    /// Shows `candidate` hovered (the stacked list's row under the
+    /// pointer); `None` clears it.
+    fn hover_candidate(&self, s: &mut S, cx: &mut dyn Cx, candidate: Option<&Candidate>) {
+        let _ = (s, cx, candidate);
     }
 }
 
@@ -443,6 +481,32 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     }
     fn normal(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<Vec3> {
         self.part.normal(own_mut(s), cx)
+    }
+    fn preset(&self) -> Option<LevelPreset> {
+        self.part.preset()
+    }
+    fn preset_on(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
+        self.part.preset_on(own(s), cx)
+    }
+    fn toggle_preset(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
+        self.part.toggle_preset(own_mut(s), cx)
+    }
+    fn candidates(&self, s: &dyn Any, cx: &dyn Cx, rect: Rect, pointer: Pos) -> Vec<Candidate> {
+        self.part.candidates(own(s), cx, rect, pointer)
+    }
+    fn pick_candidate(
+        &self,
+        s: &mut dyn Any,
+        cx: &mut dyn Cx,
+        candidate: &Candidate,
+        shift: bool,
+        command: bool,
+    ) {
+        self.part
+            .pick_candidate(own_mut(s), cx, candidate, shift, command)
+    }
+    fn hover_candidate(&self, s: &mut dyn Any, cx: &mut dyn Cx, candidate: Option<&Candidate>) {
+        self.part.hover_candidate(own_mut(s), cx, candidate)
     }
 }
 
