@@ -200,7 +200,18 @@ impl ColorLayout {
 /// `Arc<dyn SurfaceSource>`; renderers treat the allocation as the packet's
 /// identity (see [`same_surface`]), and its maker reads it back as its own
 /// type with [`packet_as`].
+///
+/// A packet of a value keeps the value's numbering, so overlays, weights,
+/// colors and selections made from the value alone name its elements:
+/// - packet point `i` is value point `i` (points are never split for
+///   normals or texture coordinates; those are per-vertex columns);
+/// - triangles are in face order, so each face's triangles are contiguous
+///   and a renderer fills a face from them ([`crate::OverlayLayer`]).
 pub trait SurfaceSource: Any + Send + Sync {
+    /// The point the f32 positions are offsets from, in the value's space
+    /// (the host folds it into the model): far from the origin, positions
+    /// stay precise. `[0.0; 3]` for a packet of absolute positions.
+    fn origin(&self) -> [f64; 3];
     /// Number of elements in a column.
     fn column_len(&self, column: Column) -> usize;
     /// Calls `write(bytes_range, bytes)` for consecutive pieces of the
@@ -231,6 +242,10 @@ pub trait SurfaceSource: Any + Send + Sync {
     }
     /// Number of faces (face ids are below it).
     fn face_count(&self) -> usize;
+    /// Face `face`'s triangles, as a range of triangles into
+    /// [`indices`](Self::indices) (three indices each): what fills it.
+    /// Empty for a face out of range or with no triangles.
+    fn face_triangles(&self, face: u32) -> Range<usize>;
     /// Bounds of the positions, `(min, max)`; none when empty.
     fn bounds(&self) -> Option<([f64; 3], [f64; 3])>;
     /// Equal keys mean equal connectivity: GPU allocations can be reused.
@@ -312,6 +327,12 @@ mod tests {
     /// An empty packet; `N` makes distinct types of one shape.
     struct Empty<const N: u8>(Arc<()>);
     impl<const N: u8> SurfaceSource for Empty<N> {
+        fn origin(&self) -> [f64; 3] {
+            [0.0; 3]
+        }
+        fn face_triangles(&self, _: u32) -> Range<usize> {
+            0..0
+        }
         fn column_len(&self, _: Column) -> usize {
             0
         }

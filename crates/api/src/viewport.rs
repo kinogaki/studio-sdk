@@ -56,6 +56,8 @@ pub struct Surface {
     corners: Arc<[Corner]>,
     triangles: Arc<[[u32; 3]]>,
     faces: usize,
+    /// Each face's first triangle, and the triangle count last.
+    face_starts: Arc<[u32]>,
     lines: Arc<[OverlayVertex]>,
     /// The lines' one class, edges (none without lines).
     classes: Arc<[LineClass]>,
@@ -72,7 +74,8 @@ pub struct Surface {
 const VERTEX_PIECE: usize = 4096;
 
 impl Surface {
-    /// A surface of `points`, `corners` and `triangles` (corner indices)
+    /// A surface of `points`, `corners` and `triangles` (corner indices,
+    /// in face order: each face's triangles together, faces ascending)
     /// with `faces` faces, and no lines or markers. `topology` is the
     /// type's key for the connectivity (corners, triangles, lines and
     /// markers): equal keys mean equal connectivity, so the host keeps its
@@ -84,11 +87,20 @@ impl Surface {
         faces: usize,
         topology: u64,
     ) -> Self {
+        let face = |t: &[u32; 3]| corners[t[0] as usize].face as usize;
+        debug_assert!(
+            triangles.windows(2).all(|w| face(&w[0]) <= face(&w[1])),
+            "triangles in face order"
+        );
+        let face_starts = (0..=faces)
+            .map(|f| triangles.partition_point(|t| face(t) < f) as u32)
+            .collect();
         Self {
             points,
             corners,
             triangles,
             faces,
+            face_starts,
             lines: Arc::from([]),
             classes: Arc::from([]),
             markers: Arc::from([]),
@@ -279,6 +291,19 @@ impl Surface {
 }
 
 impl SurfaceSource for Surface {
+    /// Its points are absolute.
+    fn origin(&self) -> [f64; 3] {
+        [0.0; 3]
+    }
+
+    fn face_triangles(&self, face: u32) -> Range<usize> {
+        let f = face as usize;
+        if f >= self.faces {
+            return 0..0;
+        }
+        self.face_starts[f] as usize..self.face_starts[f + 1] as usize
+    }
+
     fn column_len(&self, column: Column) -> usize {
         match column {
             Column::Positions => self.points.len(),
@@ -591,5 +616,22 @@ mod tests {
         // A degenerate polygon faces +Z.
         let flat = Surface::polygons([[0.0; 3]; 3], [[0, 1, 2]], 0);
         assert_eq!(flat.corners()[0].normal, [0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn a_faces_triangles_are_its_own_contiguous_run() {
+        let points = [
+            [0.0; 3],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [2.0, 0.0, 0.0],
+        ];
+        // A quad (two triangles), then a triangle.
+        let surface = Surface::polygons(points, [&[0, 1, 2, 3][..], &[1, 4, 2]], 1);
+        assert_eq!(surface.face_triangles(0), 0..2);
+        assert_eq!(surface.face_triangles(1), 2..3);
+        assert_eq!(surface.face_triangles(2), 0..0, "out of range");
+        assert_eq!(surface.origin(), [0.0; 3]);
     }
 }

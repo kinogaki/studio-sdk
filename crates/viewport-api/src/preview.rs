@@ -4,7 +4,7 @@
 //! an affine transform of the whole surface, or of the points flagged in a
 //! [`MotionMask`], with patches only for the faces that stretch between moved
 //! and fixed points.
-use crate::{SurfaceSource, Vertex};
+use crate::Vertex;
 use std::sync::Arc;
 
 /// Values replacing `start..start + values.len()` of a column.
@@ -140,8 +140,11 @@ pub struct WeightedMotion {
     pub weights: Arc<PointWeights>,
 }
 #[derive(Debug, Default)]
-/// A live preview over the displayed packet: GPU motions and CPU patches.
+/// A live preview over the displayed packet of one topology: GPU motions
+/// and CPU patches.
 pub struct PreviewUpdate {
+    /// The topology it patches ([`SurfaceSource::topology_key`]).
+    pub on: [u8; 32],
     /// Whole-surface transform, when the preview moves everything rigidly.
     pub affine: Option<[[f64; 4]; 4]>,
     /// A rigid move of part of the surface; positions are then never patched.
@@ -173,13 +176,4 @@ impl PreviewUpdate {
                 .map(|p| p.values.len() * 4)
                 .sum::<usize>()
     }
-}
-
-/// Live preview patches over `base`, which must be the displayed surface.
-#[derive(Clone, Copy)]
-pub struct Preview<'a> {
-    /// The displayed packet.
-    pub base: &'a dyn SurfaceSource,
-    /// The patches over it.
-    pub update: &'a Arc<PreviewUpdate>,
 }

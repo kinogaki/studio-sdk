@@ -36,15 +36,15 @@ mod shading;
 mod updates;
 pub use lines::{ACCENT, LineClass, LineClassId, LineHighlight, LineLook, LineStyle};
 pub use looks::{FaceLook, FaceRun, check_runs};
-pub use overlay::{FaceNormals, GuideDraw, OverlayDraw, OverlayLayer, OverlayLine, SceneLines};
+pub use overlay::{
+    FaceNormals, GuideDraw, LineLayer, OverlayDraw, OverlayLayer, OverlayLine, SceneLines,
+};
 pub use packet::{
     ColorLayout, Column, ElementKind, ElementSet, OverlayVertex, SurfaceSource, Vertex, packet_as,
     same_surface,
 };
 pub use points::{PointClass, PointClassId, PointLook, PointShape, PointStyle};
-pub use preview::{
-    MotionMask, PartMotion, Patch, PointWeights, Preview, PreviewUpdate, WeightedMotion,
-};
+pub use preview::{MotionMask, PartMotion, Patch, PointWeights, PreviewUpdate, WeightedMotion};
 pub use selection::ElementSelection;
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,

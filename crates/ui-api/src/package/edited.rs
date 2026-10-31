@@ -6,28 +6,30 @@
 //! borrowing, nothing is copied, and the renderer uploads only values
 //! whose `Arc` changed since the last frame. A context keeps the same
 //! `Arc`s while nothing changed, so a steady frame costs nothing.
-use kinogaki_studio_api::viewport::{ElementKind, ElementSet, SurfaceSource};
+use kinogaki_studio_api::Data;
+use kinogaki_studio_api::viewport::{ElementKind, ElementSet};
 use kinogaki_viewport_api::{
-    FaceNormals, GuideDraw, LineHighlight, OverlayDraw, PointWeights, PreviewUpdate, SceneLines,
+    FaceNormals, GuideDraw, LineHighlight, OverlayDraw, PointWeights, SceneLines,
 };
 use std::fmt;
 use std::sync::Arc;
 
 /// What the open location's edited surface shows in one view this frame.
 ///
-/// Every layer that names a base packet (`overlays`, `guides`,
-/// `face_normals`) and `preview` must belong to `surface`; values made
-/// for another packet (a cook on its way) are left out by the context.
+/// Core prepares `value` through its type's `Displayable` and draws the
+/// rest with whichever packet it prepared. Layers bound to a topology
+/// (`overlays`, `face_normals`) show only with a packet of that topology,
+/// so ones made for another (a cook on its way) never draw on the wrong
+/// one. Core makes drag previews itself.
 #[derive(Clone, Default)]
 pub struct Edited {
-    /// The surface being edited.
-    pub surface: Option<Arc<dyn SurfaceSource>>,
+    /// The value being edited.
+    pub value: Option<Data>,
     /// What is selected on it: faces (or whole objects), lines and markers,
     /// each set in its kind's slot ([`Edited::select`]).
     pub selection: [Option<ElementSet>; 3],
-    /// A live move over `surface`.
-    pub preview: Option<Arc<PreviewUpdate>>,
-    /// Diagnostic findings and edge marks over `surface`'s points.
+    /// Diagnostic findings and edge marks over `value`'s points and
+    /// polygons.
     pub overlays: Option<Arc<OverlayDraw>>,
     /// A tool's guides; CAD's tessellation.
     pub guides: Option<Arc<GuideDraw>>,
@@ -78,9 +80,8 @@ impl Edited {
 impl fmt::Debug for Edited {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edited")
-            .field("surface", &self.surface.is_some())
+            .field("value", &self.value.is_some())
             .field("selection", &self.selection)
-            .field("preview", &self.preview.is_some())
             .field("hover", &self.hover)
             .field("look", &self.look)
             .field("lines", &self.lines.len())

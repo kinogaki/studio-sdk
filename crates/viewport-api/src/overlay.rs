@@ -1,7 +1,8 @@
-//! Retained, depth-tested overlay layers drawn over a surface packet:
-//! diagnostic findings that reference the packet's points, and tool guides
-//! with their own world-space positions.
-use crate::{SurfaceSource, same_surface};
+//! Retained, depth-tested overlay layers drawn over a surface: diagnostic
+//! findings that name a value's points and polygons (bound to its topology,
+//! never to a packet), and tool guides with their own world-space
+//! positions.
+use crate::SurfaceSource;
 use std::sync::Arc;
 
 /// A segment between two point ids. An ordinary edge has zero offset; a point
@@ -15,44 +16,62 @@ pub struct OverlayLine {
     /// How far a point cross reaches from its point; zero for an edge.
     pub offset: [f32; 3],
 }
-/// One colored layer: filled triangles (point ids) and lines. The ids
-/// shared, layers move to a later packet of the same topology without a
-/// copy, and a renderer keeps their upload while the allocations stay.
+/// One colored layer over a value's surface: filled polygons and lines.
+/// Polygons are filled with the packet's own triangles, so a layer stays
+/// right on every packet of its topology (a drag clips concave polygons
+/// again); the ids shared, a renderer keeps their upload while the
+/// allocations stay.
 #[derive(Clone)]
 pub struct OverlayLayer {
     /// sRGB.
     pub color: [u8; 3],
-    /// Filled triangles, three point ids each.
-    pub triangles: Arc<[u32]>,
-    /// Line segments.
+    /// Filled polygons, by primitive id.
+    pub polygons: Arc<[u32]>,
+    /// Line segments between point ids.
     pub lines: Arc<[OverlayLine]>,
 }
 impl OverlayLayer {
     /// Whether `other` holds the same color and the same allocations.
     pub fn same(&self, other: &Self) -> bool {
         self.color == other.color
-            && Arc::ptr_eq(&self.triangles, &other.triangles)
+            && Arc::ptr_eq(&self.polygons, &other.polygons)
             && Arc::ptr_eq(&self.lines, &other.lines)
     }
 }
-/// Layers over `base`'s points. Layer order is significant: overlapping
-/// layers blend in order.
+/// One colored layer of lines alone, between ids of whatever positions it
+/// is drawn with (a guide's, a scene glyph's).
+#[derive(Clone)]
+pub struct LineLayer {
+    /// sRGB.
+    pub color: [u8; 3],
+    /// Line segments.
+    pub lines: Arc<[OverlayLine]>,
+}
+impl LineLayer {
+    /// Whether `other` holds the same color and the same allocation.
+    pub fn same(&self, other: &Self) -> bool {
+        self.color == other.color && Arc::ptr_eq(&self.lines, &other.lines)
+    }
+}
+/// Layers over a value's points and polygons, made from the value alone
+/// (packet point i is value point i). Layer order is significant:
+/// overlapping layers blend in order.
 pub struct OverlayDraw {
-    /// The packet whose points the layers index.
-    pub base: Arc<dyn SurfaceSource>,
+    /// The topology the layers name ([`SurfaceSource::topology_key`]).
+    pub on: [u8; 32],
     /// The layers, drawn in order.
     pub layers: Vec<OverlayLayer>,
 }
 impl OverlayDraw {
-    /// Whether the layers belong to `base`.
-    pub fn matches(&self, base: &dyn SurfaceSource) -> bool {
-        same_surface(&*self.base, base)
+    /// Whether the layers belong to `surface`'s topology.
+    pub fn matches(&self, surface: &dyn SurfaceSource) -> bool {
+        surface.topology_key() == self.on
     }
     /// Logical upload size.
     pub fn upload_bytes(&self) -> usize {
         self.layers
             .iter()
-            .map(|l| l.triangles.len() * 4 + l.lines.len() * std::mem::size_of::<OverlayLine>())
+            .map(|l| l.polygons.len() * 4 + l.lines.len() * std::mem::size_of::<OverlayLine>())
             .sum()
     }
     /// How many segments the layers hold.
@@ -60,35 +79,34 @@ impl OverlayDraw {
         self.layers.iter().map(|l| l.lines.len()).sum()
     }
 }
-/// Face normals shown with `base`: each face's center and unit normal in
-/// the packet's object space, drawn as lines the display's normal length.
+/// Face normals shown with a value's surface: each face's center and unit
+/// normal in the value's own space, drawn as lines the display's normal
+/// length.
 pub struct FaceNormals {
-    /// The packet the normals belong to.
-    pub base: Arc<dyn SurfaceSource>,
+    /// The topology the faces are of ([`SurfaceSource::topology_key`]).
+    pub on: [u8; 32],
     /// Each face's center (`[0..3]`) and unit normal (`[3..6]`).
     pub faces: Vec<[f32; 6]>,
 }
 impl FaceNormals {
-    /// Whether the normals belong to `base`.
-    pub fn matches(&self, base: &dyn SurfaceSource) -> bool {
-        same_surface(&*self.base, base)
+    /// Whether the normals belong to `surface`'s topology.
+    pub fn matches(&self, surface: &dyn SurfaceSource) -> bool {
+        surface.topology_key() == self.on
     }
 }
-/// World-space guide segments shown with `base` (line point ids index
-/// `positions`, not the surface's points).
+/// A tool's guide segments, shown with the edited surface in the value's
+/// own space (line point ids index `positions`).
 pub struct GuideDraw {
-    /// The packet the guides show with.
-    pub base: Arc<dyn SurfaceSource>,
-    /// The guides' own points, world space.
+    /// The point `positions` are offsets from, in the value's space (as a
+    /// packet's are from [`SurfaceSource::origin`], so guides far from the
+    /// origin stay precise); typically the value's bounds center.
+    pub origin: [f64; 3],
+    /// The guides' own points, as f32 offsets from `origin`.
     pub positions: Vec<[f32; 3]>,
-    /// The guide triangles and segments (ids index `positions`).
-    pub layer: OverlayLayer,
+    /// The segments (ids index `positions`).
+    pub layer: LineLayer,
 }
 impl GuideDraw {
-    /// Whether the guides belong to `base`.
-    pub fn matches(&self, base: &dyn SurfaceSource) -> bool {
-        same_surface(&*self.base, base)
-    }
     /// How many segments the guides hold.
     pub fn segment_count(&self) -> usize {
         self.layer.lines.len()
@@ -106,7 +124,7 @@ pub struct SceneLines {
     /// The points, world space.
     pub positions: Vec<[f32; 3]>,
     /// The layers, drawn in order (ids index `positions`).
-    pub layers: Vec<OverlayLayer>,
+    pub layers: Vec<LineLayer>,
 }
 impl SceneLines {
     /// How many segments the layers hold.
