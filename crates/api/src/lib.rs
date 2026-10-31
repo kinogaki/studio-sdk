@@ -96,7 +96,7 @@ pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use error::Error;
 pub use facets::{
     CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn,
-    Look, Materials, ObjectPicking, Pickable, Piece, Renderable, Role, SnapHit, SnapKind,
+    Look, Materials, ObjectPicking, Pickable, Piece, RenderCx, Renderable, Role, SnapHit, SnapKind,
     SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally, WhenOpen, WorldRay,
 };
 pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};

@@ -27,6 +27,7 @@
 pub mod aov;
 pub mod declared;
 pub mod description;
+pub mod detail;
 pub mod dirty;
 #[cfg(feature = "wgpu")]
 pub mod display;
@@ -50,6 +51,7 @@ pub use declared::{AppliedSchema, Declared, PrimType, Role};
 pub use description::{
     EngineDescription, Engines, MaterialPreset, MaterialRules, PreviewSetup, Tint,
 };
+pub use detail::Detail;
 pub use dirty::Dirty;
 pub use engine::{
     Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,

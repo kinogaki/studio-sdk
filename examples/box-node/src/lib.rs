@@ -165,7 +165,7 @@ impl Displayable for BoxType {
 
 /// In renders: twelve triangles, two a face.
 impl Renderable for BoxType {
-    fn items(&self, data: &Data, _: Time, _: &CancelToken) -> Result<Vec<RenderItem>, Error> {
+    fn items(&self, data: &Data, _: &RenderCx<'_>) -> Result<Vec<RenderItem>, Error> {
         let triangles: Vec<[u32; 3]> = FACES
             .iter()
             .flat_map(|&[a, b, c, d]| [[a, b, c], [a, c, d]])

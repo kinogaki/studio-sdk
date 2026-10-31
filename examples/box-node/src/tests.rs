@@ -137,7 +137,7 @@ fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
     let items = ty
         .renderable()
         .unwrap()
-        .items(&data, Time::default(), &cancel)
+        .items(&data, &RenderCx::new(Time::default(), &cancel))
         .unwrap();
     let RenderItem::Triangles { source, .. } = &items[0];
     assert_eq!((items.len(), source.triangle_count()), (1, 12));

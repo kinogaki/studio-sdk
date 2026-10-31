@@ -241,7 +241,7 @@ Long work polls a `CancelToken`: preparing a display, converting, reading a file
 
 ## Rendering
 
-Engines never see kernel types. A data type's `Renderable` facet returns `RenderItem::Triangles { part, source, placements, label }`:
+Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport` or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, and a cancel token), and returns `RenderItem::Triangles { part, source, placements, label }`:
 - `part` is a key stable across recooks (a CAD body's index), so the host matches the items of successive values;
 - `source` is a `TriangleSource`, an immutable snapshot with shared arrays;
 - `placements` are relative to the object: the first is the item, the rest are copies sharing its acceleration structure;

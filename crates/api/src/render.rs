@@ -13,7 +13,8 @@ use std::fmt;
 use std::sync::Arc;
 
 pub use kinogaki_render_api::{
-    AttributeDomain, ImportedMaterial, Look, MeshAttribute, PlainTriangles, Ranges, TriangleSource,
+    AttributeDomain, Detail, ImportedMaterial, Look, MeshAttribute, PlainTriangles, Ranges,
+    TriangleSource,
 };
 
 /// A file's materials as a format reads them beside its geometry

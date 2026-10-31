@@ -27,6 +27,6 @@ pub use display::{
 pub use glyph::{GlyphScale, Glyphs};
 pub use object::{Look, Materials, Matrix, ObjectPicking, WorldRay};
 pub use pick::{Combine, Pickable};
-pub use render::Renderable;
+pub use render::{RenderCx, Renderable};
 pub use snap::{SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable};
 pub use table::{CellKind, Cells, Table, TableColumn, Tabular};
