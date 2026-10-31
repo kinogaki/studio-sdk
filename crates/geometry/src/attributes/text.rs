@@ -119,6 +119,22 @@ impl Text {
         self.table.get(self.indices[i] as usize).map(|s| &**s)
     }
 
+    /// Each element's text in order; `None` for no value.
+    ///
+    /// ```
+    /// use kinogaki_geometry::Text;
+    ///
+    /// let parts = Text::from_strs(["wheel", "", "wheel", "axle"]);
+    /// let all: Vec<_> = parts.iter().collect();
+    /// assert_eq!(all, [Some("wheel"), None, Some("wheel"), Some("axle")]);
+    /// assert_eq!(parts.iter().len(), 4);
+    /// ```
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = Option<&str>> + '_ {
+        self.indices
+            .iter()
+            .map(|&i| self.table.get(i as usize).map(|s| &**s))
+    }
+
     /// The elements in `range`, sharing the indices' buffer and the table.
     pub(crate) fn slice(&self, range: std::ops::Range<usize>) -> Self {
         Self {
