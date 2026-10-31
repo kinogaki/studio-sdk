@@ -1,6 +1,8 @@
 //! [`SchemaCx`]: what a node's rows may depend on besides its parameters;
-//! [`NewCx`]: what a new node's parameters may.
+//! [`NewCx`]: what a new node's parameters may; [`PortsCx`]: what its
+//! ports may.
 use crate::data::Data;
+use crate::id::ContextId;
 
 /// What [`NodeType::schema`](super::NodeType::schema) may shape a node's
 /// rows by: which of its input ports are wired, and what each held when the
@@ -63,16 +65,23 @@ impl<'a> SchemaCx<'a> {
 /// What [`NodeType::created`](super::NodeType::created) may start a new
 /// node's parameters from: what the host knows of the network it is added
 /// to.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct NewCx<'a> {
+    context: ContextId,
     outputs: &'a [String],
 }
 
 impl<'a> NewCx<'a> {
-    /// A node added where the render writes `outputs` (its output ids, the
-    /// beauty first; none outside a render's network).
-    pub fn new(outputs: &'a [String]) -> Self {
-        Self { outputs }
+    /// A node added to a network of `context` whose render writes
+    /// `outputs` (its output ids, the beauty first; none outside a
+    /// render's network).
+    pub fn new(context: ContextId, outputs: &'a [String]) -> Self {
+        Self { context, outputs }
+    }
+
+    /// The context of the network the node is added to.
+    pub fn context(&self) -> ContextId {
+        self.context
     }
 
     /// The outputs the network's render writes, by id, the beauty first
@@ -80,6 +89,25 @@ impl<'a> NewCx<'a> {
     /// says when it compiles).
     pub fn outputs(&self) -> &'a [String] {
         self.outputs
+    }
+}
+
+/// What [`NodeType::ports`](super::NodeType::ports) may shape a node's
+/// ports by besides its parameters: the network it is in.
+#[derive(Clone, Copy, Debug)]
+pub struct PortsCx {
+    context: ContextId,
+}
+
+impl PortsCx {
+    /// A node in a network of `context`.
+    pub fn new(context: ContextId) -> Self {
+        Self { context }
+    }
+
+    /// The context of the node's network.
+    pub fn context(&self) -> ContextId {
+        self.context
     }
 }
 
@@ -106,7 +134,15 @@ mod tests {
     #[test]
     fn a_new_node_reads_the_render_outputs() {
         let outputs = ["beauty".to_owned(), "depth".to_owned()];
-        assert_eq!(NewCx::new(&outputs).outputs(), outputs);
-        assert!(NewCx::default().outputs().is_empty());
+        let cx = NewCx::new(ContextId::declared("acme.trees.network"), &outputs);
+        assert_eq!(
+            (cx.outputs(), cx.context().as_str()),
+            (&outputs[..], "acme.trees.network")
+        );
+        assert!(
+            NewCx::new(ContextId::declared("acme.trees.network"), &[])
+                .outputs()
+                .is_empty()
+        );
     }
 }

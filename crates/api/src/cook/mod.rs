@@ -28,7 +28,7 @@ pub use description::{Category, Description, Listing, NodeRole, Port, Ports};
 pub use frame::Frame;
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
-pub use sheet::{NewCx, SchemaCx};
+pub use sheet::{NewCx, PortsCx, SchemaCx};
 
 /// The prefix of the names a node's spares take ([`NodeType::spares`]): no
 /// node type's description declares a parameter so named (the
@@ -216,11 +216,13 @@ pub trait NodeType: Send + Sync {
         false
     }
 
-    /// Its ports when they follow its parameters (a render output's
-    /// outputs follow its engine's); `None`: its description's. Core asks
-    /// again whenever the node's parameters change.
-    fn ports(&self, parameters: &Parameters) -> Option<Ports> {
-        let _ = parameters;
+    /// Its ports when they follow its parameters or the network it is in
+    /// (a render output's outputs follow its engine's; a File node's
+    /// output, what its context's networks carry); `None`: its
+    /// description's. Core asks again whenever the node's parameters
+    /// change, and when it is pasted into another network.
+    fn ports(&self, parameters: &Parameters, cx: &PortsCx) -> Option<Ports> {
+        let _ = (parameters, cx);
         None
     }
 

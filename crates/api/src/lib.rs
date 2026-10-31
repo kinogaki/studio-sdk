@@ -97,7 +97,7 @@ pub use components::Components;
 pub use conversion::Conversion;
 pub use cook::{
     Category, CookCx, CookError, CookPlan, Description, Incremental, Listing, NewCx, NodeRole,
-    NodeType, Outputs, Port, Ports, Prepared, Project, Reads, Resolved, SchemaCx,
+    NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, SchemaCx,
 };
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp};

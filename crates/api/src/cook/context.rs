@@ -3,6 +3,7 @@ use crate::cancel::CancelToken;
 use crate::components::Components;
 use crate::cook::{CookError, Project, Resolved};
 use crate::data::Data;
+use crate::id::ContextId;
 use crate::parallel::{self, Workers};
 use crate::params::{Parameters, Value};
 use crate::time::Time;
@@ -33,6 +34,7 @@ pub struct CookCx<'a> {
     node: u64,
     resolved: &'a [(String, Resolved)],
     project: Option<&'a Project<'a>>,
+    context: Option<ContextId>,
     scratch: &'a mut Option<Box<dyn Any + Send>>,
 }
 
@@ -65,8 +67,21 @@ impl<'a> CookCx<'a> {
             node: 0,
             resolved: &[],
             project: None,
+            context: None,
             scratch,
         }
+    }
+
+    /// In a network of `context`.
+    pub fn with_context(mut self, context: ContextId) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// The context of the node's network; `None` when the host didn't say
+    /// (a package's own tests).
+    pub fn context(&self) -> Option<ContextId> {
+        self.context
     }
 
     /// With `wires[p]` wires on input port `p` (a multi-input port may

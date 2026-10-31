@@ -1,7 +1,7 @@
 //! [`FakeNetwork`]: one object's network in memory, edited and cooked
 //! the way Studio's core does it, so a package tests its tools' network
 //! edits and its node types in a network without Studio.
-use kinogaki_studio_api::cook::{Description, NewCx, NodeRole, Ports};
+use kinogaki_studio_api::cook::{Description, NewCx, NodeRole, Ports, PortsCx};
 use kinogaki_studio_api::network::{
     Flag, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, NodeFlags, NodeInfo, Place,
     Wire,
@@ -267,10 +267,11 @@ impl FakeNetwork {
     /// `node`'s ports: its type's for its parameters.
     fn ports(&self, node: &Node) -> Ports {
         let (code, description) = &self.types.nodes[&node.node_type];
-        code.ports(&node.parameters).unwrap_or_else(|| Ports {
-            inputs: description.inputs.clone(),
-            outputs: description.outputs.clone(),
-        })
+        code.ports(&node.parameters, &PortsCx::new(self.context.id))
+            .unwrap_or_else(|| Ports {
+                inputs: description.inputs.clone(),
+                outputs: description.outputs.clone(),
+            })
     }
 
     fn node_mut(&mut self, node: NodeRef) -> Result<&mut Node, Error> {
@@ -391,7 +392,7 @@ impl NetworkEdit for FakeNetwork {
                     Error::invalid(format_args!("node type {} isn't installed", node.node_type))
                 })?;
         let defaults = description.parameters.values();
-        let mut parameters = code.created(defaults, &NewCx::default());
+        let mut parameters = code.created(defaults, &NewCx::new(self.context.id, &[]));
         for (name, value) in &node.parameters {
             self.check_parameter(node.node_type, &parameters, name, value)?;
         }
@@ -415,7 +416,7 @@ impl NetworkEdit for FakeNetwork {
         if let Some(after) = after {
             self.known(after)?;
         }
-        let ports = match code.ports(&parameters) {
+        let ports = match code.ports(&parameters, &PortsCx::new(self.context.id)) {
             Some(ports) => ports,
             None => Ports {
                 inputs: description.inputs.clone(),
@@ -524,7 +525,7 @@ impl NetworkEdit for FakeNetwork {
             )));
         }
         let after = code.edited(&n.parameters, parameters, &SchemaCx::default());
-        let ports = code.ports(&after);
+        let ports = code.ports(&after, &PortsCx::new(self.context.id));
         let n = self.node_mut(node)?;
         n.parameters = after;
         if let Some(ports) = ports {
