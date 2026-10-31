@@ -1,8 +1,8 @@
 //! The attribute model: names, standard types, indexed text, groups, and
 //! sharing between tables.
 use kinogaki_geometry::{
-    Attribute, AttributeKind, Attributes, Class, ErrorKind, Group, Text, TextBuilder, TypeInfo,
-    check_name, limits::MAX_NAME, names,
+    Attribute, AttributeKind, Attributes, Class, ErrorKind, Group, GroupBuilder, Text, TextBuilder,
+    TypeInfo, check_name, limits::MAX_NAME, names,
 };
 use std::sync::Arc;
 
@@ -273,4 +273,38 @@ fn group_set_algebra_matches_the_per_index_definitions() {
     }
     let refused = Group::none(3).union(&Group::none(4)).unwrap_err();
     assert_eq!(refused.kind(), ErrorKind::Attribute);
+}
+
+#[test]
+fn a_group_builder_makes_the_group_of_its_members() {
+    for elements in [0usize, 1, 64, 65, 130] {
+        let members: Vec<u32> = (0..elements as u32)
+            .filter(|i| i % 7 == 0 || i % 64 == 63)
+            .collect();
+        let mut b = GroupBuilder::new(elements);
+        for &i in &members {
+            b.set(i as usize, true).unwrap();
+        }
+        assert_eq!(b.members(), members.len());
+        let built = b.finish();
+        assert_eq!(
+            built,
+            Group::from_indices(elements, members.iter().copied()).unwrap()
+        );
+        // From a group, clearing members: the rest stays.
+        let mut again = GroupBuilder::from_group(&built);
+        for &i in members.iter().step_by(2) {
+            again.set(i as usize, false).unwrap();
+        }
+        let kept: Vec<u32> = members.iter().copied().skip(1).step_by(2).collect();
+        assert!(kept.iter().all(|&i| again.contains(i as usize)));
+        assert_eq!(again.finish().iter().collect::<Vec<_>>(), kept);
+    }
+    let mut b = GroupBuilder::new(3);
+    let refused = b.set(3, true).unwrap_err();
+    assert_eq!(
+        (refused.kind(), refused.element()),
+        (ErrorKind::Attribute, Some(3))
+    );
+    assert!(!b.contains(3));
 }

@@ -104,8 +104,8 @@ mod topology;
 
 pub use attributes::names;
 pub use attributes::{
-    Attribute, AttributeKind, AttributeValues, Attributes, Class, Group, Text, TextBuilder,
-    TypeInfo, check_name,
+    Attribute, AttributeKind, AttributeValues, Attributes, Class, Group, GroupBuilder, Text,
+    TextBuilder, TypeInfo, check_name,
 };
 pub use column::Column;
 pub use curves::{Basis, Curves, CurvesBuilder, Knots};

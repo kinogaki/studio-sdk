@@ -12,7 +12,7 @@ pub mod names;
 mod text;
 
 pub use class::{Class, TypeInfo};
-pub use group::Group;
+pub use group::{Group, GroupBuilder};
 pub use names::check_name;
 pub use text::{Text, TextBuilder};
 
