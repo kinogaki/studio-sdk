@@ -16,3 +16,7 @@ workspace = true
 
 [dependencies]
 kinogaki-studio-api.workspace = true
+
+[dev-dependencies]
+# Its tests add the node to a network on the SDK's fake host.
+kinogaki-studio-ui-api.workspace = true

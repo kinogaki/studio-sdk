@@ -2,9 +2,12 @@
 //!
 //! The package adds an object kind, the Pin Board
 //! (`example.pins.board`), which opens into the package's context,
-//! `example.pins.pinning`. The context's UI is the package's too, added
-//! with [`WithUi::with_ui`]:
+//! `example.pins.pinning`. A context is one id with two halves, both
+//! declared here: its networks, as data
+//! ([`NetworkContext`], [`Package::with_context`]: every Pin Board holds
+//! one, which Studio keeps), and its UI, added with [`WithUi::with_ui`]:
 //!
+//! - the Pin Board in an object level's Create menu;
 //! - two selection levels, Pin and Board (number keys 1 and 2 choose
 //!   them);
 //! - a Pin command and a Clear command, in Tab and on right-click (Clear
@@ -19,8 +22,9 @@ use kinogaki_studio_api::*;
 use std::sync::Arc;
 use studio_ui_api::host::{Cx, HostSlotsExt, InspectorCx, Waker};
 use studio_ui_api::package::{
-    ContextMenuSpec, ContextPart, Inspector, Invoked, LevelSpec, Levels, Library, MenuEntry,
-    Places, Shared, TabSpec, UiPackage, ViewMenus, Vocabulary, VocabularyItem, WithUi,
+    ContextMenuSpec, ContextPart, Creation, Creations, Inspector, Invoked, LevelSpec, Levels,
+    Library, MenuEntry, Places, Shared, TabSpec, UiPackage, ViewMenus, Vocabulary, VocabularyItem,
+    WithUi,
 };
 use studio_ui_api::sheet::{Field as Row, Schema as Rows};
 use studio_ui_api::{Id, SheetStyle, Ui, UiExt};
@@ -139,7 +143,8 @@ impl UiPackage for PinsUi {
                 .with_library(library())
                 .with_levels(PinLevels)
                 .with_vocabulary(PinVocabulary)
-                .with_inspector(PinInspector),
+                .with_inspector(PinInspector)
+                .with_creations(BoardCreation),
         ]
     }
 }
@@ -233,6 +238,32 @@ impl Vocabulary<Pinning> for PinVocabulary {
     }
 }
 
+/// The Pin Board in Create: a new board opens, ready for pinning. It
+/// offers no starts (a new object already holding a node).
+struct BoardCreation;
+
+impl Creations<Pinning> for BoardCreation {
+    fn creations(&self) -> Vec<Creation> {
+        vec![Creation {
+            kind: board(),
+            label: "Pin Board".into(),
+            aliases: vec!["corkboard".into()],
+            opens: true,
+            root_only: None,
+            starts: Vec::new(),
+        }]
+    }
+    fn start(
+        &self,
+        _s: &mut Pinning,
+        _cx: &mut dyn Cx,
+        _kind: ObjectKindId,
+        start: &str,
+    ) -> Result<(), String> {
+        Err(format!("a Pin Board has no start {start}"))
+    }
+}
+
 /// The inspector's one row: how many pins the board holds.
 struct PinInspector;
 
@@ -244,9 +275,11 @@ impl Inspector<Pinning> for PinInspector {
     }
 }
 
-/// The package: the Pin Board kind, the pins slot and the context's UI.
+/// The package: the pinning context's networks, the Pin Board kind, the
+/// pins slot and the context's UI.
 pub fn package() -> Package {
     Package::new(id(), "Pins")
+        .with_context(NetworkContext::new(pinning(), "Pins", "pins"))
         .with_object_kind(BoardKind)
         .with_slot::<Pins>()
         .with_ui(PinsUi)

@@ -1,23 +1,30 @@
 //! A Kinogaki Studio plugin that adds a Box node.
 //!
-//! The package defines a data type, `example.boxes.box` (a box's size and
-//! center), and a node type, `example.boxes.box_node`, that makes a box
-//! from its width, depth, height and center. The data type tells Studio how
-//! a box shows in the viewport, how it renders and how it saves; the node
-//! type binds a box handle to its parameters, so Studio draws the box in
-//! the viewport and drags its faces and center with no code here. The
-//! package adds one icon to Studio's set, `example.boxes/box`, which the
-//! node shows by.
+//! The package defines:
+//!
+//! - a data type, `example.boxes.box` (a box's size and center), which
+//!   tells Studio how a box shows in the viewport, how it renders and how
+//!   it saves;
+//! - a network context, `example.boxes.network`, and an object kind,
+//!   Boxes (`example.boxes.boxes`), whose objects hold a network of that
+//!   context and show the box it yields;
+//! - a node type, `example.boxes.box_node`, offered in that context and
+//!   listed in its Tab menu, that makes a box from its size and center. It
+//!   binds a box handle to its parameters, so Studio draws the box in the
+//!   viewport and drags its faces and center with no code here;
+//! - one icon added to Studio's set, `example.boxes/box`, which the node
+//!   and the object kind show by.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
+use kinogaki_studio_api::network::FlagSet;
 use kinogaki_studio_api::params::{Number, Parameter, ParameterKind};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
-/// A box: its size along x, y and z (z is up) and its middle.
+/// A box: its size along x, y and z and its middle.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BoxShape {
-    /// Width, depth and height.
+    /// Its sides along x, y and z.
     pub size: [f64; 3],
     /// The middle.
     pub center: [f64; 3],
@@ -196,6 +203,16 @@ impl DataCodec for BoxType {
 /// own icons are drawn (Studio tints it with the widget showing it).
 const BOX_ICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11" width="11" height="11" shape-rendering="crispEdges" fill="#fff"><rect x="2" y="3" width="7" height="2"/><rect x="2" y="5" width="2" height="2"/><rect x="7" y="5" width="2" height="2"/><rect x="2" y="7" width="7" height="1"/></svg>"##;
 
+/// The context of the networks inside Boxes objects.
+pub fn network() -> ContextId {
+    ContextId::declared("example.boxes.network")
+}
+
+/// The Boxes object kind.
+pub fn boxes() -> ObjectKindId {
+    ObjectKindId::declared("example.boxes.boxes")
+}
+
 /// The Box node: makes a box from its parameters.
 pub struct BoxNode;
 
@@ -203,57 +220,119 @@ impl NodeType for BoxNode {
     fn id(&self) -> NodeTypeId {
         NodeTypeId::declared("example.boxes.box_node")
     }
-    /// No inputs, one box out, its width, depth, height and center in
-    /// scene units, and a box handle on them: Studio draws the box with a
-    /// dot on each face and one in the middle, and dragging them writes
-    /// the sides and the center.
+    /// No inputs, one box out, its size and center in scene units, and a
+    /// box handle on them: Studio draws the box with a dot on each face
+    /// and one in the middle, and dragging them writes the size and the
+    /// center. It is offered in Boxes networks, listed in Tab under Create.
     fn description(&self) -> Description {
-        let side = |name: &str, label: &str| {
-            let length = ParameterKind::Number(Number::length().range(0.001, f64::INFINITY));
-            Parameter::new(name, label, length, 1.0)
-        };
-        let center = ParameterKind::Vector {
+        let vector = |number: Number| ParameterKind::Vector {
             components: 3,
-            number: Number::length(),
+            number,
         };
+        let sides = vector(Number::length().range(0.001, f64::INFINITY));
         Description::new("Box")
             .icon("example.boxes/box")
+            .context(network())
+            .listed("Create", Category::Create, "Primitives", &["cube"])
             .output(Port::new("box", "Box", BOX.id()))
             .parameters(
                 Schema::default()
-                    .parameter(side("width", "Width"))
-                    .parameter(side("depth", "Depth"))
-                    .parameter(side("height", "Height"))
-                    .parameter(Parameter::new("center", "Center", center, vec![0.0; 3])),
+                    .parameter(Parameter::new("size", "Size", sides, vec![1.0; 3]))
+                    .parameter(Parameter::new(
+                        "center",
+                        "Center",
+                        vector(Number::length()),
+                        vec![0.0; 3],
+                    )),
             )
             .handle(Handle::new(
                 "box",
                 HandleKind::Box {
                     center: Vector::parameter("center"),
-                    size: Vector::components("width", "depth", "height"),
+                    size: Vector::parameter("size"),
                 },
             ))
     }
     fn cook(&self, cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {
-        let size = [
-            cx.number("width")?,
-            cx.number("depth")?,
-            cx.number("height")?,
-        ];
+        let three = |name: &str| {
+            Vector::parameter(name)
+                .read(cx.parameters())
+                .ok_or_else(|| CookError::message(format!("the {name} is three numbers")))
+        };
+        let (size, center) = (three("size")?, three("center")?);
         if size.iter().any(|&side| side <= 0.0) {
             return Err(CookError::message("every side must be longer than zero"));
         }
-        let center = Vector::parameter("center")
-            .read(cx.parameters())
-            .ok_or_else(|| CookError::message("the center is three numbers"))?;
         Ok(Outputs::one(BOX.wrap(BoxShape { size, center })))
+    }
+}
+
+/// A Boxes object's body: it holds nothing of its own (its network, which
+/// Studio keeps, makes its box).
+#[derive(Debug)]
+pub struct BoxesBody;
+
+impl ObjectBody for BoxesBody {
+    fn kind(&self) -> ObjectKindId {
+        boxes()
+    }
+}
+
+/// Boxes objects: placed in the scene, each holding a Boxes network whose
+/// box it shows.
+struct BoxesKind;
+
+impl ObjectKindSpec for BoxesKind {
+    fn id(&self) -> ObjectKindId {
+        boxes()
+    }
+    fn label(&self) -> &str {
+        "Boxes"
+    }
+    fn icon(&self) -> &str {
+        "example.boxes/box"
+    }
+    fn placed(&self) -> bool {
+        true
+    }
+    fn context(&self) -> Option<ContextId> {
+        Some(network())
+    }
+    fn result(&self) -> Option<DataTypeId> {
+        Some(BOX.id())
+    }
+    fn new_body(&self) -> Arc<dyn ObjectBody> {
+        Arc::new(BoxesBody)
+    }
+    fn codec(&self) -> &dyn ObjectCodec {
+        self
+    }
+    fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
+        None
+    }
+}
+
+/// A Boxes body saves nothing but its kind.
+impl ObjectCodec for BoxesKind {
+    fn write(&self, _body: &dyn ObjectBody, _out: &mut dyn ElementWriter) -> Result<(), Error> {
+        Ok(())
+    }
+    fn read(
+        &self,
+        _element: &dyn ElementReader,
+        _cx: &ReadCx<'_>,
+    ) -> Result<Arc<dyn ObjectBody>, Error> {
+        Ok(Arc::new(BoxesBody))
     }
 }
 
 /// The package: what Studio registers when it loads the plugin.
 pub fn package() -> Package {
+    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(FlagSet::all());
     Package::new(PackageId::declared("example.boxes"), "Boxes")
         .with_data_type(BoxType)
+        .with_context(context)
+        .with_object_kind(BoxesKind)
         .with_node_type(BoxNode)
         .with_icon(Icon::new("box", BOX_ICON))
 }

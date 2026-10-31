@@ -162,6 +162,7 @@ name = "example-box-node"
 version = "0.1.0"
 dependencies = [
  "kinogaki-studio-api",
+ "kinogaki-studio-ui-api",
 ]
 
 [[package]]

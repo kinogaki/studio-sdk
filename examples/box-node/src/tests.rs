@@ -1,10 +1,14 @@
 //! Cooks the Box node the way Studio does, then asks the box data type
 //! what Studio asks it: bounds, viewport surface, render triangles, save;
-//! and reads the handles the node type binds.
+//! reads the handles the node type binds; and adds the node to a Boxes
+//! network, as Tab does, on the SDK's fake host.
 use super::*;
 use kinogaki_studio_api::cook::{Constraint, Space};
 use kinogaki_studio_api::element::MemoryElement;
+use kinogaki_studio_api::network::{NetworkRead, NewNode};
 use kinogaki_studio_api::parallel::Serial;
+use studio_ui_api::host::{HostNetwork, HostUndo};
+use studio_ui_api::testing::{FakeHost, FakeNetwork};
 
 /// Cooks the Box node with `width`, `depth` and `height`, centered on the
 /// origin.
@@ -15,9 +19,7 @@ fn cook(width: f64, depth: f64, height: f64) -> Result<Outputs, CookError> {
 /// Cooks the Box node with `width`, `depth`, `height` and `center`.
 fn cook_at(width: f64, depth: f64, height: f64, center: [f64; 3]) -> Result<Outputs, CookError> {
     let mut parameters = BoxNode.description().parameters.values();
-    parameters.insert("width".into(), width.into());
-    parameters.insert("depth".into(), depth.into());
-    parameters.insert("height".into(), height.into());
+    parameters.insert("size".into(), vec![width, depth, height].into());
     parameters.insert("center".into(), center.to_vec().into());
     let cancel = CancelToken::default();
     let mut scratch = None;
@@ -35,6 +37,67 @@ fn the_package_registers() {
         registry.data_type_owner(BOX.id()).unwrap().as_str(),
         "example.boxes"
     );
+    // Boxes objects hold Boxes networks and show the box they yield.
+    let kind = registry.object_kind(boxes()).unwrap();
+    assert_eq!(
+        (kind.context(), kind.result()),
+        (Some(network()), Some(BOX.id()))
+    );
+}
+
+/// Where Studio offers the node: in Boxes networks, Tab's Create section.
+#[test]
+fn the_node_is_listed_in_its_context() {
+    let description = BoxNode.description();
+    assert_eq!(description.contexts, [network()]);
+    let listing = description.listing.expect("listed in Tab");
+    assert_eq!(
+        (
+            listing.section.as_str(),
+            listing.category,
+            listing.family.as_str()
+        ),
+        ("Create", Category::Create, "Primitives")
+    );
+}
+
+/// The node in a Boxes object's network, added and edited the way Tab and
+/// the inspector do (one undo step each), then cooked.
+#[test]
+fn the_node_cooks_in_a_network() {
+    let package = package();
+    let object = ObjectRef(1);
+    let mut host = FakeHost::new(network(), []);
+    host.networks
+        .insert(object, FakeNetwork::new(network(), &[&package]).unwrap());
+    let node_type = BoxNode.id();
+    let mut added = None;
+    host.edit_network(object, "Add Box", &mut |net| {
+        let node = NewNode::new(node_type).displayed();
+        added = Some(net.add_node(node, [0.0, 0.0])?);
+        Ok(())
+    })
+    .unwrap();
+    let node = added.unwrap();
+    host.edit_network(object, "Size", &mut |net| {
+        net.set_parameter(node, "size", vec![2.0, 1.0, 1.0].into())
+    })
+    .unwrap();
+    // A flat box's size is refused, and changes nothing.
+    let flat = host.edit_network(object, "Flat", &mut |net| {
+        net.set_parameter(node, "size", vec![2.0, 0.0, 1.0].into())
+    });
+    assert!(flat.is_err());
+    assert_eq!(host.history(), ["Add Box", "Size"]);
+    let net = &host.networks[&object];
+    assert_eq!(net.display(), Some(node));
+    assert_eq!(net.node(node).unwrap().name, "Box 1");
+    let data = net.cook(node).unwrap().data.remove(0);
+    assert_eq!(BOX.get(&data).unwrap().size, [2.0, 1.0, 1.0]);
+    host.undo();
+    let net = &host.networks[&object];
+    let data = net.cook(node).unwrap().data.remove(0);
+    assert_eq!(BOX.get(&data).unwrap().size, [1.0; 3]);
 }
 
 #[test]
@@ -134,7 +197,7 @@ fn a_moved_box_has_its_own_bounds_and_stamp() {
 }
 
 /// What Studio reads to run the node's handle: a box handle whose center
-/// is the `center` parameter and whose size is the three sides, in the
+/// is the `center` parameter and whose size is the `size` one, in the
 /// object's space, free and always shown; and the values it reads from a
 /// new node.
 #[test]
@@ -147,7 +210,7 @@ fn the_node_binds_a_box_handle_to_its_center_and_sides() {
         panic!("a box handle: {:?}", handle.kind);
     };
     assert_eq!(*center, Vector::parameter("center"));
-    assert_eq!(*size, Vector::components("width", "depth", "height"));
+    assert_eq!(*size, Vector::parameter("size"));
     assert_eq!(handle.label, "box");
     assert_eq!(
         (handle.space, handle.constraint, handle.range),

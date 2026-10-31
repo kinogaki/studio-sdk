@@ -26,7 +26,11 @@ fn run(hosted: &mut Hosting, host: &mut FakeHost, item: &str) {
 fn the_package_registers_whole() {
     let mut registry = Registry::new();
     registry.register(package()).unwrap();
-    assert!(registry.object_kind(board()).is_some());
+    assert_eq!(
+        registry.object_kind(board()).unwrap().context(),
+        Some(pinning())
+    );
+    assert!(registry.network_context(pinning()).is_some());
     assert!(registry.slot(Pins::id()).is_some());
     let package = package();
     let ui = Registered::of(&package).unwrap();
@@ -34,6 +38,9 @@ fn the_package_registers_whole() {
     let levels = ui.contexts[0].levels.as_ref().unwrap().levels();
     let names: Vec<&str> = levels.iter().map(|l| l.label.as_str()).collect();
     assert_eq!(names, ["Pin", "Board"]);
+    // Create offers the board, which opens.
+    let creations = ui.contexts[0].creations.as_ref().unwrap().creations();
+    assert_eq!((creations[0].kind, creations[0].opens), (board(), true));
 }
 
 #[test]
