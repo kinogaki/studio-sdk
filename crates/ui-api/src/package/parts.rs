@@ -262,6 +262,14 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         let _ = (s, cx);
         None
     }
+    /// Whether the context's own transform gizmo takes precedence over the
+    /// selected node's declared transform handles now (the user picked
+    /// components to move). `false`: the node's handles show in the
+    /// transform tool's place, as Maya's manipulators do.
+    fn own_gizmo(&self, s: &S, cx: &dyn Cx) -> bool {
+        let _ = (s, cx);
+        false
+    }
     /// Whether the host's transform gizmo shows for the selection now,
     /// at [`Levels::pivot`] and along the user's transform space. The
     /// host runs its drags and hands each step to
@@ -602,6 +610,9 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn live_node(&self, s: &dyn Any, cx: &dyn Cx) -> Option<NodeRef> {
         self.part.live_node(own(s), cx)
+    }
+    fn own_gizmo(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
+        self.part.own_gizmo(own(s), cx)
     }
     fn transforms(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
         self.part.transforms(own(s), cx)
