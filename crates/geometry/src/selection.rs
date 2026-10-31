@@ -9,9 +9,9 @@ use crate::topology::Topology;
 /// indices; the active one (the last picked, which tools that need one
 /// element start from); and the topology it was made on.
 ///
-/// **Rules** ([`Selection::new`] checks them): indices are sorted and
-/// distinct (the constructor sorts and deduplicates them); the active
-/// element is one of the selected.
+/// **Rules** ([`Selection::from_ascending`] checks them): indices are
+/// strictly ascending ([`Selection::new`] sorts and deduplicates them);
+/// the active element is one of the selected.
 ///
 /// **Staleness.** A selection made on a topology keeps its
 /// [fingerprint](Topology::fingerprint); once the topology changes the
@@ -51,6 +51,42 @@ impl Selection {
     ) -> Result<Self, GeometryError> {
         indices.sort_unstable();
         indices.dedup();
+        Self::from_ascending(class, Column::new(indices), active, topology)
+    }
+
+    /// The elements `indices` of `class`, already strictly ascending, kept
+    /// as given: a selection made from another's
+    /// [`indices`](Self::indices) shares them.
+    ///
+    /// ```
+    /// use kinogaki_geometry::{Class, Column, Selection};
+    ///
+    /// let picked = Column::from(vec![1, 3, 7]);
+    /// let s = Selection::from_ascending(Class::Point, picked.clone(), None, None).unwrap();
+    /// assert!(s.indices().ptr_eq(&picked));
+    /// assert!(Selection::from_ascending(Class::Point, vec![3, 3].into(), None, None).is_err());
+    /// ```
+    ///
+    /// # Errors
+    /// When `indices` are not strictly ascending, or `active` is not
+    /// selected.
+    pub fn from_ascending(
+        class: Class,
+        indices: Column<u32>,
+        active: Option<u32>,
+        topology: Option<[u8; 32]>,
+    ) -> Result<Self, GeometryError> {
+        if let Some(i) = indices.windows(2).position(|w| w[0] >= w[1]) {
+            return Err(GeometryError::at(
+                ErrorKind::Selection,
+                i + 1,
+                format!(
+                    "the selected {} indices are not strictly ascending at {}",
+                    class.name(),
+                    i + 1
+                ),
+            ));
+        }
         if let Some(a) = active
             && indices.binary_search(&a).is_err()
         {
@@ -63,7 +99,7 @@ impl Selection {
         Ok(Self {
             class,
             all: false,
-            indices: Column::new(indices),
+            indices,
             active,
             topology,
         })
