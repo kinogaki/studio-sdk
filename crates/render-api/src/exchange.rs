@@ -1,5 +1,6 @@
 //! What files that know only a preview surface (UsdPreviewSurface, OBJ's
-//! MTL) carry of a material: [`PreviewSurface`]. Each engine reads one of
+//! MTL) carry of a material: [`PreviewSurface`], and a file's materials as
+//! an import lists them ([`ImportedMaterial`]). Each engine reads one of
 //! its materials as a preview surface for export and makes a material of
 //! its own from one on import ([`crate::EngineDescription`]'s `preview` and
 //! `from_preview`); hosts read and write the files.
@@ -22,6 +23,19 @@ pub struct PreviewSurface {
     /// What a preview surface cannot say, as Kinogaki's own attributes
     /// (`kinogaki:*`), in name order.
     pub kinogaki: Vec<(String, Extra)>,
+}
+
+/// A material a file brings: the key its polygons' `material` values
+/// name, the name it takes in the scene's library, and its preview
+/// surface.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportedMaterial {
+    /// What the file's polygons name it by.
+    pub key: String,
+    /// The name it takes in the library.
+    pub name: String,
+    /// Its parameters.
+    pub preview: PreviewSurface,
 }
 
 /// A Kinogaki attribute's value.

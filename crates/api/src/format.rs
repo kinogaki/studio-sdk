@@ -12,6 +12,8 @@
 //! ([`FileFormat::schema`]) and saved by the format itself
 //! ([`FileFormat::write_options`]), so a File node's options and the
 //! application's import defaults keep the format's own spelling.
+pub mod options;
+
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::error::Error;

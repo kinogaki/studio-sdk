@@ -197,6 +197,8 @@ A `FileFormat` declares:
 
 It reads a file (`read(path, options, &Reading)`) into `Imported`, a list of `FileItem`s with parents listed before their children; an item with no data is a group, and each is placed relative to its parent and shown or hidden. A `Reading` carries the purpose, the project's `Units` (lengths convert into them), an origin a format may seed names with (a File node's id), project values the host lends by type, and a cancellation poll. For a File node a format reads one item. A format may also provide a `FormatWriter`, which writes items in given units.
 
+`format::options` holds what formats share about options: reading a typed option (`option`, `choice`), saving a choice by its own token so a saved setting survives a reordered list (`choice_value`, `read_token`), and the rows most import dialogs show (`section`, `units`, `scale`, `toggle`). A file's materials travel beside its geometry as `render::preview_materials()`, a list of `ImportedMaterial` (the key its polygons name, a library name, a `PreviewSurface`), which File ▸ Import turns into a Material Library.
+
 To import, the environment passes each value to the first object kind that `adopts` it. With no formats installed, nothing can be imported.
 
 ## Session slots

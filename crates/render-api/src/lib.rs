@@ -55,7 +55,7 @@ pub use engine::{
     Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
     ViewMode, Wake, pending,
 };
-pub use exchange::{Extra, PreviewSurface};
+pub use exchange::{Extra, ImportedMaterial, PreviewSurface};
 pub use id::{IdAllocator, MaterialId, PrimId, TextureId};
 pub use material::{
     Constant, ImageUse, Link, MaterialNetwork, NetworkError, NodeIndex, ShaderNode,
