@@ -1,0 +1,19 @@
+[package]
+name = "kinogaki-geometry"
+description = "Kinogaki Studio's standard geometry values: polygons and polylines, curves, the attribute model, selections, render detail and project tolerances, each a validated, shared, immutable value"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# The topology fingerprint: a stable 32-byte content hash, from crates.io
+# at an exact version.
+blake3 = "=1.8.7"
+# `Pod` on the plain records (`Edge`), and free casts of a kernel's own
+# vector types into columns (`cast_vec` needs `extern_crate_alloc`), from
+# crates.io at an exact version.
+bytemuck = { version = "=1.25.2", features = ["derive", "extern_crate_alloc"] }

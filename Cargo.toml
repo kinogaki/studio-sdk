@@ -8,12 +8,14 @@ edition = "2024"
 rust-version = "1.98"
 publish = false
 
-# The SDK depends on the standard library alone (README "Self-contained").
+# The SDK depends on the standard library and the few crates.io crates
+# README "Self-contained" lists, at exact versions.
 [workspace.dependencies]
 kinogaki-studio-api = { path = "crates/api" }
 kinogaki-studio-ui-api = { path = "crates/ui-api" }
 kinogaki-render-api = { path = "crates/render-api" }
 kinogaki-viewport-api = { path = "crates/viewport-api" }
+kinogaki-geometry = { path = "crates/geometry" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
