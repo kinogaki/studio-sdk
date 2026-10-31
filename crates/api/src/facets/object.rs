@@ -44,6 +44,22 @@ pub trait ObjectPicking: Send + Sync {
 
     /// Its world box.
     fn bounds(&self, data: &Data, drawn: &Drawn, world: &Matrix) -> Option<Bounds>;
+
+    /// The distance along `ray` to piece `piece` of `drawn` alone (a
+    /// templated branch's packet), as [`ray`](Self::ray) measures the
+    /// whole: what branch picks pick. `None`: missed, or the type doesn't
+    /// pick pieces alone.
+    fn piece_ray(
+        &self,
+        data: &Data,
+        drawn: &Drawn,
+        piece: usize,
+        world: &Matrix,
+        ray: &WorldRay,
+    ) -> Option<f64> {
+        let _ = (data, drawn, piece, world, ray);
+        None
+    }
 }
 
 /// What the scene's materials say, as an object's look reads them. It is

@@ -253,6 +253,15 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         let _ = (s, cx, at);
         None
     }
+    /// The node a live tool works on (its card is up). While there is one,
+    /// the open network's templated branches are pickable in the views: a
+    /// click wires the branch under the pointer into the node's operand
+    /// input (Command takes it off), in the tool's gesture. `None`: no
+    /// tool is live.
+    fn live_node(&self, s: &S, cx: &dyn Cx) -> Option<NodeRef> {
+        let _ = (s, cx);
+        None
+    }
     /// Whether the host's transform gizmo shows for the selection now,
     /// at [`Levels::pivot`] and along the user's transform space. The
     /// host runs its drags and hands each step to
@@ -590,6 +599,9 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn pick_pivot(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
         self.part.pick_pivot(own_mut(s), cx, at)
+    }
+    fn live_node(&self, s: &dyn Any, cx: &dyn Cx) -> Option<NodeRef> {
+        self.part.live_node(own(s), cx)
     }
     fn transforms(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
         self.part.transforms(own(s), cx)
