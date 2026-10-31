@@ -43,8 +43,9 @@
 //! set of optional parts: the selection [`Levels`], the [`ViewportLayer`],
 //! the [`Inspector`], the [`Vocabulary`] that runs its items, the
 //! [`ObjectRows`] and [`OutlineRows`] for the object
-//! kinds it owns, the [`Creations`] it adds to an object level's Create
-//! and [`Results`], how it takes the host's cooks of its objects. A part a
+//! kinds it owns (their creations are the kinds' own,
+//! `ObjectKindSpec::creations`), and [`Results`], how it takes the host's
+//! cooks of its objects. A part a
 //! context leaves out is never another context's. In a context whose
 //! networks are core's, the host's own UI is there without a part: its
 //! network pane, Tab and menus listing the context's listed node types,
@@ -66,8 +67,8 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, ContextObject, ContextView, Creation, LevelPreset, LevelSpec,
-    NumericBar, OutlineRow, Start, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
+    BarField, BarValue, Candidate, ContextObject, ContextView, LevelPreset, LevelSpec, NumericBar,
+    OutlineRow, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
 };
 pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
 pub use library::{
@@ -77,8 +78,7 @@ pub use library::{
     VocabularyItem, When,
 };
 pub use parts::{
-    Creations, Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, ViewportLayer,
-    Vocabulary,
+    Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, ViewportLayer, Vocabulary,
 };
 pub use results::{Results, Shown, ShownKind};
 pub use settings::{Section, SettingsSection};
@@ -145,8 +145,6 @@ pub struct ContextPart<S: ?Sized> {
     pub objects: Option<Box<dyn ObjectRows<S>>>,
     /// Outliner rows inside the object kinds it owns.
     pub outline: Option<Box<dyn OutlineRows<S>>>,
-    /// What it adds to an object level's Create.
-    pub creations: Option<Box<dyn Creations<S>>>,
     /// How it takes the host's cooks of its objects.
     pub results: Option<Box<dyn Results<S>>>,
 }
@@ -164,7 +162,6 @@ impl<S: ?Sized> ContextPart<S> {
             vocabulary: None,
             objects: None,
             outline: None,
-            creations: None,
             results: None,
         }
     }
@@ -217,12 +214,6 @@ impl<S: ?Sized> ContextPart<S> {
         self
     }
 
-    /// With creations.
-    pub fn with_creations(mut self, part: impl Creations<S> + 'static) -> Self {
-        self.creations = Some(Box::new(part));
-        self
-    }
-
     /// With how it takes the host's cooks.
     pub fn with_results(mut self, part: impl Results<S> + 'static) -> Self {
         self.results = Some(Box::new(part));
@@ -255,9 +246,6 @@ impl<S: 'static> ContextPart<S> {
             outline: self
                 .outline
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn OutlineRows<dyn Any>>),
-            creations: self
-                .creations
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Creations<dyn Any>>),
             results: self
                 .results
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Results<dyn Any>>),
@@ -278,7 +266,6 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("vocabulary", &has(self.vocabulary.is_some()))
             .field("objects", &has(self.objects.is_some()))
             .field("outline", &has(self.outline.is_some()))
-            .field("creations", &has(self.creations.is_some()))
             .field("results", &has(self.results.is_some()))
             .finish()
     }

@@ -266,3 +266,31 @@ fn the_entry_point_makes_the_package() {
     assert_eq!(package.id, PackageId::declared("example.boxes"));
     assert_eq!(package.node_types.len(), 1);
 }
+
+#[test]
+fn boxes_are_made_empty_or_holding_a_box() {
+    let kind = BoxesKind;
+    let engines = kinogaki_render_api::Engines::new(Vec::new());
+    let cx = CreateCx::new(&engines, None);
+    let made: Vec<_> = kind
+        .creations(&cx)
+        .into_iter()
+        .map(|c| (c.id, c.opens, c.start))
+        .collect();
+    assert_eq!(
+        made,
+        [
+            ("example.boxes.boxes".to_owned(), true, None),
+            (
+                "example.boxes.box_node".to_owned(),
+                false,
+                Some(NodeTypeId::declared("example.boxes.box_node"))
+            ),
+        ]
+    );
+    assert_eq!(
+        kind.create("example.boxes.box_node", &cx).unwrap().kind(),
+        boxes()
+    );
+    assert!(kind.create("example.pins.board", &cx).is_err());
+}

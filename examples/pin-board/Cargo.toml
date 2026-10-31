@@ -17,3 +17,7 @@ workspace = true
 [dependencies]
 kinogaki-studio-api.workspace = true
 kinogaki-studio-ui-api.workspace = true
+
+[dev-dependencies]
+# The engines a creation may read (none, in the tests).
+kinogaki-render-api.workspace = true

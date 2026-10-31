@@ -18,5 +18,7 @@ workspace = true
 kinogaki-studio-api.workspace = true
 
 [dev-dependencies]
+# The engines a creation may read (none, in the tests).
+kinogaki-render-api.workspace = true
 # Its tests add the node to a network on the SDK's fake host.
 kinogaki-studio-ui-api.workspace = true

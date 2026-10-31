@@ -12,6 +12,8 @@
 //!   listed in its Tab menu, that makes a box from its size and center. It
 //!   binds a box handle to its parameters, so Studio draws the box in the
 //!   viewport and drags its faces and center with no code here;
+//! - the kind's creations: an empty Boxes object, and a Box (a Boxes
+//!   object already holding a Box node), in Create, Tab and the A menu;
 //! - one icon added to Studio's set, `example.boxes/box`, which the node
 //!   and the object kind show by.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
@@ -218,7 +220,7 @@ pub struct BoxNode;
 
 impl NodeType for BoxNode {
     fn id(&self) -> NodeTypeId {
-        NodeTypeId::declared("example.boxes.box_node")
+        NodeTypeId::declared(BOX_NODE)
     }
     /// No inputs, one box out, its size and center in scene units, and a
     /// box handle on them: Studio draws the box with a dot on each face
@@ -278,6 +280,9 @@ impl ObjectBody for BoxesBody {
     }
 }
 
+/// The Box node's id.
+const BOX_NODE: &str = "example.boxes.box_node";
+
 /// Boxes objects: placed in the scene, each holding a Boxes network whose
 /// box it shows.
 struct BoxesKind;
@@ -309,6 +314,24 @@ impl ObjectKindSpec for BoxesKind {
     }
     fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
         None
+    }
+    /// In Create, Tab and the A menu: an empty Boxes object, which opens
+    /// for its first node, and a Box: a Boxes object already holding a Box
+    /// node.
+    fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
+        let mut empty = KindCreation::new(boxes().as_str(), "Boxes");
+        empty.opens = true;
+        let mut one = KindCreation::new(BOX_NODE, "Box");
+        one.family = "Boxes".into();
+        one.aliases = vec!["cube".into()];
+        one.start = Some(NodeTypeId::declared(BOX_NODE));
+        vec![empty, one]
+    }
+    fn create(&self, id: &str, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+        match id {
+            _ if id == boxes().as_str() || id == BOX_NODE => Ok(self.new_body()),
+            _ => Err(format!("Boxes don't make {id}")),
+        }
     }
 }
 

@@ -38,7 +38,7 @@ use kinogaki_studio_api::*;
 use std::sync::Arc;
 use studio_ui_api::host::{Cx, HostSlotsExt, InspectorCx, Waker};
 use studio_ui_api::package::{
-    ContextMenuSpec, ContextPart, Creation, Creations, Inspector, Invoked, LevelSpec, Levels,
+    ContextMenuSpec, ContextPart, Inspector, Invoked, LevelSpec, Levels,
     Library, MenuEntry, Places, Shared, TabSpec, UiPackage, ViewMenus, Vocabulary, VocabularyItem,
     WithUi,
 };
@@ -76,7 +76,7 @@ impl Slot for Pins {
 
 ## 3. The object kind
 
-A context is entered by opening an object whose kind names it. The Pin Board kind is placed in the scene and opens into the pinning context. Its body, the kind's own state, holds nothing here, and saves nothing but its kind.
+A context is entered by opening an object whose kind names it. The Pin Board kind is placed in the scene and opens into the pinning context. Its body, the kind's own state, holds nothing here, and saves nothing but its kind. The kind also says how an object level makes its objects (`creations`): Studio lists each in Create, Tab and the A menu by its id, and a new Pin Board opens, ready for pinning. A creation may name a `start`, a node the new object's network holds from the outset (a Mesh object holding a Sphere); a kind lists only what can be made now.
 
 ```rust
 /// A Pin Board's body.
@@ -119,6 +119,17 @@ impl ObjectKindSpec for BoardKind {
     }
     fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
         None
+    }
+    fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
+        let mut board = KindCreation::new(board().as_str(), "Pin Board");
+        board.aliases = vec!["corkboard".into()];
+        board.opens = true;
+        vec![board]
+    }
+    fn create(&self, id: &str, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+        (id == board().as_str())
+            .then(|| self.new_body())
+            .ok_or_else(|| format!("{id} isn't a Pin Board"))
     }
 }
 
@@ -168,8 +179,7 @@ impl UiPackage for PinsUi {
                 .with_library(library())
                 .with_levels(PinLevels)
                 .with_vocabulary(PinVocabulary)
-                .with_inspector(PinInspector)
-                .with_creations(BoardCreation),
+                .with_inspector(PinInspector),
         ]
     }
 }
@@ -250,7 +260,7 @@ VocabularyItem {
 
 Without that item Edit ▸ Select All is unavailable in the context. The pinning context selects nothing, so it doesn't list it.
 
-## 6. Levels, the inspector and Create
+## 6. Levels and the inspector
 
 **Levels** are what the user selects at (a mesh's points, edges and faces). Number keys choose them in order; the context keeps which is active.
 
@@ -287,7 +297,6 @@ impl Levels<Pinning> for PinLevels {
 
 **The inspector** shows rows through Studio's own widgets: the context builds a sheet (`sheet::Schema`) and Studio draws it. Raw widgets on `Ui` are for custom panels only.
 
-**Create** lists object kinds a context offers at an object level; a new Pin Board opens, ready for pinning. A creation may also offer starts, a new object already holding a node; this one offers none.
 
 ```rust
 /// The inspector's one row: how many pins the board holds.
@@ -301,24 +310,6 @@ impl Inspector<Pinning> for PinInspector {
     }
 }
 
-/// The Pin Board in Create.
-struct BoardCreation;
-
-impl Creations<Pinning> for BoardCreation {
-    fn creations(&self) -> Vec<Creation> {
-        vec![Creation {
-            kind: board(),
-            label: "Pin Board".into(),
-            aliases: vec!["corkboard".into()],
-            opens: true,
-            root_only: None,
-            starts: Vec::new(),
-        }]
-    }
-    fn start(&self, _s: &mut Pinning, _cx: &mut dyn Cx, _kind: ObjectKindId, start: &str) -> Result<(), String> {
-        Err(format!("a Pin Board has no start {start}"))
-    }
-}
 ```
 
 ## 7. One package

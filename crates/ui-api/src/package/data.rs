@@ -1,12 +1,12 @@
 //! The plain values a context's parts hand the host: levels, toolbar
 //! items, the status bar's pieces, the numeric bar, what the views draw
-//! of the context's own, its time, its network's tiles, its creations and
+//! of the context's own, its time, its network's tiles and
 //! its outliner rows. The host draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
 use crate::host::{NodeRef, ObjectRef};
+use kinogaki_studio_api::Mat4;
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::viewport::{ElementKind, SurfaceSource};
-use kinogaki_studio_api::{Mat4, ObjectKindId};
 use kinogaki_viewport_api::SceneLines;
 use std::fmt;
 use std::sync::Arc;
@@ -226,39 +226,6 @@ pub struct TimeDomain {
     pub current: f64,
     /// The playback speeds offered; none: 1×.
     pub speeds: Vec<f64>,
-}
-
-/// A kind of object an object level can create, contributed by the
-/// context that owns the kind.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Creation {
-    /// The kind (its id).
-    pub kind: ObjectKindId,
-    /// What menus call it.
-    pub label: String,
-    /// Lower-case synonyms for search.
-    pub aliases: Vec<String>,
-    /// The new object opens, ready for its first node.
-    pub opens: bool,
-    /// Only the scene root holds it: why, elsewhere.
-    pub root_only: Option<String>,
-    /// What a new object of this kind can start with, each offered as its
-    /// own entry ("Sphere": a new Mesh object holding a Sphere).
-    pub starts: Vec<Start>,
-}
-
-/// A start: a new object of a creation's kind holding one node,
-/// made in one step ([`Creations::start`](super::Creations::start)).
-#[derive(Clone, Debug, PartialEq)]
-pub struct Start {
-    /// Its stored name (the node type's id, "kinogaki.mesh.sphere").
-    pub id: String,
-    /// What menus call it.
-    pub label: String,
-    /// The family it is listed in.
-    pub family: String,
-    /// Lower-case synonyms for search.
-    pub aliases: Vec<String>,
 }
 
 /// One outliner row inside an object of a kind a context owns.

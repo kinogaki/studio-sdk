@@ -478,7 +478,7 @@ EOF
 
 A plugin that builds on another package's types names it in its manifest, one `def Depends "depends0" { str id = "acme.trees" }` block each; Studio loads it after them, and not at all without them.
 
-Start Studio: Settings ▸ Plugins lists Boxes, loaded or with the reason it isn't, and the Console says why a plugin was refused. Inside a Boxes object, Tab lists Box under Create; the node draws its box, the box handle drags its size and center, and the inspector shows Size and Center. Studio's Create menu offers the kinds a context's UI offers (`Creations`, in the next walkthrough), and projects that hold Boxes objects open with them.
+Start Studio: Settings ▸ Plugins lists Boxes, loaded or with the reason it isn't, and the Console says why a plugin was refused. Inside a Boxes object, Tab lists Box under Create; the node draws its box, the box handle drags its size and center, and the inspector shows Size and Center. Create, Tab and the A menu offer the kind's creations (`ObjectKindSpec::creations`): an empty Boxes object, which opens, and a Box, a Boxes object already holding a Box node. Projects that hold Boxes objects open with them.
 
 ## Where to go next
 

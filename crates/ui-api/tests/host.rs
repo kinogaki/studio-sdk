@@ -1,19 +1,18 @@
 //! A toy package's UI on the fake host: registering erases its state's
-//! type; its inspector, viewport layer, levels and creations run through
+//! type; its inspector, viewport layer and levels run through
 //! the host interface; its slot is undone with the document; its
 //! settings section round-trips; and a nested call is refused.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
-use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
+use kinogaki_studio_api::{ContextId, Error, Package, PackageId, Slot, SlotId};
 use studio_ui_api::gizmo::TransformTool;
 use studio_ui_api::host::{
     Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef,
     Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
-    ContextPart, Creation, Creations, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec,
-    Levels, Library, MarkingDefault, MenuDefaults, Places, Registered, Section, SettingsSection,
-    Shared, Situation, Start, Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem,
-    When, WithUi,
+    ContextPart, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library,
+    MarkingDefault, MenuDefaults, Places, Registered, Section, SettingsSection, Shared, Situation,
+    Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -70,8 +69,7 @@ impl UiPackage for Trees {
                 .with_library(library())
                 .with_levels(TreeLevels)
                 .with_viewport(TreeView)
-                .with_inspector(TreeInspector)
-                .with_creations(TreeCreations),
+                .with_inspector(TreeInspector),
         ]
     }
     fn settings(&self) -> Vec<SettingsSection> {
@@ -221,36 +219,6 @@ impl Inspector<Forest> for TreeInspector {
             more.push(next);
             cx.set_slot("Pick Tree", Picked(more));
         }
-    }
-}
-
-struct TreeCreations;
-
-impl Creations<Forest> for TreeCreations {
-    fn creations(&self) -> Vec<Creation> {
-        vec![Creation {
-            kind: ObjectKindId::declared("toy.trees.object"),
-            label: "Forest".into(),
-            aliases: vec!["woods".into()],
-            opens: true,
-            root_only: None,
-            starts: vec![Start {
-                id: "toy.trees.oak".into(),
-                label: "Oak".into(),
-                family: "Trees".into(),
-                aliases: Vec::new(),
-            }],
-        }]
-    }
-    fn start(
-        &self,
-        _s: &mut Forest,
-        cx: &mut dyn Cx,
-        _kind: ObjectKindId,
-        start: &str,
-    ) -> Result<(), String> {
-        cx.info(&format!("planted {start}"));
-        Ok(())
     }
 }
 
@@ -465,20 +433,6 @@ fn a_viewport_layer_reads_its_view_and_draws_through_the_painter() {
     assert_eq!(status.left, [("0 picked".to_owned(), false)]);
     let after = trees.with(|p, s| p.contexts[0].viewport.as_ref().unwrap().toolbar(s, &host));
     assert!(after[0].on);
-}
-
-#[test]
-fn creations_start_objects_through_the_package() {
-    let mut host = host();
-    let mut trees = hosted(&host);
-    let kind = ObjectKindId::declared("toy.trees.object");
-    let started = trees.with(|p, s| {
-        let creations = p.contexts[0].creations.as_ref().unwrap();
-        assert_eq!(creations.creations()[0].starts[0].label, "Oak");
-        creations.start(s, &mut host, kind, "toy.trees.oak")
-    });
-    assert_eq!(started, Ok(()));
-    assert_eq!(host.calls, [HostCall::Info("planted toy.trees.oak".into())]);
 }
 
 #[test]

@@ -38,9 +38,18 @@ fn the_package_registers_whole() {
     let levels = ui.contexts[0].levels.as_ref().unwrap().levels();
     let names: Vec<&str> = levels.iter().map(|l| l.label.as_str()).collect();
     assert_eq!(names, ["Pin", "Board"]);
-    // Create offers the board, which opens.
-    let creations = ui.contexts[0].creations.as_ref().unwrap().creations();
-    assert_eq!((creations[0].kind, creations[0].opens), (board(), true));
+    // Create offers the board, which opens; making one gives a board.
+    let kind = registry.object_kind(board()).unwrap();
+    let engines = kinogaki_render_api::Engines::new(Vec::new());
+    let cx = CreateCx::new(&engines, None);
+    let creations = kind.creations(&cx);
+    assert_eq!(
+        (creations[0].id.as_str(), creations[0].opens),
+        ("example.pins.board", true)
+    );
+    let made = kind.create("example.pins.board", &cx).unwrap();
+    assert_eq!(made.kind(), board());
+    assert!(kind.create("example.pins.other", &cx).is_err());
 }
 
 #[test]

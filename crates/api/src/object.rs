@@ -14,9 +14,9 @@
 //! shown grey, written back unchanged on save, and reported.
 use crate::codec::ObjectCodec;
 use crate::data::Data;
-use crate::id::{ContextId, DataTypeId, ObjectKindId};
+use crate::id::{ContextId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
-use kinogaki_render_api::{Aov, Declared, SettingValues};
+use kinogaki_render_api::{Aov, Declared, EngineDescription, Engines, SettingValues};
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -104,6 +104,93 @@ pub trait ObjectKindSpec: Send + Sync {
     fn handles(&self, body: &dyn ObjectBody) -> Vec<crate::cook::Handle> {
         let _ = body;
         Vec::new()
+    }
+
+    /// The ways an object level makes this kind's objects now (a Light of
+    /// each type the active engine renders; a Pin Board), each listed in
+    /// Create, Tab and the A menu by its id. Only what can be made now is
+    /// listed (what doesn't apply is hidden); a kind that stays at the root
+    /// ([`at_root`](Self::at_root)) is listed only there. None by default:
+    /// the kind isn't offered.
+    fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
+        let _ = cx;
+        Vec::new()
+    }
+
+    /// A new body for creation `id` (one of [`creations`](Self::creations)'),
+    /// which Studio adds selected, holding its creation's start and opened
+    /// as it says, in one undo step; `Err` with why it can't be made now
+    /// (a key or shelf run after the active engine changed).
+    fn create(&self, id: &str, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+        let _ = cx;
+        Err(format!("{id} isn't made here"))
+    }
+}
+
+/// One way an object level makes a kind's objects
+/// ([`ObjectKindSpec::creations`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct KindCreation {
+    /// Its item id, which menus, keys and shelves name it by
+    /// (`kinogaki.render.spot_light`, `example.pins.board`).
+    pub id: String,
+    /// What menus call it ("Spot Light").
+    pub label: String,
+    /// The menus' family it is listed in ("Lights", "Primitives"); empty:
+    /// with the other object kinds.
+    pub family: String,
+    /// More words search finds it by (other applications' names).
+    pub aliases: Vec<String>,
+    /// The new object opens, ready for its first node.
+    pub opens: bool,
+    /// The node its network starts with, displayed (a Mesh object holding
+    /// a Sphere); `None`: it starts empty.
+    pub start: Option<NodeTypeId>,
+    /// Where menus list it: by family (each family where its lowest member
+    /// is), then by this, lowest first; equal values keep install order.
+    /// Studio's own creations use negative values (Mesh −1000 … Printer
+    /// −100, lights −600) and Mesh's primitives 100 and up, so a plugin's
+    /// creation, 0 by default, lists after Studio's objects and before the
+    /// primitives unless it says otherwise.
+    pub order: i32,
+}
+
+impl KindCreation {
+    /// Creation `id` called `label`, with the other kinds, starting empty,
+    /// not opening, at order 0.
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            family: String::new(),
+            aliases: Vec::new(),
+            opens: false,
+            start: None,
+            order: 0,
+        }
+    }
+}
+
+/// What a kind's creations may depend on: the installed render engines,
+/// and the active Render Settings' engine, if any.
+#[derive(Clone, Copy)]
+pub struct CreateCx<'a> {
+    engines: &'a Engines,
+    active: Option<&'a EngineDescription>,
+}
+
+impl<'a> CreateCx<'a> {
+    /// Creating with `engines` installed, `active` rendering.
+    pub fn new(engines: &'a Engines, active: Option<&'a EngineDescription>) -> Self {
+        Self { engines, active }
+    }
+    /// The installed engines.
+    pub fn engines(&self) -> &'a Engines {
+        self.engines
+    }
+    /// The engine the active Render Settings name, if any.
+    pub fn active(&self) -> Option<&'a EngineDescription> {
+        self.active
     }
 }
 

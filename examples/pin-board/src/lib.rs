@@ -7,7 +7,8 @@
 //! ([`NetworkContext`], [`Package::with_context`]: every Pin Board holds
 //! one, which Studio keeps), and its UI, added with [`WithUi::with_ui`]:
 //!
-//! - the Pin Board in an object level's Create menu;
+//! - the Pin Board in an object level's Create menu (its kind's
+//!   [`creations`](ObjectKindSpec::creations));
 //! - two selection levels, Pin and Board (number keys 1 and 2 choose
 //!   them);
 //! - a Pin command and a Clear command, in Tab and on right-click (Clear
@@ -22,9 +23,8 @@ use kinogaki_studio_api::*;
 use std::sync::Arc;
 use studio_ui_api::host::{Cx, HostSlotsExt, InspectorCx, Waker};
 use studio_ui_api::package::{
-    ContextMenuSpec, ContextPart, Creation, Creations, Inspector, Invoked, LevelSpec, Levels,
-    Library, MenuEntry, Places, Shared, TabSpec, UiPackage, ViewMenus, Vocabulary, VocabularyItem,
-    WithUi,
+    ContextMenuSpec, ContextPart, Inspector, Invoked, LevelSpec, Levels, Library, MenuEntry,
+    Places, Shared, TabSpec, UiPackage, ViewMenus, Vocabulary, VocabularyItem, WithUi,
 };
 use studio_ui_api::sheet::{Field as Row, Schema as Rows};
 use studio_ui_api::{Id, SheetStyle, Ui, UiExt};
@@ -104,6 +104,19 @@ impl ObjectKindSpec for BoardKind {
     fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
         None
     }
+    /// The Pin Board in Create, Tab and the A menu: a new board opens,
+    /// ready for pinning.
+    fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
+        let mut board = KindCreation::new(board().as_str(), "Pin Board");
+        board.aliases = vec!["corkboard".into()];
+        board.opens = true;
+        vec![board]
+    }
+    fn create(&self, id: &str, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+        (id == board().as_str())
+            .then(|| self.new_body())
+            .ok_or_else(|| format!("{id} isn't a Pin Board"))
+    }
 }
 
 /// A board saves nothing but its kind.
@@ -143,8 +156,7 @@ impl UiPackage for PinsUi {
                 .with_library(library())
                 .with_levels(PinLevels)
                 .with_vocabulary(PinVocabulary)
-                .with_inspector(PinInspector)
-                .with_creations(BoardCreation),
+                .with_inspector(PinInspector),
         ]
     }
 }
@@ -236,32 +248,6 @@ impl Vocabulary<Pinning> for PinVocabulary {
     fn label(&self, _s: &Pinning, cx: &dyn Cx, item: &str) -> Option<String> {
         let n = cx.slot::<Pins>().0;
         (item == CLEAR).then(|| format!("Clear {n} Pins"))
-    }
-}
-
-/// The Pin Board in Create: a new board opens, ready for pinning. It
-/// offers no starts (a new object already holding a node).
-struct BoardCreation;
-
-impl Creations<Pinning> for BoardCreation {
-    fn creations(&self) -> Vec<Creation> {
-        vec![Creation {
-            kind: board(),
-            label: "Pin Board".into(),
-            aliases: vec!["corkboard".into()],
-            opens: true,
-            root_only: None,
-            starts: Vec::new(),
-        }]
-    }
-    fn start(
-        &self,
-        _s: &mut Pinning,
-        _cx: &mut dyn Cx,
-        _kind: ObjectKindId,
-        start: &str,
-    ) -> Result<(), String> {
-        Err(format!("a Pin Board has no start {start}"))
     }
 }
 

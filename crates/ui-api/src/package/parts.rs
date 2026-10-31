@@ -1,7 +1,6 @@
 //! A context's parts, one trait each, over the package's state `S`: the
 //! selection levels, the viewport layer, the inspector, the vocabulary,
-//! the network view, the object kinds' inspector and outliner rows, and
-//! the object levels' creations.
+//! the network view, and the object kinds' inspector and outliner rows.
 //!
 //! Each method gets the package's state and the call's context (`cx`);
 //! a query gets them shared (`&S`, `&dyn Cx`) and cannot change anything.
@@ -13,8 +12,8 @@
 //! part over `S` into the same part over `dyn Any`, downcasting the state
 //! the host lends back to `S`.
 use super::data::{
-    Candidate, ContextView, Creation, LevelPreset, LevelSpec, NumericBar, OutlineRow, Status,
-    TimeDomain, ToolbarItem, Tools,
+    Candidate, ContextView, LevelPreset, LevelSpec, NumericBar, OutlineRow, Status, TimeDomain,
+    ToolbarItem, Tools,
 };
 use super::edited::{Edited, TemplateMark};
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
@@ -412,23 +411,6 @@ pub trait OutlineRows<S: ?Sized>: Send + Sync {
     fn pick(&self, s: &mut S, cx: &mut dyn Cx, row: &OutlineRow);
 }
 
-/// The object kinds a context adds to an object level's Create, and the
-/// starts it offers with them.
-pub trait Creations<S: ?Sized>: Send + Sync {
-    /// Its creations. Read once.
-    fn creations(&self) -> Vec<Creation>;
-    /// Makes a new object of `kind` starting with `start` (one of its
-    /// creation's [`starts`](Creation::starts)) at the open object level,
-    /// selected, in one step.
-    fn start(
-        &self,
-        s: &mut S,
-        cx: &mut dyn Cx,
-        kind: ObjectKindId,
-        start: &str,
-    ) -> Result<(), String>;
-}
-
 /// A part over `S` as the same part over `dyn Any`: the host's state,
 /// lent as `dyn Any`, is downcast back to `S` for each call.
 pub struct Erased<S, P: ?Sized> {
@@ -708,20 +690,5 @@ impl<S: 'static> OutlineRows<dyn Any> for Erased<S, dyn OutlineRows<S>> {
     }
     fn pick(&self, s: &mut dyn Any, cx: &mut dyn Cx, row: &OutlineRow) {
         self.part.pick(own_mut(s), cx, row)
-    }
-}
-
-impl<S: 'static> Creations<dyn Any> for Erased<S, dyn Creations<S>> {
-    fn creations(&self) -> Vec<Creation> {
-        self.part.creations()
-    }
-    fn start(
-        &self,
-        s: &mut dyn Any,
-        cx: &mut dyn Cx,
-        kind: ObjectKindId,
-        start: &str,
-    ) -> Result<(), String> {
-        self.part.start(own_mut(s), cx, kind, start)
     }
 }
