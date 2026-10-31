@@ -306,3 +306,22 @@ fn the_triangulation_is_kept_and_its_refresh_after_a_drag_matches_a_whole_build(
     }
     assert!(fanned > 0, "the drags folded some polygons");
 }
+
+#[test]
+fn a_drag_that_flips_no_diagonal_keeps_the_triangle_columns() {
+    let before = grid(8);
+    let t = before.triangulation();
+    let mut positions = before.positions().to_vec();
+    // A small lift of one interior point: every polygon keeps its triangles.
+    positions[10][1] += 0.01;
+    let after = before.with_positions(positions.into()).unwrap();
+    let moved = after.triangulation_after(&before, &[10]);
+    assert!(moved.triangles().ptr_eq(t.triangles()));
+    assert!(moved.corners().ptr_eq(t.corners()));
+    // Folding a polygon changes its triangles, and so the column.
+    let mut positions = after.positions().to_vec();
+    positions[10][0] += 3.0;
+    let folded = after.with_positions(positions.into()).unwrap();
+    let refolded = folded.triangulation_after(&after, &[10]);
+    assert!(!refolded.triangles().ptr_eq(t.triangles()));
+}

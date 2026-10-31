@@ -315,7 +315,10 @@ fn build(value: &Polygons, polygons: Range<usize>) -> Triangulation {
 
 /// `previous` (over the same topology) with the polygons through `moved`
 /// clipped again at `value`'s positions; the layout is the topology's, so
-/// each polygon's triangles stay where they were.
+/// each polygon's triangles stay where they were. When every moved polygon
+/// keeps its triangles (its diagonals didn't flip), the columns are
+/// `previous`'s own, shared: a drag that changes no triangle changes no
+/// triangle column.
 fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangulation {
     let topology = value.topology();
     let point_faces = topology.index().point_faces();
@@ -326,8 +329,7 @@ fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangu
         .collect();
     polygons.sort_unstable();
     polygons.dedup();
-    let mut triangles = previous.triangles.to_vec();
-    let mut corners = previous.corners.to_vec();
+    let mut changed: Vec<(usize, Triangle)> = Vec::new();
     let mut fans: Vec<u32> = previous
         .fans
         .iter()
@@ -340,15 +342,25 @@ fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangu
         if !fanned.is_empty() {
             fans.push(p);
         }
-        for (i, t) in range.zip(&one) {
+        changed.extend(range.zip(one).filter(|(i, t)| {
+            previous.triangles[*i] != t.points || previous.corners[*i] != t.vertices
+        }));
+    }
+    fans.sort_unstable();
+    let (triangles, corners) = if changed.is_empty() {
+        (previous.triangles.clone(), previous.corners.clone())
+    } else {
+        let mut triangles = previous.triangles.to_vec();
+        let mut corners = previous.corners.to_vec();
+        for (i, t) in changed {
             triangles[i] = t.points;
             corners[i] = t.vertices;
         }
-    }
-    fans.sort_unstable();
+        (triangles.into(), corners.into())
+    };
     Triangulation {
-        triangles: triangles.into(),
-        corners: corners.into(),
+        triangles,
+        corners,
         primitives: previous.primitives.clone(),
         fans: fans.into(),
         offsets: previous.offsets.clone(),
