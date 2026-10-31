@@ -77,6 +77,42 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
     })
 }
 
+/// The kind and type info a standard attribute name always has (`N` a
+/// normal vector, `Cd` a color, `material` text…); `None` for a standard
+/// group's name and for any other name.
+///
+/// ```
+/// use kinogaki_geometry::{AttributeKind, TypeInfo, names};
+///
+/// assert_eq!(names::standard_type("N"), Some((AttributeKind::Vector, TypeInfo::Normal)));
+/// assert_eq!(names::standard_type("material"), Some((AttributeKind::Text, TypeInfo::None)));
+/// assert_eq!(names::standard_type("sharp"), None);
+/// assert_eq!(names::standard_type("acme:weight"), None);
+/// ```
+pub fn standard_type(name: &str) -> Option<(AttributeKind, TypeInfo)> {
+    match standard(name)? {
+        Standard::Attribute(kind, info) => Some((kind, info)),
+        Standard::Group(_) => None,
+    }
+}
+
+/// The class a standard group name always belongs to (`sharp` the edges,
+/// `.hidden` the primitives); `None` for any other name.
+///
+/// ```
+/// use kinogaki_geometry::{Class, names};
+///
+/// assert_eq!(names::standard_group("sharp"), Some(Class::Edge));
+/// assert_eq!(names::standard_group(".hidden"), Some(Class::Primitive));
+/// assert_eq!(names::standard_group("N"), None);
+/// ```
+pub fn standard_group(name: &str) -> Option<Class> {
+    match standard(name)? {
+        Standard::Group(class) => Some(class),
+        Standard::Attribute(..) => None,
+    }
+}
+
 /// Whether `name` may name an attribute or a group: a letter, `_` or `.`
 /// first, then letters, digits and `_ . : - /`, at most [`MAX_NAME`]
 /// bytes.

@@ -333,3 +333,57 @@ fn texts_are_equal_by_their_values_whatever_their_tables() {
     let compact = fresh.compacted();
     assert!(compact.indices().ptr_eq(fresh.indices()));
 }
+
+#[test]
+fn the_standard_types_are_the_ones_a_table_accepts() {
+    let attribute = |kind: AttributeKind, info: TypeInfo| match kind {
+        AttributeKind::Float => Attribute::float(vec![0.0]),
+        AttributeKind::Integer => Attribute::integer(vec![0]),
+        AttributeKind::Vector => Attribute::vector(vec![[0.0; 3]], info),
+        _ => Attribute::text(Text::from_strs(["a"])),
+    };
+    let standard = [
+        names::N,
+        names::V,
+        names::UV,
+        names::CD,
+        names::ALPHA,
+        names::WIDTH,
+        names::MATERIAL,
+        names::NAME,
+        names::PART,
+        names::INSTANCE,
+    ];
+    for name in standard {
+        let (kind, info) = names::standard_type(name).unwrap();
+        let t = Attributes::new();
+        assert!(
+            t.with(Class::Primitive, name, attribute(kind, info))
+                .is_ok(),
+            "{name}"
+        );
+        let other = if kind == AttributeKind::Float {
+            AttributeKind::Integer
+        } else {
+            AttributeKind::Float
+        };
+        assert!(
+            t.with(Class::Primitive, name, attribute(other, TypeInfo::None))
+                .is_err(),
+            "{name}"
+        );
+        assert_eq!(names::standard_group(name), None);
+    }
+    for (name, class) in [
+        (names::SHARP, Class::Edge),
+        (names::SMOOTH, Class::Edge),
+        (names::HIDDEN, Class::Primitive),
+    ] {
+        assert_eq!(names::standard_group(name), Some(class));
+        assert_eq!(names::standard_type(name), None);
+    }
+    assert_eq!(
+        names::standard_type(names::P),
+        Some((AttributeKind::Vector, TypeInfo::Point))
+    );
+}
