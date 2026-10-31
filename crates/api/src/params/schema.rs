@@ -162,6 +162,11 @@ pub struct Parameter {
     /// setting: Bevel's segments); `false` (a gesture's measure: Extrude's
     /// distance, a primitive's placement) starts at the default each run.
     pub remembered: bool,
+    /// Whether it can be keyed over time. Its kind gives the default
+    /// ([`ParameterKind::animatable`]); a type turns it off for a parameter
+    /// that shapes its ports or spares, or whose change should be one
+    /// deliberate edit.
+    pub animatable: bool,
 }
 
 impl Parameter {
@@ -173,6 +178,7 @@ impl Parameter {
         kind: ParameterKind,
         value: impl Into<Value>,
     ) -> Self {
+        let animatable = kind.animatable();
         Self {
             name: name.into(),
             label: label.into(),
@@ -188,7 +194,14 @@ impl Parameter {
             language: None,
             read_only: false,
             remembered: false,
+            animatable,
         }
+    }
+
+    /// Animatable or not (see [`animatable`](Self::animatable)).
+    pub fn animatable(mut self, on: bool) -> Self {
+        self.animatable = on;
+        self
     }
 
     /// Remembered by its tool (see [`remembered`](Self::remembered)).
@@ -397,6 +410,34 @@ pub struct CurveChannel {
 }
 
 impl ParameterKind {
+    /// Whether a parameter of this kind can be keyed over time unless its
+    /// type says otherwise: numbers, integers, vectors, colors, channels,
+    /// toggles, choices, ramps, tone curves and palettes can; text of every
+    /// kind (text, code, files, paths, references, attributes, groups,
+    /// texts) can't.
+    pub fn animatable(&self) -> bool {
+        match self {
+            Self::Number(_)
+            | Self::Integer { .. }
+            | Self::Vector { .. }
+            | Self::Color
+            | Self::Channels(_)
+            | Self::Toggle
+            | Self::Choice(_)
+            | Self::Ramp { .. }
+            | Self::ToneCurves { .. }
+            | Self::Palette { .. } => true,
+            Self::Text
+            | Self::Code
+            | Self::File
+            | Self::Path
+            | Self::Reference(_)
+            | Self::Attribute
+            | Self::Group
+            | Self::Texts => false,
+        }
+    }
+
     /// Whether `value` is of the variant this kind holds (and, for vectors
     /// and colors, has the right count).
     pub fn accepts(&self, value: &Value) -> bool {
@@ -640,5 +681,15 @@ mod tests {
         };
         assert!(vector.accepts(&Value::Numbers(vec![0.0; 2])));
         assert!(!ParameterKind::Toggle.accepts(&Value::Number(1.0)));
+    }
+
+    #[test]
+    fn kinds_give_the_animatable_default() {
+        let size = Parameter::new("size", "Size", ParameterKind::Number(Number::plain()), 1.0);
+        assert!(size.animatable && !size.clone().animatable(false).animatable);
+        let code = Parameter::new("code", "Code", ParameterKind::Code, "");
+        assert!(!code.animatable);
+        assert!(ParameterKind::Choice(vec!["A".into()]).animatable());
+        assert!(!ParameterKind::Texts.animatable());
     }
 }

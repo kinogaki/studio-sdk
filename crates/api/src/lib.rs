@@ -44,7 +44,8 @@
 //! bounds), [`params`] (parameter values, schemas, diagnostics),
 //! [`element`] (the project's element tree codecs write), [`viewport`]
 //! (display surfaces, element sets, picks), [`refs`] (the host's objects
-//! and nodes) and [`render`] (neutral render items).
+//! and nodes), [`render`] (neutral render items), [`time`] (the scene's
+//! time) and [`anim`] (a parameter's keys over time).
 //!
 //! **Self-contained.** The crate depends on the standard library and the
 //! SDK's leaf crates alone (the standard geometry values, the render
@@ -57,6 +58,7 @@
 //! Every value crosses as a Rust type: Studio and its packages are built
 //! by one compiler and share one copy of each crate, so `TypeId`s and
 //! downcasts agree across packages.
+pub mod anim;
 pub mod cancel;
 pub mod codec;
 pub mod components;
@@ -91,6 +93,7 @@ pub mod viewport;
 /// The standard geometry values: what the [`standard`] data types are.
 pub use kinogaki_geometry as geometry;
 
+pub use anim::{Interp, Key};
 pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
