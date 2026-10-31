@@ -73,7 +73,10 @@ pub struct Reads {
 }
 
 /// What core resolved one of a node's path parameters to
-/// ([`Reads::objects`]).
+/// ([`Reads::objects`]). A parameter that names nothing is core's to
+/// report: core warns about it on the node (what isn't installed, or that
+/// nothing is there), and the node sees no object, or a blank path, and
+/// says nothing about it itself.
 #[derive(Clone, Debug)]
 pub enum Resolved {
     /// What the path names: an object's result, or a node's.

@@ -130,7 +130,9 @@ impl<'a> CookCx<'a> {
     }
 
     /// Path parameter `name` as core resolved it (absolute), when the node
-    /// reads objects and core resolved it to a path.
+    /// reads objects and core resolved it to a path: blank when it names
+    /// nothing, which core warns about on the node (what isn't installed,
+    /// or that nothing is there), so the node doesn't warn about it itself.
     pub fn path(&self, name: &str) -> Option<&str> {
         self.resolved.iter().find_map(|(n, r)| match r {
             Resolved::Path(path) if n == name => Some(path.as_str()),
