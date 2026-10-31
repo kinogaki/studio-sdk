@@ -1,7 +1,6 @@
 //! [`Incremental`] cooking: a node prepares reusable work once and updates
 //! from it while only light parameters change (an Extrude's distance
-//! during a drag). This is lib-mesh's `cook_prepared` and `ToolPlan` as a
-//! node capability.
+//! during a drag), as a node capability.
 use crate::cook::{CookCx, CookError, Outputs};
 use crate::data::Data;
 use std::sync::Arc;

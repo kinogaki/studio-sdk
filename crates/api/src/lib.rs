@@ -31,8 +31,10 @@
 //! - **Icons** ([`icon`]): the named icons a package adds to Studio's
 //!   icon set, under its own id.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
-//!   and the environment's table of it all; a plugin library exports its
-//!   package through [`export_package!`] ([`entry`]).
+//!   its UI included ([`PackageUi`]), and the environment's table of it
+//!   all, which admits a package only once its checks pass
+//!   ([`Registry::check`]); a plugin library exports its package through
+//!   [`export_package!`] ([`entry`]).
 //!
 //! And the plain types those exchange: [`math`] (vectors, placements, units,
 //! bounds), [`params`] (parameter values, schemas, diagnostics),

@@ -4,8 +4,9 @@
 //! display, picking, the spreadsheet and rendering.
 //!
 //! A kernel package implements one `DataType` per kind of value it defines
-//! (`kinogaki.mesh.geometry` over lib-mesh's `Mesh`, `kinogaki.cad.body`
-//! over lib-cad's bodies) and registers it in its [`Package`](crate::Package).
+//! (Studio's Mesh plugin registers `kinogaki.mesh.geometry` over its mesh
+//! kernel's meshes, its CAD plugin `kinogaki.cad.body` over its solid
+//! bodies) and registers it in its [`Package`](crate::Package).
 //! A facet a type doesn't offer is simply absent: a type without
 //! [`Displayable`] isn't drawn, one without [`Renderable`] isn't rendered,
 //! and nothing fails.

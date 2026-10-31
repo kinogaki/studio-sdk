@@ -4,9 +4,10 @@
 //! the environment creates an element for a value or a body (its kind and
 //! place are the environment's) and hands the codec an
 //! [`ElementWriter`] to fill it, or an [`ElementReader`] to read it back.
-//! The environment stores nothing of its own inside that element, so a
-//! type that is not installed leaves its elements untouched: the file
-//! still opens and saves them back as they were.
+//! The environment stores nothing of its own inside that element. A
+//! project holding values of a type no installed package registers still
+//! opens: those values, and what holds them, are skipped, the Console
+//! says what was skipped and why, and saving writes only what loaded.
 //!
 //! Codecs follow the project's rules: strict reading (no defaults for
 //! missing values, no fallbacks) and no version fields. A body that needs

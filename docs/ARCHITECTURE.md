@@ -8,7 +8,7 @@ Two leaf crates sit below them, so kernels can depend on a contract without depe
 - `kinogaki-render-api` (`crates/render-api`) is the render interface between a host and its engines (see [Rendering](#rendering)).
 - `kinogaki-viewport-api` (`crates/viewport-api`) is the viewport packet contract: what a data type hands the viewport to draw (see [The viewport](#the-viewport)).
 
-This page explains how their parts fit together and the rules packages follow. The rustdoc on each item is the reference.
+This page explains how their parts fit together and the rules packages follow. The rustdoc on each item is the reference. To write a plugin step by step, start with [Write your first node plugin](FIRST-NODE-PLUGIN.md), then [Write your first context plugin](FIRST-CONTEXT-PLUGIN.md).
 
 # The headless API
 
@@ -18,8 +18,8 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 
 | Kind | Registers here | Example |
 |---|---|---|
-| Kernel | data types (`DataType`), how held edits apply to them (`HeldEdit`) and their session state (`SessionSlot`) | the mesh kernel adapter: `kinogaki.mesh.geometry` over lib-mesh |
-| Node package | node types (`NodeType`: description and cook) and object kinds (`ObjectKindSpec`); contexts through the UI interface | Mesh objects, the Mesh nodes and the Mesh context |
+| Kernel | data types (`DataType`), how held edits apply to them (`HeldEdit`) and their session state (`SessionSlot`) | Studio's Mesh plugin's kernel: `kinogaki.mesh.geometry` over its mesh library |
+| Node package | node types (`NodeType`: description and cook), the network contexts they live in (`NetworkContext`) and object kinds (`ObjectKindSpec`); the contexts' UI through the UI layer | Mesh objects, the Mesh nodes and the Mesh context |
 | Bridge | conversions (`Conversion`) between two kernels' types | Tessellate: `kinogaki.cad.body` → `kinogaki.mesh.geometry` |
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
 | Render | engines (`Package::engines`, the `wgpu` feature); they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
@@ -30,7 +30,11 @@ A package with a UI carries it: `Package::ui` holds the parts the host UI interf
 
 ## Plugin libraries
 
-A plugin is a Rust dylib that exports its one `Package`, UI included, through `export_package!(make)`: the macro writes the entry Studio looks up (`entry::SYMBOL`, of type `entry::Entry`), catches a panic in `make`, and keeps `unsafe` out of the plugin's own code, so its crate keeps `unsafe_code = "forbid"`. Studio and its plugins share one standard library and one build of each shared crate, so values cross as plain Rust types and `TypeId`s agree. A plugin is therefore built with the exact compiler this repository pins (`rust-toolchain.toml`) against the build of the SDK its Studio release ships; Studio reads the plugin's manifest and refuses one built for another build before loading it, and never unloads a plugin it loaded.
+A plugin is a Rust dylib that exports its one `Package`, UI included, through `export_package!(make)`: the macro writes the entry Studio looks up (`entry::SYMBOL`, of type `entry::Entry`), catches a panic in `make`, and keeps `unsafe` out of the plugin's own code, so its crate keeps `unsafe_code = "forbid"`. Studio and its plugins share one standard library and one build of each shared crate, so values cross as plain Rust types and `TypeId`s agree.
+
+A plugin is therefore built with the exact compiler this repository pins (`rust-toolchain.toml`) against the **plugin kit** of the Studio release it runs in: the build of the SDK that release ships, with its standard library and its kit id. The kit's README gives the build command. A plugin is developed and unit-tested with plain cargo against this repository, and built against the kit to ship.
+
+Studio looks for plugins in its own plugin folder and the user's (macOS: `~/Library/Application Support/Kinogaki Studio/plugins`; Windows: `%APPDATA%\Kinogaki Studio\plugins`; Linux: `$XDG_CONFIG_HOME/kinogaki-studio/plugins`, else `~/.config/kinogaki-studio/plugins`), in one folder per kind (`kernels/`, `nodes/`, `formats/`, `renders/`). Each plugin is its library and a manifest beside it, `<name>.prisma`, naming its package id, kind, version, the kit it was built with and the packages it depends on. Studio reads the manifests first, refuses a plugin built for another kit or missing a dependency without opening it, loads the rest in dependency order, admits each package through the registry, and never unloads a plugin it loaded. Settings ▸ Plugins lists every plugin found, loaded or not, with the reason.
 
 ## Ids
 
@@ -78,8 +82,10 @@ Facets are optional:
 
 | Facet | Used by | Notes |
 |---|---|---|
-| `Displayable` | the viewport | levels (`ElementKind`s), `prepare` → `Drawn` (pieces: packets with their placements, roles and how they draw while the object is open, plus type-owned detail) over the value shown before, `refine` once a value rests, `highlight` → `ElementSet`, and `convert` |
+| `Displayable` | the viewport | levels (`ElementKind`s), `prepare` → `Drawn` (pieces: packets with their placements, roles and how they draw while the object is open, plus type-owned detail) over the value shown before, `refine` once a value rests, `highlight` → `ElementSet`, `convert`, the status bar's counts (`tally` → `Tally`s) and a selection's box for the pivot (`bounds_of`) |
 | `Pickable` | viewport picking | the host finds packet elements (`Hit`s, box `ElementSet`s); the facet turns them into `Components` and combines selections |
+| `ObjectPicking` (`picking`) | the object levels | how an object holding the value is hit by a `WorldRay` and framed; without it core frames the value by its `bounds` and doesn't pick it |
+| `Look` (`look`) | shading | the pieces' colors while shaded and whether the value renders as a volume; without it the value shows as clay |
 | `Tabular` | the spreadsheet | tables, columns, and cells read a range of rows at a time |
 | `Renderable` | render sync | `RenderItem::Triangles` over a `TriangleSource`, placed once or many times |
 
@@ -102,7 +108,7 @@ A package owns only what a node is and computes. It implements `NodeType`:
 - the description's `handles`: viewport handles bound to its parameters, as Houdini's handle bindings. A `Handle` names its kind (`Translate`, `Rotate`, `Orient` and `Scale` on Studio's transform gizmo, shown while the matching transform tool is active; `Pivot`, `Distance`, `Radius`, `Direction`, `Box` and `Sphere` as dots and rings on their shape), the parameters it reads and writes (a `Vector` is one three-number parameter or three `Scalar`s; a `Scalar` is a number parameter, one number of a vector parameter, or fixed), its space (object or world), an optional placement `Frame` (Position, Up and Turn) its places are in, an anchor (which point of a shape its center names: a box built on its base), a constraint (one axis or one plane), a range for the numbers it writes, and the parameter values it shows for. Studio draws, hit-tests, snaps and drags them while the node is selected, writes the parameters as the pointer moves (the node recooks, incrementally where it can) and records one undo step a drag. A tool that needs more than a binding draws through the UI's `GizmoService` instead;
 - `cook(cx, inputs)`: the outputs (`Outputs`: one `Data` per output port, the selection output 0 carries downstream, warnings) or a `CookError` (cancelled, or failed with diagnostics). An output nothing reads (`cx.wants(k)` is false) needn't be made;
 - `reads(parameters)`: what besides inputs and parameters invalidates a node with those parameters, as data (time, input names, selection). What a node doesn't declare, core withholds from its `CookCx`, so it can't depend on it by accident;
-- `incremental()`, optionally: `prepare` returns the outputs and a `CookPlan`, and the plan's `update` produces outputs for new light parameters (a drag) until it returns `None`. This is lib-mesh's `cook_prepared` / `ToolPlan` as a capability. Plans live in core's cache, never in the project or undo.
+- `incremental()`, optionally: `prepare` returns the outputs and a `CookPlan`, and the plan's `update` produces outputs for new light parameters (a drag) until it returns `None`. Plans live in core's cache, never in the project or undo.
 
 `CookCx` gives a cook:
 - parameters by name (`Parameters` of `params::Value`; typed reads fail with the parameter's name);
@@ -116,6 +122,28 @@ Packages keep no evaluator, worker or private cache.
 ## Held edits
 
 Edit Mesh and Edit CAD hold an authored delta over their input. Core owns the mechanism: capturing the input once as the base, keeping one result per held state that its copies (undo snapshots) share, applying the delta anew when it changes, and undo. A package supplies `HeldEdit` for its deltas: the registry keys it by the deltas' data type, which a held node's type names (`NodeType::held`), so one package declares how one type of delta applies. It gives the base data type, the delta's data type (so a delta saves, stamps and counts memory like any value), which other inputs a delta reads (`reads_input`: what it projects onto), and `apply(cx, base, delta, inputs)`, which returns the node's outputs and may keep prepared work in the node's scratch slot. How deltas are authored interactively is the package's UI, through `studio-ui-api`.
+
+## Networks and contexts
+
+A **context** is one `ContextId` naming a kind of editing (Mesh, Comp, a package's own). It has two halves, each declared by the package that owns the context:
+- **its networks**, as data: a `NetworkContext`, registered with `Package::with_context`. It says how the context's networks evaluate (`Evaluation::Cook`, node by node, or `Compile`, below), which core flags their nodes offer (`FlagSet`: Bypass, Template, Freeze), whether deleting a node heals the chain, how the network pane draws their nodes (`NodeLayout`), and the element they are stored under (`NetworkStorage`);
+- **its UI**: a `ContextPart` of the package's `UiPackage` (see [The UI layer](#the-ui-layer)): what Tab, keys, menus and the viewport offer while the user works in it, its selection levels, its inspector.
+
+A headless package declares only the first half: its context's nodes are then drawn, edited and inspected by Studio's own UI.
+
+An **object kind** names the context its objects open into (`ObjectKindSpec::context`). Core keeps one network of that context beside each such object's body: it creates, edits, validates, cooks, undoes and saves it, as Houdini's host owns its node graphs, and the body never holds it. The object's result is what its network yields (`NetworkRead::yielded`): its `NodeRole::Output` node, else the node its display flag is on.
+
+**Node types say where they are offered.** `Description::context` names each context whose networks offer a type, and `Description::listed` says where Tab, the menus and the shelves list it there: a section ("Create"), a `Category` that colors its tile, a family within the section and search aliases. A type without a listing is still added by code and by files, never by Tab.
+
+**One node shape.** Every node of every context is its type, its `Parameters`, its input wires, the core flags and, optionally, a held delta or the outputs it keeps while frozen. Core stores a network as one child element of its object's element, spelt as `NetworkStorage::element` says, with an element per node: its type, name and position, its flags, its wires, its parameters in one layout every type shares, and its delta and kept outputs through their data types' codecs. Packages never write networks themselves.
+
+**Reading and editing.** A package reads a network through `NetworkRead` (its nodes by the host's `NodeRef`s, each node's `NodeInfo`, the displayed and the yielded node) and edits it through `NetworkEdit`: add a node (`NewNode`, placed by `Place::At`, `After` a node or `Grow`n from what the level displays), rename, move, set parameters, connect and disconnect, set flags and the display, remove, hold a delta, freeze. Each call refuses what doesn't fit (an unknown node, a port the node hasn't got, a value its parameter doesn't take, a flag the context doesn't offer) and changes nothing then. New parameters go through the type's `created` and edited ones through its `edited`, on every path (Tab, the inspector, `NetworkEdit`), so all paths agree. A package's UI reaches an object's network through `HostNetwork` (`network`, `edit_network`); each `edit_network` is one undo step, checked whole when it commits (no cycles, required values) and dropped when that fails.
+
+## Compiled contexts
+
+A context declared `compiled()` (Comp's, shading's) isn't cooked node by node. Its node types are ordinary `NodeType`s for their descriptions, ports and rows, but core never calls their `cook`. Core flattens the network into a `Flat` (subnets resolved, nodes in cook order) and hands it, with the output to show, to the context's `NetworkCompiler`. The compiler returns a `Compiled`: the package's own plan, opaque to the host, and the render outputs the plan reads (`CompileCx::outputs` lists those the render writes). Core keeps the plan until the network's topology or a flattened node's parameters change.
+
+The package that declares a compiled context registers its compiler (`Package::with_compiler`, exactly one per compiled context: the registry refuses a compiled context without one, and a compiler or runner for any other context). With the `wgpu` feature it also brings the plan's runner (`Package::runners`: a `PlanRunner` makes a `Runner` on the host's device, which runs plans on the GPU). A runner that shows display values asks the host's `ViewTransforms` for the view's transform as WGSL, so its images go through the same view transform as the viewport's.
 
 ## Saving
 
@@ -176,6 +204,16 @@ Some state belongs to a package and lasts only for the session: a selection, pic
 `SessionSlots` holds every slot's value, shared and copy-on-write: a clone is a snapshot (one pointer a value), and changing a value copies it only while a snapshot still shares it. Studio keeps its undo history with these tables.
 
 Session state is never saved in the project.
+
+## Stored values
+
+Some values belong to a package and to the project rather than to an object: CAD's tolerances and display quality for the project, its rows for each view. A package declares each as a value type implementing `Stored` and registers it (`StoredValue::of::<T>()`, `Package::with_stored`):
+- `id`, the name of its element in the project;
+- `scope`: one value for the project (`Scope::Project`) or one per view (`Scope::View`);
+- `defaults`, what a new project or view starts with;
+- `write` and `read`, its codec; reading is strict, as codecs' is.
+
+The host keeps them in `StoredValues` tables (the project's, and one per view), shared and copy-on-write like session slots, and saves each into the project under an element naming its package, so a project holding a value of a package that isn't installed skips it. A package's UI reads and sets them through `HostDoc` (typed through `HostDocExt::stored`); a project value's change is a change to the project, saved with it, while a view's isn't undone. A cook reads the project's values when its node declares `Reads::project` (`CookCx`'s `Project`).
 
 ## Icons
 
@@ -267,11 +305,13 @@ Some pure maths the host's own tools use lives here, so a plugin's tools hit, dr
 
 ## The host interface
 
-A package's UI never sees the editor. Each call into it gets a context, `&mut dyn host::Cx`, reaching the host's capabilities, one trait each: `HostUndo` (gestures, undo, redo), `HostSlots` (typed through `HostSlotsExt`), `HostSelection`, `HostDoc` (where the user is, objects and their bodies), `HostView`, `HostStatus`, `HostShell`, `HostTransform` and `HostSettings` (typed through `HostSettingsExt`); plus the plain `HostPrefs`, the wake for the package's workers, and two services over the host's drawing: `GizmoService` (a view's transform gizmo) and `UnitsService` (numbers in the user's units). A view's parts get a `ViewCx` (the view as data: rectangle, response, pointer, modifiers, camera), the inspector an `InspectorCx`.
+A package's UI never sees the editor. Each call into it gets a context, `&mut dyn host::Cx`, reaching the host's capabilities, one trait each: `HostUndo` (gestures, undo, redo), `HostSlots` (typed through `HostSlotsExt`), `HostSelection`, `HostDoc` (where the user is, objects and their bodies, stored values), `HostNetwork` (objects' networks, read and edited), `HostView`, `HostStatus`, `HostShell`, `HostTransform` and `HostSettings` (typed through `HostSettingsExt`); plus the plain `HostPrefs`, the wake for the package's workers, and two services over the host's drawing: `GizmoService` (a view's transform gizmo) and `UnitsService` (numbers in the user's units). A view's parts get a `ViewCx` (the view as data: rectangle, response, pointer, modifiers, camera), the inspector an `InspectorCx`.
 
-**A package's UI** (`package::UiPackage`) is a state type, its contexts (`ContextPart<S>`: a `Library` and optional `Levels`, `ViewportLayer`, `Inspector`, `Vocabulary`, `ObjectRows`, `OutlineRows`, `Creations`) and its settings sections (`Section`, `SettingsSection`); its id, label and slots are its `Package`'s. `Package::with_ui` (`package::WithUi`) adds it to the package and erases the state's type, and the host reads it back with `Registered::of`. The host keeps the state, and for each call the host takes the state out, lends it to the part with the call's context, and puts it back. Host methods never call back into a package; what would (an undo ending a live tool, an action) is queued until the call returns. Undo never holds a package's state: it restores the document and the slots.
+**A package's UI** (`package::UiPackage`) is a state type, its contexts' UI halves (`ContextPart<S>`, under the context's id: a `Library` and optional `Levels`, `ViewportLayer`, `Inspector`, `Vocabulary`, `ObjectRows`, `OutlineRows`, `Creations`, `Results`; the network half is the context's `NetworkContext`, see [Networks and contexts](#networks-and-contexts)) and its settings sections (`Section`, `SettingsSection`); its id, label and slots are its `Package`'s. `Package::with_ui` (`package::WithUi`) adds it to the package and erases the state's type, and the host reads it back with `Registered::of`. The host keeps the state, and for each call the host takes the state out, lends it to the part with the call's context, and puts it back. Host methods never call back into a package; what would (an undo ending a live tool, an action) is queued until the call returns. Undo never holds a package's state: it restores the document and the slots.
 
 **The library.** What a context offers the host's menus is data, read once when the package registers: its items (each tool, command or node by its stored name, with its label, family, search words, Tab section, the levels it applies at and which surfaces offer it), its key store and default bindings, its A/S/D marking menus and shelves (the user's to edit, kept under the menus' store name), its right-click menus and menu bar sections (each for a level, a selection or none, inside a held edit or outside one), how Tab lists its items (tools over the views while it edits, else nodes; a Suggested category) and the viewport chrome it takes (the shared Shading rows, its own analysis modes, the snap steps, the starting pivot). A context may share another's keys or menus (`Shared::Of`). The host builds every one of those surfaces from it. An entry that can't apply is left out, never greyed: its `When` (level, selection, held edit) and the vocabulary's `shown` decide; `label` renames an item by its state ("Repeat Bevel"). The vocabulary runs the items.
+
+**Results.** A context's `Results` part is how it takes the host's cooks of its objects. The host cooks every object and keeps, reports and publishes what comes back; a context keeps only its gestures' part. While one of its gestures stands on what the open object shows (a drag previewing over the shown packet), `hold` keeps the next answer waiting; `takes` may refuse to show a gesture's earlier state or a refinement for now; `shown` hears whenever what the open object shows changes (a `Shown` change), so the context drops or resumes its gestures; and `wants` names nodes to cook besides what objects show, whose results come back through `cooked`.
 
 **The edited surface.** Core renders every view. While a context's object is open, its `ViewportLayer::edited` returns, per view and frame, an `Edited`: the packet being edited, its selection, a live preview, overlay and guide layers, face normals, the soft-selection tint, the line highlight, colors and scalars, the hover, which of its parts draw (`SurfaceLook`), the view's own lines and the sketch-like grid and section planes. Everything in it is an `Arc` of the packet contract's types, so core borrows it into its renderer's scene without a copy and the renderer uploads only what changed allocation. `template_mark` says how the open object's templated pieces are marked. A context's own objects and line layers (`ContextView`, from `layers`) are packets and `SceneLines` too, its objects shaded or see-through (`ghost`).
 
@@ -279,6 +319,8 @@ Rules: every call runs on the UI thread and returns at once; a query gets `&S` a
 
 ## Testing
 
-`testing::FakeHost` stands in for Studio's host interface (slots with a real undo history, selections, a place, views and settings sections as plain fields, every request recorded as a `HostCall`), and `testing::Hosting` calls a registered package's parts on it as the host does.
+`testing::FakeHost` stands in for Studio's host interface (slots and objects' networks with a real undo history, selections, a place, views and settings sections as plain fields, every request recorded as a `HostCall`), and `testing::Hosting` calls a registered package's parts on it as the host does.
+
+`testing::FakeNetwork` is one object's network in memory, made from the packages whose node types it holds. It answers `NetworkRead` and `NetworkEdit` as core does, refusing what core refuses, and cooks a node through its type (`cook`). Put into `FakeHost::networks`, it is what a package's tools edit through `HostNetwork`, one undo step an edit; so a tool's network edits, and a node type in a network, are tested without Studio. It is a test double, not core: it caches nothing and cooks every node anew, and its rustdoc lists where it is simpler than core.
 
 `testing::RecordingUi` and `testing::RecordingPainter` are headless fakes: they lay widgets out simply, record every call and every shape, and play back scripted user actions (click a button, edit a sheet field, type into a field, pick a choice). A plugin's unit tests drive its panels with them, with no window and no GPU.
