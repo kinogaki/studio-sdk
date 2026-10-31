@@ -30,8 +30,8 @@ pub trait Results<S: ?Sized>: Send + Sync {
     fn hold(&self, s: &mut S, cx: &mut dyn Cx) -> bool;
     /// Whether the open object may show `change` now: a gesture's earlier
     /// state ([`ShownKind::Continuing`]) or a refinement
-    /// ([`ShownKind::Refined`]). Answers, failures and closings always
-    /// show. By default, yes.
+    /// ([`ShownKind::Refined`]). Answers, failures, openings and closings
+    /// always show. By default, yes.
     fn takes(&self, s: &S, cx: &dyn Cx, change: &Shown) -> bool {
         let _ = (s, cx, change);
         true
@@ -92,6 +92,9 @@ pub enum ShownKind {
     /// No object is open (an object level), or the open one has no result
     /// yet.
     Closed,
+    /// An object was opened (or the root returned to): its cooked result
+    /// shows without a cook (`result` is `None` when it has none yet).
+    Opened,
 }
 
 impl<S: 'static> Results<dyn Any> for Erased<S, dyn Results<S>> {
