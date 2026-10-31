@@ -25,13 +25,28 @@ pub enum DisplayQuality {
     Fine,
 }
 
-/// What [`Displayable::prepare`] is asked for: the quality, and the
-/// object's body when the value is an object's result (its display
-/// settings: a mesh's subdivision display).
+/// What a value is drawn for.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum DrawPurpose {
+    /// As what its object shows.
+    #[default]
+    Shown,
+    /// As a templated node's result beside what the open object shows.
+    /// The host draws its pieces as [`Role::Template`]; a type may draw
+    /// templates differently (a mesh of points alone keeps a piece for its
+    /// points, another type might draw wires).
+    Template,
+}
+
+/// What [`Displayable::prepare`] is asked for: the quality, what the
+/// value is drawn for, and the object's body when the value is an
+/// object's result (its display settings: a mesh's subdivision display).
 #[derive(Clone, Default)]
 pub struct DisplayRequest {
     /// How finely.
     pub quality: DisplayQuality,
+    /// What it is drawn for.
+    pub purpose: DrawPurpose,
     /// The object's body, when the value is an object's result.
     pub body: Option<Arc<dyn ObjectBody>>,
 }
@@ -40,6 +55,7 @@ impl fmt::Debug for DisplayRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DisplayRequest")
             .field("quality", &self.quality)
+            .field("purpose", &self.purpose)
             .field("body", &self.body.is_some())
             .finish()
     }

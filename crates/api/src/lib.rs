@@ -95,9 +95,9 @@ pub use data_type::{Color, DataType, InfoRow, Stamp};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use error::Error;
 pub use facets::{
-    CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, Drawn, Look, Materials,
-    ObjectPicking, Pickable, Piece, Renderable, Role, SnapHit, SnapKind, SnapQuery, SnapTargets,
-    Snappable, Table, TableColumn, Tabular, Tally, WhenOpen, WorldRay,
+    CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn,
+    Look, Materials, ObjectPicking, Pickable, Piece, Renderable, Role, SnapHit, SnapKind,
+    SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally, WhenOpen, WorldRay,
 };
 pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};
 pub use held::HeldEdit;

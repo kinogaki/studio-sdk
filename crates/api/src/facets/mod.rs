@@ -20,7 +20,7 @@ mod snap;
 mod table;
 
 pub use display::{
-    DisplayQuality, DisplayRequest, Displayable, Drawn, Piece, Role, Tally, WhenOpen,
+    DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally, WhenOpen,
 };
 pub use object::{Look, Materials, Matrix, ObjectPicking, WorldRay};
 pub use pick::{Combine, Pickable};
