@@ -11,12 +11,17 @@ egui is Copyright (c) 2018-2021 Emil Ernerfeldt <emil.ernerfeldt@gmail.com> and 
 
 ## Dependencies
 
-The SDK contains no third-party code beyond the above. Its default build depends on the Rust standard library alone. Two optional features bring crates.io dependencies, which carry their own licenses and are not copied into this repository:
+The SDK contains no third-party code beyond the above. Its crates.io dependencies carry their own licenses and are not copied into this repository. Its default build depends on two, which `kinogaki-geometry` needs:
+
+- [blake3](https://crates.io/crates/blake3) 1.8.7 (CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception), the topology fingerprint;
+- [bytemuck](https://crates.io/crates/bytemuck) 1.25.2 (Zlib OR Apache-2.0 OR MIT), plain records and casts into columns.
+
+Two optional features bring more:
 
 - [wgpu](https://crates.io/crates/wgpu) 30.0.1 (MIT OR Apache-2.0), with `kinogaki-render-api`'s `wgpu` feature (and `kinogaki-studio-api`'s, which turns it on);
-- [bytemuck](https://crates.io/crates/bytemuck) 1.25.2 (Zlib OR Apache-2.0 OR MIT), with `kinogaki-viewport-api`'s `bytemuck` feature.
+- bytemuck's derives on the viewport records, with `kinogaki-viewport-api`'s `bytemuck` feature.
 
-A build with those features also uses the crates they depend on. The table lists them for every target platform, as `Cargo.lock` pins them (a build links only its own platform's); "Linked" says whether a crate's code ends up in a build, or only runs while building (procedural macros and what they use). It is what this command prints:
+A build also uses the crates these depend on. The table lists them for every target platform, as `Cargo.lock` pins them (a build links only its own platform's); "Linked" says whether a crate's code ends up in a build, or only runs while building (procedural macros and what they use). It is what this command prints:
 
 ```sh
 cargo tree --locked --workspace -e normal --target all --prefix none --format "{p}|{l}" \
@@ -32,12 +37,15 @@ cargo tree --locked --workspace -e normal --target all --prefix none --format "{
 | [bit-set](https://crates.io/crates/bit-set) | 0.10.0 | Apache-2.0 OR MIT | yes |
 | [bit-vec](https://crates.io/crates/bit-vec) | 0.9.1 | Apache-2.0 OR MIT | yes |
 | [bitflags](https://crates.io/crates/bitflags) | 2.13.2 | MIT OR Apache-2.0 | yes |
+| [blake3](https://crates.io/crates/blake3) | 1.8.7 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | yes |
 | [block2](https://crates.io/crates/block2) | 0.6.2 | MIT | yes |
 | [bumpalo](https://crates.io/crates/bumpalo) | 3.20.3 | MIT OR Apache-2.0 | no: build time only (procedural macros) |
 | [bytemuck](https://crates.io/crates/bytemuck) | 1.25.2 | Zlib OR Apache-2.0 OR MIT | yes |
 | [bytemuck_derive](https://crates.io/crates/bytemuck_derive) | 1.12.1 | Zlib OR Apache-2.0 OR MIT | no: build time only (procedural macros) |
 | [cfg-if](https://crates.io/crates/cfg-if) | 1.0.5 | MIT OR Apache-2.0 | yes |
 | [codespan-reporting](https://crates.io/crates/codespan-reporting) | 0.13.1 | Apache-2.0 | yes |
+| [constant_time_eq](https://crates.io/crates/constant_time_eq) | 0.4.2 | CC0-1.0 OR MIT-0 OR Apache-2.0 | yes |
+| [cpufeatures](https://crates.io/crates/cpufeatures) | 0.3.1 | MIT OR Apache-2.0 | yes |
 | [crunchy](https://crates.io/crates/crunchy) | 0.2.4 | MIT | yes |
 | [dlib](https://crates.io/crates/dlib) | 0.5.3 | MIT | yes |
 | [document-features](https://crates.io/crates/document-features) | 0.2.12 | MIT OR Apache-2.0 | no: build time only (procedural macros) |

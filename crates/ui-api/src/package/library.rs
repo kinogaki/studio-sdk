@@ -38,8 +38,9 @@ pub struct Library {
     pub view_menus: Option<Shared<ViewMenus>>,
     /// How Tab lists its items.
     pub tab: TabSpec,
-    /// The viewport's shared chrome it takes.
-    pub viewport: ViewportSpec,
+    /// The viewport's chrome it takes: `None`, core's view of the scene
+    /// ([`ViewportSpec::scene`]); `Some`, exactly that spec.
+    pub viewport: Option<ViewportSpec>,
 }
 
 /// A part of a library a context gives itself or shares with another
@@ -450,6 +451,25 @@ impl Default for ViewportSpec {
             default_pivot: Pivot::Centre,
             transform: false,
             popovers: Vec::new(),
+        }
+    }
+}
+
+impl ViewportSpec {
+    /// Core's chrome for views showing the scene (what a library without
+    /// its own spec gets, and what a context's own spec may start from):
+    /// back faces' tint and the shared analysis modes, each object's own
+    /// pivot, the Gear popover.
+    pub fn scene() -> Self {
+        ViewportSpec {
+            shared_rows: SharedRows {
+                tint_back_faces: true,
+                analysis: true,
+                ..SharedRows::NONE
+            },
+            default_pivot: Pivot::Origin,
+            popovers: vec![Popover::Gear],
+            ..ViewportSpec::default()
         }
     }
 }

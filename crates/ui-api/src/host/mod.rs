@@ -31,7 +31,9 @@
 //! **Workers.** A package's background work runs on its own services,
 //! built with [`Cx::wake`]: the service calls the wake once per result,
 //! and the host then calls the package's
-//! [`poll`](crate::package::UiPackage::poll). No timers.
+//! [`poll`](crate::package::UiPackage::poll). Work where only the newest
+//! request matters runs on the host's lanes through [`Cx::latest`]. No
+//! timers.
 mod capabilities;
 mod data;
 mod network;
@@ -45,12 +47,21 @@ pub use network::HostNetwork;
 
 use crate::gizmo::{GizmoFrame, Handle, TransformTool};
 use crate::{Pos, Projection, Rect};
+use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::params::Unit;
+use std::any::Any;
 use std::sync::Arc;
 
 /// Wakes the host's UI once (a worker's result is ready). Cheap to clone;
 /// callable from any thread.
 pub type Waker = Arc<dyn Fn() + Send + Sync>;
+
+/// A job [`Cx::latest`] runs off the UI thread: it polls its token and
+/// stops early once cancelled (its result is dropped then anyway).
+pub type LatestJob = Box<dyn FnOnce(&CancelToken) -> LatestResult + Send>;
+
+/// What a [`LatestJob`] gives back, downcast by the package that ran it.
+pub type LatestResult = Box<dyn Any + Send>;
 
 /// One call's context: every capability of the host.
 pub trait Cx:
@@ -72,6 +83,17 @@ pub trait Cx:
     fn wake(&self) -> Waker;
     /// Numbers typed and shown in the user's units.
     fn units(&self) -> &dyn UnitsService;
+    /// Runs `job` on the host's worker lanes as the latest job of `key`
+    /// (one of the package's own names): a job of `key` still running has
+    /// its token cancelled, and its result is dropped. When `job` lands the
+    /// host wakes the package ([`UiPackage::poll`](crate::package::UiPackage::poll)),
+    /// which takes the result with [`take_latest`](Self::take_latest). For
+    /// work where only the newest request matters (soft-selection weights,
+    /// a check of the shown value).
+    fn latest(&mut self, key: &str, job: LatestJob);
+    /// The result of `key`'s latest job, once it has landed; each result is
+    /// given once.
+    fn take_latest(&mut self, key: &str) -> Option<LatestResult>;
 }
 
 /// The context of a call about one view (a viewport layer's pointer

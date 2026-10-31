@@ -54,6 +54,9 @@ pub struct NodeInfo<'a> {
     /// The delta it holds over its input (a held edit's,
     /// [`NetworkEdit::set_delta`](super::NetworkEdit::set_delta)).
     pub delta: Option<&'a Data>,
+    /// Its first output as last cooked, when it has cooked since its last
+    /// change (a held edit's result, for baking it into its base).
+    pub result: Option<Data>,
 }
 
 /// A wire into a node: the node it leaves and which of its outputs.

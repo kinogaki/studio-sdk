@@ -78,7 +78,8 @@ pub use library::{
     VocabularyItem, When,
 };
 pub use parts::{
-    Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, ViewportLayer, Vocabulary,
+    Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, RowAction, ViewportLayer,
+    Vocabulary,
 };
 pub use results::{Results, Shown, ShownKind};
 pub use settings::{Section, SettingsSection};

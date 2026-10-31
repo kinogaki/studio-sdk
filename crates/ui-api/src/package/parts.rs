@@ -326,6 +326,28 @@ pub trait Inspector<S: ?Sized>: Send + Sync {
     fn select_subject(&self, s: &mut S, cx: &mut dyn Cx, subject: &str) {
         let _ = (s, cx, subject);
     }
+    /// The user took `action` on row `row` (a parameter's name) of node
+    /// `node`'s sheet: [`RowAction::Pick`] on a row offering a pick in the
+    /// viewport (a group from the node's input). Core's sheet draws the
+    /// rows and owns file, path and reference rows itself.
+    fn row_action(&self, s: &mut S, cx: &mut dyn Cx, node: NodeRef, row: &str, action: RowAction) {
+        let _ = (s, cx, node, row, action);
+    }
+    /// The text being typed into row `row` of node `node`'s sheet, as it
+    /// is now (each change); `None` once typing ends. For live feedback
+    /// (the elements a group expression names), never the edit itself.
+    fn typing(&self, s: &mut S, cx: &mut dyn Cx, node: NodeRef, row: &str, text: Option<&str>) {
+        let _ = (s, cx, node, row, text);
+    }
+}
+
+/// What the user did on an inspector row ([`Inspector::row_action`]). New
+/// actions may be added; a context that doesn't know one ignores it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RowAction {
+    /// Pick in the viewport for the row (its pick button).
+    Pick,
 }
 
 /// How a context's items run, and what of them applies now. The items
@@ -635,6 +657,26 @@ impl<S: 'static> Inspector<dyn Any> for Erased<S, dyn Inspector<S>> {
     }
     fn select_subject(&self, s: &mut dyn Any, cx: &mut dyn Cx, subject: &str) {
         self.part.select_subject(own_mut(s), cx, subject)
+    }
+    fn row_action(
+        &self,
+        s: &mut dyn Any,
+        cx: &mut dyn Cx,
+        node: NodeRef,
+        row: &str,
+        action: RowAction,
+    ) {
+        self.part.row_action(own_mut(s), cx, node, row, action)
+    }
+    fn typing(
+        &self,
+        s: &mut dyn Any,
+        cx: &mut dyn Cx,
+        node: NodeRef,
+        row: &str,
+        text: Option<&str>,
+    ) {
+        self.part.typing(own_mut(s), cx, node, row, text)
     }
 }
 

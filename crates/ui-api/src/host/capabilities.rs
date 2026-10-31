@@ -10,6 +10,7 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
+use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
@@ -31,6 +32,11 @@ pub trait HostUndo {
     fn finish_gesture(&mut self);
     /// Puts back everything the open gesture changed, and records nothing.
     fn cancel_gesture(&mut self);
+    /// Puts back everything the open gesture changed so far and keeps it
+    /// open: a live tool recomputing from the gesture's start each step
+    /// (an adjustment, a pen stroke) stays one undo step. Nothing happens
+    /// when no gesture is open.
+    fn restart_gesture(&mut self);
     /// Whether a gesture is open.
     fn in_gesture(&self) -> bool;
     /// Undoes the last step (live tools end first, after this call).
@@ -225,6 +231,10 @@ pub trait HostView {
     /// Asks for one more frame (a package's own state changed outside an
     /// event: a worker's result it just adopted). Never a timer.
     fn redraw(&mut self);
+    /// Whether view `view` renders now (an engine draws it, not the
+    /// viewport's shading): a package keeps render-only work (a preview
+    /// copy of a drag) for while one does. `false` for no such view.
+    fn rendering(&self, view: usize) -> bool;
 }
 
 /// The status bar, the error line and the Console.
@@ -234,6 +244,13 @@ pub trait HostStatus {
     fn fail(&mut self, message: &str);
     /// Logs `message` to the Console as information.
     fn info(&mut self, message: &str);
+    /// Logs a Console record of `level` saying `text`, about `subject`
+    /// inside the open object (its own spelling: a node path, an element),
+    /// which the Console's link selects through the context's
+    /// [`Inspector::select_subject`](crate::package::Inspector::select_subject).
+    /// Unlike [`fail`](Self::fail) and [`info`](Self::info), nothing shows
+    /// on the status line.
+    fn console(&mut self, level: Severity, subject: Option<&str>, text: &str);
 }
 
 /// The shell around the views: actions, menus and the keyboard.
@@ -243,6 +260,10 @@ pub trait HostShell {
     fn run_action(&mut self, vocabulary: &str, item: &str);
     /// Whether a text field has the keyboard (keys are not commands now).
     fn keyboard_taken(&self) -> bool;
+    /// Puts `text` on the system clipboard (a copied value or selection).
+    fn copy_text(&mut self, text: &str);
+    /// The system clipboard's text, when it holds text.
+    fn paste_text(&self) -> Option<String>;
 }
 
 /// The viewport's transform tool and snapping.

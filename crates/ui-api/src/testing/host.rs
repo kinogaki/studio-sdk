@@ -8,19 +8,21 @@ use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
     HostSlots, HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx,
-    NodeRef, ObjectRef, Place, UnitsService, View, ViewCamera, ViewCx, Waker,
+    LatestJob, LatestResult, NodeRef, ObjectRef, Place, UnitsService, View, ViewCamera, ViewCx,
+    Waker,
 };
 use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
+use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
-use kinogaki_studio_api::params::Unit;
+use kinogaki_studio_api::params::{Severity, Unit};
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
     Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, Package, SessionSlot,
     SessionSlots, SlotId,
 };
 use std::any::Any;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -34,6 +36,8 @@ pub enum HostCall {
     FinishGesture,
     /// [`HostUndo::cancel_gesture`].
     CancelGesture,
+    /// [`HostUndo::restart_gesture`].
+    RestartGesture,
     /// [`HostUndo::undo`].
     Undo,
     /// [`HostUndo::redo`].
@@ -54,6 +58,12 @@ pub enum HostCall {
     Fail(String),
     /// [`HostStatus::info`].
     Info(String),
+    /// [`HostStatus::console`]: level, subject, text.
+    Console(Severity, Option<String>, String),
+    /// [`HostShell::copy_text`].
+    CopyText(String),
+    /// [`Cx::latest`], by key.
+    Latest(String),
     /// [`HostShell::run_action`].
     RunAction(String, String),
     /// [`HostTransform::set_transform_tool`].
@@ -157,6 +167,15 @@ pub struct FakeHost {
     pub adjustable: Option<NodeRef>,
     /// How many times the wake was called.
     pub wakes: Arc<AtomicUsize>,
+    /// The views that render ([`HostView::rendering`]).
+    pub rendering: BTreeSet<usize>,
+    /// The clipboard's text.
+    pub clipboard: Option<String>,
+    /// The [`Cx::latest`] jobs not yet run, by key, with their tokens;
+    /// [`FakeHost::run_latest`] runs them.
+    latest: BTreeMap<String, (CancelToken, LatestJob)>,
+    /// The landed [`Cx::latest`] results not yet taken.
+    landed: BTreeMap<String, LatestResult>,
     undo: Vec<Step>,
     redo: Vec<Step>,
     gesture: Option<(String, Kept)>,
@@ -194,6 +213,10 @@ impl FakeHost {
             remembered: BTreeMap::new(),
             adjustable: None,
             wakes: Arc::default(),
+            rendering: BTreeSet::new(),
+            clipboard: None,
+            latest: BTreeMap::new(),
+            landed: BTreeMap::new(),
             undo: Vec::new(),
             redo: Vec::new(),
             gesture: None,
@@ -203,6 +226,22 @@ impl FakeHost {
     /// The recorded requests, taken (the next test step starts empty).
     pub fn take_calls(&mut self) -> Vec<HostCall> {
         std::mem::take(&mut self.calls)
+    }
+
+    /// Runs every pending [`Cx::latest`] job, as the host's lanes would:
+    /// each result lands (replacing an untaken one of its key) and wakes
+    /// the package once. Returns how many ran.
+    pub fn run_latest(&mut self) -> usize {
+        let jobs = std::mem::take(&mut self.latest);
+        let ran = jobs.len();
+        for (key, (token, job)) in jobs {
+            let result = job(&token);
+            if !token.is_cancelled() {
+                self.landed.insert(key, result);
+                self.wakes.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        ran
     }
 
     /// The labels of the undo history, oldest first.
@@ -275,6 +314,13 @@ impl HostUndo for FakeHost {
     fn cancel_gesture(&mut self) {
         self.calls.push(HostCall::CancelGesture);
         if let Some((_, before)) = self.gesture.take() {
+            self.restore(before);
+        }
+    }
+    fn restart_gesture(&mut self) {
+        self.calls.push(HostCall::RestartGesture);
+        if let Some((_, before)) = &self.gesture {
+            let before = before.clone();
             self.restore(before);
         }
     }
@@ -449,6 +495,9 @@ impl HostView for FakeHost {
     fn redraw(&mut self) {
         self.calls.push(HostCall::Redraw);
     }
+    fn rendering(&self, view: usize) -> bool {
+        self.rendering.contains(&view)
+    }
 }
 
 impl HostStatus for FakeHost {
@@ -457,6 +506,13 @@ impl HostStatus for FakeHost {
     }
     fn info(&mut self, message: &str) {
         self.calls.push(HostCall::Info(message.into()));
+    }
+    fn console(&mut self, level: Severity, subject: Option<&str>, text: &str) {
+        self.calls.push(HostCall::Console(
+            level,
+            subject.map(str::to_owned),
+            text.into(),
+        ));
     }
 }
 
@@ -467,6 +523,13 @@ impl HostShell for FakeHost {
     }
     fn keyboard_taken(&self) -> bool {
         self.keyboard_taken
+    }
+    fn copy_text(&mut self, text: &str) {
+        self.calls.push(HostCall::CopyText(text.into()));
+        self.clipboard = Some(text.into());
+    }
+    fn paste_text(&self) -> Option<String> {
+        self.clipboard.clone()
     }
 }
 
@@ -561,6 +624,18 @@ impl Cx for FakeHost {
     }
     fn units(&self) -> &dyn UnitsService {
         self
+    }
+    /// Queues `job` (cancelling a queued job of `key`, which then never
+    /// runs) until [`FakeHost::run_latest`].
+    fn latest(&mut self, key: &str, job: LatestJob) {
+        self.calls.push(HostCall::Latest(key.into()));
+        let token = CancelToken::default();
+        if let Some((previous, _)) = self.latest.insert(key.into(), (token, job)) {
+            previous.cancel();
+        }
+    }
+    fn take_latest(&mut self, key: &str) -> Option<LatestResult> {
+        self.landed.remove(key)
     }
 }
 
