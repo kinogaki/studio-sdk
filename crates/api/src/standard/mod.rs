@@ -39,9 +39,9 @@ use crate::viewport::ElementKind;
 use kinogaki_geometry::{Class, Curves, GeometryError, Polygons, Selection};
 
 /// The id of [`Polygons`] values.
-pub const POLYGONS: &str = "kinogaki.standard.polygons";
+pub const POLYGONS: &str = "kinogaki.core.polygons";
 /// The id of [`Curves`] values.
-pub const CURVES: &str = "kinogaki.standard.curves";
+pub const CURVES: &str = "kinogaki.core.curves";
 
 /// The handle on [`Polygons`] values ([`POLYGONS`]).
 pub fn polygons() -> Typed<Polygons> {
