@@ -158,6 +158,10 @@ pub struct Parameter {
     /// show numbers, vectors, text, choices, toggles, colors, ramps, paths
     /// and palettes so; other kinds (code, tone curves) show disabled.
     pub read_only: bool,
+    /// A tool's next run starts from this parameter's last value (a
+    /// setting: Bevel's segments); `false` (a gesture's measure: Extrude's
+    /// distance, a primitive's placement) starts at the default each run.
+    pub remembered: bool,
 }
 
 impl Parameter {
@@ -183,7 +187,14 @@ impl Parameter {
             unavailable: Vec::new(),
             language: None,
             read_only: false,
+            remembered: false,
         }
+    }
+
+    /// Remembered by its tool (see [`remembered`](Self::remembered)).
+    pub fn remembered(mut self) -> Self {
+        self.remembered = true;
+        self
     }
 
     /// Read-only (or editable again): shown, not edited.

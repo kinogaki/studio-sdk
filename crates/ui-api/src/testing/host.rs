@@ -7,8 +7,8 @@ use super::FakeNetwork;
 use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
-    HostSlots, HostStatus, HostTransform, HostUndo, HostView, Inspected, InspectorCx, NodeRef,
-    ObjectRef, Place, UnitsService, View, ViewCamera, ViewCx, Waker,
+    HostSlots, HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx,
+    NodeRef, ObjectRef, Place, UnitsService, View, ViewCamera, ViewCx, Waker,
 };
 use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
@@ -150,6 +150,11 @@ pub struct FakeHost {
     pub editing: bool,
     /// The transform tool's space.
     pub space: TransformSpace,
+    /// The tools' remembered parameters, by node type (a fake host knows
+    /// no declared defaults: `starting` is what was remembered).
+    pub remembered: BTreeMap<kinogaki_studio_api::NodeTypeId, kinogaki_studio_api::Parameters>,
+    /// The node the last tool ran on.
+    pub adjustable: Option<NodeRef>,
     /// How many times the wake was called.
     pub wakes: Arc<AtomicUsize>,
     undo: Vec<Step>,
@@ -186,6 +191,8 @@ impl FakeHost {
             keyboard_taken: false,
             editing: false,
             space: TransformSpace::World,
+            remembered: BTreeMap::new(),
+            adjustable: None,
             wakes: Arc::default(),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -484,6 +491,25 @@ impl HostTransform for FakeHost {
     fn set_transform_space(&mut self, space: TransformSpace) {
         self.calls.push(HostCall::SetTransformSpace(space));
         self.space = space;
+    }
+}
+
+impl HostTools for FakeHost {
+    fn starting(&self, ty: kinogaki_studio_api::NodeTypeId) -> kinogaki_studio_api::Parameters {
+        self.remembered.get(&ty).cloned().unwrap_or_default()
+    }
+    fn remember(
+        &mut self,
+        ty: kinogaki_studio_api::NodeTypeId,
+        parameters: &kinogaki_studio_api::Parameters,
+    ) {
+        self.remembered.insert(ty, parameters.clone());
+    }
+    fn adjustable(&self) -> Option<NodeRef> {
+        self.adjustable
+    }
+    fn ran(&mut self, node: NodeRef) {
+        self.adjustable = Some(node);
     }
 }
 

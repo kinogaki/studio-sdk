@@ -12,7 +12,9 @@ use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
-use kinogaki_studio_api::{Bounds, ContextId, Data, Drawn, ObjectBody, ObjectKindId, SlotId};
+use kinogaki_studio_api::{
+    Bounds, ContextId, Data, Drawn, NodeTypeId, ObjectBody, ObjectKindId, Parameters, SlotId,
+};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -257,6 +259,23 @@ pub trait HostTransform {
     fn transform_space(&self) -> TransformSpace;
     /// Chooses the current tool's space (saved with the user's settings).
     fn set_transform_space(&mut self, space: TransformSpace);
+}
+
+/// The tools' memory and the tool a card still adjusts, the same for every
+/// context's tools (the application's, saved with the user's settings).
+pub trait HostTools {
+    /// The parameters node type `ty`'s tool starts from: its declared
+    /// defaults with its [remembered](kinogaki_studio_api::params::Parameter::remembered)
+    /// parameters' last values written in.
+    fn starting(&self, ty: NodeTypeId) -> Parameters;
+    /// Remembers `parameters`' remembered values for `ty` (the others are
+    /// left out).
+    fn remember(&mut self, ty: NodeTypeId, parameters: &Parameters);
+    /// The node the last tool run added or changed, while its card may
+    /// still adjust it: until any other edit, an undo or a change of place.
+    fn adjustable(&self) -> Option<NodeRef>;
+    /// A tool just ran on `node`: it becomes the adjustable one.
+    fn ran(&mut self, node: NodeRef);
 }
 
 /// The user's settings sections of the installed packages (a package's
