@@ -52,6 +52,11 @@ pub struct Description {
     /// Where Tab, menus and shelves list it in its contexts; `None`: not
     /// listed (a node only code or a file adds).
     pub listing: Option<Listing>,
+    /// The context of the network a node of this type holds inside it (a
+    /// Material's Shading network); `None`: none (a subnet holds its own
+    /// context's levels). A new node gets it empty; core keeps, saves,
+    /// copies and navigates it, and the type's own cook doesn't read it.
+    pub inside: Option<ContextId>,
 }
 
 impl Description {
@@ -68,6 +73,7 @@ impl Description {
             contexts: Vec::new(),
             role: NodeRole::Plain,
             listing: None,
+            inside: None,
         }
     }
 
@@ -110,6 +116,13 @@ impl Description {
     /// Playing `role`.
     pub fn role(mut self, role: NodeRole) -> Self {
         self.role = role;
+        self
+    }
+
+    /// Holding a network of `context` inside each node (a Material its
+    /// Shading network).
+    pub fn holding(mut self, context: ContextId) -> Self {
+        self.inside = Some(context);
         self
     }
 

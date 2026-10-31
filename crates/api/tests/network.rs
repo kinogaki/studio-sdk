@@ -276,3 +276,99 @@ fn a_compiled_context_takes_its_compiler_from_another_package() {
         Err(RegistryError::DuplicateCompiler { first, .. }) if first == PackageId::declared("acme.forest")
     ));
 }
+
+/// A node type `id`, offered in context `offered`, holding a network of
+/// context `inside`.
+struct Holder {
+    id: &'static str,
+    offered: &'static str,
+    inside: &'static str,
+}
+
+impl NodeType for Holder {
+    fn id(&self) -> NodeTypeId {
+        NodeTypeId::declared(self.id)
+    }
+    fn description(&self) -> Description {
+        Description::new("Holder")
+            .context(ContextId::declared(self.offered))
+            .holding(ContextId::declared(self.inside))
+    }
+    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+        Ok(Outputs::default())
+    }
+}
+
+/// A node holds a network of a declared context; contexts may nest
+/// (Houdini's matnet under a SOP network), but never hold their own
+/// networks, directly or through others: the package closing the loop is
+/// refused, naming it.
+#[test]
+fn nodes_hold_networks_of_declared_contexts_without_loops() {
+    let holder = |id, offered, inside| Holder {
+        id,
+        offered,
+        inside,
+    };
+    // A context no one declares.
+    let stray = Package::new(PackageId::declared("acme.trees"), "Trees")
+        .with_context(context("acme.trees.grove"))
+        .with_node_type(holder(
+            "acme.trees.oak",
+            "acme.trees.grove",
+            "acme.trees.nowhere",
+        ));
+    assert!(matches!(
+        Registry::new().register(stray),
+        Err(RegistryError::UnknownContext { .. })
+    ));
+    // A context holding its own.
+    let own = Package::new(PackageId::declared("acme.trees"), "Trees")
+        .with_context(context("acme.trees.grove"))
+        .with_node_type(holder(
+            "acme.trees.oak",
+            "acme.trees.grove",
+            "acme.trees.grove",
+        ));
+    assert!(matches!(
+        Registry::new().register(own),
+        Err(RegistryError::InsideCycle { .. })
+    ));
+    // Grove holds Leaves, Leaves hold Veins: nesting is fine.
+    let mut r = Registry::new();
+    let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
+        .with_context(context("acme.trees.grove"))
+        .with_context(context("acme.trees.leaves"))
+        .with_context(context("acme.trees.veins"))
+        .with_node_type(holder(
+            "acme.trees.oak",
+            "acme.trees.grove",
+            "acme.trees.leaves",
+        ))
+        .with_node_type(holder(
+            "acme.trees.leaf",
+            "acme.trees.leaves",
+            "acme.trees.veins",
+        ));
+    r.register(trees).unwrap();
+    // A later package whose Veins node holds a Grove closes the loop.
+    let loop_ = Package::new(PackageId::declared("acme.moss"), "Moss").with_node_type(holder(
+        "acme.moss.spore",
+        "acme.trees.veins",
+        "acme.trees.grove",
+    ));
+    let Err(RegistryError::InsideCycle { node, path, .. }) = r.register(loop_) else {
+        panic!("the loop is refused");
+    };
+    assert_eq!(node, NodeTypeId::declared("acme.moss.spore"));
+    let path: Vec<&str> = path.iter().map(|c| c.as_str()).collect();
+    assert_eq!(
+        path,
+        [
+            "acme.trees.veins",
+            "acme.trees.grove",
+            "acme.trees.leaves",
+            "acme.trees.veins"
+        ]
+    );
+}

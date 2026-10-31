@@ -25,6 +25,12 @@ pub trait NetworkRead {
 
     /// Node `node`, when the network holds it.
     fn node(&self, node: NodeRef) -> Option<NodeInfo<'_>>;
+    /// The network node `node` holds inside it, when its type holds one
+    /// ([`Description::inside`](crate::cook::Description::inside)).
+    fn inside(&self, node: NodeRef) -> Option<&dyn NetworkRead> {
+        let _ = node;
+        None
+    }
 }
 
 /// One node as [`NetworkRead::node`] reads it.

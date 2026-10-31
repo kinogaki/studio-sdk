@@ -106,6 +106,27 @@ pub enum RegistryError {
         /// The context.
         context: ContextId,
     },
+    /// `package`'s node type `node` holds a network of `context` inside
+    /// it, which neither it nor a registered package declares.
+    UnknownContext {
+        /// The refused package.
+        package: PackageId,
+        /// The node type.
+        node: NodeTypeId,
+        /// The context.
+        context: ContextId,
+    },
+    /// `package`'s node type `node` closes a loop of contexts holding each
+    /// other's networks: `path` runs from the context the node is offered
+    /// in, through each held, back to it.
+    InsideCycle {
+        /// The refused package.
+        package: PackageId,
+        /// The node type.
+        node: NodeTypeId,
+        /// The loop, its first context again at its end.
+        path: Vec<ContextId>,
+    },
     /// `package` brings a compiler for `context`, which `first` already
     /// brought (or `package` brings twice): one a context.
     DuplicateCompiler {
@@ -180,6 +201,26 @@ impl fmt::Display for RegistryError {
                 f,
                 "{package} brings a compiler for {context}, which no package declares as a compiled context"
             ),
+            Self::UnknownContext {
+                package,
+                node,
+                context,
+            } => write!(
+                f,
+                "{package}'s {node} holds a {context} network, which no package declares"
+            ),
+            Self::InsideCycle {
+                package,
+                node,
+                path,
+            } => {
+                let path: Vec<&str> = path.iter().map(|c| c.as_str()).collect();
+                write!(
+                    f,
+                    "{package}'s {node} would make contexts hold each other: {}",
+                    path.join(" → ")
+                )
+            }
             Self::DuplicateCompiler {
                 package,
                 context,
@@ -231,6 +272,9 @@ pub struct Registry {
     contexts: BTreeMap<ContextId, Entry<NetworkContext>>,
     /// Each compiled context's compiler.
     compilers: BTreeMap<ContextId, Entry<dyn NetworkCompiler>>,
+    /// Which contexts hold networks of which: an edge from a context a
+    /// holding node type is offered in to the context it holds.
+    holds: Vec<(ContextId, ContextId)>,
     /// The package bringing each compiled context's runner.
     #[cfg(feature = "wgpu")]
     runners: BTreeMap<ContextId, PackageId>,
@@ -256,6 +300,8 @@ impl Registry {
     pub fn register(&mut self, package: Package) -> Result<(), RegistryError> {
         self.check(&package)?;
         let id = package.id;
+        self.holds
+            .extend(holds(&package).into_iter().map(|(from, to, _)| (from, to)));
         for &context in package.ui.iter().flat_map(|ui| ui.contexts()) {
             self.ui_contexts.insert(context, id);
         }
@@ -407,6 +453,7 @@ impl Registry {
             }
         }
         self.check_compilers(package)?;
+        self.check_insides(package)?;
         self.check_references(package)
     }
 
@@ -465,6 +512,40 @@ impl Registry {
                         first,
                     });
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Each network `package`'s node types hold inside them is of a
+    /// declared context, and no context comes to hold its own networks
+    /// through others' (Houdini's nesting stays possible; recursion
+    /// doesn't).
+    fn check_insides(&self, package: &Package) -> Result<(), RegistryError> {
+        let id = package.id;
+        let new = holds(package);
+        for &(_, inside, node) in &new {
+            let declared = package.contexts.iter().any(|c| c.id == inside)
+                || self.contexts.contains_key(&inside);
+            if !declared {
+                return Err(RegistryError::UnknownContext {
+                    package: id,
+                    node,
+                    context: inside,
+                });
+            }
+        }
+        let mut edges = self.holds.clone();
+        edges.extend(new.iter().map(|&(from, to, _)| (from, to)));
+        for &(from, to, node) in &new {
+            if let Some(back) = route(&edges, to, from) {
+                let mut path = vec![from];
+                path.extend(back);
+                return Err(RegistryError::InsideCycle {
+                    package: id,
+                    node,
+                    path,
+                });
             }
         }
         Ok(())
@@ -660,4 +741,44 @@ impl fmt::Debug for Registry {
             .field("slots", &self.slots.keys().collect::<Vec<_>>())
             .finish()
     }
+}
+
+/// The contexts `package`'s node types hold networks of: (offered in,
+/// held, node type), one for each context a holding type is offered in.
+fn holds(package: &Package) -> Vec<(ContextId, ContextId, NodeTypeId)> {
+    let mut out = Vec::new();
+    for t in &package.node_types {
+        let d = t.description();
+        if let Some(inside) = d.inside {
+            out.extend(d.contexts.iter().map(|&from| (from, inside, t.id())));
+        }
+    }
+    out
+}
+
+/// A way along `edges` from `from` to `to` (both ends included), if any.
+fn route(
+    edges: &[(ContextId, ContextId)],
+    from: ContextId,
+    to: ContextId,
+) -> Option<Vec<ContextId>> {
+    let mut seen = BTreeSet::new();
+    let mut stack = vec![vec![from]];
+    while let Some(path) = stack.pop() {
+        let at = *path.last().expect("a path has an end");
+        if at == to {
+            return Some(path);
+        }
+        if !seen.insert(at) {
+            continue;
+        }
+        for &(a, b) in edges {
+            if a == at {
+                let mut next = path.clone();
+                next.push(b);
+                stack.push(next);
+            }
+        }
+    }
+    None
 }

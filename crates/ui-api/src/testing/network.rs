@@ -22,6 +22,8 @@ use std::sync::Arc;
 struct Types {
     nodes: BTreeMap<NodeTypeId, (Arc<dyn NodeType>, Description)>,
     held: BTreeMap<DataTypeId, Arc<dyn HeldEdit>>,
+    /// Every context the packages declare, for the networks nodes hold.
+    contexts: BTreeMap<ContextId, NetworkContext>,
 }
 
 /// One node of a [`FakeNetwork`].
@@ -85,6 +87,8 @@ pub struct FakeNetwork {
     displays: BTreeMap<Option<NodeRef>, NodeRef>,
     next: u64,
     revision: u64,
+    /// The network each holding node holds ([`Description::inside`]).
+    insides: BTreeMap<NodeRef, FakeNetwork>,
 }
 
 impl fmt::Debug for FakeNetwork {
@@ -119,15 +123,24 @@ impl FakeNetwork {
             for h in &package.held_edits {
                 types.held.insert(h.delta(), h.clone());
             }
+            for c in &package.contexts {
+                types.contexts.insert(c.id, c.clone());
+            }
         }
-        Ok(Self {
-            context: declared,
-            types: Arc::new(types),
+        Ok(Self::empty(declared, Arc::new(types)))
+    }
+
+    /// An empty network of `context`, with `types`.
+    fn empty(context: NetworkContext, types: Arc<Types>) -> Self {
+        Self {
+            context,
+            types,
             nodes: BTreeMap::new(),
             displays: BTreeMap::new(),
             next: 1,
             revision: 0,
-        })
+            insides: BTreeMap::new(),
+        }
     }
 
     /// Counts the edits that changed it: equal revisions, the same
@@ -345,6 +358,9 @@ impl NetworkRead for FakeNetwork {
             delta: n.delta.as_ref(),
         })
     }
+    fn inside(&self, node: NodeRef) -> Option<&dyn NetworkRead> {
+        self.insides.get(&node).map(|n| n as &dyn NetworkRead)
+    }
 }
 
 impl NetworkEdit for FakeNetwork {
@@ -397,7 +413,17 @@ impl NetworkEdit for FakeNetwork {
                 outputs: description.outputs.clone(),
             },
         };
+        let inside = match description.inside {
+            Some(context) => Some(self.types.contexts.get(&context).cloned().ok_or_else(|| {
+                Error::invalid(format_args!("no package declares context {context}"))
+            })?),
+            None => None,
+        };
         let id = NodeRef(self.next);
+        if let Some(context) = inside {
+            self.insides
+                .insert(id, Self::empty(context, self.types.clone()));
+        }
         let name = match &node.name {
             Some(name) => self.fresh(subnet, name, false),
             None => self.fresh(subnet, &description.label, true),
@@ -579,6 +605,7 @@ impl NetworkEdit for FakeNetwork {
             return Err(Error::invalid(format_args!("{} holds nodes", gone.name)));
         }
         self.nodes.remove(&node);
+        self.insides.remove(&node);
         let heal = self
             .context
             .heals
@@ -620,6 +647,25 @@ impl NetworkEdit for FakeNetwork {
         let n = self.node_mut(node)?;
         n.delta = Some(delta);
         n.flags.held = true;
+        self.changed();
+        Ok(())
+    }
+    /// Edits the network `node` holds: on a copy, kept only when the edit
+    /// and the commit check pass.
+    fn edit_inside(
+        &mut self,
+        node: NodeRef,
+        edit: &mut dyn FnMut(&mut dyn NetworkEdit) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        let name = self.known(node)?.name.clone();
+        let mut inside = self
+            .insides
+            .get(&node)
+            .cloned()
+            .ok_or_else(|| Error::invalid(format_args!("{name} holds no network")))?;
+        edit(&mut inside)?;
+        inside.check()?;
+        self.insides.insert(node, inside);
         self.changed();
         Ok(())
     }
