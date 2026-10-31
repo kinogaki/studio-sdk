@@ -126,7 +126,11 @@ fn the_tolerances_save_as_a_project_value() {
     let mut saved = MemoryElement::new("tolerances");
     saved.write(|w| value.write(&inches, w)).unwrap();
     let read = saved.read(|r| value.read(r)).unwrap();
-    assert_eq!(read.downcast_ref::<Tolerances>(), Some(&inches));
+    // The model unit isn't saved (the project's units are its source): the
+    // value reads back unsized, and sized again it is the same.
+    let read = read.downcast_ref::<Tolerances>().unwrap();
+    assert_eq!(read.millimeters_per_unit(), 1.0);
+    assert_eq!(read.with_unit(25.4).unwrap(), inches);
     let mut wrong = MemoryElement::new("tolerances");
     wrong
         .write(|w| {
