@@ -185,6 +185,21 @@ impl Topology {
         self.index.get_or_init(|| index::build(self))
     }
 
+    /// The index when it has been built, without building it: for memory
+    /// accounting and budgets.
+    ///
+    /// ```
+    /// use kinogaki_geometry::Topology;
+    ///
+    /// let t = Topology::new(3, vec![0, 3].into(), vec![0, 1, 2].into(), 1).unwrap();
+    /// assert!(t.built_index().is_none());
+    /// assert_eq!(t.index().edges().len(), 3);
+    /// assert!(t.built_index().is_some_and(|i| i.bytes() > 0));
+    /// ```
+    pub fn built_index(&self) -> Option<&Index> {
+        self.index.get()
+    }
+
     /// The unique edges in canonical order: polygon sides (each vertex to
     /// the next, wrapping) and polyline segments, once each, ascending by
     /// `(low point, high point)`. An edge's position here is its id, and
