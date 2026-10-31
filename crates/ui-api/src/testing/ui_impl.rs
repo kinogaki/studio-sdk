@@ -163,7 +163,7 @@ impl Ui for RecordingUi {
         response
     }
 
-    fn text_edit(&mut self, text: &mut String, spec: &TextEditSpec<'_>) -> Response {
+    fn text_edit(&mut self, text: &mut String, spec: &TextEditSpec) -> Response {
         let size = self.field_size(spec.width);
         let id = spec
             .id

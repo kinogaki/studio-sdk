@@ -97,13 +97,11 @@ impl<'a> ButtonSpec<'a> {
 
 /// A text field.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TextEditSpec<'a> {
+pub struct TextEditSpec {
     /// Its id, to keep its focus and cursor when the layout around it
     /// changes, or to [request the focus](crate::Ui::request_focus); `None`
     /// lets the host place it.
     pub id: Option<Id>,
-    /// Grey text shown while it is empty.
-    pub hint: &'a str,
     /// Its width; `None` takes the available width.
     pub width: Option<f32>,
     /// Several lines (Enter starts a new line).
@@ -114,12 +112,11 @@ pub struct TextEditSpec<'a> {
     pub enabled: bool,
 }
 
-impl<'a> TextEditSpec<'a> {
+impl TextEditSpec {
     /// A one-line, enabled field across the available width.
     pub fn new() -> Self {
         TextEditSpec {
             id: None,
-            hint: "",
             width: None,
             multiline: false,
             code: false,
@@ -130,12 +127,6 @@ impl<'a> TextEditSpec<'a> {
     /// With id `id`.
     pub fn id(mut self, id: Id) -> Self {
         self.id = Some(id);
-        self
-    }
-
-    /// With `hint` shown while empty.
-    pub fn hint(mut self, hint: &'a str) -> Self {
-        self.hint = hint;
         self
     }
 
@@ -164,7 +155,7 @@ impl<'a> TextEditSpec<'a> {
     }
 }
 
-impl Default for TextEditSpec<'_> {
+impl Default for TextEditSpec {
     /// [`TextEditSpec::new`].
     fn default() -> Self {
         Self::new()

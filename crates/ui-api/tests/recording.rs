@@ -219,7 +219,7 @@ fn text_and_choices_take_scripted_input() {
     let mut ui = RecordingUi::new(window());
     let mut name = String::from("group1");
     ui.type_text("rim");
-    let r = ui.text_edit(&mut name, &studio_ui_api::TextEditSpec::new().hint("Name"));
+    let r = ui.text_edit(&mut name, &studio_ui_api::TextEditSpec::new());
     assert!(r.changed && r.lost_focus);
     assert_eq!(name, "rim");
     let mut at = 0;

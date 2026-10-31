@@ -106,7 +106,7 @@ pub trait Ui {
 
     /// A text field writing `text`; [`Response::changed`] while typing,
     /// [`Response::lost_focus`] when the edit ends.
-    fn text_edit(&mut self, text: &mut String, spec: &TextEditSpec<'_>) -> Response;
+    fn text_edit(&mut self, text: &mut String, spec: &TextEditSpec) -> Response;
 
     /// A choice of one of `items` writing the index `at`, as `look` says;
     /// `id` keeps a dropdown's state.
