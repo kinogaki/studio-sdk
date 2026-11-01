@@ -1,4 +1,5 @@
 //! [`GeometryError`]: why a standard value was refused.
+use crate::brep::Entity;
 use std::fmt;
 
 /// Why a builder or constructor refused a value: what failed, and which
@@ -7,7 +8,9 @@ use std::fmt;
 pub struct GeometryError {
     kind: ErrorKind,
     at: Option<usize>,
+    entity: Option<Entity>,
     message: String,
+    detail: Option<String>,
 }
 
 /// What kind of rule a refused value broke. New kinds may be added; a
@@ -33,6 +36,10 @@ pub enum ErrorKind {
     /// A polygon can't be triangulated strictly: its outline crosses or
     /// collapses ([`crate::Polygons::triangulate_strict`]).
     Triangulation,
+    /// A B-rep body, its geometry or a value holding it breaks a rule of
+    /// [`crate::brep`] ([`GeometryError::entity`] names the entity at
+    /// fault).
+    Brep,
 }
 
 impl GeometryError {
@@ -42,7 +49,22 @@ impl GeometryError {
         Self {
             kind,
             at,
+            entity: None,
             message: message.into(),
+            detail: None,
+        }
+    }
+
+    /// A B-rep refusal ([`ErrorKind::Brep`]) blaming `entity` when one is
+    /// at fault: `phrase` is the short text (`{}`), `detail` the full one
+    /// (`{:#}`). Neither names an id or a number: the entity says which.
+    pub(crate) fn brep(entity: Option<Entity>, phrase: &'static str, detail: String) -> Self {
+        Self {
+            kind: ErrorKind::Brep,
+            at: entity.map(Entity::index),
+            entity,
+            message: phrase.into(),
+            detail: Some(detail),
         }
     }
 
@@ -67,15 +89,34 @@ impl GeometryError {
         self.at
     }
 
-    /// What failed, for the user ("polygon 12 repeats a point").
+    /// The B-rep entity at fault, when a [`ErrorKind::Brep`] refusal
+    /// blames one; [`element`](Self::element) is then its index.
+    pub fn entity(&self) -> Option<Entity> {
+        self.entity
+    }
+
+    /// What failed, for the user ("polygon 12 repeats a point"). A B-rep
+    /// refusal's is a short phrase ("open loop"), naming no id or number.
     pub fn message(&self) -> &str {
         &self.message
     }
+
+    /// The full text: what failed and the rule it broke. The message
+    /// itself when the refusal has no more to say.
+    pub fn detail(&self) -> &str {
+        self.detail.as_deref().unwrap_or(&self.message)
+    }
 }
 
+/// `{}` writes the [`message`](GeometryError::message), `{:#}` the
+/// [`detail`](GeometryError::detail).
 impl fmt::Display for GeometryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
+        if f.alternate() {
+            f.write_str(self.detail())
+        } else {
+            f.write_str(&self.message)
+        }
     }
 }
 

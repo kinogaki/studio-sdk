@@ -72,11 +72,11 @@ fn bsplines_need_degree_plus_one_points() {
     assert!(one(Basis::BSpline, 6).degree(5).build().is_ok());
     assert_eq!(
         refused(one(Basis::BSpline, 20).degree(MAX_DEGREE + 1)),
-        "curve 0 has degree 16, not 1 to 15"
+        "curve 0 has degree 26, not 1 to 25"
     );
     assert_eq!(
         refused(one(Basis::BSpline, 4).degree(0)),
-        "curve 0 has degree 0, not 1 to 15"
+        "curve 0 has degree 0, not 1 to 25"
     );
 }
 

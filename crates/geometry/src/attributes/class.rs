@@ -13,20 +13,22 @@
 pub enum Class {
     /// The whole value: one element.
     Detail,
-    /// Each object (a B-rep's bodies).
+    /// Each object: a B-rep body (one element in its own attributes).
     Object,
     /// Each placement of an instanced object.
     Instance,
-    /// Each primitive: a polygon or polyline, or a curve.
+    /// Each primitive: a polygon or polyline, a curve, or a B-rep body's
+    /// face.
     Primitive,
     /// Each primitive again, in a namespace of its own: the pieces a
     /// kernel groups primitives into. A reader wanting a primitive's value
     /// reads [`Primitive`](Class::Primitive) first, then `Piece`.
     Piece,
-    /// Each unique edge, in the canonical edge order
-    /// ([`Topology::edges`](crate::Topology::edges)).
+    /// Each edge, in the value's edge order: a polygon value's canonical
+    /// order ([`Topology::edges`](crate::Topology::edges)), a B-rep body's
+    /// edge ids.
     Edge,
-    /// Each point.
+    /// Each point: a position, or a B-rep body's vertex.
     Point,
     /// Each corner of a primitive (a vertex), in primitive order.
     Vertex,

@@ -10,6 +10,7 @@
 //! |---|---|
 //! | [`Polygons`] | polygons and polylines over shared points ([`Topology`]), with [`Attributes`] |
 //! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves ([`Basis`]) |
+//! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
 //! | [`Attributes`] | named [`Attribute`] columns and [`Group`]s per [`Class`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`] | selected elements of one class, with the active one |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
@@ -90,6 +91,7 @@
 //! assert_eq!(builds.load(Ordering::Relaxed), 1);
 //! ```
 mod attributes;
+pub mod brep;
 mod column;
 mod curves;
 mod derived;

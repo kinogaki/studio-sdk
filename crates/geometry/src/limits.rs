@@ -15,8 +15,9 @@ pub const MAX_PRIMITIVES: usize = 8_388_608;
 pub const MAX_VERTICES: usize = 33_554_432;
 /// The longest attribute or group name, in bytes.
 pub const MAX_NAME: usize = 256;
-/// The highest curve degree.
-pub const MAX_DEGREE: u8 = 15;
+/// The highest curve degree, of [`Curves`](crate::Curves) and of B-rep
+/// NURBS ([`crate::brep`]) alike.
+pub const MAX_DEGREE: u8 = 25;
 /// The largest position component's magnitude.
 pub const MAX_COORDINATE: f64 = 1e100;
 

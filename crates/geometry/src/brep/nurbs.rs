@@ -1,0 +1,490 @@
+//! Clamped NURBS curves (in space and in a chart) and tensor-product NURBS
+//! surfaces, with the one evaluation the contract is stated through.
+use super::geometry::refuse;
+use crate::column::Column;
+use crate::error::GeometryError;
+use crate::limits::{MAX_COORDINATE, MAX_DEGREE};
+
+/// How smoothly a closed NURBS direction continues across its seam.
+///
+/// New kinds may be added; a reader that doesn't know one treats the
+/// seam as [`Position`](SeamContinuity::Position) only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum SeamContinuity {
+    /// The first and last rows meet; the tangent planes may not (a crease
+    /// along the seam).
+    Position,
+    /// The tangent planes agree across the seam (G1); the first
+    /// derivative across it may change in length.
+    Tangent,
+    /// The first derivative across the seam is the same on both sides
+    /// (C1): the parameterization continues as if periodic.
+    Parametric,
+}
+
+/// Checks a clamped knot vector for `count` control points of `degree`:
+/// finite, never decreasing, the end knots each exactly `degree + 1`
+/// times, interior knots at most `degree` times, a domain of positive
+/// width.
+fn check_knots(degree: u8, knots: &[f64], count: usize) -> Result<(), GeometryError> {
+    let bad = |detail: &str| Err(refuse(None, "knots not clamped", detail));
+    if degree == 0 || degree > MAX_DEGREE {
+        return Err(refuse(
+            None,
+            "degree out of range",
+            "a NURBS degree must be positive and at most the degree limit",
+        ));
+    }
+    let d = degree as usize;
+    if count < d + 1 {
+        return Err(refuse(
+            None,
+            "too few control points",
+            "a NURBS curve needs at least its degree plus one control points",
+        ));
+    }
+    if knots.len() != count + d + 1 {
+        return Err(refuse(
+            None,
+            "wrong knot count",
+            "a NURBS curve has its control point count plus its degree plus one knots",
+        ));
+    }
+    if knots.iter().any(|k| !k.is_finite()) || knots.windows(2).any(|w| w[1] < w[0]) {
+        return bad("knots must be finite and never decrease");
+    }
+    let (first, last) = (knots[0], knots[knots.len() - 1]);
+    if first >= last {
+        return bad("the knots must span an interval");
+    }
+    let n = knots.len();
+    if knots[d] != first
+        || knots[n - 1 - d] != last
+        || knots[d + 1] == first
+        || knots[n - 2 - d] == last
+    {
+        return bad("each end knot must be repeated exactly degree plus one times");
+    }
+    let interior = &knots[d + 1..n - 1 - d];
+    let mut run = 1;
+    for w in interior.windows(2) {
+        run = if w[1] == w[0] { run + 1 } else { 1 };
+        if run > d {
+            return bad("an interior knot may be repeated at most degree times");
+        }
+    }
+    Ok(())
+}
+
+fn check_points<const D: usize>(points: &[[f64; D]]) -> Result<(), GeometryError> {
+    if points
+        .iter()
+        .any(|p| !p.iter().all(|c| c.abs() <= MAX_COORDINATE))
+    {
+        return Err(refuse(
+            None,
+            "control point not finite",
+            "a control point is not finite, or is beyond the coordinate limit",
+        ));
+    }
+    Ok(())
+}
+
+fn check_weights(weights: Option<&[f64]>, count: usize) -> Result<(), GeometryError> {
+    let Some(weights) = weights else {
+        return Ok(());
+    };
+    if weights.len() != count {
+        return Err(refuse(
+            None,
+            "wrong weight count",
+            "a rational NURBS has one weight a control point",
+        ));
+    }
+    if weights
+        .iter()
+        .any(|w| !(w.is_finite() && *w > 0.0 && *w <= MAX_COORDINATE))
+    {
+        return Err(refuse(
+            None,
+            "weight not positive",
+            "NURBS weights must be finite and positive",
+        ));
+    }
+    Ok(())
+}
+
+/// A clamped, possibly rational B-spline curve in `D` dimensions: a
+/// carrier in space (`D = 3`) or a p-curve in a chart (`D = 2`).
+///
+/// **Rules** ([`NurbsCurve::new`]): degree 1 to
+/// [`MAX_DEGREE`](crate::limits::MAX_DEGREE); `count + degree + 1` knots,
+/// finite and never decreasing, each end knot exactly `degree + 1` times,
+/// each interior one at most `degree` times, spanning an interval; points
+/// finite within 1e100; weights, when rational, one a point, finite and
+/// above 0. Its parameter runs over the domain `knots[degree]` to
+/// `knots[count]`.
+///
+/// ```
+/// use kinogaki_geometry::brep::NurbsCurve;
+///
+/// // A quadratic Bézier arc from (0, 0) to (2, 0).
+/// let arc = NurbsCurve::new(2, vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+///     vec![[0.0, 0.0], [1.0, 1.0], [2.0, 0.0]], None).unwrap();
+/// assert_eq!(arc.point(0.5), [1.0, 0.5]);
+/// assert!(NurbsCurve::new(2, vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+///     vec![[0.0, 0.0], [1.0, 1.0], [2.0, 0.0]], None).is_err());
+/// ```
+#[derive(Clone, Debug, PartialEq)]
+pub struct NurbsCurve<const D: usize> {
+    degree: u8,
+    knots: Column<f64>,
+    points: Column<[f64; D]>,
+    weights: Option<Column<f64>>,
+}
+
+impl<const D: usize> NurbsCurve<D> {
+    /// The curve of `degree` over `knots` with control `points` and, when
+    /// rational, their `weights`.
+    ///
+    /// # Errors
+    /// The first rule broken.
+    pub fn new(
+        degree: u8,
+        knots: impl Into<Column<f64>>,
+        points: impl Into<Column<[f64; D]>>,
+        weights: Option<Column<f64>>,
+    ) -> Result<Self, GeometryError> {
+        let (knots, points) = (knots.into(), points.into());
+        check_knots(degree, &knots, points.len())?;
+        check_points(&points)?;
+        check_weights(weights.as_deref(), points.len())?;
+        Ok(Self {
+            degree,
+            knots,
+            points,
+            weights,
+        })
+    }
+
+    /// The degree.
+    pub fn degree(&self) -> u8 {
+        self.degree
+    }
+
+    /// The knots.
+    pub fn knots(&self) -> &Column<f64> {
+        &self.knots
+    }
+
+    /// The control points.
+    pub fn points(&self) -> &Column<[f64; D]> {
+        &self.points
+    }
+
+    /// The weights, one a point; `None` when polynomial.
+    pub fn weights(&self) -> Option<&Column<f64>> {
+        self.weights.as_ref()
+    }
+
+    /// The parameter domain, `[knots[degree], knots[count]]`.
+    pub fn domain(&self) -> [f64; 2] {
+        let d = self.degree as usize;
+        [self.knots[d], self.knots[self.points.len()]]
+    }
+
+    /// The same curve with control `points` moved (a CV edit): knots and
+    /// weights shared.
+    ///
+    /// # Errors
+    /// A different number of points, or a point not finite.
+    pub fn with_points(&self, points: impl Into<Column<[f64; D]>>) -> Result<Self, GeometryError> {
+        let points = points.into();
+        if points.len() != self.points.len() {
+            return Err(refuse(
+                None,
+                "wrong control point count",
+                "a CV edit keeps the number of control points",
+            ));
+        }
+        check_points(&points)?;
+        Ok(Self {
+            points,
+            ..self.clone()
+        })
+    }
+
+    /// The point at `t`: in the domain, de Boor's algorithm on the span
+    /// holding `t` (the span above at an interior knot); outside it, the
+    /// polynomial of the end span continued.
+    pub fn point(&self, t: f64) -> [f64; D] {
+        self.jet(t)[0]
+    }
+
+    /// The first derivative at `t` (from the span above at an interior
+    /// knot).
+    pub fn derivative(&self, t: f64) -> [f64; D] {
+        self.jet(t)[1]
+    }
+
+    /// The point and first derivative at `t`.
+    pub(crate) fn jet(&self, t: f64) -> [[f64; D]; 2] {
+        let homogeneous = |i: usize| {
+            let w = self.weights.as_ref().map_or(1.0, |w| w[i]);
+            let mut h = [0.0; 4];
+            for (h, p) in h.iter_mut().zip(self.points[i]) {
+                *h = p * w;
+            }
+            h[3] = w;
+            h
+        };
+        let [p, d] = jet_1d(
+            self.degree as usize,
+            &self.knots,
+            self.points.len(),
+            t,
+            homogeneous,
+        );
+        let mut out = [[0.0; D]; 2];
+        for k in 0..D {
+            out[0][k] = p[k] / p[3];
+            out[1][k] = (d[k] - out[0][k] * d[3]) / p[3];
+        }
+        out
+    }
+}
+
+/// A clamped, possibly rational tensor-product B-spline surface.
+///
+/// Control points form a `count_u × count_v` grid, `u`-major: point
+/// `(i, j)` is `points[i·count_v + j]`, so a row of constant `i` is
+/// contiguous; weights, when rational, follow the same layout. Each
+/// direction follows [`NurbsCurve`]'s rules for its degree and knots.
+///
+/// **Closed directions** (`closed`) are a declaration: in that direction
+/// the first and last control rows coincide within the body's tolerance,
+/// with the stated [`SeamContinuity`]. The chart is then periodic in
+/// position with the domain's width as its period (as a cylinder's angle
+/// is): evaluation wraps a parameter outside the domain back into it by
+/// whole periods. A body's builder checks the rows coincide.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NurbsSurface {
+    degrees: [u8; 2],
+    knots: [Column<f64>; 2],
+    counts: [usize; 2],
+    points: Column<[f64; 3]>,
+    weights: Option<Column<f64>>,
+    closed: [Option<SeamContinuity>; 2],
+}
+
+impl NurbsSurface {
+    /// The surface of `degrees` `[u, v]` over `knots` `[u, v]` with the
+    /// `u`-major control grid `points` (and `weights`, when rational),
+    /// closed in the directions `closed` declares.
+    ///
+    /// # Errors
+    /// The first rule broken, or a point count that isn't the grid's.
+    pub fn new(
+        degrees: [u8; 2],
+        knots: [Column<f64>; 2],
+        points: impl Into<Column<[f64; 3]>>,
+        weights: Option<Column<f64>>,
+        closed: [Option<SeamContinuity>; 2],
+    ) -> Result<Self, GeometryError> {
+        let points = points.into();
+        let counts = [0, 1].map(|k| (knots[k].len()).saturating_sub(degrees[k] as usize + 1));
+        for k in 0..2 {
+            check_knots(degrees[k], &knots[k], counts[k])?;
+        }
+        if counts[0].checked_mul(counts[1]) != Some(points.len()) {
+            return Err(refuse(
+                None,
+                "wrong control point count",
+                "a NURBS surface's control grid does not match its knots",
+            ));
+        }
+        check_points(&points)?;
+        check_weights(weights.as_deref(), points.len())?;
+        Ok(Self {
+            degrees,
+            knots,
+            counts,
+            points,
+            weights,
+            closed,
+        })
+    }
+
+    /// The degrees `[u, v]`.
+    pub fn degrees(&self) -> [u8; 2] {
+        self.degrees
+    }
+
+    /// The knots `[u, v]`.
+    pub fn knots(&self) -> &[Column<f64>; 2] {
+        &self.knots
+    }
+
+    /// The grid's size `[count_u, count_v]`.
+    pub fn counts(&self) -> [usize; 2] {
+        self.counts
+    }
+
+    /// The control points, `u`-major.
+    pub fn points(&self) -> &Column<[f64; 3]> {
+        &self.points
+    }
+
+    /// Control point `(i, j)`.
+    pub fn point_at(&self, i: usize, j: usize) -> [f64; 3] {
+        self.points[i * self.counts[1] + j]
+    }
+
+    /// The weights, `u`-major; `None` when polynomial.
+    pub fn weights(&self) -> Option<&Column<f64>> {
+        self.weights.as_ref()
+    }
+
+    /// The closed directions `[u, v]` and their seams' continuity.
+    pub fn closed(&self) -> [Option<SeamContinuity>; 2] {
+        self.closed
+    }
+
+    /// The domain `[[u0, u1], [v0, v1]]`.
+    pub fn domain(&self) -> [[f64; 2]; 2] {
+        [0, 1].map(|k| {
+            let d = self.degrees[k] as usize;
+            [self.knots[k][d], self.knots[k][self.counts[k]]]
+        })
+    }
+
+    /// The width of the domain in each closed direction: the chart's
+    /// period there.
+    pub fn periods(&self) -> [Option<f64>; 2] {
+        let domain = self.domain();
+        [0, 1].map(|k| self.closed[k].map(|_| domain[k][1] - domain[k][0]))
+    }
+
+    /// The same surface with its control `points` moved (a CV edit):
+    /// knots, weights and closures shared. A body built on it checks the
+    /// closed rows again.
+    ///
+    /// # Errors
+    /// A different number of points, or a point not finite.
+    pub fn with_points(&self, points: impl Into<Column<[f64; 3]>>) -> Result<Self, GeometryError> {
+        let points = points.into();
+        if points.len() != self.points.len() {
+            return Err(refuse(
+                None,
+                "wrong control point count",
+                "a CV edit keeps the number of control points",
+            ));
+        }
+        check_points(&points)?;
+        Ok(Self {
+            points,
+            ..self.clone()
+        })
+    }
+
+    /// `(u, v)` with each closed direction wrapped into the domain by
+    /// whole periods; parameters inside it are kept as they are.
+    pub(crate) fn wrap(&self, uv: [f64; 2]) -> [f64; 2] {
+        let domain = self.domain();
+        [0, 1].map(|k| match self.closed[k] {
+            Some(_) => wrap_into(uv[k], domain[k]),
+            None => uv[k],
+        })
+    }
+
+    /// The point and first partials `[S, S_u, S_v]` at `uv`.
+    pub(crate) fn jet(&self, uv: [f64; 2]) -> [[f64; 3]; 3] {
+        let [u, v] = self.wrap(uv);
+        let [du, dv] = self.degrees.map(|d| d as usize);
+        let [nu, nv] = self.counts;
+        // Each row of constant i evaluated along v, then those along u.
+        let su = span(du, &self.knots[0], nu, u);
+        let rows: Vec<[[f64; 4]; 2]> = (su - du..=su)
+            .map(|i| {
+                jet_1d(dv, &self.knots[1], nv, v, |j| {
+                    let w = self.weights.as_ref().map_or(1.0, |w| w[i * nv + j]);
+                    let p = self.points[i * nv + j];
+                    [p[0] * w, p[1] * w, p[2] * w, w]
+                })
+            })
+            .collect();
+        let along_u = |which: usize| {
+            jet_1d(du, &self.knots[0], nu, u, |i| {
+                if (su - du..=su).contains(&i) {
+                    rows[i + du - su][which]
+                } else {
+                    [0.0; 4]
+                }
+            })
+        };
+        let [p, pu] = along_u(0);
+        let [pv, _] = along_u(1);
+        let point = [p[0] / p[3], p[1] / p[3], p[2] / p[3]];
+        let quotient = |d: [f64; 4]| [0, 1, 2].map(|k| (d[k] - point[k] * d[3]) / p[3]);
+        [point, quotient(pu), quotient(pv)]
+    }
+}
+
+/// `x` reduced into `[a, b]` by whole periods `b − a`; values inside (the
+/// ends included) and non-finite values are returned unchanged.
+pub(crate) fn wrap_into(x: f64, [a, b]: [f64; 2]) -> f64 {
+    if !(x < a || x > b) || !x.is_finite() {
+        return x;
+    }
+    let r = (x - a).rem_euclid(b - a);
+    (a + r).min(b)
+}
+
+/// The knot span `[knots[s], knots[s + 1])` holding `t`, `s` in
+/// `degree..count` (the last span holds the domain's end and beyond, the
+/// first everything before it).
+fn span(degree: usize, knots: &[f64], count: usize, t: f64) -> usize {
+    // The last s with knots[s] <= t, among degree..count.
+    let s = knots[degree + 1..count].partition_point(|&k| k <= t);
+    degree + s
+}
+
+/// The homogeneous point and first derivative at `t` of the 1D B-spline
+/// whose control value `i` is `value(i)`, by de Boor's algorithm on the
+/// span holding `t`.
+fn jet_1d(
+    degree: usize,
+    knots: &[f64],
+    count: usize,
+    t: f64,
+    value: impl Fn(usize) -> [f64; 4],
+) -> [[f64; 4]; 2] {
+    let s = span(degree, knots, count, t);
+    let mut d: Vec<[f64; 4]> = (s - degree..=s).map(&value).collect();
+    // The derivative: the degree − 1 spline of differences, by the same
+    // recursion one level short (NURBS Book eq. 3.4).
+    let blend = |a: [f64; 4], b: [f64; 4], alpha: f64| {
+        [0, 1, 2, 3].map(|k| (1.0 - alpha) * a[k] + alpha * b[k])
+    };
+    let mut derivative = [0.0; 4];
+    for r in 1..=degree {
+        if r == degree {
+            // d[degree − 1] and d[degree] are the last two points of the
+            // de Boor triangle: their difference over the knot gap is the
+            // derivative.
+            let gap = knots[s + 1] - knots[s];
+            if gap > 0.0 {
+                derivative =
+                    [0, 1, 2, 3].map(|k| (d[degree][k] - d[degree - 1][k]) * degree as f64 / gap);
+            }
+        }
+        for j in (r..=degree).rev() {
+            let i = s - degree + j;
+            let (lo, hi) = (knots[i], knots[i + degree + 1 - r]);
+            let alpha = if hi > lo { (t - lo) / (hi - lo) } else { 0.0 };
+            d[j] = blend(d[j - 1], d[j], alpha);
+        }
+    }
+    [d[degree], derivative]
+}
