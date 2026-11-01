@@ -1,6 +1,7 @@
 //! The API through a toy kernel: a point cloud data type (codec, display,
 //! no other facet), a "count" type a bridge converts clouds into, a Cloud
 //! object kind, a format and a selection slot, registered as packages.
+use kinogaki_studio_api::conformance::Unconverted;
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::viewport::OverlayVertex;
 use kinogaki_studio_api::*;
@@ -374,7 +375,7 @@ fn objects_adopt_imported_values_of_their_result_type() {
         .read(
             std::path::Path::new("in.xyz"),
             &format.options(),
-            &Reading::new(Purpose::Objects, Units::default()),
+            &Reading::new(Purpose::Objects, Units::default(), &Unconverted),
         )
         .unwrap();
     let value = imported.items[0].data.as_ref().unwrap();

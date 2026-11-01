@@ -19,8 +19,9 @@
 //!
 //! A compiled context (Comp) runs its plans on the film through a
 //! [`Runner`] its package makes on the host's device ([`PlanRunner`]): the
-//! host gives it the film ([`RunFilm`]) and its view transforms as WGSL
-//! ([`ViewTransforms`]: the host keeps the color maths), and shows the
+//! host gives it the film ([`RunFilm`]) and its color service, whose view
+//! transforms come as WGSL ([`ColorService`]: the host keeps the color
+//! maths), and shows the
 //! [`RunImage`] it returns; what the runner reads back (a palette) the host
 //! asks for with [`Runner::kept`].
 //!
@@ -33,6 +34,7 @@ use std::sync::Arc;
 /// engines and runners build against.
 pub use wgpu;
 
+use crate::color::ColorService;
 use crate::{Aov, EngineDescription, Frame, RenderEngine, Wake};
 
 /// The images an engine shows its frames in.
@@ -223,52 +225,6 @@ pub trait Engine: Send + Sync {
     ) -> Result<Made, String>;
 }
 
-/// Which display and view a view transform is for.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ViewChoice {
-    /// The viewer's display and view.
-    Viewer,
-    /// A display and view of the host's color configuration, by name.
-    Pinned {
-        /// The display.
-        display: Arc<str>,
-        /// The view.
-        view: Arc<str>,
-    },
-}
-
-/// A view transform (scene-referred ACEScg to display code values, without
-/// the viewer's exposure and gamma) as the host's color management writes
-/// it for a compute shader: WGSL declaring its data buffer at the group and
-/// binding asked for, with helpers and a function `fn <function>(c:
-/// vec3<f32>) -> vec3<f32>`, and the buffer's contents. The host holds the
-/// color maths; a package only embeds the shader.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ViewTransform {
-    /// The WGSL: the buffer's declaration, helpers and the function.
-    pub source: String,
-    /// The function's name.
-    pub function: String,
-    /// The buffer's contents (f32s).
-    pub data: Vec<f32>,
-}
-
-/// The host's view transforms, for a runner that shows display code
-/// values (Comp's To Display).
-pub trait ViewTransforms {
-    /// `view`'s transform as WGSL named `name` (`[A-Za-z0-9_]`) reading its
-    /// data at `group`, `binding`; none when the configuration lacks it.
-    fn transform(
-        &self,
-        view: &ViewChoice,
-        name: &str,
-        group: u32,
-        binding: u32,
-    ) -> Option<ViewTransform>;
-    /// Changes whenever a transform would.
-    fn revision(&self) -> u64;
-}
-
 /// What an image means.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Referred {
@@ -313,7 +269,7 @@ pub trait Runner: Send {
         &mut self,
         plan: &(dyn std::any::Any + Send + Sync),
         film: &RunFilm<'_>,
-        transforms: &dyn ViewTransforms,
+        colors: &dyn ColorService,
         encoder: &mut wgpu::CommandEncoder,
     ) -> Result<RunImage, String>;
     /// The host submitted the last run as `index`: what it reads back (a

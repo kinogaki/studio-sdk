@@ -18,9 +18,11 @@
 //! ```
 mod brep;
 mod checks;
+mod colors;
 mod fixtures;
 
 pub use checks::{Codecs, Invariants};
+pub use colors::Unconverted;
 pub use fixtures::Fixtures;
 
 use crate::data::Data;

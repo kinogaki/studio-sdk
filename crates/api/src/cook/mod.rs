@@ -108,6 +108,9 @@ pub enum Resolved {
 pub struct Project<'a> {
     /// The project's units.
     pub units: crate::math::Units,
+    /// The host's color management, in the project's working space (a
+    /// cook reading it cooks again when its revision moves).
+    pub colors: &'a dyn kinogaki_render_api::ColorService,
     /// The directory relative paths resolve against; `None` for a project
     /// not saved yet.
     pub directory: Option<&'a std::path::Path>,

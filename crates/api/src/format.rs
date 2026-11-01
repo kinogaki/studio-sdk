@@ -23,6 +23,7 @@ use crate::error::Error;
 use crate::id::{DataTypeId, FormatId};
 use crate::math::{Affine3, Units};
 use crate::params::{Parameters, Schema, Value};
+use kinogaki_render_api::ColorService;
 use std::any::Any;
 use std::path::Path;
 
@@ -90,6 +91,9 @@ pub struct Reading<'a> {
     pub purpose: Purpose,
     /// The project's units: lengths in the file are converted into them.
     pub units: Units,
+    /// The host's color management: colors in the file are converted
+    /// from the file's space into the project's working space.
+    pub colors: &'a dyn ColorService,
     /// A number naming what the read is for (a File node's id), which a
     /// format may seed the names of what it reads with, so two nodes
     /// reading one file give values told apart.
@@ -107,12 +111,13 @@ pub struct Reading<'a> {
 }
 
 impl<'a> Reading<'a> {
-    /// A read for `purpose` into `units`, of origin 0, lent nothing and
-    /// never cancelled.
-    pub fn new(purpose: Purpose, units: Units) -> Self {
+    /// A read for `purpose` into `units` and `colors`' working space, of
+    /// origin 0, lent nothing and never cancelled.
+    pub fn new(purpose: Purpose, units: Units, colors: &'a dyn ColorService) -> Self {
         Self {
             purpose,
             units,
+            colors,
             origin: 0,
             settings: &[],
             cancel: CancelToken::default(),
@@ -277,6 +282,9 @@ pub trait FormatWriter: Send + Sync {
 pub struct Writing<'a> {
     /// The project's units, which the items' lengths are in.
     pub units: Units,
+    /// The host's color management: the items' colors are in its working
+    /// space, converted into the file's.
+    pub colors: &'a dyn ColorService,
     /// Raised once the write is no longer wanted; long writes poll it
     /// ([`Writing::check`]) and stop with [`Error::Cancelled`], and so does
     /// the work they ask of the host ([`meshed`](Self::meshed)).
@@ -291,10 +299,12 @@ pub struct Writing<'a> {
 }
 
 impl<'a> Writing<'a> {
-    /// A write in `units`, never cancelled, meshing nothing, of one time.
-    pub fn new(units: Units) -> Self {
+    /// A write in `units` and `colors`' working space, never cancelled,
+    /// meshing nothing, of one time.
+    pub fn new(units: Units, colors: &'a dyn ColorService) -> Self {
         Self {
             units,
+            colors,
             cancel: CancelToken::default(),
             meshed: &|_| None,
             frames: None,
@@ -416,13 +426,17 @@ mod tests {
         let reading = Reading {
             settings: &lent,
             cancel: stop,
-            ..Reading::new(Purpose::Node, units)
+            ..Reading::new(Purpose::Node, units, &crate::conformance::Unconverted)
         };
         assert_eq!(reading.setting::<f64>(), Some(&0.01));
         assert_eq!(reading.setting::<u32>(), None);
         let read = Plain.read(Path::new("a.plain"), &Plain.options(), &reading);
         assert_eq!(read.unwrap_err(), Error::Cancelled);
-        let fine = Reading::new(Purpose::Objects, Units::default());
+        let fine = Reading::new(
+            Purpose::Objects,
+            Units::default(),
+            &crate::conformance::Unconverted,
+        );
         assert!(
             Plain
                 .read(Path::new("a.plain"), &Plain.options(), &fine)

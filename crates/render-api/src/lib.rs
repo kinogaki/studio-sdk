@@ -26,6 +26,7 @@
 //! geometry values (`geometry`, which also holds [`Detail`]) alone.
 
 pub mod aov;
+pub mod color;
 pub mod declared;
 pub mod description;
 pub mod dirty;
@@ -47,6 +48,7 @@ pub mod update;
 pub mod vocabulary;
 
 pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec, CryptomatteOf};
+pub use color::{ColorService, RENDER_SPACE};
 pub use declared::{AppliedSchema, Declared, PrimType, Role};
 pub use description::{
     EngineDescription, Engines, MaterialPreset, MaterialRules, PreviewSetup, Tint,
