@@ -60,7 +60,8 @@ pub trait HeldEdit: Send + Sync {
 
     /// The rows `delta` shows in the inspector of the node holding it (an
     /// Edit Mesh's latest action's), at their values; `cx.input(0)` is
-    /// the node's held result. `None`: the delta shows no rows. Like
+    /// the node's held result, and `cx.purpose()` where they show (a
+    /// tool's card may show fewer). `None`: the delta shows no rows. Like
     /// [`NodeType::schema`](crate::NodeType::schema), it must be quick.
     fn rows(&self, delta: &Data, cx: &SchemaCx<'_>) -> Option<Schema> {
         let _ = (delta, cx);

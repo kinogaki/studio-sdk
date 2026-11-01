@@ -42,13 +42,15 @@ pub use capabilities::{
     HostDoc, HostDocExt, HostSelection, HostSettings, HostSettingsExt, HostShell, HostSlots,
     HostSlotsExt, HostStatus, HostTools, HostTransform, HostUndo, HostView,
 };
-pub use data::{Ground, HostPrefs, Inspected, NodeRef, ObjectRef, Place, View, ViewCamera};
+pub use data::{
+    Ground, HostPrefs, Inspected, NodeRef, NodeRows, ObjectRef, Place, View, ViewCamera,
+};
 pub use network::HostNetwork;
 
 use crate::gizmo::{GizmoFrame, Handle, TransformTool};
 use crate::{Pos, Projection, Rect};
-use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::params::Unit;
+use kinogaki_studio_api::{CancelToken, RowsFor};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -98,6 +100,20 @@ pub trait Cx:
     /// The result of `key`'s latest job, once it has landed; each result is
     /// given once.
     fn take_latest(&mut self, key: &str) -> Option<LatestResult>;
+    /// Draws node `node`'s rows into `ui` as its type gives them for
+    /// `purpose` (a card's: compact, at `ui`'s width), the node of
+    /// `object`'s open network; nothing for another object or node. The
+    /// host's own rows: an edit is applied as the inspector's are, one undo
+    /// step, or part of the open gesture (a tool's run, its card's edits,
+    /// its drags and typed values stay one step). A tool's card shows its
+    /// node this way instead of drawing parameters of its own.
+    fn node_rows(
+        &mut self,
+        ui: &mut dyn crate::Ui,
+        object: ObjectRef,
+        node: NodeRef,
+        purpose: RowsFor,
+    ) -> NodeRows;
 }
 
 /// The context of a call about one view (a viewport layer's pointer

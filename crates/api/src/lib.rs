@@ -101,7 +101,7 @@ pub use components::Components;
 pub use conversion::Conversion;
 pub use cook::{
     Category, CookCx, CookError, CookPlan, Description, Incremental, Inside, Listing, NewCx,
-    NodeRole, NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved,
+    NodeRole, NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, RowsFor,
     SchemaCx,
 };
 pub use data::{Data, Typed};

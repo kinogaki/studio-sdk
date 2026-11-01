@@ -1,30 +1,60 @@
-//! [`SchemaCx`]: what a node's rows may depend on besides its parameters;
-//! [`NewCx`]: what a new node's parameters may; [`PortsCx`]: what its
-//! ports may.
+//! [`SchemaCx`]: what a node's rows may depend on besides its parameters,
+//! and [`RowsFor`] where they show; [`NewCx`]: what a new node's
+//! parameters may; [`PortsCx`]: what its ports may.
 use crate::data::Data;
 use crate::id::ContextId;
 
+/// Where a node's rows show: what [`SchemaCx::purpose`] says.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum RowsFor {
+    /// The inspector: every row.
+    #[default]
+    Inspector,
+    /// A tool's card over the views: the rows a tool's run is adjusted by
+    /// (a type may leave out the rest); `more`: the user asked the card
+    /// for more.
+    Card {
+        /// The card's More is on.
+        more: bool,
+    },
+}
+
 /// What [`NodeType::schema`](super::NodeType::schema) may shape a node's
-/// rows by: which of its input ports are wired, and what each held when the
-/// node last cooked (an attribute menu from the input's attributes).
+/// rows by: which of its input ports are wired, what each held when the
+/// node last cooked (an attribute menu from the input's attributes), and
+/// where the rows show.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SchemaCx<'a> {
     wired: &'a [bool],
     inputs: &'a [Option<Data>],
     names: &'a [Vec<String>],
     kept: Option<&'a [f64]>,
+    purpose: RowsFor,
 }
 
 impl<'a> SchemaCx<'a> {
     /// Ports `wired` (one a port), and the value each input held at the
-    /// node's last cook (`None`: not cooked yet, or nothing wired).
+    /// node's last cook (`None`: not cooked yet, or nothing wired); for the
+    /// inspector.
     pub fn new(wired: &'a [bool], inputs: &'a [Option<Data>]) -> Self {
         Self {
             wired,
             inputs,
             names: &[],
             kept: None,
+            purpose: RowsFor::Inspector,
         }
+    }
+
+    /// For rows shown where `purpose` says.
+    pub fn with_purpose(mut self, purpose: RowsFor) -> Self {
+        self.purpose = purpose;
+        self
+    }
+
+    /// Where the rows show.
+    pub fn purpose(&self) -> RowsFor {
+        self.purpose
     }
 
     /// With the names of the nodes wired into each port, in wire order.
@@ -127,6 +157,9 @@ mod tests {
         let named = SchemaCx::new(&[true], &[None]).with_input_names(&names);
         assert_eq!(named.input_names(0), ["a", "b"]);
         assert!(named.input_names(1).is_empty());
+        assert_eq!(cx.purpose(), RowsFor::Inspector);
+        let card = RowsFor::Card { more: false };
+        assert_eq!(cx.with_purpose(card).purpose(), card);
         let palette = [0.1, 0.2, 0.3];
         assert_eq!(cx.with_kept(Some(&palette)).kept(), Some(&palette[..]));
     }

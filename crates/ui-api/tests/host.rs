@@ -1,12 +1,15 @@
 //! A toy package's UI on the fake host: registering erases its state's
 //! type; its inspector, viewport layer and levels run through
 //! the host interface; its slot is undone with the document; its
-//! settings section round-trips; and a nested call is refused.
+//! settings section round-trips; a tool's card shows its node's rows
+//! through the host, with More while they are fewer than the inspector's;
+//! and a nested call is refused.
+use kinogaki_studio_api::RowsFor;
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
 use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
 use studio_ui_api::host::{
-    Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef,
-    Place, View, ViewCamera, ViewCx, Waker,
+    Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows,
+    ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
     ContextPart, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library,
@@ -51,6 +54,12 @@ struct Forest {
     pages: u32,
     level: usize,
     wake: Option<Waker>,
+    /// The node its Plant tool adjusts while its card is up.
+    planting: Option<NodeRef>,
+    /// The card's More is on.
+    more: bool,
+    /// The card's rows were fewer than the inspector's last time.
+    hidden: bool,
 }
 
 struct Trees;
@@ -178,6 +187,33 @@ impl ViewportLayer<Forest> for TreeView {
         };
         let stroke = Stroke::new(1.0, Color::WHITE);
         ui.painter().circle_stroke(at, 4.0, stroke);
+    }
+    /// Plant's card: its node's rows, More while some are left out, Done
+    /// ending it.
+    fn cards(&self, s: &mut Forest, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
+        let (Some(node), Some(object)) = (s.planting, cx.place().object) else {
+            return;
+        };
+        let spec = studio_ui_api::CardSpec {
+            id: studio_ui_api::Id::new("toy.trees.plant"),
+            rect,
+            bounds: rect,
+            title: "Plant",
+            more: (s.more || s.hidden).then_some(s.more),
+        };
+        let purpose = RowsFor::Card { more: s.more };
+        let mut drawn = NodeRows::default();
+        let card = ui.card(&spec, &mut |ui| {
+            drawn = cx.node_rows(ui, object, node, purpose);
+        });
+        s.hidden = drawn.hidden;
+        if drawn.changed {
+            cx.ran(node);
+        }
+        s.more ^= card.toggle_more;
+        if card.done {
+            s.planting = None;
+        }
     }
 }
 
@@ -527,4 +563,42 @@ fn a_body_is_set_whole_and_only_of_its_kind() {
             HostCall::SetBody(object, "Refresh".into())
         ]
     );
+}
+
+#[test]
+fn a_tools_card_shows_its_nodes_rows_and_more_while_some_are_left_out() {
+    let mut host = host();
+    host.node_rows = NodeRows {
+        changed: true,
+        hidden: true,
+    };
+    let mut trees = hosted(&host);
+    trees.with(|_, s| s.downcast_mut::<Forest>().unwrap().planting = Some(NodeRef(3)));
+    let mut cards = |host: &mut FakeHost, ui: &mut RecordingUi| {
+        trees.with(|p, s| {
+            let layer = p.contexts[0].viewport.as_ref().unwrap();
+            layer.cards(s, host, ui, rect());
+        });
+    };
+    let mut ui = RecordingUi::new(rect());
+    // Its first frame learns that rows are left out: the click waits for
+    // the More shown after.
+    ui.click("More");
+    cards(&mut host, &mut ui);
+    assert!(ui.calls().contains(&Call::Card("Plant".into())));
+    cards(&mut host, &mut ui);
+    cards(&mut host, &mut ui);
+    let rows = |more| HostCall::NodeRows(ObjectRef(7), NodeRef(3), RowsFor::Card { more });
+    let asked: Vec<_> = (host.take_calls().into_iter())
+        .filter(|c| matches!(c, HostCall::NodeRows(..)))
+        .collect();
+    assert_eq!(asked, [rows(false), rows(false), rows(true)]);
+    assert_eq!(
+        host.adjustable,
+        Some(NodeRef(3)),
+        "an edit keeps it adjustable"
+    );
+    ui.click("Done");
+    cards(&mut host, &mut ui);
+    assert!(trees.state::<Forest>().planting.is_none(), "Done ends it");
 }

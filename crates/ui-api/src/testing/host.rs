@@ -8,8 +8,8 @@ use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
     HostSlots, HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx,
-    LatestJob, LatestResult, NodeRef, ObjectRef, Place, UnitsService, View, ViewCamera, ViewCx,
-    Waker,
+    LatestJob, LatestResult, NodeRef, NodeRows, ObjectRef, Place, UnitsService, View, ViewCamera,
+    ViewCx, Waker,
 };
 use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
@@ -18,7 +18,7 @@ use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::{Severity, Unit};
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, Package, SessionSlot,
+    Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, Package, RowsFor, SessionSlot,
     SessionSlots, SlotId, Time,
 };
 use std::any::Any;
@@ -82,6 +82,8 @@ pub enum HostCall {
     /// [`HostNetwork::edit_network`], by object and step label, whether or
     /// not the edit held.
     EditNetwork(ObjectRef, String),
+    /// [`Cx::node_rows`].
+    NodeRows(ObjectRef, NodeRef, RowsFor),
 }
 
 /// An object of a [`FakeHost`]'s scene.
@@ -182,6 +184,8 @@ pub struct FakeHost {
     pub rendering: BTreeSet<usize>,
     /// The clipboard's text.
     pub clipboard: Option<String>,
+    /// What [`Cx::node_rows`] answers (it draws nothing).
+    pub node_rows: NodeRows,
     /// The [`Cx::latest`] jobs not yet run, by key, with their tokens;
     /// [`FakeHost::run_latest`] runs them.
     latest: BTreeMap<String, (CancelToken, LatestJob)>,
@@ -229,6 +233,7 @@ impl FakeHost {
             wakes: Arc::default(),
             rendering: BTreeSet::new(),
             clipboard: None,
+            node_rows: NodeRows::default(),
             latest: BTreeMap::new(),
             landed: BTreeMap::new(),
             undo: Vec::new(),
@@ -672,6 +677,17 @@ impl Cx for FakeHost {
     }
     fn take_latest(&mut self, key: &str) -> Option<LatestResult> {
         self.landed.remove(key)
+    }
+    /// Records the call and answers its `node_rows` field.
+    fn node_rows(
+        &mut self,
+        _ui: &mut dyn crate::Ui,
+        object: ObjectRef,
+        node: NodeRef,
+        purpose: RowsFor,
+    ) -> NodeRows {
+        self.calls.push(HostCall::NodeRows(object, node, purpose));
+        self.node_rows
     }
 }
 

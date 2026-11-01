@@ -1,6 +1,6 @@
 //! The plain values the host interface exchanges: references to objects
-//! and nodes, where the user is, one view as a package sees it, and the
-//! user's preferences.
+//! and nodes, where the user is, one view as a package sees it, what a
+//! node's rows drawn by the host did, and the user's preferences.
 use crate::gizmo::TransformTool;
 use crate::{Modifiers, Pos, Projection, Ray, Rect, Response, Slot};
 use kinogaki_studio_api::{ContextId, Units, Vec3};
@@ -22,6 +22,17 @@ pub struct Place {
     /// The node the level is opened on (a Material's shading network, a
     /// mode such as CAD's sketch).
     pub node: Option<NodeRef>,
+}
+
+/// What [`Cx::node_rows`](super::Cx::node_rows) did.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct NodeRows {
+    /// An edit of the rows was applied this call (the tool calls
+    /// [`HostTools::ran`](super::HostTools::ran) again to keep adjusting
+    /// the node).
+    pub changed: bool,
+    /// The rows drawn are fewer than the inspector's: a card offers More.
+    pub hidden: bool,
 }
 
 /// One view's camera, for the edited object's space (the open object's,

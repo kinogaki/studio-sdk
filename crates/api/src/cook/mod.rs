@@ -28,7 +28,7 @@ pub use description::{Category, Description, Listing, NodeRole, Port, Ports};
 pub use frame::Frame;
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
-pub use sheet::{NewCx, PortsCx, SchemaCx};
+pub use sheet::{NewCx, PortsCx, RowsFor, SchemaCx};
 
 /// The prefix of the names a node's spares take ([`NodeType::spares`]): no
 /// node type's description declares a parameter so named (the
@@ -266,10 +266,13 @@ pub trait NodeType: Any + Send + Sync {
     /// description's parameters and its spares, at their values) by what
     /// `cx` says: rows enabled or disabled (with the reason) by what is
     /// wired, choices filled from what an input held (its attributes, its
-    /// groups). It shapes rows only: it never changes a parameter, and the
-    /// same parameters and `cx` give the same rows. Core asks only while
-    /// the node's rows are shown, so it must be quick. `rows` unchanged by
-    /// default.
+    /// groups). Where they show is `cx.purpose()`: a tool's card
+    /// ([`RowsFor::Card`]) may leave out the rows its run isn't adjusted
+    /// by, and offers More while it shows fewer than the inspector does.
+    /// It shapes rows only: it never changes a parameter, and the same
+    /// parameters and `cx` give the same rows. Core asks only while the
+    /// node's rows are shown, so it must be quick. `rows` unchanged by
+    /// default, for every purpose.
     fn schema(&self, rows: Schema, parameters: &Parameters, cx: &SchemaCx<'_>) -> Schema {
         let _ = (parameters, cx);
         rows
