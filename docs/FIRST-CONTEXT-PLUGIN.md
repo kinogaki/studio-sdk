@@ -437,5 +437,4 @@ The context parts this plugin leaves out, all in `studio_ui_api::package` with t
 
 - `ViewportLayer`: the context's tools over the views (pointer and keys, overlays through the `Painter`, the edited surface core draws, heads-up `ValueFields`);
 - `ObjectRows` and `OutlineRows`: rows for the context's objects in the inspector and the outliner;
-- `Results`: how the context's gestures take the host's cooks of its objects;
 - a `KeyStore`, marking menus and shelves (`MenuDefaults`) in the library, and settings pages (`SettingsSection`).

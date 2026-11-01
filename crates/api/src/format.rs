@@ -16,6 +16,7 @@
 //! [`FormatWriter::schema`]): writing never gets the reading options.
 pub mod options;
 
+use crate::cancel::CancelToken;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::error::Error;
@@ -83,7 +84,7 @@ pub enum Purpose {
 
 /// What a read is for and what it reads into, besides the format's
 /// options.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Reading<'a> {
     /// What the host makes of the items.
     pub purpose: Purpose,
@@ -96,9 +97,9 @@ pub struct Reading<'a> {
     /// Values of the project the host lends formats, found by their Rust
     /// type ([`Reading::setting`]): a CAD kernel's tolerances.
     pub settings: &'a [&'a (dyn Any + Send + Sync)],
-    /// Whether the read is no longer wanted; long reads poll it and stop
-    /// with [`Error::Cancelled`].
-    pub cancelled: &'a (dyn Fn() -> bool + Sync),
+    /// Raised once the read is no longer wanted; long reads poll it
+    /// ([`Reading::check`]) and stop with [`Error::Cancelled`].
+    pub cancel: CancelToken,
     /// The data type the host wants the file read as, for
     /// [`Purpose::Node`]: the File node's output (a STEP file as B-rep or
     /// as polygons); `None` for Import, which takes any.
@@ -114,7 +115,7 @@ impl<'a> Reading<'a> {
             units,
             origin: 0,
             settings: &[],
-            cancelled: &|| false,
+            cancel: CancelToken::default(),
             wants: None,
         }
     }
@@ -128,11 +129,7 @@ impl<'a> Reading<'a> {
 
     /// `Err(Error::Cancelled)` once the read is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
-        if (self.cancelled)() {
-            Err(Error::Cancelled)
-        } else {
-            Ok(())
-        }
+        self.cancel.check()
     }
 }
 
@@ -276,13 +273,14 @@ pub trait FormatWriter: Send + Sync {
 }
 
 /// What a write is for, besides the writer's options.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Writing<'a> {
     /// The project's units, which the items' lengths are in.
     pub units: Units,
-    /// Whether the write is no longer wanted; long writes poll it and stop
-    /// with [`Error::Cancelled`].
-    pub cancelled: &'a (dyn Fn() -> bool + Sync),
+    /// Raised once the write is no longer wanted; long writes poll it
+    /// ([`Writing::check`]) and stop with [`Error::Cancelled`], and so does
+    /// the work they ask of the host ([`meshed`](Self::meshed)).
+    pub cancel: CancelToken,
     /// An item's value as polygons, for a writer that writes only those
     /// (a B-rep through the installed mesher); `None` when nothing meshes
     /// it.
@@ -297,7 +295,7 @@ impl<'a> Writing<'a> {
     pub fn new(units: Units) -> Self {
         Self {
             units,
-            cancelled: &|| false,
+            cancel: CancelToken::default(),
             meshed: &|_| None,
             frames: None,
         }
@@ -305,11 +303,7 @@ impl<'a> Writing<'a> {
 
     /// `Err(Error::Cancelled)` once the write is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
-        if (self.cancelled)() {
-            Err(Error::Cancelled)
-        } else {
-            Ok(())
-        }
+        self.cancel.check()
     }
 }
 
@@ -413,14 +407,15 @@ mod tests {
     fn readings_lend_settings_by_type_and_poll_cancellation() {
         let tolerance = 0.01_f64;
         let lent: [&(dyn Any + Send + Sync); 1] = [&tolerance];
-        let stop = || true;
+        let stop = CancelToken::default();
+        stop.cancel();
         let units = Units {
             up: UpAxis::Z,
             meters_per_unit: 0.001,
         };
         let reading = Reading {
             settings: &lent,
-            cancelled: &stop,
+            cancel: stop,
             ..Reading::new(Purpose::Node, units)
         };
         assert_eq!(reading.setting::<f64>(), Some(&0.01));

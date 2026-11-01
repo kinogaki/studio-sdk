@@ -1,4 +1,5 @@
 //! [`NetworkRead`]: a network as packages read it.
+use crate::components::Components;
 use crate::data::Data;
 use crate::id::{ContextId, NodeTypeId};
 use crate::params::{Parameters, Value};
@@ -70,6 +71,11 @@ pub struct NodeInfo<'a> {
     /// Its first output as last cooked, when it has cooked since its last
     /// change (a held edit's result, for baking it into its base).
     pub result: Option<Data>,
+    /// The selection that output carries downstream
+    /// ([`Outputs::selection`](crate::Outputs::selection)) as last cooked,
+    /// on the same terms as [`result`](Self::result): what `.selection`
+    /// names in a group expression.
+    pub selection: Option<Components>,
 }
 
 /// A wire into a node: the node it leaves and which of its outputs.

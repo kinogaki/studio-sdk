@@ -353,6 +353,7 @@ impl NetworkRead for FakeNetwork {
     }
     fn node(&self, node: NodeRef) -> Option<NodeInfo<'_>> {
         let n = self.nodes.get(&node)?;
+        let mut cooked = self.cook(node).ok();
         Some(NodeInfo {
             name: &n.name,
             node_type: n.node_type,
@@ -363,10 +364,10 @@ impl NetworkRead for FakeNetwork {
             level: n.level,
             position: n.position,
             delta: n.delta.as_ref(),
-            result: self
-                .cook(node)
-                .ok()
-                .and_then(|mut o| (!o.data.is_empty()).then(|| o.data.swap_remove(0))),
+            result: cooked
+                .as_mut()
+                .and_then(|o| (!o.data.is_empty()).then(|| o.data.swap_remove(0))),
+            selection: cooked.and_then(|o| o.selection),
         })
     }
     fn inside(&self, node: NodeRef) -> Option<&dyn NetworkRead> {

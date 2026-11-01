@@ -44,8 +44,7 @@
 //! the [`Inspector`], the [`Vocabulary`] that runs its items, the
 //! [`ObjectRows`] and [`OutlineRows`] for the object
 //! kinds it owns (their creations are the kinds' own,
-//! `ObjectKindSpec::creations`), and [`Results`], how it takes the host's
-//! cooks of its objects. A part a
+//! `ObjectKindSpec::creations`). A part a
 //! context leaves out is never another context's. In a context whose
 //! networks are core's, the host's own UI is there without a part: its
 //! network pane, Tab and menus listing the context's listed node types,
@@ -62,7 +61,6 @@ mod data;
 mod edited;
 mod library;
 mod parts;
-mod results;
 mod settings;
 mod view;
 
@@ -81,7 +79,6 @@ pub use parts::{
     Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, RowAction, ViewportLayer,
     Vocabulary,
 };
-pub use results::{Results, Shown, ShownKind};
 pub use settings::{Section, SettingsSection};
 pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 
@@ -146,8 +143,6 @@ pub struct ContextPart<S: ?Sized> {
     pub objects: Option<Box<dyn ObjectRows<S>>>,
     /// Outliner rows inside the object kinds it owns.
     pub outline: Option<Box<dyn OutlineRows<S>>>,
-    /// How it takes the host's cooks of its objects.
-    pub results: Option<Box<dyn Results<S>>>,
 }
 
 impl<S: ?Sized> ContextPart<S> {
@@ -163,7 +158,6 @@ impl<S: ?Sized> ContextPart<S> {
             vocabulary: None,
             objects: None,
             outline: None,
-            results: None,
         }
     }
 
@@ -214,12 +208,6 @@ impl<S: ?Sized> ContextPart<S> {
         self.outline = Some(Box::new(part));
         self
     }
-
-    /// With how it takes the host's cooks.
-    pub fn with_results(mut self, part: impl Results<S> + 'static) -> Self {
-        self.results = Some(Box::new(part));
-        self
-    }
 }
 
 impl<S: 'static> ContextPart<S> {
@@ -247,9 +235,6 @@ impl<S: 'static> ContextPart<S> {
             outline: self
                 .outline
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn OutlineRows<dyn Any>>),
-            results: self
-                .results
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Results<dyn Any>>),
         }
     }
 }
@@ -267,7 +252,6 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("vocabulary", &has(self.vocabulary.is_some()))
             .field("objects", &has(self.objects.is_some()))
             .field("outline", &has(self.outline.is_some()))
-            .field("results", &has(self.results.is_some()))
             .finish()
     }
 }
