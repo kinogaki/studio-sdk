@@ -44,11 +44,13 @@ pub trait NetworkEdit: NetworkRead {
     /// computes changes.
     fn set_position(&mut self, node: NodeRef, position: [f32; 2]) -> Result<(), Error>;
 
-    /// Sets parameter `name` of `node` to `value`.
+    /// Sets parameter `name` of `node` to `value`: on an animated row, its
+    /// key at the current time (a new one between keys).
     fn set_parameter(&mut self, node: NodeRef, name: &str, value: Value) -> Result<(), Error>;
 
     /// Replaces every parameter of `node`: `parameters` hold each one its
-    /// type declares.
+    /// type declares. An animated row it changes is its key at the current
+    /// time, as [`set_parameter`](Self::set_parameter) sets it.
     fn set_parameters(&mut self, node: NodeRef, parameters: Parameters) -> Result<(), Error>;
 
     /// Wires `from` into input `port` of `node`: after its wires on a

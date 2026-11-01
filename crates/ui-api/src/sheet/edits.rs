@@ -16,6 +16,10 @@ pub enum Action {
     Socket,
     /// The trailing icon.
     Trailing,
+    /// A keyable field's label was Alt+clicked
+    /// ([`Field::keyable`](super::Field::keyable)): the host sets or
+    /// removes its key at the current time.
+    Key,
     /// The tree path picker's Relative paths toggle, now this.
     Relative(bool),
     /// The vector's uniform lock, or the channels' link, now this.

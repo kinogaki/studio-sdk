@@ -40,7 +40,7 @@ pub use kind::{
     Chip, CurveChannel, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing,
 };
 pub use number::{Number, NumberStyle};
-pub use schema::{Field, Item, Schema, Section};
+pub use schema::{Animation, Field, Item, Schema, Section};
 
 use crate::id::Id;
 use std::borrow::Cow;

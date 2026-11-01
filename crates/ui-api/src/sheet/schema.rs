@@ -44,6 +44,22 @@ pub struct Section {
     pub sub: bool,
 }
 
+/// How a row's value moves over time, shown as its value field's tint (no
+/// icon): the host says, from the row's channel at the current time.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Animation {
+    /// It holds one value.
+    #[default]
+    Static,
+    /// It has a channel: its value is the channel's at the current time.
+    Animated,
+    /// It has a channel with a key at the current time.
+    Keyed,
+    /// Its value is set from elsewhere than its own (a subnet parameter
+    /// driving it).
+    Overridden,
+}
+
 /// One labelled property.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Field<K> {
@@ -75,6 +91,11 @@ pub struct Field<K> {
     pub socket: Option<Socket>,
     /// The slot at the field's right edge.
     pub trailing: Trailing,
+    /// How its value moves over time (its tint).
+    pub animation: Animation,
+    /// The host keys it: an Alt+click on its label reports
+    /// [`Action::Key`](super::Action::Key).
+    pub keyable: bool,
 }
 
 impl<K> Field<K> {
@@ -93,6 +114,8 @@ impl<K> Field<K> {
             mixed: false,
             socket: None,
             trailing: Trailing::None,
+            animation: Animation::Static,
+            keyable: false,
         }
     }
 
@@ -312,6 +335,13 @@ impl<K> Field<K> {
         self
     }
 
+    /// Keyable by the host, its value moving as `animation` says.
+    pub fn keyed(mut self, animation: Animation) -> Self {
+        self.keyable = true;
+        self.animation = animation;
+        self
+    }
+
     /// The field with its key mapped by `f`.
     pub fn map<J>(self, f: impl FnOnce(K) -> J) -> Field<J> {
         Field {
@@ -327,6 +357,8 @@ impl<K> Field<K> {
             mixed: self.mixed,
             socket: self.socket,
             trailing: self.trailing,
+            animation: self.animation,
+            keyable: self.keyable,
         }
     }
 }
