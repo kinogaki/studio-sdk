@@ -105,6 +105,7 @@ mod polygons;
 mod positions;
 mod selection;
 mod shading;
+mod spline;
 mod tolerances;
 mod topology;
 mod triangulation;

@@ -4,6 +4,7 @@ use super::geometry::refuse;
 use crate::column::Column;
 use crate::error::GeometryError;
 use crate::limits::{MAX_COORDINATE, MAX_DEGREE};
+use crate::spline;
 
 /// How smoothly a closed NURBS direction continues across its seam.
 ///
@@ -230,28 +231,14 @@ impl<const D: usize> NurbsCurve<D> {
 
     /// The point and first derivative at `t`.
     pub(crate) fn jet(&self, t: f64) -> [[f64; D]; 2] {
-        let homogeneous = |i: usize| {
-            let w = self.weights.as_ref().map_or(1.0, |w| w[i]);
-            let mut h = [0.0; 4];
-            for (h, p) in h.iter_mut().zip(self.points[i]) {
-                *h = p * w;
-            }
-            h[3] = w;
-            h
-        };
-        let [p, d] = jet_1d(
-            self.degree as usize,
+        let weight = |i: usize| self.weights.as_ref().map_or(1.0, |w| w[i]);
+        spline::rational(spline::evaluate(
             &self.knots,
+            self.degree as usize,
             self.points.len(),
             t,
-            homogeneous,
-        );
-        let mut out = [[0.0; D]; 2];
-        for k in 0..D {
-            out[0][k] = p[k] / p[3];
-            out[1][k] = (d[k] - out[0][k] * d[3]) / p[3];
-        }
-        out
+            |i| spline::homogeneous(self.points[i], weight(i)),
+        ))
     }
 }
 
@@ -404,18 +391,17 @@ impl NurbsSurface {
         let [du, dv] = self.degrees.map(|d| d as usize);
         let [nu, nv] = self.counts;
         // Each row of constant i evaluated along v, then those along u.
-        let su = span(du, &self.knots[0], nu, u);
+        let su = spline::span(&self.knots[0], du, nu, u);
         let rows: Vec<[[f64; 4]; 2]> = (su - du..=su)
             .map(|i| {
-                jet_1d(dv, &self.knots[1], nv, v, |j| {
+                spline::evaluate(&self.knots[1], dv, nv, v, |j| {
                     let w = self.weights.as_ref().map_or(1.0, |w| w[i * nv + j]);
-                    let p = self.points[i * nv + j];
-                    [p[0] * w, p[1] * w, p[2] * w, w]
+                    spline::homogeneous(self.points[i * nv + j], w)
                 })
             })
             .collect();
         let along_u = |which: usize| {
-            jet_1d(du, &self.knots[0], nu, u, |i| {
+            spline::evaluate(&self.knots[0], du, nu, u, |i| {
                 if (su - du..=su).contains(&i) {
                     rows[i + du - su][which]
                 } else {
@@ -425,9 +411,9 @@ impl NurbsSurface {
         };
         let [p, pu] = along_u(0);
         let [pv, _] = along_u(1);
-        let point = [p[0] / p[3], p[1] / p[3], p[2] / p[3]];
-        let quotient = |d: [f64; 4]| [0, 1, 2].map(|k| (d[k] - point[k] * d[3]) / p[3]);
-        [point, quotient(pu), quotient(pv)]
+        let [point, s_u] = spline::rational([p, pu]);
+        let [_, s_v] = spline::rational([p, pv]);
+        [point, s_u, s_v]
     }
 }
 
@@ -439,52 +425,4 @@ pub(crate) fn wrap_into(x: f64, [a, b]: [f64; 2]) -> f64 {
     }
     let r = (x - a).rem_euclid(b - a);
     (a + r).min(b)
-}
-
-/// The knot span `[knots[s], knots[s + 1])` holding `t`, `s` in
-/// `degree..count` (the last span holds the domain's end and beyond, the
-/// first everything before it).
-fn span(degree: usize, knots: &[f64], count: usize, t: f64) -> usize {
-    // The last s with knots[s] <= t, among degree..count.
-    let s = knots[degree + 1..count].partition_point(|&k| k <= t);
-    degree + s
-}
-
-/// The homogeneous point and first derivative at `t` of the 1D B-spline
-/// whose control value `i` is `value(i)`, by de Boor's algorithm on the
-/// span holding `t`.
-fn jet_1d(
-    degree: usize,
-    knots: &[f64],
-    count: usize,
-    t: f64,
-    value: impl Fn(usize) -> [f64; 4],
-) -> [[f64; 4]; 2] {
-    let s = span(degree, knots, count, t);
-    let mut d: Vec<[f64; 4]> = (s - degree..=s).map(&value).collect();
-    // The derivative: the degree − 1 spline of differences, by the same
-    // recursion one level short (NURBS Book eq. 3.4).
-    let blend = |a: [f64; 4], b: [f64; 4], alpha: f64| {
-        [0, 1, 2, 3].map(|k| (1.0 - alpha) * a[k] + alpha * b[k])
-    };
-    let mut derivative = [0.0; 4];
-    for r in 1..=degree {
-        if r == degree {
-            // d[degree − 1] and d[degree] are the last two points of the
-            // de Boor triangle: their difference over the knot gap is the
-            // derivative.
-            let gap = knots[s + 1] - knots[s];
-            if gap > 0.0 {
-                derivative =
-                    [0, 1, 2, 3].map(|k| (d[degree][k] - d[degree - 1][k]) * degree as f64 / gap);
-            }
-        }
-        for j in (r..=degree).rev() {
-            let i = s - degree + j;
-            let (lo, hi) = (knots[i], knots[i + degree + 1 - r]);
-            let alpha = if hi > lo { (t - lo) / (hi - lo) } else { 0.0 };
-            d[j] = blend(d[j - 1], d[j], alpha);
-        }
-    }
-    [d[degree], derivative]
 }

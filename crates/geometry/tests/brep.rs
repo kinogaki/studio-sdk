@@ -1271,3 +1271,41 @@ fn consistency_is_checked_at_ends_and_joins() {
         ("closed rows apart".into(), Some(("surface", 0)))
     );
 }
+
+#[test]
+fn curves_and_brep_nurbs_evaluate_alike() {
+    use kinogaki_geometry::Basis;
+    // A rational cubic with a double interior knot, and its polynomial
+    // twin: one evaluator behind both values.
+    let knots = vec![0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.7, 1.5, 1.5, 1.5, 1.5];
+    let points = vec![
+        [0.0, 0.0, 0.0],
+        [1.0, 2.0, 0.5],
+        [2.0, -1.0, 1.0],
+        [3.0, 0.5, -0.5],
+        [4.0, 2.5, 0.0],
+        [5.0, 0.0, 1.5],
+        [6.0, 1.0, 0.0],
+    ];
+    for weights in [None, Some(vec![1.0, 0.5, 2.0, 1.0, 0.7, 1.3, 1.0])] {
+        let mut b = Curves::builder(Basis::Nurbs, points.clone().into(), vec![0, 7].into())
+            .degree(3)
+            .knots(vec![0, 11].into(), knots.clone().into());
+        if let Some(w) = &weights {
+            b = b.weights(w.clone().into());
+        }
+        let curves = b.build().unwrap();
+        let nurbs = NurbsCurve::new(
+            3,
+            knots.clone(),
+            points.clone(),
+            weights.clone().map(Column::from),
+        )
+        .unwrap();
+        assert_eq!(curves.domain(0), nurbs.domain());
+        for k in 0..=150 {
+            let t = 1.5 * k as f64 / 150.0;
+            assert!(close(curves.point(0, t), nurbs.point(t), 1e-12), "at {t}");
+        }
+    }
+}

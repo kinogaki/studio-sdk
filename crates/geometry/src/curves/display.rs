@@ -6,6 +6,7 @@
 use super::{Basis, Curves};
 use crate::column::Column;
 use crate::kept::Kept;
+use crate::spline::{self, homogeneous, rational};
 use std::sync::Arc;
 
 /// Every curve of a value as a polyline: what the viewport draws.
@@ -172,10 +173,12 @@ impl Curves {
                     let knots: Vec<f64> = (0..=2 * d + 1).map(|k| k as f64).collect();
                     let points: Vec<[f64; 4]> =
                         (0..=d).map(|k| homogeneous(cv(span + k), 1.0)).collect();
-                    project(de_boor(&knots, points, d, d as f64 + u, d))
+                    rational(spline::de_boor(&knots, points, d, d as f64 + u, d))[0]
                 } else {
                     let knots = clamped(n, d);
-                    de_boor_at(&knots, n, d, t, |k| homogeneous(cv(k), 1.0))
+                    rational(spline::evaluate(&knots, d, n, t, |k| {
+                        homogeneous(cv(k), 1.0)
+                    }))[0]
                 }
             }
             Basis::Nurbs => {
@@ -185,7 +188,9 @@ impl Curves {
                         .as_ref()
                         .map_or(1.0, |w| w[self.offsets[curve] as usize + k])
                 };
-                de_boor_at(knots, n, d, t, |k| homogeneous(cv(k), weight(k)))
+                rational(spline::evaluate(knots, d, n, t, |k| {
+                    homogeneous(cv(k), weight(k))
+                }))[0]
             }
         }
     }
@@ -349,49 +354,6 @@ fn clamped(n: usize, d: usize) -> Vec<f64> {
     (0..n + d + 1)
         .map(|k| k.saturating_sub(d).min(interior) as f64)
         .collect()
-}
-
-/// De Boor at `t` over knots for `n` vertices of degree `d` (domain
-/// `knots[d]..knots[n]`), vertex `k` in homogeneous form from `point`.
-fn de_boor_at(
-    knots: &[f64],
-    n: usize,
-    d: usize,
-    t: f64,
-    point: impl Fn(usize) -> [f64; 4],
-) -> [f64; 3] {
-    // The span holding t: the last with knots[k] <= t < knots[k + 1], the
-    // domain's end in the last span of non-zero length.
-    let mut k = d;
-    while k + 1 < n && knots[k + 1] <= t {
-        k += 1;
-    }
-    while k > d && knots[k] == knots[k + 1] {
-        k -= 1;
-    }
-    let points: Vec<[f64; 4]> = (0..=d).map(|j| point(k - d + j)).collect();
-    project(de_boor(knots, points, d, t, k))
-}
-
-/// De Boor's recursion over the `d + 1` homogeneous points of span `k`.
-fn de_boor(knots: &[f64], mut points: Vec<[f64; 4]>, d: usize, t: f64, k: usize) -> [f64; 4] {
-    for r in 1..=d {
-        for j in (r..=d).rev() {
-            let (lo, hi) = (knots[j + k - d], knots[j + 1 + k - r]);
-            let alpha = if hi > lo { (t - lo) / (hi - lo) } else { 0.0 };
-            let (before, here) = (points[j - 1], points[j]);
-            points[j] = std::array::from_fn(|c| (1.0 - alpha) * before[c] + alpha * here[c]);
-        }
-    }
-    points[d]
-}
-
-fn homogeneous(p: [f64; 3], w: f64) -> [f64; 4] {
-    [p[0] * w, p[1] * w, p[2] * w, w]
-}
-
-fn project(p: [f64; 4]) -> [f64; 3] {
-    [p[0] / p[3], p[1] / p[3], p[2] / p[3]]
 }
 
 fn lerp(a: [f64; 3], b: [f64; 3], u: f64) -> [f64; 3] {
