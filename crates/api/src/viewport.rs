@@ -1,6 +1,7 @@
 //! What the viewport draws and picks: a value's display [`Surface`],
 //! component levels ([`ElementKind`]), sets of packet elements
-//! ([`ElementSet`]) and pick [`Hit`]s.
+//! ([`ElementSet`]), pick [`Hit`]s, and [`pack_linear`], the one packing
+//! of the linear colors a [`Look`](crate::Look) gives.
 //!
 //! Studio's core owns the viewport (panes, cameras, drawing, picking). A
 //! data type only says what to draw, as packets its
@@ -16,7 +17,9 @@ use crate::render::Ranges;
 use kinogaki_viewport_api::{
     BufferRanges, Column, DrawUpdate, LineClass, LineClassId, LineStyle, Vertex,
 };
-pub use kinogaki_viewport_api::{ElementKind, ElementSet, OverlayVertex, SurfaceSource, packet_as};
+pub use kinogaki_viewport_api::{
+    ElementKind, ElementSet, OverlayVertex, SurfaceSource, pack_linear, packet_as,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::ops::Range;
