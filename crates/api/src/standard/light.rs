@@ -25,8 +25,10 @@ const MAX_VALUE: f32 = 1e12;
 /// `light` as a light value, when it is one: every number finite and
 /// within range, sizes and radii positive, an angle and intensity of at
 /// least 0, a color temperature above 0, a cone angle of 0 to 180 degrees
-/// and a softness of 0 to 1, a color of at least 0. Its transform and a
-/// dome's image are dropped: what a light value holds.
+/// and a softness of 0 to 1, colors finite (a component below 0 is a
+/// color outside the space's gamut, as a file in a narrower space than
+/// the scene's holds). Its transform and a dome's image are dropped: what
+/// a light value holds.
 ///
 /// ```
 /// use kinogaki_render_api::standard::{Light, Shape};
@@ -47,7 +49,7 @@ pub fn light_value(light: Light) -> Result<Light, Error> {
     let shape = match light.shape {
         Shape::Rect { width, height } => positive(width) && positive(height),
         Shape::Disk { radius } => positive(radius),
-        Shape::Dome { ground, .. } => ground.is_none_or(|g| g.into_iter().all(at_least_0)),
+        Shape::Dome { ground, .. } => ground.is_none_or(|g| g.into_iter().all(within)),
         Shape::Distant { angle } => at_least_0(angle) && angle <= 180.0,
         Shape::Spot {
             radius,
@@ -60,7 +62,7 @@ pub fn light_value(light: Light) -> Result<Light, Error> {
         }
     };
     let ok = shape
-        && light.color.into_iter().all(at_least_0)
+        && light.color.into_iter().all(within)
         && at_least_0(light.intensity)
         && within(light.exposure)
         && positive(light.color_temperature);
@@ -300,7 +302,7 @@ mod tests {
             },
             Shape::Dome {
                 texture: None,
-                ground: Some([-1.0, 0.0, 0.0]),
+                ground: Some([f32::NAN, 0.0, 0.0]),
             },
         ];
         for shape in bad {
@@ -321,6 +323,12 @@ mod tests {
             ..Light::default()
         };
         assert!(light_value(cold).is_err() && light_value(wild).is_err());
+        // Outside a space's gamut is a color still.
+        let wide = Light {
+            color: [-0.62, 1.14, -0.13],
+            ..Light::default()
+        };
+        assert!(light_value(wide).is_ok());
     }
 
     #[test]
