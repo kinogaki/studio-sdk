@@ -10,6 +10,8 @@
 //!   derive vertex shading from positions; [`FaceRun`]s draw some faces
 //!   see-through ([`FaceLook`]). A kernel reads its own packets back with
 //!   [`packet_as`].
+//! - [`pack_linear`]: a linear color as the RGB9E5 word surface colors
+//!   are carried in ([`ColorLayout`]); [`unpack_linear`] reads one back.
 //! - [`ElementSet`]: the selected points, edges, faces, vertices or
 //!   objects; [`ElementSelection`]: one set per drawn family (faces,
 //!   lines, markers) for surfaces whose levels combine.
@@ -25,6 +27,7 @@
 //! The `bytemuck` feature derives `bytemuck::Pod` on the records a renderer
 //! uploads as bytes ([`Vertex`], [`OverlayVertex`], [`OverlayLine`]).
 //! Without it the crate depends on the standard library alone.
+mod color;
 mod lines;
 mod looks;
 mod overlay;
@@ -34,6 +37,7 @@ mod preview;
 mod selection;
 mod shading;
 mod updates;
+pub use color::{pack_linear, unpack_linear};
 pub use lines::{ACCENT, LineClass, LineClassId, LineHighlight, LineLook, LineStyle};
 pub use looks::{FaceLook, FaceRun, check_runs};
 pub use overlay::{

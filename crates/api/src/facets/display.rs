@@ -3,7 +3,7 @@ use crate::cancel::CancelToken;
 use crate::components::Components;
 use crate::data::Data;
 use crate::error::Error;
-use crate::math::Bounds;
+use crate::math::{Bounds, Units};
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
 use crate::viewport::{ElementKind, ElementSet, SurfaceSource};
@@ -41,9 +41,10 @@ pub enum DrawPurpose {
 
 /// What [`Displayable::prepare`] is asked for: the quality, what the
 /// value is drawn for, the object's body when the value is an object's
-/// result (its display settings: a mesh's subdivision display), and the
+/// result (its display settings: a mesh's subdivision display), the
 /// project's tolerances, which an approximate display (a B-rep's mesh, a
-/// sampled surface) is made to.
+/// sampled surface) is made to, and the project's units, which a display
+/// of physical sizes (a printer's bed in millimetres) draws in.
 #[derive(Clone, Default)]
 pub struct DisplayRequest {
     /// How finely.
@@ -55,6 +56,8 @@ pub struct DisplayRequest {
     /// The project's tolerances (the host fills them; the default
     /// otherwise).
     pub tolerances: Tolerances,
+    /// The project's units (the host fills them; the default otherwise).
+    pub units: Units,
 }
 
 impl fmt::Debug for DisplayRequest {
@@ -64,6 +67,7 @@ impl fmt::Debug for DisplayRequest {
             .field("purpose", &self.purpose)
             .field("body", &self.body.is_some())
             .field("tolerances", &self.tolerances)
+            .field("units", &self.units)
             .finish()
     }
 }
