@@ -33,16 +33,25 @@ pub const EDGE: &str = "edge";
 ///   it, and the edge's polyline runs over those same points. Seams are
 ///   watertight by equal point ids, not by equal positions;
 /// - normals (`N`) and texture coordinates (`uv`), when it makes them,
-///   are Vertex attributes, so a crease keeps one point and two normals.
+///   are Vertex attributes defined on the polygons' corners only, so a
+///   crease keeps one point and two normals. Polyline corners carry
+///   zeros, and consumers ignore them;
+/// - `uv` is a texture coordinate. A face's chart coordinates are not
+///   `uv`, and the mesh doesn't carry them.
 ///
-/// **Sizes.** [`Detail::Viewport`] takes its chord and angle from
-/// `tolerances` (the project's), [`Detail::Render`] from its own numbers.
-/// Either way a mesher never sizes below the body's positional tolerance
-/// ([`Body::tolerance`]).
+/// **Sizes.** [`Detail::Viewport`] is the mesher's own interactive
+/// preset: the project has no display chord or angle, and its tangent
+/// tolerance is not one. [`Detail::Render`] gives the chord and angle; a
+/// mesher may clamp them to the range it supports, and its documentation
+/// states that range. Either way no facet is sized below the chord floor,
+/// the larger of the project's positional tolerance (`tolerances`) and
+/// the body's own ([`Body::tolerance`]).
 ///
 /// **Failures.** A face it can't mesh is left out of the polygons and
 /// listed in [`Meshed::failed`] with a short reason; the rest of the body
-/// still shows. An error is for a body it can't mesh at all.
+/// still shows. A body it can't mesh at all is an error:
+/// [`Error::Cancelled`] when `cancel` was raised, otherwise
+/// [`Error::Invalid`] saying why.
 ///
 /// **State.** `mesh` is a function of its arguments. A mesher may keep
 /// its own state in the derived slots of the body's

@@ -11,7 +11,10 @@ use crate::error::{ErrorKind, GeometryError};
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub enum Detail {
-    /// As fine as the viewport draws it: interactive views and drags.
+    /// As fine as the viewport draws it, for interactive views and drags:
+    /// the producer's own interactive preset (a mesher's, say), never
+    /// finer than the project's positional tolerance allows. The project
+    /// holds no display chord or angle for it.
     #[default]
     Viewport,
     /// For a final render. Build it with [`Detail::render`], which checks
