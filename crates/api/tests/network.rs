@@ -415,3 +415,68 @@ fn nodes_hold_networks_of_declared_contexts_without_loops() {
         ]
     );
 }
+
+/// An engine's description, by id.
+fn engine(id: &str) -> kinogaki_render_api::EngineDescription {
+    let wake: kinogaki_render_api::Wake = Arc::new(|| {});
+    use kinogaki_render_api::RenderEngine;
+    let mut d = kinogaki_render_api::RecordingEngine::new(wake)
+        .description()
+        .as_ref()
+        .clone();
+    d.id = id.into();
+    d
+}
+
+#[test]
+fn an_engine_is_described_by_one_package() {
+    let package = |id: &'static str, engines: &[&str]| {
+        (engines.iter()).fold(Package::new(PackageId::declared(id), id), |p, e| {
+            p.with_engine_description(engine(e))
+        })
+    };
+    let mut registry = Registry::new();
+    assert!(registry.register(package("acme.glow", &["glow"])).is_ok());
+    assert!(matches!(
+        registry.register(package("rival.glow", &["glow"])),
+        Err(RegistryError::DuplicateEngine { first, .. }) if first.as_str() == "acme.glow"
+    ));
+    assert!(matches!(
+        registry.register(package("twice.glow", &["spark", "spark"])),
+        Err(RegistryError::DuplicateEngine { first, .. }) if first.as_str() == "twice.glow"
+    ));
+    assert!(registry.register(package("rival.glow", &["spark"])).is_ok());
+}
+
+#[cfg(feature = "wgpu")]
+struct Glow;
+
+#[cfg(feature = "wgpu")]
+impl kinogaki_render_api::display::Engine for Glow {
+    fn description(&self) -> kinogaki_render_api::EngineDescription {
+        engine("glow")
+    }
+    fn make(
+        &self,
+        _: &kinogaki_render_api::display::wgpu::Device,
+        _: &kinogaki_render_api::display::wgpu::Queue,
+        _: kinogaki_render_api::Wake,
+        _: &kinogaki_render_api::display::Options,
+    ) -> Result<kinogaki_render_api::display::Made, String> {
+        unreachable!("not made in this test")
+    }
+}
+
+#[cfg(feature = "wgpu")]
+#[test]
+fn a_package_makes_the_engines_it_describes() {
+    let glow = Package::new(PackageId::declared("acme.glow"), "Glow").with_engine(Glow);
+    assert_eq!(glow.engines.len(), 1);
+    assert!(Registry::new().register(glow.clone()).is_ok());
+    let mut stray = glow;
+    stray.engines.clear();
+    assert!(matches!(
+        Registry::new().register(stray),
+        Err(RegistryError::StrayMaker { engine, .. }) if &*engine == "glow"
+    ));
+}

@@ -281,3 +281,10 @@ impl Engines {
         self.0.iter()
     }
 }
+
+impl FromIterator<Arc<EngineDescription>> for Engines {
+    /// The engines described, in order.
+    fn from_iter<I: IntoIterator<Item = Arc<EngineDescription>>>(descriptions: I) -> Self {
+        Engines(descriptions.into_iter().collect())
+    }
+}

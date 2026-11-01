@@ -22,7 +22,7 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 | Node package | node types (`NodeType`: description and cook), the network contexts they live in (`NetworkContext`) and object kinds (`ObjectKindSpec`); the contexts' UI through the UI layer | Mesh objects, the Mesh nodes and the Mesh context |
 | Bridge | conversions (`Conversion`) between two kernels' types | Tessellate: `kinogaki.cad.body` → `kinogaki.mesh.geometry` |
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
-| Render | engines (`Package::engines`, the `wgpu` feature); they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
+| Render | engines (`Package::engines`, their descriptions, and `Package::makers`, the `wgpu` feature); they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
 
 The environment registers packages into a `Registry` in dependency order. The loader resolves that order from the plugins' manifests, so a kernel always comes before the packages that build on it. Every package goes through the registry's checks (`Registry::check`, `Registry::register`): its id and every id it declares are new and under its vendor, each data type it names is registered, each compiled context has one compiler, no node type declares a parameter named as spares are (`cook::SPARE`), and its UI's contexts are its own. A package that fails is refused whole: Studio lists it as unavailable in Settings ▸ Plugins, says why in the Console, and keeps running.
 
@@ -302,7 +302,7 @@ The simpler path is a `viewport::Surface`, a `SurfaceSource` itself: points, pol
 
 ## Self-contained
 
-The SDK depends on the standard library and two crates.io crates its standard geometry values need, at exact versions: blake3 1.8.7 (the topology fingerprint) and bytemuck 1.25.2 (plain records and free casts into columns). Beyond those, two optional features: `kinogaki-render-api`'s `wgpu` (the display contract), which brings wgpu 30.0.1, and `kinogaki-viewport-api`'s `bytemuck` (byte casts of the records a renderer uploads), from crates.io. `kinogaki-studio-api`'s `wgpu` feature turns the first on for packages' render engines (`Package::engines`), and is off by default. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
+The SDK depends on the standard library and two crates.io crates its standard geometry values need, at exact versions: blake3 1.8.7 (the topology fingerprint) and bytemuck 1.25.2 (plain records and free casts into columns). Beyond those, two optional features: `kinogaki-render-api`'s `wgpu` (the display contract), which brings wgpu 30.0.1, and `kinogaki-viewport-api`'s `bytemuck` (byte casts of the records a renderer uploads), from crates.io. `kinogaki-studio-api`'s `wgpu` feature turns the first on for the makers of packages' render engines (`Package::makers`; their descriptions, `Package::engines`, are headless), and is off by default. Every type above is the SDK's own, so a package compiles against nothing private and the SDK builds from a plain clone. Studio converts between these types and its own libraries' at the boundary (its maths, its property schemas, its project documents, its viewport and render libraries, its worker threads).
 
 
 # The UI layer

@@ -157,6 +157,24 @@ pub enum RegistryError {
         /// The package that brought it first.
         first: PackageId,
     },
+    /// `package` describes render engine `engine`, which `first` already
+    /// described (or `package` describes twice).
+    DuplicateEngine {
+        /// The refused package.
+        package: PackageId,
+        /// The engine's id.
+        engine: Arc<str>,
+        /// The package that described it first.
+        first: PackageId,
+    },
+    /// `package` brings a maker of render engine `engine`, which it
+    /// doesn't describe.
+    StrayMaker {
+        /// The refused package.
+        package: PackageId,
+        /// The engine's id.
+        engine: Arc<str>,
+    },
 }
 
 impl fmt::Display for RegistryError {
@@ -250,6 +268,18 @@ impl fmt::Display for RegistryError {
                 f,
                 "{package} brings a runner for {context}, which {first} already brought"
             ),
+            Self::DuplicateEngine {
+                package,
+                engine,
+                first,
+            } => write!(
+                f,
+                "{package} describes render engine {engine}, which {first} described"
+            ),
+            Self::StrayMaker { package, engine } => write!(
+                f,
+                "{package} makes render engine {engine}, which it doesn't describe"
+            ),
         }
     }
 }
@@ -316,6 +346,8 @@ pub struct Registry {
     /// The contexts packages' UIs give parts to (with whether it is the
     /// context's mode), and the package giving them.
     ui_contexts: BTreeMap<(ContextId, bool), PackageId>,
+    /// The package describing each render engine, by engine id.
+    engines: BTreeMap<Arc<str>, PackageId>,
 }
 
 impl Registry {
@@ -375,6 +407,9 @@ impl Registry {
         }
         for slot in package.slots {
             self.slots.insert(slot.id(), Entry::new(id, Arc::new(slot)));
+        }
+        for engine in package.engines {
+            self.engines.insert(engine.id.clone(), id);
         }
         self.packages.push((id, package.label));
         Ok(())
@@ -509,9 +544,39 @@ impl Registry {
                 });
             }
         }
+        self.check_engines(package)?;
         self.check_compilers(package)?;
         self.check_insides(package)?;
         self.check_references(package)
+    }
+
+    /// Each render engine `package` describes is new (engine ids are
+    /// files' names, `pixel`, under no vendor), and each maker it brings
+    /// makes one it describes.
+    fn check_engines(&self, package: &Package) -> Result<(), RegistryError> {
+        let id = package.id;
+        for (at, engine) in package.engines.iter().enumerate() {
+            let twice = package.engines[..at].iter().any(|e| e.id == engine.id);
+            let first = self.engines.get(&engine.id).copied();
+            if let Some(first) = first.or(twice.then_some(id)) {
+                return Err(RegistryError::DuplicateEngine {
+                    package: id,
+                    engine: engine.id.clone(),
+                    first,
+                });
+            }
+        }
+        #[cfg(feature = "wgpu")]
+        for maker in &package.makers {
+            let engine = maker.description().id;
+            if !package.engines.iter().any(|e| e.id == engine) {
+                return Err(RegistryError::StrayMaker {
+                    package: id,
+                    engine,
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Each compiler and runner `package` brings serves a compiled context

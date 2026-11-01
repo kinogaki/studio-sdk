@@ -12,6 +12,7 @@ use crate::network::{NetworkCompiler, NetworkContext, NodeCreation};
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
+use kinogaki_render_api::EngineDescription;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
@@ -20,8 +21,9 @@ use std::sync::Arc;
 /// types (a kernel's), held edits over them, conversions (a bridge's),
 /// B-rep meshers (a kernel's),
 /// node types' cooks, the network contexts its object kinds hold, object
-/// kinds, file formats, session slots, stored values and icons, and with
-/// the `wgpu` feature its render engines; and its UI, when it has one
+/// kinds, file formats, session slots, stored values and icons, the render
+/// engines it describes (made, with the `wgpu` feature, by their makers);
+/// and its UI, when it has one
 /// ([`PackageUi`], which the host UI interface makes).
 ///
 /// Every id it declares has its vendor (the first segment of its id):
@@ -68,15 +70,21 @@ pub struct Package {
     /// The icons it adds to Studio's icon set, named under its id
     /// ([`icon`](crate::icon)).
     pub icons: Vec<Icon>,
-    /// The render engines it brings (the `wgpu` feature, which a host that
-    /// renders enables).
+    /// The render engines it brings, by their descriptions (headless):
+    /// what declares the values its object kinds hold beyond their
+    /// placement (a light's prim values, a Render Settings' engine
+    /// settings), and what a host lists and renders by.
+    pub engines: Vec<Arc<EngineDescription>>,
+    /// How each of its engines is made on a device, by engine id (the
+    /// `wgpu` feature, which a host that renders enables): each one's
+    /// description is among [`engines`](Self::engines).
     ///
     /// A field behind a feature changes the struct's layout. That is sound
     /// because a host and its plugins share one build of this crate (one
     /// feature set, so one layout): a plugin built against another build
     /// is refused before it is loaded.
     #[cfg(feature = "wgpu")]
-    pub engines: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
+    pub makers: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
     /// The runners of its compiled contexts' plans, by context (the `wgpu`
     /// feature): how the host shows what a compiled network makes.
     #[cfg(feature = "wgpu")]
@@ -148,8 +156,9 @@ impl Package {
             slots: Vec::new(),
             stored: Vec::new(),
             icons: Vec::new(),
-            #[cfg(feature = "wgpu")]
             engines: Vec::new(),
+            #[cfg(feature = "wgpu")]
+            makers: Vec::new(),
             #[cfg(feature = "wgpu")]
             runners: Vec::new(),
             ui: None,
@@ -238,12 +247,21 @@ impl Package {
         self
     }
 
-    /// With render engine `engine` too.
+    /// With render engine `engine` too: its description and its maker.
     #[cfg(feature = "wgpu")]
     pub fn with_engine(
         mut self,
         engine: impl kinogaki_render_api::display::Engine + 'static,
     ) -> Self {
+        self.engines.push(Arc::new(engine.description()));
+        self.makers.push(Arc::new(engine));
+        self
+    }
+
+    /// With the description of render engine `engine` too, which this
+    /// build doesn't make (a headless one, or tests reading the values it
+    /// declares).
+    pub fn with_engine_description(mut self, engine: EngineDescription) -> Self {
         self.engines.push(Arc::new(engine));
         self
     }
@@ -304,16 +322,11 @@ impl fmt::Debug for Package {
                 "icons",
                 &self.icons.iter().map(|i| &i.name).collect::<Vec<_>>(),
             )
+            .field(
+                "engines",
+                &self.engines.iter().map(|e| &e.id).collect::<Vec<_>>(),
+            )
             .field("ui", &self.ui);
-        #[cfg(feature = "wgpu")]
-        out.field(
-            "engines",
-            &self
-                .engines
-                .iter()
-                .map(|e| e.description().id)
-                .collect::<Vec<_>>(),
-        );
         out.finish()
     }
 }
