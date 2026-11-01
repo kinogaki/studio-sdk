@@ -117,7 +117,7 @@ pub use curves::{Basis, Curves, CurvesBuilder, Knots};
 pub use detail::Detail;
 pub use error::{ErrorKind, GeometryError};
 pub use polygons::Polygons;
-pub use selection::Selection;
+pub use selection::{Coverage, Selection, SelectionCounts};
 pub use shading::ShadingNormals;
 pub use tolerances::{CURVATURE, FIT_OF_POSITIONAL, POSITIONAL_MM, TANGENT_DEGREES, Tolerances};
 pub use topology::{Adjacency, Edge, Index, Topology};

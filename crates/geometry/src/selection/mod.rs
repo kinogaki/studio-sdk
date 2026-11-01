@@ -5,6 +5,9 @@ use crate::column::Column;
 use crate::error::{ErrorKind, GeometryError};
 use crate::topology::Topology;
 
+mod polygons;
+pub use polygons::{Coverage, SelectionCounts};
+
 /// Selected elements of one class: all of them, or a sorted set of
 /// indices; the active one (the last picked, which tools that need one
 /// element start from); and the topology it was made on.

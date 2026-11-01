@@ -272,3 +272,32 @@ fn smooth_edges_join_past_the_cusp_and_sharp_edges_win() {
         plain.shading_normals().vertices()
     );
 }
+
+#[test]
+fn a_piece_normal_is_each_primitives_own_after_primitive() {
+    // Piece values are one a primitive (`count(Piece)` is the primitives):
+    // a polygon's corners read the Piece `N` at its own index when there
+    // is no Primitive `N`.
+    let v = folded(FRAC_PI_2);
+    assert_eq!(v.count(Class::Piece), Some(2));
+    let ups = Attribute::vector(vec![[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]], TypeInfo::Normal);
+    let a = v.attributes().with(Class::Piece, names::N, ups).unwrap();
+    let pieces = v.with_attributes(a).unwrap();
+    let n = pieces.shading_normals();
+    for corner in 0..3 {
+        close(n.vertices()[corner], [0.0, 0.0, 1.0]);
+        close(n.vertices()[3 + corner], [1.0, 0.0, 0.0]);
+    }
+    // A Primitive `N` comes first.
+    let down = Attribute::vector(vec![[0.0, -1.0, 0.0]; 2], TypeInfo::Normal);
+    let a = pieces
+        .attributes()
+        .with(Class::Primitive, names::N, down)
+        .unwrap();
+    let both = pieces.with_attributes(a).unwrap().shading_normals();
+    close(both.vertices()[0], [0.0, -1.0, 0.0]);
+    // One Piece value for two primitives is refused, not read.
+    let one = Attribute::vector(vec![[0.0, 0.0, 1.0]], TypeInfo::Normal);
+    let short = v.attributes().with(Class::Piece, names::N, one).unwrap();
+    assert!(v.with_attributes(short).is_err());
+}

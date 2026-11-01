@@ -162,6 +162,15 @@ impl<T> FromIterator<T> for Column<T> {
     }
 }
 
+/// Iterates the values by reference, as a slice does.
+impl<'a, T> IntoIterator for &'a Column<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
 /// Columns are equal when their values are.
 impl<T: PartialEq> PartialEq for Column<T> {
     fn eq(&self, other: &Self) -> bool {
