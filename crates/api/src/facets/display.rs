@@ -83,13 +83,13 @@ pub enum Role {
         /// Outlined with its object (a cage beside its smooth surface isn't).
         marks: bool,
     },
-    /// A templated node's result: faint wires in its place, marked by the
-    /// open context (the branch a live tool would take, an operand it
-    /// chose). `key` is the type's name for it (a CAD body's name).
+    /// A templated node's result: faint wires in its place. While a live
+    /// tool is up (`ViewportLayer::live_node`), the host marks the branch
+    /// a click would take and the ones wired into the tool's node.
     Template {
         /// The node.
         node: NodeRef,
-        /// The type's name for the piece, read by the open context.
+        /// The type's name for the piece (a CAD body's name).
         key: Option<Arc<dyn Any + Send + Sync>>,
     },
 }

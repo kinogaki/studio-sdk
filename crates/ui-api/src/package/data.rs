@@ -1,14 +1,10 @@
-//! The plain values a context's parts hand the host: levels, toolbar
-//! items, the status bar's pieces, the numeric bar, what the views draw
-//! of the context's own, its time, its network's tiles and
+//! The plain values a context's parts hand the host: levels, the stacked
+//! list's candidates, what live tools take, the numeric bar, its time and
 //! its outliner rows. The host draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
 use crate::host::{NodeRef, ObjectRef};
-use kinogaki_studio_api::Mat4;
 use kinogaki_studio_api::params::Unit;
-use kinogaki_studio_api::viewport::{ElementKind, SurfaceSource};
-use kinogaki_viewport_api::SceneLines;
-use std::fmt;
+use kinogaki_studio_api::viewport::ElementKind;
 use std::sync::Arc;
 
 /// One selection level of a context (Face, Edge, CV…), what the levels
@@ -56,22 +52,6 @@ pub struct Candidate {
     pub label: String,
 }
 
-/// A button of the viewport's left toolbar.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ToolbarItem {
-    /// Its stable name ([`ViewportLayer::run_tool`](super::ViewportLayer::run_tool)
-    /// gets it back).
-    pub id: String,
-    /// Its icon, by name.
-    pub icon: String,
-    /// The tooltip.
-    pub label: String,
-    /// Drawn lit.
-    pub on: bool,
-    /// Greyed, with this reason on hover; pressing it does nothing.
-    pub unavailable: Option<String>,
-}
-
 /// What a context's live tools take this frame, before camera navigation.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Tools {
@@ -81,17 +61,6 @@ pub struct Tools {
     pub wheel: bool,
     /// No right-click menu now.
     pub menu: bool,
-}
-
-/// The pieces of the status bar a context owns.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Status {
-    /// Left: (text, emphasized), the place first.
-    pub left: Vec<(String, bool)>,
-    /// The context's problems, for the error line.
-    pub problems: Vec<String>,
-    /// How long its last cook took, in milliseconds.
-    pub took: Option<f64>,
 }
 
 /// The numeric bar under the active view: its fields in order.
@@ -140,55 +109,6 @@ impl BarValue {
             Self::Count(n) => f64::from(n),
             Self::Choice { at, .. } => at as f64,
         }
-    }
-}
-
-/// A shaded object of a context's own (CAM's toolpath beads): a packet
-/// placed in the world.
-#[derive(Clone)]
-pub struct ContextObject {
-    /// What it draws (uploaded once per allocation).
-    pub surface: Arc<dyn SurfaceSource>,
-    /// Where it is: world from the surface's space.
-    pub model: Mat4,
-    /// One 0xRRGGBB color a face; `None`: the clay.
-    pub colors: Option<Arc<[u32]>>,
-    /// Drawn see-through, in the look the rest of the scene takes inside
-    /// an object (a live tool's operands, bodies behind a sketch).
-    pub ghost: bool,
-}
-
-impl fmt::Debug for ContextObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ContextObject")
-            .field("faces", &self.surface.face_count())
-            .field("model", &self.model)
-            .field("colors", &self.colors.as_ref().map(|c| c.len()))
-            .field("ghost", &self.ghost)
-            .finish()
-    }
-}
-
-/// What the views draw of a context's own while it is open.
-#[derive(Clone, Default)]
-pub struct ContextView {
-    /// World-space line layers drawn in every view (CAM's plate, CAD's
-    /// curvature combs). The host uploads a value once per allocation, so
-    /// a context keeps its `Arc` while nothing changed.
-    pub lines: Vec<Arc<SceneLines>>,
-    /// Shaded objects.
-    pub objects: Vec<ContextObject>,
-    /// Whether they take the place of the scene's objects.
-    pub replaces_scene: bool,
-}
-
-impl fmt::Debug for ContextView {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ContextView")
-            .field("lines", &self.lines.len())
-            .field("objects", &self.objects)
-            .field("replaces_scene", &self.replaces_scene)
-            .finish()
     }
 }
 

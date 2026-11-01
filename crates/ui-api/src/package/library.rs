@@ -435,9 +435,9 @@ pub struct ViewportSpec {
     /// own [rows](super::ViewportLayer::rows). The gizmo itself shows where
     /// [`ViewportLayer::transforms`](super::ViewportLayer::transforms) says.
     pub transform: bool,
-    /// The popovers among Gear, Components and Snap whose buttons show,
-    /// with the context's [rows](super::ViewportLayer::rows). Shading,
-    /// Viewport and Camera always show.
+    /// The popovers among Gear and Components whose buttons show, with the
+    /// context's [rows](super::ViewportLayer::rows). Shading, Viewport,
+    /// Camera and Snap are core's and always show.
     pub popovers: Vec<Popover>,
 }
 

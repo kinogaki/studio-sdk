@@ -1,8 +1,8 @@
 //! What a context adds over the open object in one view: the value its
 //! [`ViewportLayer::edited`](super::ViewportLayer::edited) returns each
 //! frame (overlays, guides and style; core draws the object's value
-//! itself, drag previews included), and how its templated pieces are
-//! marked.
+//! itself, drag previews included, and marks the templated pieces a live
+//! tool picks from).
 //!
 //! Everything in it is shared: core turns it into its renderer's scene by
 //! borrowing, nothing is copied, and the renderer uploads only values
@@ -95,15 +95,6 @@ impl Default for SurfaceLook {
             hidden_points: 0,
         }
     }
-}
-
-/// How the open object's templated piece is marked.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TemplateMark {
-    /// A live tool chose it as an operand.
-    pub operand: bool,
-    /// It is the branch a live tool would take under the pointer.
-    pub hovered: bool,
 }
 
 #[cfg(test)]

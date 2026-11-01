@@ -435,6 +435,6 @@ Install it as a node plugin, `nodes/pins.dylib` with `nodes/pins.prisma` naming 
 
 The context parts this plugin leaves out, all in `studio_ui_api::package` with their rules in its rustdoc and [The host interface](ARCHITECTURE.md#the-host-interface):
 
-- `ViewportLayer`: the context's tools over the views (pointer and keys, overlays through the `Painter`, the edited surface core draws, heads-up `ValueFields`);
+- `ViewportLayer`: the context's live tools over the views (their input, keys, overlays through the `Painter` and heads-up `ValueFields`, a tool's card, its numeric bar) and what it adds over the edited surface core draws;
 - `ObjectRows` and `OutlineRows`: rows for the context's objects in the inspector and the outliner;
 - a `KeyStore`, marking menus and shelves (`MenuDefaults`) in the library, and settings pages (`SettingsSection`).

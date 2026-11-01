@@ -4,7 +4,6 @@
 //! settings section round-trips; and a nested call is refused.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
 use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
-use studio_ui_api::gizmo::TransformTool;
 use studio_ui_api::host::{
     Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef,
     Place, View, ViewCamera, ViewCx, Waker,
@@ -12,7 +11,7 @@ use studio_ui_api::host::{
 use studio_ui_api::package::{
     ContextPart, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library,
     MarkingDefault, MenuDefaults, Places, Registered, Section, SettingsSection, Shared, Situation,
-    Status, ToolbarItem, Tools, UiPackage, ViewportLayer, VocabularyItem, When, WithUi,
+    Tools, UiPackage, ViewportLayer, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -46,7 +45,6 @@ impl Slot for Picked {
 /// The package's UI state: what its parts remember between calls.
 #[derive(Default)]
 struct Forest {
-    entered: u32,
     overlays: u32,
     polls: u32,
     /// How many times a settings page was drawn (it shows live state).
@@ -167,32 +165,6 @@ impl Levels<Forest> for TreeLevels {
 struct TreeView;
 
 impl ViewportLayer<Forest> for TreeView {
-    fn name(&self) -> &str {
-        "Trees"
-    }
-    fn enter(&self, s: &mut Forest, _cx: &mut dyn Cx) {
-        s.entered += 1;
-    }
-    fn toolbar(&self, _s: &Forest, cx: &dyn Cx) -> Vec<ToolbarItem> {
-        vec![ToolbarItem {
-            id: "grow".into(),
-            icon: "plus".into(),
-            label: "Grow".into(),
-            on: cx.transform_tool() == TransformTool::Move,
-            unavailable: None,
-        }]
-    }
-    fn run_tool(&self, _s: &mut Forest, cx: &mut dyn Cx, id: &str) {
-        if id == "grow" {
-            cx.set_transform_tool(TransformTool::Move);
-        }
-    }
-    fn status(&self, _s: &mut Forest, cx: &mut dyn Cx) -> Status {
-        Status {
-            left: vec![(format!("{} picked", cx.slot::<Picked>().0.len()), false)],
-            ..Status::default()
-        }
-    }
     fn tools(&self, _s: &mut Forest, cx: &mut dyn ViewCx, _ui: &mut dyn Ui) -> Tools {
         Tools {
             busy: cx.view().modifiers.shift,
@@ -421,30 +393,13 @@ fn a_viewport_layer_reads_its_view_and_draws_through_the_painter() {
     let mut ui = RecordingUi::new(rect());
     let tools = trees.with(|p, s| {
         let layer = p.contexts[0].viewport.as_ref().unwrap();
-        layer.enter(s, &mut host);
         let tools = layer.tools(s, &mut host, &mut ui);
         layer.overlay(s, &mut host, &mut ui);
         tools
     });
     assert!(tools.busy);
     assert_eq!(ui.painter_record().shapes().len(), 1);
-    assert_eq!(trees.state::<Forest>().entered, 1);
     assert_eq!(trees.state::<Forest>().overlays, 1);
-    // Toolbar, tools and status through the host's transform and slots.
-    let (before, status) = trees.with(|p, s| {
-        let layer = p.contexts[0].viewport.as_ref().unwrap();
-        let before = layer.toolbar(s, &host);
-        layer.run_tool(s, &mut host, "grow");
-        (before, layer.status(s, &mut host))
-    });
-    assert!(!before[0].on);
-    assert_eq!(
-        host.take_calls(),
-        [HostCall::SetTransformTool(TransformTool::Move)]
-    );
-    assert_eq!(status.left, [("0 picked".to_owned(), false)]);
-    let after = trees.with(|p, s| p.contexts[0].viewport.as_ref().unwrap().toolbar(s, &host));
-    assert!(after[0].on);
 }
 
 #[test]

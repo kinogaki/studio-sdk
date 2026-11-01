@@ -65,10 +65,10 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, ContextObject, ContextView, LevelPreset, LevelSpec, NumericBar,
-    OutlineRow, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
+    BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, TimeDomain,
+    TimeMark, TimeUnits, Tools,
 };
-pub use edited::{Edited, SurfaceLook, TemplateMark};
+pub use edited::{Edited, SurfaceLook};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
     LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT,

@@ -37,26 +37,19 @@ pub struct Holds {
     pub space: bool,
 }
 
-/// The viewport's popovers whose rows a context gives. Shading, Viewport
-/// and Camera always show their buttons, with the host's own rows after
-/// the context's; Gear, Components and Snap show where the context's
-/// library lists them
-/// ([`ViewportSpec::popovers`](super::ViewportSpec::popovers)).
+/// The viewport's popovers whose rows a context gives, each showing where
+/// the context's library lists it
+/// ([`ViewportSpec::popovers`](super::ViewportSpec::popovers)). Shading,
+/// Viewport, Camera and Snap are core's: a context declares what it takes
+/// of them as data (its `ViewportSpec`, its values' `SnapTargets`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Popover {
-    /// The toolbar's gear: the current tool's settings (shown while they
-    /// have rows).
+    /// The toolbar's gear: the transform tool's settings here (soft
+    /// selection, symmetry), shown while it has rows. A live tool's
+    /// settings are its card.
     Gear,
-    /// Shading: how the views draw.
-    Shading,
     /// Components: what the views show of the open object.
     Components,
-    /// Viewport: the views' own options.
-    Viewport,
-    /// A view's camera menu.
-    Camera,
-    /// Snap: the context's snap targets.
-    Snap,
 }
 
 /// One row of a popover. Keys are the context's own names for its rows;
@@ -109,7 +102,7 @@ pub enum PopoverRow {
     },
     /// The rows after it start a new column beside the ones before.
     Column,
-    /// A menu row (the Camera menu's Look At), greyed with its reason.
+    /// A menu row, greyed with its reason.
     Button {
         /// The row's key.
         key: String,

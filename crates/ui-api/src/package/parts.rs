@@ -11,11 +11,8 @@
 //! The host erases `S` when a package registers: [`Erased`] turns each
 //! part over `S` into the same part over `dyn Any`, downcasting the state
 //! the host lends back to `S`.
-use super::data::{
-    Candidate, ContextView, LevelPreset, LevelSpec, NumericBar, OutlineRow, Status, TimeDomain,
-    ToolbarItem, Tools,
-};
-use super::edited::{Edited, TemplateMark};
+use super::data::{Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, TimeDomain, Tools};
+use super::edited::Edited;
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
@@ -127,23 +124,20 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     }
 }
 
-/// What a context adds to the viewport: its toolbar, status, numeric bar,
-/// its own drawing in the views (line layers and shaded objects), its live
-/// tools' pointer handling and overlays, and its time.
+/// What a context adds to the viewport: its live tools (their input in a
+/// view, overlays, cards and numeric bar), what it draws over the open
+/// object, its keys, its popovers' rows and its time. The rest of the
+/// viewport is core's: the left toolbar, the status bar, framing, the
+/// gizmo, pivot picks and component picks (through [`Levels`]).
+///
+/// A view's frame calls, in order: [`controls`](Self::controls) and
+/// [`holds`](Self::holds) (what the pointer may reach), [`tools`](Self::tools)
+/// before the camera's navigation, then core's gizmo, handles and picks,
+/// then [`overlay`](Self::overlay); after every view,
+/// [`cards`](Self::cards), and [`edited`](Self::edited) for each view drawn.
 pub trait ViewportLayer<S: ?Sized>: Send + Sync {
-    /// The context's name for the viewport ("Mesh", "CAD sketch"): the
-    /// host calls [`leave`](Self::leave) and [`enter`](Self::enter) when it
-    /// changes.
-    fn name(&self) -> &str;
-    /// The location became this layer's (once, before its first frame).
-    fn enter(&self, s: &mut S, cx: &mut dyn Cx) {
-        let _ = (s, cx);
-    }
-    /// The location stops being this layer's.
-    fn leave(&self, s: &mut S, cx: &mut dyn Cx) {
-        let _ = (s, cx);
-    }
-    /// Escape, or an undo: end live drags and gestures.
+    /// Escape, an undo, or the location leaving the context: end live
+    /// drags and gestures.
     fn cancel(&self, s: &mut S, cx: &mut dyn Cx) {
         let _ = (s, cx);
     }
@@ -155,24 +149,11 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         let _ = (s, cx, press);
         false
     }
-    /// What a live gesture keeps from the rest of the viewport now.
+    /// What a live gesture keeps from the rest of the viewport now (asked
+    /// once a frame, before the views' input).
     fn holds(&self, s: &S, cx: &dyn Cx) -> Holds {
         let _ = (s, cx);
         Holds::default()
-    }
-    /// The left toolbar, in order; empty: no toolbar.
-    fn toolbar(&self, s: &S, cx: &dyn Cx) -> Vec<ToolbarItem> {
-        let _ = (s, cx);
-        Vec::new()
-    }
-    /// A toolbar item pressed.
-    fn run_tool(&self, s: &mut S, cx: &mut dyn Cx, id: &str) {
-        let _ = (s, cx, id);
-    }
-    /// The status bar's pieces.
-    fn status(&self, s: &mut S, cx: &mut dyn Cx) -> Status {
-        let _ = (s, cx);
-        Status::default()
     }
     /// The context's rows of `popover`, called while it is open (and,
     /// for the Gear, once a frame to know whether it has any).
@@ -184,74 +165,46 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn apply_row(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
         let _ = (s, cx, popover, edit);
     }
-    /// The numeric bar for the current tool and selection.
+    /// The numeric bar of a live tool: while `Some`, it stands in the
+    /// transform tool's place under the active view.
     fn numeric_bar(&self, s: &mut S, cx: &mut dyn Cx) -> Option<NumericBar> {
         let _ = (s, cx);
         None
     }
-    /// A value typed into field `field` (from `current`).
+    /// A value typed or chosen in field `field` of
+    /// [`numeric_bar`](Self::numeric_bar) (`current`: what the field held).
     fn apply_numeric(&self, s: &mut S, cx: &mut dyn Cx, field: usize, current: f64, value: f64) {
         let _ = (s, cx, field, current, value);
     }
-    /// Frames the active view on what F frames here.
-    fn frame(&self, s: &mut S, cx: &mut dyn Cx) {
-        let _ = (s, cx);
-    }
-    /// Once a frame before the views: refresh the context's view services.
-    fn prepare(&self, s: &mut S, cx: &mut dyn Cx) {
-        let _ = (s, cx);
-    }
-    /// What the views draw of the context's own.
-    fn layers(&self, s: &mut S, cx: &mut dyn Cx) -> Option<ContextView> {
-        let _ = (s, cx);
-        None
-    }
     /// What the context adds over the open object in view `view` this
-    /// frame: overlays, guides and style (`None`: nothing). Core draws the
-    /// object's value itself; called once per drawn view after the views'
-    /// input.
+    /// frame: overlays, guides, lines and style (`None`: nothing). Core
+    /// draws the object's value itself; called once per drawn view after
+    /// the views' input, so it is also where a context refreshes what its
+    /// drawing needs.
     fn edited(&self, s: &mut S, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
         let _ = (s, cx, view);
         None
     }
-    /// How the open object's templated piece of node `node` is marked
-    /// (`key`: its data type's name for the piece, a CAD body's name).
-    fn template_mark(
-        &self,
-        s: &S,
-        cx: &dyn Cx,
-        node: NodeRef,
-        key: Option<&(dyn Any + Send + Sync)>,
-    ) -> TemplateMark {
-        let _ = (s, cx, node, key);
-        TemplateMark::default()
-    }
-    /// This frame's live tools in a view, before camera navigation.
+    /// A live tool's input in a view, before camera navigation: its drags,
+    /// clicks and wheel (Alt's drags are the camera's). What it says it
+    /// takes ([`Tools`]) keeps core's gizmo, handles, picks, wheel and
+    /// right-click menu off this frame. A drag edits in the tool's gesture,
+    /// one undo step.
     fn tools(&self, s: &mut S, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
         let _ = (s, cx, ui);
         Tools::default()
     }
-    /// A view's gizmo, hover, picking and marquee, after the camera and the
-    /// view cube had the pointer; `tools` is what [`Self::tools`] said.
-    fn pointer(&self, s: &mut S, cx: &mut dyn ViewCx, ui: &mut dyn Ui, tools: Tools) {
-        let _ = (s, cx, ui, tools);
-    }
-    /// Draws over a view after its pointer handling: labels, handles,
-    /// heads-up value fields.
+    /// Draws over a view after its navigation and pointer handling, so
+    /// what it places follows this frame's camera: labels, handles,
+    /// heads-up values.
     fn overlay(&self, s: &mut S, cx: &mut dyn ViewCx, ui: &mut dyn Ui) {
         let _ = (s, cx, ui);
-    }
-    /// The point a click at `at` in the view picks for the transform
-    /// pivot (snapped as the context snaps), in the space of its
-    /// [`Levels::pivot`]'s frame; `None` gives up picking.
-    fn pick_pivot(&self, s: &mut S, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
-        let _ = (s, cx, at);
-        None
     }
     /// The node a live tool works on (its card is up). While there is one,
     /// the open network's templated branches are pickable in the views: a
     /// click wires the branch under the pointer into the node's operand
-    /// input (Command takes it off), in the tool's gesture. `None`: no
+    /// input (Command takes it off), in the tool's gesture. Core marks the
+    /// branch under the pointer and those wired into the node. `None`: no
     /// tool is live.
     fn live_node(&self, s: &S, cx: &dyn Cx) -> Option<NodeRef> {
         let _ = (s, cx);
@@ -281,22 +234,18 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn transform(&self, s: &mut S, cx: &mut dyn Cx, phase: TransformPhase, step: &TransformStep) {
         let _ = (s, cx, phase, step);
     }
-    /// Floating cards drawn once a frame over the views in `rect` (a
-    /// tool's card, a panel). Where they are is [`controls`](Self::controls).
+    /// Floating cards drawn once a frame over the views in `rect`, after
+    /// every view's input: a live tool's card ([`Ui::card`](crate::Ui::card)),
+    /// a panel. Where they are is [`controls`](Self::controls).
     fn cards(&self, s: &mut S, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         let _ = (s, cx, ui, rect);
     }
-    /// Whether the context's controls take the pointer over every view
-    /// now (a popup open over them): the views' tools see none of it.
-    fn blocks(&self, s: &S, cx: &dyn Cx) -> bool {
-        let _ = (s, cx);
-        false
-    }
     /// Where the context's floating controls are over the view at `view`
     /// this frame (its cards, its panels in the view): the pointer over
-    /// one is theirs, not the view's tools. Said from the state the
-    /// controls draw from, never recorded while drawing, so it holds for
-    /// the frame that draws them.
+    /// one is theirs, not the view's tools. A popup taking the pointer over
+    /// every view gives `view` itself. Said from the state the controls
+    /// draw from, never recorded while drawing, so it holds for the frame
+    /// that draws them.
     fn controls(&self, s: &S, cx: &dyn Cx, view: Rect) -> Vec<Rect> {
         let _ = (s, cx, view);
         Vec::new()
@@ -530,15 +479,6 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
 }
 
 impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
-    fn name(&self) -> &str {
-        self.part.name()
-    }
-    fn enter(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
-        self.part.enter(own_mut(s), cx)
-    }
-    fn leave(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
-        self.part.leave(own_mut(s), cx)
-    }
     fn cancel(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
         self.part.cancel(own_mut(s), cx)
     }
@@ -547,15 +487,6 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn holds(&self, s: &dyn Any, cx: &dyn Cx) -> Holds {
         self.part.holds(own(s), cx)
-    }
-    fn toolbar(&self, s: &dyn Any, cx: &dyn Cx) -> Vec<ToolbarItem> {
-        self.part.toolbar(own(s), cx)
-    }
-    fn run_tool(&self, s: &mut dyn Any, cx: &mut dyn Cx, id: &str) {
-        self.part.run_tool(own_mut(s), cx, id)
-    }
-    fn status(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Status {
-        self.part.status(own_mut(s), cx)
     }
     fn rows(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
         self.part.rows(own_mut(s), cx, popover)
@@ -577,38 +508,14 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
         self.part
             .apply_numeric(own_mut(s), cx, field, current, value)
     }
-    fn frame(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
-        self.part.frame(own_mut(s), cx)
-    }
-    fn prepare(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
-        self.part.prepare(own_mut(s), cx)
-    }
-    fn layers(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<ContextView> {
-        self.part.layers(own_mut(s), cx)
-    }
     fn edited(&self, s: &mut dyn Any, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
         self.part.edited(own_mut(s), cx, view)
-    }
-    fn template_mark(
-        &self,
-        s: &dyn Any,
-        cx: &dyn Cx,
-        node: NodeRef,
-        key: Option<&(dyn Any + Send + Sync)>,
-    ) -> TemplateMark {
-        self.part.template_mark(own(s), cx, node, key)
     }
     fn tools(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
         self.part.tools(own_mut(s), cx, ui)
     }
-    fn pointer(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui, tools: Tools) {
-        self.part.pointer(own_mut(s), cx, ui, tools)
-    }
     fn overlay(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) {
         self.part.overlay(own_mut(s), cx, ui)
-    }
-    fn pick_pivot(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, at: Pos) -> Option<Vec3> {
-        self.part.pick_pivot(own_mut(s), cx, at)
     }
     fn live_node(&self, s: &dyn Any, cx: &dyn Cx) -> Option<NodeRef> {
         self.part.live_node(own(s), cx)
@@ -630,9 +537,6 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn cards(&self, s: &mut dyn Any, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         self.part.cards(own_mut(s), cx, ui, rect)
-    }
-    fn blocks(&self, s: &dyn Any, cx: &dyn Cx) -> bool {
-        self.part.blocks(own(s), cx)
     }
     fn controls(&self, s: &dyn Any, cx: &dyn Cx, view: Rect) -> Vec<Rect> {
         self.part.controls(own(s), cx, view)
