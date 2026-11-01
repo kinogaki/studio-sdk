@@ -143,7 +143,7 @@ pub struct WeightedMotion {
 /// A live preview over the displayed packet of one topology: GPU motions
 /// and CPU patches.
 pub struct PreviewUpdate {
-    /// The topology it patches ([`SurfaceSource::topology_key`]).
+    /// The topology it patches ([`SurfaceSource::topology_key`](crate::SurfaceSource::topology_key)).
     pub on: [u8; 32],
     /// Whole-surface transform, when the preview moves everything rigidly.
     pub affine: Option<[[f64; 4]; 4]>,

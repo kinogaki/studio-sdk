@@ -57,7 +57,7 @@ impl LineLayer {
 /// (packet point i is value point i). Layer order is significant:
 /// overlapping layers blend in order.
 pub struct OverlayDraw {
-    /// The topology the layers name ([`SurfaceSource::topology_key`]).
+    /// The topology the layers name ([`SurfaceSource::topology_key`](crate::SurfaceSource::topology_key)).
     pub on: [u8; 32],
     /// The layers, drawn in order.
     pub layers: Vec<OverlayLayer>,
@@ -83,7 +83,7 @@ impl OverlayDraw {
 /// normal in the value's own space, drawn as lines the display's normal
 /// length.
 pub struct FaceNormals {
-    /// The topology the faces are of ([`SurfaceSource::topology_key`]).
+    /// The topology the faces are of ([`SurfaceSource::topology_key`](crate::SurfaceSource::topology_key)).
     pub on: [u8; 32],
     /// Each face's center (`[0..3]`) and unit normal (`[3..6]`).
     pub faces: Vec<[f32; 6]>,
