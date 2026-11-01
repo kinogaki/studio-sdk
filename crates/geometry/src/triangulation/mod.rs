@@ -167,29 +167,7 @@ impl Polygons {
         out: &mut Vec<Triangle>,
     ) -> Result<(), GeometryError> {
         let topology = self.topology();
-        if primitive >= topology.polygons() {
-            let what = if primitive < topology.primitives() {
-                "is a polyline"
-            } else {
-                "is not a primitive"
-            };
-            return Err(GeometryError::at(
-                ErrorKind::Selection,
-                primitive,
-                format!("primitive {primitive} {what}"),
-            ));
-        }
-        let points = topology.primitive(primitive);
-        if let Some(&p) = points
-            .iter()
-            .find(|&&p| !position(p).iter().all(|c| c.is_finite()))
-        {
-            return Err(GeometryError::at(
-                ErrorKind::Position,
-                p as usize,
-                format!("point {p} is not finite"),
-            ));
-        }
+        checked(topology, primitive, position)?;
         clip(&outline(topology, primitive), position, false, out).map_err(|()| {
             GeometryError::at(
                 ErrorKind::Triangulation,
@@ -213,6 +191,28 @@ impl Polygons {
         self.triangulate_strict_at(primitive, &|p| positions[p as usize], out)
     }
 
+    /// Polygon `primitive`'s n − 2 display triangles at `position`
+    /// appended to `out`: what [`triangulation`](Self::triangulation)
+    /// holds for it at those positions (clipped strictly, else tolerantly,
+    /// else a fan from its first vertex). Whether it fell back to the fan.
+    /// For a preview that shows polygons at positions no value holds yet.
+    ///
+    /// # Errors
+    /// In this order: `primitive` out of range or a polyline
+    /// ([`ErrorKind::Selection`]); a position among the polygon's points
+    /// that isn't finite ([`ErrorKind::Position`], naming the point). `out`
+    /// is left as it was.
+    pub fn triangulate_display_at(
+        &self,
+        primitive: usize,
+        position: &impl Fn(u32) -> [f64; 3],
+        out: &mut Vec<Triangle>,
+    ) -> Result<bool, GeometryError> {
+        let topology = self.topology();
+        checked(topology, primitive, position)?;
+        Ok(display(topology, primitive, position, out))
+    }
+
     /// Every polygon, strictly, in order.
     ///
     /// # Errors
@@ -226,6 +226,39 @@ impl Polygons {
         }
         Ok(out)
     }
+}
+
+/// Whether `primitive` is a polygon of `topology` whose points are finite
+/// at `position`.
+fn checked(
+    topology: &Topology,
+    primitive: usize,
+    position: &impl Fn(u32) -> [f64; 3],
+) -> Result<(), GeometryError> {
+    if primitive >= topology.polygons() {
+        let what = if primitive < topology.primitives() {
+            "is a polyline"
+        } else {
+            "is not a primitive"
+        };
+        return Err(GeometryError::at(
+            ErrorKind::Selection,
+            primitive,
+            format!("primitive {primitive} {what}"),
+        ));
+    }
+    let points = topology.primitive(primitive);
+    if let Some(&p) = points
+        .iter()
+        .find(|&&p| !position(p).iter().all(|c| c.is_finite()))
+    {
+        return Err(GeometryError::at(
+            ErrorKind::Position,
+            p as usize,
+            format!("point {p} is not finite"),
+        ));
+    }
+    Ok(())
 }
 
 fn outline(topology: &Topology, polygon: usize) -> Outline<'_> {

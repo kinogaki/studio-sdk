@@ -325,3 +325,63 @@ fn a_drag_that_flips_no_diagonal_keeps_the_triangle_columns() {
     let refolded = folded.triangulation_after(&after, &[10]);
     assert!(!refolded.triangles().ptr_eq(t.triangles()));
 }
+
+#[test]
+fn a_polygons_display_triangles_at_given_positions_are_its_triangulation() {
+    // Exact, concave and damaged polygons in one value: each polygon's
+    // display triangles at the value's own positions are its run of the
+    // triangulation, the fan flagged where the triangulation lists one.
+    let mut cases = vec![grid(6)];
+    for positions in [
+        vec![[0.0; 3], [3.0, 2.0, 0.0], [0.0, 2.0, 0.0], [2.0, 0.0, 0.0]],
+        vec![[0.0; 3]; 4],
+    ] {
+        cases.push(value(&positions, &[&[0, 1, 2, 3]]));
+    }
+    for v in &cases {
+        let t = v.triangulation();
+        let positions = v.positions();
+        for p in 0..v.topology().polygons() {
+            let mut out = vec![Triangle {
+                vertices: [9; 3],
+                points: [9; 3],
+                primitive: 9,
+            }];
+            let fan = v
+                .triangulate_display_at(p, &|i| positions[i as usize], &mut out)
+                .unwrap();
+            assert_eq!(fan, t.fans().contains(&(p as u32)), "polygon {p}");
+            let run = t.of(p);
+            assert_eq!(out.len(), 1 + run.len(), "appended, the rest kept");
+            for (k, tri) in run.zip(&out[1..]) {
+                assert_eq!(tri.points, t.triangles()[k]);
+                assert_eq!(tri.vertices, t.corners()[k]);
+                assert_eq!(tri.primitive, p as u32);
+            }
+        }
+    }
+    // At other positions: the polygon as it would show there.
+    let v = &cases[0];
+    let lifted = |i: u32| {
+        let p = v.positions()[i as usize];
+        [p[0], p[1] + 2.0, p[2]]
+    };
+    let mut out = Vec::new();
+    assert!(!v.triangulate_display_at(0, &lifted, &mut out).unwrap());
+    assert!(out.iter().all(|t| t.primitive == 0));
+}
+
+#[test]
+fn display_requests_for_polylines_or_bad_positions_leave_the_output_alone() {
+    let positions = [[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [2.0, 0.0, 0.0]];
+    let topology = Topology::new(4, vec![0, 3, 5].into(), vec![0, 1, 2, 1, 3].into(), 1).unwrap();
+    let v = Polygons::new(positions.to_vec().into(), topology, Attributes::new()).unwrap();
+    let at = |i: u32| positions[i as usize];
+    let mut out = Vec::new();
+    let e = v.triangulate_display_at(1, &at, &mut out).unwrap_err();
+    assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, Some(1)));
+    let nan = |i: u32| if i == 2 { [f64::NAN; 3] } else { at(i) };
+    let e = v.triangulate_display_at(0, &nan, &mut out).unwrap_err();
+    assert_eq!((e.kind(), e.element()), (ErrorKind::Position, Some(2)));
+    assert!(out.is_empty());
+}
