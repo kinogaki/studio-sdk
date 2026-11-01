@@ -296,3 +296,162 @@ fn bases_name_themselves() {
         assert_eq!(Basis::from_name(b.name()), Some(b));
     }
 }
+
+mod display {
+    use kinogaki_geometry::{Basis, CurveDisplay, Curves, Group};
+    use std::sync::Arc;
+
+    fn curve(basis: Basis, points: Vec<[f64; 3]>, degree: u8, periodic: bool) -> Curves {
+        let n = points.len() as u32;
+        let mut builder = Curves::builder(basis, points.into(), vec![0, n].into()).degree(degree);
+        if periodic {
+            builder = builder.periodic(Group::from_indices(1, [0]).unwrap());
+        }
+        builder.build().unwrap()
+    }
+
+    fn close(a: [f64; 3], b: [f64; 3], tolerance: f64) -> bool {
+        (0..3).all(|c| (a[c] - b[c]).abs() <= tolerance)
+    }
+
+    #[test]
+    fn a_rational_quadratic_is_exactly_a_circle() {
+        let w = std::f64::consts::FRAC_1_SQRT_2;
+        let quarter = Curves::builder(
+            Basis::Nurbs,
+            vec![[1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]].into(),
+            vec![0, 3].into(),
+        )
+        .degree(2)
+        .knots(vec![0, 6].into(), vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0].into())
+        .weights(vec![1.0, w, 1.0].into())
+        .build()
+        .unwrap();
+        assert_eq!(quarter.domain(0), [0.0, 1.0]);
+        for k in 0..=100 {
+            let p = quarter.point(0, k as f64 / 100.0);
+            assert!((p[0].hypot(p[1]) - 1.0).abs() < 1e-12, "{p:?}");
+        }
+        let display = quarter.display();
+        assert_eq!(display.positions().len(), CurveDisplay::SAMPLES + 1);
+        assert!(
+            display
+                .positions()
+                .iter()
+                .all(|p| (p[0].hypot(p[1]) - 1.0).abs() < 1e-12)
+        );
+    }
+
+    #[test]
+    fn bezier_ends_on_its_end_points_and_follows_bernstein() {
+        let p = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 2.0, 0.0],
+            [3.0, 2.0, 0.0],
+            [4.0, 0.0, 0.0],
+        ];
+        let cubic = curve(Basis::Bezier, p.clone(), 3, false);
+        assert_eq!(cubic.domain(0), [0.0, 1.0]);
+        assert_eq!(cubic.point(0, 0.0), p[0]);
+        assert_eq!(cubic.point(0, 1.0), p[3]);
+        // At t = ½: (p0 + 3 p1 + 3 p2 + p3) / 8.
+        let half: [f64; 3] =
+            std::array::from_fn(|c| (p[0][c] + 3.0 * p[1][c] + 3.0 * p[2][c] + p[3][c]) / 8.0);
+        assert!(close(cubic.point(0, 0.5), half, 1e-12));
+    }
+
+    #[test]
+    fn an_open_bspline_is_clamped_and_a_straight_one_straight() {
+        let line: Vec<[f64; 3]> = (0..6).map(|k| [k as f64, 2.0 * k as f64, 0.0]).collect();
+        let spline = curve(Basis::BSpline, line.clone(), 3, false);
+        assert_eq!(spline.domain(0), [0.0, 3.0]);
+        assert!(close(spline.point(0, 0.0), line[0], 1e-12));
+        assert!(close(spline.point(0, 3.0), line[5], 1e-12));
+        for k in 0..=30 {
+            let p = spline.point(0, k as f64 / 10.0);
+            assert!((p[1] - 2.0 * p[0]).abs() < 1e-12, "on the line: {p:?}");
+        }
+    }
+
+    #[test]
+    fn catmull_rom_passes_through_every_point() {
+        let points = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [2.0, -1.0, 0.0],
+            [3.0, 0.5, 1.0],
+            [4.0, 0.0, 0.0],
+        ];
+        let open = curve(Basis::CatmullRom, points.clone(), 3, false);
+        assert_eq!(open.domain(0), [0.0, 4.0]);
+        for (k, p) in points.iter().enumerate() {
+            assert!(close(open.point(0, k as f64), *p, 1e-12), "point {k}");
+        }
+        let closed = curve(Basis::CatmullRom, points.clone(), 3, true);
+        assert_eq!(closed.domain(0), [0.0, 5.0]);
+        assert!(close(closed.point(0, 5.0), points[0], 1e-12), "it closes");
+    }
+
+    #[test]
+    fn periodic_curves_close_and_linear_curves_show_their_points() {
+        let square = vec![
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+        ];
+        let ring = curve(Basis::BSpline, square.clone(), 3, true);
+        assert_eq!(ring.domain(0), [0.0, 4.0]);
+        assert!(
+            close(ring.point(0, 0.0), ring.point(0, 4.0), 1e-12),
+            "the ends meet"
+        );
+        let display = ring.display();
+        assert!(display.closed(0));
+        assert_eq!(
+            display.positions().len(),
+            4 * CurveDisplay::SAMPLES,
+            "no repeated end"
+        );
+        let segments: Vec<[u32; 2]> = display.segments(0).collect();
+        assert_eq!(
+            segments.len(),
+            display.positions().len(),
+            "closing segment included"
+        );
+        let polyline = curve(Basis::Linear, square.clone(), 1, false);
+        let display = polyline.display();
+        assert_eq!(display.positions().as_slice(), square.as_slice());
+        assert_eq!(display.spans().as_slice(), [0, 1, 2, 2]);
+        assert!(!display.closed(0));
+    }
+
+    #[test]
+    fn the_display_is_kept_and_follows_moved_points_in_place() {
+        let points: Vec<[f64; 3]> = (0..7).map(|k| [k as f64, (k % 2) as f64, 0.0]).collect();
+        let first = Curves::builder(Basis::BSpline, points.clone().into(), vec![0, 4, 7].into())
+            .degree(2)
+            .build()
+            .unwrap();
+        let shown = first.display();
+        assert!(Arc::ptr_eq(&shown, &first.display()), "kept");
+        let mut moved = points;
+        moved[5][1] += 3.0;
+        let after = first.with_positions(moved.into()).unwrap();
+        let patched = after.display_after(&first, &[5]);
+        assert_eq!(
+            *patched,
+            *after
+                .with_positions(after.positions().clone())
+                .unwrap()
+                .display()
+        );
+        assert_eq!(patched.offsets(), shown.offsets(), "the layout holds");
+        // The first curve didn't move.
+        let first_curve = shown.offsets()[0] as usize..shown.offsets()[1] as usize;
+        assert_eq!(
+            &patched.positions().as_slice()[first_curve.clone()],
+            &shown.positions().as_slice()[first_curve]
+        );
+    }
+}

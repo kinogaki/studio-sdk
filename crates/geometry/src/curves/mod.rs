@@ -1,10 +1,12 @@
 //! [`Curves`]: polylines, Bézier, B-spline, Catmull-Rom and NURBS curves
 //! over shared control points — the standard value `kinogaki.curves`.
 mod build;
+mod display;
 mod polylines;
 mod validate;
 
 pub use build::CurvesBuilder;
+pub use display::CurveDisplay;
 
 use crate::attributes::{Attributes, Class, Group};
 use crate::column::Column;
@@ -28,9 +30,12 @@ pub enum Basis {
     /// curve has `k·degree + 1` control points, a periodic one
     /// `k·degree`.
     Bezier,
-    /// Uniform, non-rational B-splines of the curve's degree.
+    /// Uniform, non-rational B-splines of the curve's degree: clamped when
+    /// open (they start and end on their end points), wrapping when
+    /// periodic.
     BSpline,
-    /// Catmull-Rom splines through every point. Degree 3.
+    /// Catmull-Rom splines through every point (an open curve's ends
+    /// reflect their neighbours). Degree 3.
     CatmullRom,
     /// Rational B-splines with explicit knots and optional weights.
     Nurbs,

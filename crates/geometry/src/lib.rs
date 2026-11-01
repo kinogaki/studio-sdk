@@ -113,7 +113,7 @@ pub use attributes::{
     TextBuilder, TypeInfo, check_name,
 };
 pub use column::Column;
-pub use curves::{Basis, Curves, CurvesBuilder, Knots};
+pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
 pub use detail::Detail;
 pub use error::{ErrorKind, GeometryError};
 pub use polygons::Polygons;
