@@ -41,6 +41,7 @@ use crate::data_type::Stamp;
 use crate::error::Error;
 use crate::id::{DataTypeId, NodeTypeId};
 use crate::params::{Diagnostic, Parameters, Schema};
+use std::any::Any;
 use std::fmt;
 
 /// What, besides its inputs and parameters, a node's result depends on.
@@ -190,7 +191,12 @@ impl std::error::Error for CookError {}
 /// What one node type computes. Cooks run on core's workers, several at
 /// once (different nodes, and the same node for different times), so a
 /// node type holds no per-node state: that is the scratch slot's.
-pub trait NodeType: Send + Sync {
+///
+/// A node type is [`Any`]: whoever holds a `&dyn NodeType` (a compiler,
+/// through [`CompileCx::node_type`](crate::network::CompileCx::node_type))
+/// may upcast it to `&dyn Any` and downcast it to its own concrete type,
+/// for what only that type knows.
+pub trait NodeType: Any + Send + Sync {
     /// Its id (`kinogaki.mesh.extrude`).
     fn id(&self) -> NodeTypeId;
 

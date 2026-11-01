@@ -5,6 +5,7 @@
 //! own plan; the package's executor runs the plan (a Comp plan on the GPU,
 //! as the display draws). Core keeps the plan until the network's topology
 //! or a flattened node's parameters change.
+use crate::cook::NodeType;
 use crate::id::{ContextId, NodeTypeId};
 use crate::params::Parameters;
 use std::any::Any;
@@ -61,23 +62,64 @@ impl<'a> Flat<'a> {
     }
 }
 
-/// What a compile may read besides the network.
-#[derive(Clone, Copy, Debug, Default)]
+/// The node types a compile sees, by id ([`CompileCx::with_types`]): the
+/// host's installed types, or a [`Registry`](crate::Registry)'s.
+pub trait NodeTypes {
+    /// Node type `id`, when there is one.
+    fn node_type(&self, id: NodeTypeId) -> Option<&dyn NodeType>;
+}
+
+/// What a compile may read besides the network: the outputs the render
+/// writes and the types of the nodes it compiles.
+#[derive(Clone, Copy, Default)]
 pub struct CompileCx<'a> {
     outputs: &'a [String],
+    types: Option<&'a dyn NodeTypes>,
 }
 
 impl<'a> CompileCx<'a> {
     /// A compile where the render writes `outputs` (its output ids, the
-    /// beauty first).
+    /// beauty first), seeing no node types.
     pub fn new(outputs: &'a [String]) -> Self {
-        Self { outputs }
+        Self {
+            outputs,
+            types: None,
+        }
+    }
+
+    /// Seeing node types through `types` (the host passes its installed
+    /// types). A borrowed trait object keeps the context covariant.
+    pub fn with_types(mut self, types: &'a dyn NodeTypes) -> Self {
+        self.types = Some(types);
+        self
     }
 
     /// The outputs the render writes, by id, the beauty first: what a
     /// render's image nodes may read.
     pub fn outputs(&self) -> &'a [String] {
         self.outputs
+    }
+
+    /// Node type `id`, when it is installed (`None` for every id in a
+    /// compile that sees no types).
+    ///
+    /// A compiler reads what a type declares (its description, its
+    /// [`ports`](NodeType::ports) and [`spares`](NodeType::spares))
+    /// through the trait first, and downcasts it to its own concrete type
+    /// (`NodeType` is [`Any`]: `(ty as &dyn Any).downcast_ref::<Mine>()`)
+    /// only for what that type alone knows (a Comp operator's plan node, a
+    /// shader's engine vocabulary).
+    pub fn node_type(&self, id: NodeTypeId) -> Option<&'a dyn NodeType> {
+        self.types?.node_type(id)
+    }
+}
+
+impl fmt::Debug for CompileCx<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CompileCx")
+            .field("outputs", &self.outputs)
+            .field("types", &self.types.is_some())
+            .finish()
     }
 }
 
@@ -144,4 +186,51 @@ pub trait NetworkCompiler: Send + Sync {
         target: Source,
         cx: &CompileCx<'_>,
     ) -> Result<Compiled, CompileError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cook::{CookCx, CookError, Description, Outputs};
+    use crate::data::Data;
+
+    /// A type a compiler knows by its own struct.
+    struct Mine(u32);
+
+    impl NodeType for Mine {
+        fn id(&self) -> NodeTypeId {
+            NodeTypeId::declared("acme.trees.mine")
+        }
+        fn description(&self) -> Description {
+            Description::new("Mine")
+        }
+        fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+            Err(CookError::message("compiled"))
+        }
+    }
+
+    impl NodeTypes for Mine {
+        fn node_type(&self, id: NodeTypeId) -> Option<&dyn NodeType> {
+            (id == self.id()).then_some(self as &dyn NodeType)
+        }
+    }
+
+    #[test]
+    fn a_compile_sees_node_types_through_its_lookup() {
+        let mine = Mine(7);
+        let outputs = ["beauty".to_owned()];
+        let cx = CompileCx::new(&outputs).with_types(&mine);
+        let ty = cx.node_type(mine.id()).expect("installed");
+        assert_eq!(ty.description().label, "Mine");
+        let any: &dyn Any = ty;
+        assert_eq!(any.downcast_ref::<Mine>().map(|m| m.0), Some(7));
+        assert!(
+            cx.node_type(NodeTypeId::declared("acme.trees.other"))
+                .is_none()
+        );
+        assert_eq!(cx.outputs(), outputs);
+        // A compile that sees no types finds none.
+        assert!(CompileCx::default().node_type(mine.id()).is_none());
+        assert!(CompileCx::new(&outputs).node_type(mine.id()).is_none());
+    }
 }

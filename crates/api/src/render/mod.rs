@@ -8,6 +8,10 @@
 //! ([`PlainTriangles`]) are the render interface's
 //! (`kinogaki-render-api`), the crate engines build on; they are re-exported
 //! here, so a source a data type makes is what engines' hosts consume.
+//!
+//! [`ShaderType`]s ([`shaders`]) are an engine's material vocabulary as
+//! node types of Studio's Shading context, which the engine's package
+//! registers.
 use crate::math::Mat4;
 use std::fmt;
 use std::sync::Arc;
@@ -16,6 +20,9 @@ pub use kinogaki_render_api::{
     AttributeDomain, Detail, ImportedMaterial, Look, MeshAttribute, PlainTriangles, Ranges,
     TriangleSource,
 };
+pub use shader::{SHADER_VALUE, SHADING, ShaderType, shader_value, shaders};
+
+mod shader;
 
 /// A file's materials as a format reads them beside its geometry
 /// (`kinogaki.render.preview_materials`): what File ▸ Import turns into a

@@ -17,7 +17,7 @@ use crate::id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
 use crate::mesher::Mesher;
-use crate::network::{Evaluation, NetworkCompiler, NetworkContext};
+use crate::network::{Evaluation, NetworkCompiler, NetworkContext, NodeTypes};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::{SessionSlot, SessionSlots};
@@ -741,6 +741,13 @@ impl Registry {
     /// The package that registered format `id`.
     pub fn format_owner(&self, id: FormatId) -> Option<PackageId> {
         self.formats.get(&id).map(|e| e.package)
+    }
+}
+
+/// A compile sees the registered node types.
+impl NodeTypes for Registry {
+    fn node_type(&self, id: NodeTypeId) -> Option<&dyn NodeType> {
+        Registry::node_type(self, id)
     }
 }
 
