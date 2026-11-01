@@ -16,7 +16,8 @@
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`]) are the ones core registers,
+//! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`],
+//! [`PreviewMaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
 //! [`Tolerances`](crate::geometry::Tolerances) is the project value core
@@ -26,6 +27,7 @@ mod attributes;
 mod brep;
 mod camera;
 mod curves;
+mod materials;
 mod polygons;
 mod selection;
 mod tolerances;
@@ -33,6 +35,7 @@ mod tolerances;
 pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use curves::CurvesCodec;
+pub use materials::PreviewMaterialsCodec;
 pub use polygons::PolygonsCodec;
 
 use crate::components::Components;
@@ -42,6 +45,7 @@ use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
 use kinogaki_geometry::{Class, Curves, GeometryError, Polygons, Selection};
+use kinogaki_render_api::ImportedMaterial;
 
 /// The id of [`Polygons`] values.
 pub const POLYGONS: &str = "kinogaki.core.polygons";
@@ -50,6 +54,10 @@ pub const CURVES: &str = "kinogaki.core.curves";
 
 /// The id of [`Brep`] values.
 pub const BREP: &str = "kinogaki.core.brep";
+
+/// The id of a file's materials as a format reads them beside its
+/// geometry ([`preview_materials`]).
+pub const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
 
 /// The handle on [`Polygons`] values ([`POLYGONS`]).
 pub fn polygons() -> Typed<Polygons> {
@@ -74,6 +82,13 @@ pub fn camera() -> Typed<kinogaki_render_api::Camera> {
 /// The handle on [`Brep`] values ([`BREP`]).
 pub fn brep() -> Typed<Brep> {
     Typed::new(DataTypeId::declared(BREP))
+}
+
+/// The handle on a file's materials as a format reads them beside its
+/// geometry ([`PREVIEW_MATERIALS`]): each keyed by the name the file's
+/// polygons' `material` values give it, with its preview surface.
+pub fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
+    Typed::new(DataTypeId::declared(PREVIEW_MATERIALS))
 }
 
 /// How many elements of `class` a B-rep value holds: one Detail element,

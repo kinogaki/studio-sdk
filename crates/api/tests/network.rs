@@ -2,11 +2,13 @@
 //! package, refused twice or under another vendor's name; node types
 //! holding deltas name a registered data type; conditionally required
 //! ports follow parameters; a compiled context comes with exactly one
-//! compiler, which plans a flattened network.
+//! compiler, which plans a flattened network; a library declares its
+//! nodes unwired results; packages add ways to make other packages'
+//! nodes.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::network::{
     CompileCx, CompileError, Compiled, Flag, FlagSet, Flat, FlatNode, NetworkCompiler,
-    NetworkContext, Source,
+    NetworkContext, NewNode, NodeCreation, Source,
 };
 use kinogaki_studio_api::{
     ContextId, CookCx, CookError, Data, DataTypeId, NodeType, NodeTypeId, Outputs, Package,
@@ -72,6 +74,47 @@ fn a_context_registers_once_under_its_vendor() {
         })
     ));
     assert!(!FlagSet::default().offers(Flag::Bypass));
+}
+
+#[test]
+fn a_library_holds_unwired_results_without_flags() {
+    let plain = context("acme.trees.network").flags(FlagSet::all());
+    assert!(!plain.library);
+    let library = plain.clone().library();
+    assert!(library.library && !library.heals);
+    assert_eq!(library.flags, FlagSet::default());
+    assert_eq!((library.id, library.storage), (plain.id, plain.storage));
+}
+
+#[test]
+fn a_package_adds_ways_to_make_another_packages_nodes() {
+    let mut registry = Registry::new();
+    // Another package's type, which Studio lists the creations with.
+    let grow = NodeTypeId::declared("acme.trees.grow");
+    let oak = NodeCreation::new(
+        "acme.forest.oak",
+        "Oak",
+        NewNode::new(grow).named("oak").with("rate", 2.0),
+    )
+    .family("Broadleaf")
+    .aliases(["quercus"])
+    .inside(NewNode::new(grow).displayed());
+    let forest = Package::new(PackageId::declared("acme.forest"), "Forest")
+        .with_creation(oak.clone())
+        .with_creation(NodeCreation::new(
+            "acme.forest.pine",
+            "Pine",
+            NewNode::new(grow),
+        ));
+    registry.register(forest).unwrap();
+    let made: Vec<&NodeCreation> = registry.creations().collect();
+    assert_eq!(made[0], &oak);
+    assert_eq!(made[1].id, "acme.forest.pine");
+    assert_eq!(made[1].node.name, None);
+    assert!(made[1].family.is_empty() && made[1].inside.is_empty());
+    assert_eq!(oak.node.name.as_deref(), Some("oak"));
+    assert_eq!(oak.node.parameters["rate"], Value::Number(2.0));
+    assert!(oak.inside[0].display);
 }
 
 #[test]

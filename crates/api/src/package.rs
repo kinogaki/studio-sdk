@@ -8,7 +8,7 @@ use crate::held::HeldEdit;
 use crate::icon::Icon;
 use crate::id::{ContextId, PackageId};
 use crate::mesher::Mesher;
-use crate::network::{NetworkCompiler, NetworkContext};
+use crate::network::{NetworkCompiler, NetworkContext, NodeCreation};
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
@@ -54,6 +54,9 @@ pub struct Package {
     pub contexts: Vec<NetworkContext>,
     /// The compilers of its compiled contexts, one each.
     pub compilers: Vec<Arc<dyn NetworkCompiler>>,
+    /// The further ways it makes nodes, of its own types or others'
+    /// (an engine's material presets).
+    pub creations: Vec<NodeCreation>,
     /// The object kinds it contributes.
     pub object_kinds: Vec<Arc<dyn ObjectKindSpec>>,
     /// The file formats it reads and writes.
@@ -139,6 +142,7 @@ impl Package {
             node_types: Vec::new(),
             contexts: Vec::new(),
             compilers: Vec::new(),
+            creations: Vec::new(),
             object_kinds: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
@@ -187,6 +191,13 @@ impl Package {
     /// context.
     pub fn with_compiler(mut self, compiler: impl NetworkCompiler + 'static) -> Self {
         self.compilers.push(Arc::new(compiler));
+        self
+    }
+
+    /// With `creation` too, listed wherever its node type is (an
+    /// engine's material preset, a Material of its surface).
+    pub fn with_creation(mut self, creation: NodeCreation) -> Self {
+        self.creations.push(creation);
         self
     }
 

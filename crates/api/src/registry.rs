@@ -17,10 +17,11 @@ use crate::id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
 use crate::mesher::Mesher;
-use crate::network::{Evaluation, NetworkCompiler, NetworkContext, NodeTypes};
-use crate::object::ObjectKindSpec;
+use crate::network::{Evaluation, NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
+use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
 use crate::session::{SessionSlot, SessionSlots};
+use kinogaki_render_api::Engines;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
@@ -41,6 +42,14 @@ pub enum RegistryError {
         id: &'static str,
         /// The package that declared it first.
         first: PackageId,
+    },
+    /// `package` declares a creation named `id`, which isn't a well-formed
+    /// id ([`well_formed`](crate::id::well_formed)).
+    MalformedId {
+        /// The refused package.
+        package: PackageId,
+        /// The text.
+        id: String,
     },
     /// `package` declares `id`, which is under another vendor's name.
     ForeignId {
@@ -160,6 +169,9 @@ impl fmt::Display for RegistryError {
                 id,
                 first,
             } => write!(f, "{package} declares {what} {id}, which {first} declared"),
+            Self::MalformedId { package, id } => {
+                write!(f, "{package} names a creation {id:?}, which isn't an id")
+            }
             Self::ForeignId { package, id } => {
                 write!(f, "{package} declares {id}, under another vendor's name")
             }
@@ -256,6 +268,18 @@ impl<T: ?Sized> Entry<T> {
     }
 }
 
+/// Creation name `text` of `package` as an id's text, when well formed.
+fn creation_id(package: PackageId, text: &str) -> Result<&'static str, RegistryError> {
+    if crate::id::well_formed(text) {
+        Ok(crate::id::intern(text))
+    } else {
+        Err(RegistryError::MalformedId {
+            package,
+            id: text.to_owned(),
+        })
+    }
+}
+
 /// The package that registered `entry`, when there is one.
 fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
     entry.map(|e| e.package)
@@ -280,6 +304,8 @@ pub struct Registry {
     #[cfg(feature = "wgpu")]
     runners: BTreeMap<ContextId, PackageId>,
     conversions: BTreeMap<ConversionId, Entry<dyn Conversion>>,
+    /// Further ways to make nodes, in registration order.
+    creations: Vec<Entry<NodeCreation>>,
     /// B-rep meshers, in registration order.
     meshers: Vec<Entry<dyn Mesher>>,
     /// Each (from, to) pair's conversion.
@@ -335,6 +361,9 @@ impl Registry {
             self.conversions
                 .insert(conversion.id(), Entry::new(id, conversion));
         }
+        for creation in package.creations {
+            self.creations.push(Entry::new(id, Arc::new(creation)));
+        }
         for mesher in package.meshers {
             self.meshers.push(Entry::new(id, mesher));
         }
@@ -352,7 +381,9 @@ impl Registry {
     }
 
     /// Whether `package` may register: its id and every id it declares
-    /// (its UI's contexts too) are new and under its vendor, no node type
+    /// (its UI's contexts too, and its creations' names: its kinds' with
+    /// no engine installed, and its node creations', each well formed)
+    /// are new and under its vendor, no node type
     /// declares a parameter named as spares are ([`SPARE`]), each compiler
     /// and runner it brings serves a compiled context (its own or a
     /// registered package's) that has no other, and every data type
@@ -429,6 +460,22 @@ impl Registry {
                 k.id().as_str(),
                 owner(self.object_kinds.get(&k.id())),
             )?;
+        }
+        // Creations are named by text, under the same rule. A kind's are
+        // those it makes with no engine installed; the rest are named by
+        // the engines' own types.
+        let engines = Engines::new(Vec::new());
+        let cx = CreateCx::new(&engines, None);
+        let made = |k: &dyn ObjectKindSpec| k.creations(&cx).into_iter().map(|c| c.id);
+        for text in package.object_kinds.iter().flat_map(|k| made(&**k)) {
+            let first = (self.object_kinds.values())
+                .find(|e| made(&*e.item).any(|t| t == text))
+                .map(|e| e.package);
+            declare("object creation", creation_id(id, &text)?, first)?;
+        }
+        for c in &package.creations {
+            let first = self.creations.iter().find(|e| e.item.id == c.id);
+            declare("node creation", creation_id(id, &c.id)?, owner(first))?;
         }
         for f in &package.formats {
             declare("format", f.id().as_str(), owner(self.formats.get(&f.id())))?;
@@ -682,6 +729,12 @@ impl Registry {
         self.routes
             .get(&(from, to))
             .and_then(|&id| self.conversion(id))
+    }
+
+    /// The further ways packages make nodes
+    /// ([`Package::with_creation`]), in registration order.
+    pub fn creations(&self) -> impl Iterator<Item = &NodeCreation> {
+        self.creations.iter().map(|e| &*e.item)
     }
 
     /// The B-rep meshers, the preferred first: first-party (`kinogaki.*`)

@@ -38,6 +38,9 @@ pub struct NetworkContext {
     /// Other packages' node types its networks offer too, each listed under
     /// a section of this context's (CAM's networks take Mesh's Import).
     pub adopts: Vec<Adopted>,
+    /// A library ([`library`](Self::library)): its nodes aren't wired,
+    /// each is a result of its network, and none carries the display flag.
+    pub library: bool,
 }
 
 /// A node type a context offers though its own package doesn't make it
@@ -67,6 +70,7 @@ impl NetworkContext {
             },
             layout: NodeLayout::Vertical,
             adopts: Vec::new(),
+            library: false,
         }
     }
 
@@ -95,6 +99,18 @@ impl NetworkContext {
     /// [`NetworkCompiler`](super::NetworkCompiler) plans its networks.
     pub fn compiled(mut self) -> Self {
         self.evaluation = Evaluation::Compile;
+        self
+    }
+
+    /// A library of results (Studio's Material Libraries): its nodes
+    /// take no wires and show no ports, every node is a result of its
+    /// network (a holder's compiled inside, published by path), and none
+    /// carries the display flag; they offer no flags and deleting one
+    /// heals nothing.
+    pub fn library(mut self) -> Self {
+        self.library = true;
+        self.flags = FlagSet::default();
+        self.heals = false;
         self
     }
 

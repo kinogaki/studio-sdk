@@ -18,17 +18,21 @@ use crate::cook::{
 };
 use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
+use crate::network::{NewNode, NodeCreation};
 use crate::params::{Number, Parameter, ParameterKind, Parameters, Schema, Value};
-use kinogaki_render_api::EngineDescription;
 use kinogaki_render_api::vocabulary::{
     self as vocabulary, InputEdit, NodeLayout, ParamKind, ParamSpec, ParamValue, Params,
     SocketSpec, param,
 };
+use kinogaki_render_api::{EngineDescription, MaterialPreset};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
 /// Studio's Shading context, which shader node types are offered in.
 pub const SHADING: &str = "kinogaki.core.shading";
+
+/// Studio's Material node type, which holds a Shading network.
+pub const MATERIAL: &str = "kinogaki.core.material";
 
 /// The data type every shader socket carries: every output drives every
 /// input (a number spreads to three, three into one is the engine's
@@ -61,6 +65,40 @@ pub struct ShaderType {
 pub fn shaders(package: PackageId, engine: &EngineDescription) -> Vec<ShaderType> {
     (engine.material_nodes.iter())
         .map(|v| ShaderType::new(package, v))
+        .collect()
+}
+
+/// `engine`'s material presets as creations of `package` (the engine's,
+/// which registers its [`shaders`] too), in the engine's order: each
+/// makes a [`MATERIAL`] named after it whose inside starts with its
+/// surface, displayed (what the Material is), its settings and inputs
+/// set. Each is listed in the engine's
+/// family and named `<package>.preset_<name>` (its name in lowercase,
+/// words joined by `_`).
+///
+/// # Panics
+/// For a preset whose surface the engine's vocabulary lacks: presets are
+/// code, and its package's tests make them.
+pub fn presets(package: PackageId, engine: &EngineDescription) -> Vec<NodeCreation> {
+    (engine.material_presets.iter())
+        .map(|preset| {
+            let surface = (engine.material_nodes.iter())
+                .find(|v| v.name == preset.surface)
+                .unwrap_or_else(|| panic!("{} has no surface {}", engine.id, preset.surface));
+            let words: Vec<String> = (preset.name.split(|c: char| !c.is_ascii_alphanumeric()))
+                .filter(|w| !w.is_empty())
+                .map(str::to_ascii_lowercase)
+                .collect();
+            let id = format!("{}.preset_{}", package.as_str(), words.join("_"));
+            NodeCreation::new(
+                id,
+                &*preset.name,
+                NewNode::new(NodeTypeId::declared(MATERIAL)),
+            )
+            .family(&*engine.label)
+            .aliases(preset.aliases.iter().map(|a| a.to_string()))
+            .inside(ShaderType::new(package, surface).preset(preset).displayed())
+        })
         .collect()
 }
 
@@ -124,6 +162,32 @@ impl ShaderType {
             Value::Bool(on) => Some([f64::from(u8::from(*on)); 3]),
             _ => None,
         }
+    }
+
+    /// A node of this type with `preset`'s settings and inputs set.
+    fn preset(&self, preset: &MaterialPreset) -> NewNode {
+        let t = &self.vocabulary;
+        let settings = t.fit(&preset.params);
+        let layout = t.layout(&settings);
+        let mut node = NewNode::new(self.id);
+        for spec in &layout.params {
+            if let Some(value) = param(&settings, &spec.name) {
+                node = node.with(&*spec.name, encode(spec, value));
+            }
+        }
+        for (socket, v) in &preset.values {
+            let edited = |s: &&SocketSpec| s.name == *socket && constant_kind(&s.edit).is_some();
+            let Some(spec) = layout.inputs.iter().find(edited) else {
+                continue;
+            };
+            let value = match spec.edit {
+                InputEdit::Number { .. } => Value::Number(v[0]),
+                InputEdit::Toggle => Value::Bool(v[0] != 0.0),
+                _ => Value::Numbers(v.to_vec()),
+            };
+            node = node.with(&**socket, value);
+        }
+        node
     }
 
     /// The default layout: the one for its default settings.
@@ -541,6 +605,39 @@ mod tests {
     /// The toy engine's package.
     fn toy() -> PackageId {
         PackageId::declared("kinogaki.toy")
+    }
+
+    #[test]
+    fn presets_make_materials_starting_with_their_surface() {
+        let mut engine = engine();
+        engine.label = Arc::from("Toy");
+        engine.material_presets = vec![MaterialPreset {
+            name: Arc::from("Red, Thin-Walled"),
+            aliases: vec![Arc::from("ruby")],
+            surface: Arc::from("toy_surface"),
+            params: Vec::new(),
+            values: vec![
+                (Arc::from("base_color"), [1.0, 0.0, 0.0]),
+                (Arc::from("thin"), [1.0; 3]),
+                (Arc::from("no_such_socket"), [2.0; 3]),
+            ],
+        }];
+        let [glass] = &presets(toy(), &engine)[..] else {
+            panic!("one preset");
+        };
+        assert_eq!(glass.id, "kinogaki.toy.preset_red_thin_walled");
+        assert!(crate::id::well_formed(&glass.id));
+        assert_eq!(
+            (glass.label.as_str(), glass.family.as_str()),
+            ("Red, Thin-Walled", "Toy")
+        );
+        assert_eq!(glass.aliases, ["ruby"]);
+        assert_eq!(glass.node, NewNode::new(NodeTypeId::declared(MATERIAL)));
+        let surface = NewNode::new(NodeTypeId::declared("kinogaki.toy.toy_surface"))
+            .with("base_color", Value::Numbers(vec![1.0, 0.0, 0.0]))
+            .with("thin", true)
+            .displayed();
+        assert_eq!(glass.inside, [surface]);
     }
 
     fn names(schema: &Schema) -> Vec<&str> {

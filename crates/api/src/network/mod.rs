@@ -35,5 +35,5 @@ pub use compile::{
     CompileCx, CompileError, Compiled, Flat, FlatNode, NetworkCompiler, NodeTypes, Source,
 };
 pub use context::{Adopted, Evaluation, Flag, FlagSet, NetworkContext, NetworkStorage, NodeLayout};
-pub use edit::{Growth, NetworkEdit, NewNode, Place};
+pub use edit::{Growth, NetworkEdit, NewNode, NodeCreation, Place};
 pub use read::{NetworkRead, NodeFlags, NodeInfo, Wire};

@@ -17,22 +17,12 @@ use std::fmt;
 use std::sync::Arc;
 
 pub use kinogaki_render_api::{
-    AttributeDomain, Detail, ImportedMaterial, Look, MeshAttribute, PlainTriangles, Ranges,
-    TriangleSource,
+    AttributeDomain, Detail, Extra, ImportedMaterial, Look, MeshAttribute, PlainTriangles,
+    PreviewSurface, Ranges, TriangleSource,
 };
-pub use shader::{SHADER_VALUE, SHADING, ShaderType, shader_value, shaders};
+pub use shader::{MATERIAL, SHADER_VALUE, SHADING, ShaderType, presets, shader_value, shaders};
 
 mod shader;
-
-/// A file's materials as a format reads them beside its geometry
-/// (`kinogaki.render.preview_materials`): what File ▸ Import turns into a
-/// Material Library.
-pub fn preview_materials() -> crate::Typed<Vec<ImportedMaterial>> {
-    static ID: std::sync::LazyLock<crate::DataTypeId> = std::sync::LazyLock::new(|| {
-        crate::DataTypeId::declared("kinogaki.render.preview_materials")
-    });
-    crate::Typed::new(*ID)
-}
 
 /// What a value renders as.
 #[derive(Clone)]

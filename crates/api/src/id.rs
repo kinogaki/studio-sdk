@@ -53,7 +53,7 @@ fn segments_well_formed(text: &str, segments: usize) -> bool {
 
 /// The one table of every id's text: each distinct text is leaked once and
 /// shared by every id type that names it.
-fn intern(text: &str) -> &'static str {
+pub(crate) fn intern(text: &str) -> &'static str {
     static TEXTS: Mutex<BTreeSet<&'static str>> = Mutex::new(BTreeSet::new());
     // A panic while holding the lock can't leave the set inconsistent
     // (insertion is the only write), so a poisoned lock is still usable.

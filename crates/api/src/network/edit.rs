@@ -190,9 +190,74 @@ impl NewNode {
         self
     }
 
+    /// Named `name`.
+    pub fn named(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
     /// Displayed.
     pub fn displayed(mut self) -> Self {
         self.display = true;
+        self
+    }
+}
+
+/// Another way Tab and the menus make a node: a node of `node.node_type`
+/// with its parameters set, and its inside started with nodes (a Material
+/// of an engine's preset). A package declares it
+/// ([`Package::with_creation`](crate::Package::with_creation)) for any
+/// installed node type, its own or another package's. Studio lists it
+/// wherever `node.node_type` is listed, in that type's section, and makes
+/// it in one undo step.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NodeCreation {
+    /// Its item id, which menus, keys and shelves name it by, under its
+    /// package's vendor (`kinogaki.spectre.glass`).
+    pub id: String,
+    /// What menus call it ("Glass").
+    pub label: String,
+    /// Its family within its type's section; empty: its type's family.
+    pub family: String,
+    /// More words search finds it by.
+    pub aliases: Vec<String>,
+    /// The node made; `name` `None` names it after `label`.
+    pub node: NewNode,
+    /// The nodes its inside starts with, in order, each displayed as it
+    /// says, laid out by Studio and wired to nothing; the type must hold
+    /// a network ([`Description::inside`](crate::cook::Description::inside))
+    /// when any is given.
+    pub inside: Vec<NewNode>,
+}
+
+impl NodeCreation {
+    /// Creation `id` called `label`, making `node` with an empty inside.
+    pub fn new(id: impl Into<String>, label: impl Into<String>, node: NewNode) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            family: String::new(),
+            aliases: Vec::new(),
+            node,
+            inside: Vec::new(),
+        }
+    }
+
+    /// Listed in `family` within its type's section.
+    pub fn family(mut self, family: impl Into<String>) -> Self {
+        self.family = family.into();
+        self
+    }
+
+    /// Found by search under `aliases` too.
+    pub fn aliases<S: Into<String>>(mut self, aliases: impl IntoIterator<Item = S>) -> Self {
+        self.aliases = aliases.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// With `node` next inside.
+    pub fn inside(mut self, node: NewNode) -> Self {
+        self.inside.push(node);
         self
     }
 }

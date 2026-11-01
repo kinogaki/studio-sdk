@@ -1,0 +1,158 @@
+//! Creations are named like every other id: well formed, under their
+//! package's vendor and declared once, a kind's (those it makes with no
+//! engine installed) and a package's node creations alike.
+use kinogaki_studio_api::element::{ElementReader, ElementWriter};
+use kinogaki_studio_api::network::{NewNode, NodeCreation};
+use kinogaki_studio_api::*;
+use std::sync::Arc;
+
+#[derive(Debug)]
+struct Body;
+impl ObjectBody for Body {
+    fn kind(&self) -> ObjectKindId {
+        ObjectKindId::declared("acme.toys.top")
+    }
+}
+
+struct Unsaved;
+impl ObjectCodec for Unsaved {
+    fn write(&self, _: &dyn ObjectBody, _: &mut dyn ElementWriter) -> Result<(), Error> {
+        Err(Error::invalid("not saved"))
+    }
+    fn read(&self, _: &dyn ElementReader, _: &ReadCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+        Err(Error::invalid("not saved"))
+    }
+}
+
+/// Kind `id`, made as `made` says, and as `engine_made` too while an
+/// engine renders (named by the engine, so not checked).
+struct Kind {
+    id: &'static str,
+    made: &'static [&'static str],
+    engine_made: &'static str,
+}
+
+impl ObjectKindSpec for Kind {
+    fn id(&self) -> ObjectKindId {
+        ObjectKindId::declared(self.id)
+    }
+    fn label(&self) -> &str {
+        self.id
+    }
+    fn icon(&self) -> &str {
+        "cube"
+    }
+    fn placed(&self) -> bool {
+        true
+    }
+    fn context(&self) -> Option<ContextId> {
+        None
+    }
+    fn result(&self) -> Option<DataTypeId> {
+        None
+    }
+    fn new_body(&self) -> Arc<dyn ObjectBody> {
+        Arc::new(Body)
+    }
+    fn codec(&self) -> &dyn ObjectCodec {
+        &Unsaved
+    }
+    fn adopts(&self, _: &Data) -> Option<Arc<dyn ObjectBody>> {
+        None
+    }
+    fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
+        let engine = cx.active().map(|_| self.engine_made);
+        (self.made.iter().copied().chain(engine))
+            .map(|id| KindCreation::new(id, id))
+            .collect()
+    }
+}
+
+fn kind(id: &'static str, made: &'static [&'static str]) -> Kind {
+    Kind {
+        id,
+        made,
+        engine_made: "other.lights.lamp",
+    }
+}
+
+fn package(id: &str) -> Package {
+    Package::new(PackageId::declared(id), id)
+}
+
+fn node(id: &str) -> NodeCreation {
+    NodeCreation::new(
+        id,
+        id,
+        NewNode::new(NodeTypeId::declared("other.trees.grow")),
+    )
+}
+
+#[test]
+fn a_kinds_creations_are_its_vendors_and_new() {
+    let mut registry = Registry::new();
+    let toys = package("acme.toys").with_object_kind(kind("acme.toys.top", &["acme.toys.top"]));
+    registry.register(toys).unwrap();
+    let again = package("acme.more").with_object_kind(kind("acme.more.top", &["acme.toys.top"]));
+    assert!(matches!(
+        registry.register(again),
+        Err(RegistryError::DuplicateId {
+            what: "object creation",
+            id: "acme.toys.top",
+            ..
+        })
+    ));
+    let foreign = package("acme.odd").with_object_kind(kind("acme.odd.top", &["other.toys.top"]));
+    assert!(matches!(
+        registry.register(foreign),
+        Err(RegistryError::ForeignId { .. })
+    ));
+    let malformed = package("acme.bad").with_object_kind(kind("acme.bad.top", &["Top"]));
+    assert_eq!(
+        registry.register(malformed),
+        Err(RegistryError::MalformedId {
+            package: PackageId::declared("acme.bad"),
+            id: "Top".into(),
+        })
+    );
+}
+
+#[test]
+fn node_creations_are_their_vendors_and_new() {
+    let mut registry = Registry::new();
+    registry
+        .register(package("acme.forest").with_creation(node("acme.forest.oak")))
+        .unwrap();
+    let again = package("acme.more").with_creation(node("acme.forest.oak"));
+    assert!(matches!(
+        registry.register(again),
+        Err(RegistryError::DuplicateId {
+            what: "node creation",
+            ..
+        })
+    ));
+    let twice = package("acme.twice")
+        .with_creation(node("acme.twice.oak"))
+        .with_creation(node("acme.twice.oak"));
+    assert!(matches!(
+        registry.register(twice),
+        Err(RegistryError::DuplicateId { .. })
+    ));
+    let foreign = package("acme.odd").with_creation(node("other.forest.oak"));
+    assert!(matches!(
+        registry.register(foreign),
+        Err(RegistryError::ForeignId { .. })
+    ));
+    let malformed = package("acme.bad").with_creation(node("acme.bad"));
+    assert!(matches!(
+        registry.register(malformed),
+        Err(RegistryError::MalformedId { .. })
+    ));
+    // A node creation and an object creation may share a name: each kind
+    // of id is its own.
+    let toys = package("acme.toys").with_object_kind(kind("acme.toys.top", &["acme.toys.oak"]));
+    registry
+        .register(toys.with_creation(node("acme.toys.oak")))
+        .unwrap();
+    assert_eq!(registry.creations().count(), 2);
+}
