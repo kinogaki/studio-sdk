@@ -219,37 +219,33 @@ impl WeightedMove {
 
     /// The full move as a column-major matrix (weight 1, primary side).
     pub fn matrix(&self) -> [[f64; 4]; 4] {
-        let image = |p: [f64; 3]| self.weighted(p, 1.0);
-        let origin = image([0.0; 3]);
-        let column = |e: [f64; 3]| {
-            let q = image(e);
-            [q[0] - origin[0], q[1] - origin[1], q[2] - origin[2], 0.0]
-        };
-        [
-            column([1.0, 0.0, 0.0]),
-            column([0.0, 1.0, 0.0]),
-            column([0.0, 0.0, 1.0]),
-            [origin[0], origin[1], origin[2], 1.0],
-        ]
+        affine(|p| self.weighted(p, 1.0))
     }
 
-    /// Where point `p` of weight `w` goes.
+    /// The affine map that moves point `p` of weight `w`, as a column-major
+    /// matrix: identity at weight 0, and on the mirrored side the move's
+    /// image (reflect, move, reflect back). It carries what a point holds
+    /// (normals, orientations) with the point; on the plane it is the
+    /// move itself, which [`at`](Self::at) then puts back onto the plane.
+    pub fn matrix_at(&self, p: [f64; 3], w: f64) -> [[f64; 4]; 4] {
+        if w <= 0.0 {
+            return affine(|q| q);
+        }
+        let mirrored = self.mirrored(p);
+        affine(|q| self.image(q, w, mirrored))
+    }
+
+    /// Where point `p` of weight `w` goes: [`matrix_at`](Self::matrix_at)
+    /// applied to it, and on a mirror's plane back onto the plane.
     pub fn at(&self, p: [f64; 3], w: f64) -> [f64; 3] {
         if w <= 0.0 {
             return p;
         }
-        let Some(mirror) = self.mirror else {
-            return self.weighted(p, w);
-        };
-        match mirror.side(p) {
-            Side::On => {
-                let mut q = self.weighted(p, w);
-                q[mirror.axis.index()] = mirror.offset;
-                q
-            }
-            _ if mirror.mirrored(p) => mirror.reflect(self.weighted(mirror.reflect(p), w)),
-            _ => self.weighted(p, w),
+        let mut q = self.image(p, w, self.mirrored(p));
+        if let Some(mirror) = self.mirror.filter(|m| m.side(p) == Side::On) {
+            q[mirror.axis.index()] = mirror.offset;
         }
+        q
     }
 
     /// Whether every point moves rigidly with its side: no scale, or a
@@ -259,6 +255,18 @@ impl WeightedMove {
         (s[0] - s[1]).abs() <= s[0].abs() * 1e-12 && (s[0] - s[2]).abs() <= s[0].abs() * 1e-12
     }
 
+    fn mirrored(&self, p: [f64; 3]) -> bool {
+        self.mirror.is_some_and(|m| m.mirrored(p))
+    }
+
+    /// `q` moved at weight `w` by the move, or by its mirror image.
+    fn image(&self, q: [f64; 3], w: f64, mirrored: bool) -> [f64; 3] {
+        match self.mirror {
+            Some(mirror) if mirrored => mirror.reflect(self.weighted(mirror.reflect(q), w)),
+            _ => self.weighted(q, w),
+        }
+    }
+
     fn weighted(&self, p: [f64; 3], w: f64) -> [f64; 3] {
         let scale: [f64; 3] = std::array::from_fn(|i| 1.0 + (self.scale[i] - 1.0) * w);
         let local = rotate(conjugate(self.frame), sub(p, self.pivot));
@@ -266,6 +274,22 @@ impl WeightedMove {
         let turned = rotate(axis_angle(self.axis, self.angle * w), scaled);
         std::array::from_fn(|i| self.pivot[i] + self.translate[i] * w + turned[i])
     }
+}
+
+/// The column-major matrix of the affine map `f`, read from the images of
+/// the origin and the unit axes.
+fn affine(f: impl Fn([f64; 3]) -> [f64; 3]) -> [[f64; 4]; 4] {
+    let origin = f([0.0; 3]);
+    let column = |e: [f64; 3]| {
+        let q = f(e);
+        [q[0] - origin[0], q[1] - origin[1], q[2] - origin[2], 0.0]
+    };
+    [
+        column([1.0, 0.0, 0.0]),
+        column([0.0, 1.0, 0.0]),
+        column([0.0, 0.0, 1.0]),
+        [origin[0], origin[1], origin[2], 1.0],
+    ]
 }
 
 fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
@@ -381,5 +405,36 @@ mod tests {
         assert!(close(m.at([0.0, 1.0, 0.0], 1.0), [0.0, 2.0, 0.0]));
         assert!(close(m.at([1.0, 0.0, 0.0], 1.0), [1.0, 0.0, 0.0]));
         assert!(!m.uniform_scale());
+    }
+
+    #[test]
+    fn the_matrix_at_a_point_moves_it_there() {
+        let mirror = Mirror::new(Axis::X, 0.25, 1e-6, Side::Positive).unwrap();
+        let m = WeightedMove::new(
+            [1.0, 0.5, -0.2],
+            quarter(),
+            [2.0, 1.0, 0.5],
+            [0.5, 0.1, 0.0],
+        )
+        .unwrap()
+        .with_frame(axis_angle([1.0, 0.0, 0.0], 0.3))
+        .unwrap()
+        .with_mirror(Some(mirror));
+        // Off the plane, both sides, at several weights.
+        for p in [[2.0, 1.0, 0.5], [-1.5, 0.3, 2.0], [0.9, -2.0, 0.0]] {
+            for w in [0.0, 0.25, 1.0] {
+                assert!(close(m.at(p, w), apply(m.matrix_at(p, w), p)), "{p:?} {w}");
+            }
+        }
+        // Weight 0 is the identity; the primary side at weight 1 is the move.
+        assert_eq!(m.matrix_at([3.0, 0.0, 0.0], -1.0), affine(|q| q));
+        assert_eq!(m.matrix_at([3.0, 0.0, 0.0], 1.0), m.matrix());
+        // The mirrored side's matrix carries a normal as the image's.
+        let n = [1.0, 0.0, 0.0];
+        let image = m.matrix_at([-3.0, 0.0, 0.0], 1.0);
+        let carried: [f64; 3] = std::array::from_fn(|r| (0..3).map(|c| image[c][r] * n[c]).sum());
+        let primary = m.matrix();
+        let direct: [f64; 3] = std::array::from_fn(|r| primary[0][r]);
+        assert!(close(carried, [direct[0], -direct[1], -direct[2]]));
     }
 }
