@@ -261,7 +261,14 @@ pub fn is_path_step(text: &str) -> bool {
 pub struct CreateCx<'a> {
     engines: &'a Engines,
     active: Option<&'a EngineDescription>,
-    settings: &'a dyn Fn(ContextId) -> Option<&'a (dyn Any + Send + Sync)>,
+    settings: Option<&'a dyn UserSettings>,
+}
+
+/// The user's settings sections, by context, as the host keeps them
+/// ([`CreateCx::settings`]).
+pub trait UserSettings {
+    /// Context `context`'s section value, when it has one.
+    fn section(&self, context: ContextId) -> Option<&(dyn Any + Send + Sync)>;
 }
 
 impl<'a> CreateCx<'a> {
@@ -271,23 +278,20 @@ impl<'a> CreateCx<'a> {
         Self {
             engines,
             active,
-            settings: &|_| None,
+            settings: None,
         }
     }
 
-    /// Reading the user's settings sections through `settings`, by context.
-    pub fn with_settings(
-        mut self,
-        settings: &'a dyn Fn(ContextId) -> Option<&'a (dyn Any + Send + Sync)>,
-    ) -> Self {
-        self.settings = settings;
+    /// Reading the user's settings sections from `settings`.
+    pub fn with_settings(mut self, settings: &'a dyn UserSettings) -> Self {
+        self.settings = Some(settings);
         self
     }
 
     /// Context `context`'s user settings section (the package's section
     /// value; read it with `downcast_ref`), when it has one.
     pub fn settings(&self, context: ContextId) -> Option<&'a (dyn Any + Send + Sync)> {
-        (self.settings)(context)
+        self.settings?.section(context)
     }
     /// The installed engines.
     pub fn engines(&self) -> &'a Engines {

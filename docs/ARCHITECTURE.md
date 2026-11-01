@@ -211,7 +211,7 @@ An `ObjectKindSpec` describes one kind of object. It gives:
 - `adopts`, which turns an imported value into a new body;
 - for a kind that holds no network, `value(body, path)`: what a reference naming the object reads (a printer's description). The path is the object's own, so a rename, like a body change, makes core read it again and recook its readers;
 - `materials(body)`: Materials the object publishes (a printer's slots), each a `PublishedMaterial` under the object's path by its key (`/X1C/AMS 1 · 2`; a key is any `is_path_step`, spaces and `·` included), read-only, with a `PreviewSurface` and, while it can't be used, why (`unavailable`: a path naming it then names nothing). Core asks again whenever the body changes, and pickers and renders take them as they take a Material Library's;
-- `creations` and `create`, the ways an object level makes its objects, given a `CreateCx`: the installed engines, the active one, and the user's settings sections by context (`CreateCx::settings`: a printer saved in Settings becomes a creation).
+- `creations` and `create`, the ways an object level makes its objects, given a `CreateCx`: the installed engines, the active one, and the user's settings sections by context (`CreateCx::settings`, read through the host's `UserSettings`: a printer saved in Settings becomes a creation).
 
 An `ObjectBody` is the part of an object that the package owns: the kind's own state (a Mesh object's display settings, a Render Settings object's engine and settings). The environment keeps the object's name, its place in the hierarchy, its placement, its flags and its network. Bodies are immutable and are replaced whole, so undo keeps the previous body.
 

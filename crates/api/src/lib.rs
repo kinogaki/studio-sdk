@@ -124,7 +124,7 @@ pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     CreateCx, KindCreation, ObjectBody, ObjectKindSpec, Processing, PublishedMaterial, RenderSetup,
-    RenderSetupKind, RenderedKind,
+    RenderSetupKind, RenderedKind, UserSettings,
 };
 pub use package::{Package, PackageUi};
 pub use parallel::Workers;
