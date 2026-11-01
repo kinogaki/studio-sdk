@@ -79,9 +79,11 @@ pub trait ObjectKindSpec: Send + Sync {
     /// ([`context`](Self::context) `None`) and has a
     /// [`result`](Self::result): a reference naming the object reads it,
     /// and core reads it again when the body or the path changes (a
-    /// printer's value naming its slots' Materials by path). `None` by
+    /// printer's value naming its slots' Materials by path). With it come
+    /// lines for what the value leaves out of the body (an engine's own
+    /// parameters on a standard light), which Export reports. `None` by
     /// default: a reference to it names nothing.
-    fn value(&self, body: &dyn ObjectBody, path: &str) -> Option<Data> {
+    fn value(&self, body: &dyn ObjectBody, path: &str) -> Option<Valued> {
         let _ = (body, path);
         None
     }
@@ -192,6 +194,33 @@ impl KindCreation {
             start: None,
             order: 0,
         }
+    }
+}
+
+/// A networkless object's value ([`ObjectKindSpec::value`]) and what of
+/// its body the value leaves out, as lines ("Gobo is Pixel's own; left
+/// out"), each about the object and without its path.
+#[derive(Clone)]
+pub struct Valued {
+    /// The value.
+    pub value: Data,
+    /// What it leaves out.
+    pub lines: Vec<String>,
+}
+
+impl Valued {
+    /// `value`, leaving nothing out.
+    pub fn new(value: Data) -> Self {
+        Self {
+            value,
+            lines: Vec::new(),
+        }
+    }
+
+    /// With `line` said of what it leaves out.
+    pub fn line(mut self, line: impl Into<String>) -> Self {
+        self.lines.push(line.into());
+        self
     }
 }
 
