@@ -49,7 +49,7 @@ pub enum StrokeKind {
     /// Inside the edge: the outline stays within the rectangle.
     #[default]
     Inside,
-    /// Centred on the edge.
+    /// Centered on the edge.
     Middle,
     /// Outside the edge.
     Outside,
@@ -78,7 +78,7 @@ pub struct Circle {
     pub radius: f32,
     /// Its fill ([`Color::TRANSPARENT`] for none).
     pub fill: Color,
-    /// Its outline, centred on the edge ([`Stroke::NONE`] for none).
+    /// Its outline, centered on the edge ([`Stroke::NONE`] for none).
     pub stroke: Stroke,
 }
 

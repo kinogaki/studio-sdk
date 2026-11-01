@@ -234,7 +234,7 @@ mod tests {
             .parameter(Parameter::new(
                 "source",
                 "Source",
-                ParameterKind::Reference(RefFilter::material(false)),
+                ParameterKind::Reference(RefFilter::material()),
                 Value::Text("/Materials/Red".into()),
             ));
         let sheet = Schema::<String>::from(&schema);
@@ -270,7 +270,7 @@ mod tests {
         );
         assert_eq!(
             sheet.field(&"source".to_owned()).unwrap().kind,
-            Kind::Reference(RefFilter::material(false))
+            Kind::Reference(RefFilter::material())
         );
     }
 

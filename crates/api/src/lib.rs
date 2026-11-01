@@ -110,9 +110,11 @@ pub use error::Error;
 pub use facets::{
     CellKind, Cells, Combine, DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn,
     Look, Materials, ObjectPicking, Pickable, Piece, RenderCx, Renderable, Role, SnapHit, SnapKind,
-    SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally, WhenOpen, WorldRay,
+    SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally, WorldRay,
 };
-pub use format::{FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Purpose, Reading};
+pub use format::{
+    FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Purpose, Reading, Writing,
+};
 pub use held::HeldEdit;
 pub use icon::{Icon, IconError};
 pub use id::{
@@ -121,8 +123,8 @@ pub use id::{
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
-    CreateCx, KindCreation, ObjectBody, ObjectKindSpec, Processing, RenderSetup, RenderSetupKind,
-    RenderedKind,
+    CreateCx, KindCreation, ObjectBody, ObjectKindSpec, Processing, PublishedMaterial, RenderSetup,
+    RenderSetupKind, RenderedKind,
 };
 pub use package::{Package, PackageUi};
 pub use parallel::Workers;

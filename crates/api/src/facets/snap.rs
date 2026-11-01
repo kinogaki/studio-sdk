@@ -1,5 +1,5 @@
 //! [`Snappable`]: what a gizmo move may land on in a value: its points,
-//! edges' middles, faces' centres, crossings, edges and surfaces nearest
+//! edges' middles, faces' centers, crossings, edges and surfaces nearest
 //! the pointer. The host keeps everything else about snapping: the user's
 //! targets and the master, what the move snaps from, the grid, ranking
 //! across objects, the handle's axis or plane, and the feedback drawn.
@@ -14,7 +14,7 @@ pub struct SnapTargets {
     pub points: bool,
     /// Edges' middles.
     pub middles: bool,
-    /// Faces' centres.
+    /// Faces' centers.
     pub face_centers: bool,
     /// Where two edges cross on screen.
     pub crossings: bool,
@@ -38,7 +38,7 @@ pub enum SnapKind {
     Point,
     /// An edge's middle.
     Middle,
-    /// A face's centre.
+    /// A face's center.
     FaceCenter,
     /// Where two edges cross on screen.
     Crossing,

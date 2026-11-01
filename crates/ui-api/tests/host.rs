@@ -3,7 +3,7 @@
 //! the host interface; its slot is undone with the document; its
 //! settings section round-trips; and a nested call is refused.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
-use kinogaki_studio_api::{ContextId, Error, Package, PackageId, Slot, SlotId};
+use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
 use studio_ui_api::gizmo::TransformTool;
 use studio_ui_api::host::{
     Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, ObjectRef,
@@ -49,6 +49,8 @@ struct Forest {
     entered: u32,
     overlays: u32,
     polls: u32,
+    /// How many times a settings page was drawn (it shows live state).
+    pages: u32,
     level: usize,
     wake: Option<Waker>,
 }
@@ -72,7 +74,7 @@ impl UiPackage for Trees {
                 .with_inspector(TreeInspector),
         ]
     }
-    fn settings(&self) -> Vec<SettingsSection> {
+    fn settings(&self) -> Vec<SettingsSection<Forest>> {
         vec![SettingsSection::of::<Density>()]
     }
     fn poll(&self, s: &mut Forest, _cx: &mut dyn Cx) {
@@ -227,6 +229,7 @@ impl Inspector<Forest> for TreeInspector {
 struct Density(f64);
 
 impl Section for Density {
+    type State = Forest;
     fn context() -> ContextId {
         forest()
     }
@@ -236,14 +239,23 @@ impl Section for Density {
     fn defaults() -> Self {
         Density(0.5)
     }
-    fn page(&self, _page: &str) -> Schema<u32> {
-        let mut s = Schema::new();
-        s.push(Row::number(0, "Density", self.0, Number::length()));
-        s
+    fn page(&self, _page: &str, s: &mut Forest, _cx: &mut dyn Cx) -> Schema<u32> {
+        s.pages += 1;
+        let mut rows = Schema::new();
+        rows.push(Row::number(0, "Density", self.0, Number::length()));
+        rows
     }
-    fn apply(&mut self, _page: &str, rows: &Schema<u32>, edits: &Edits<u32>) {
+    fn apply(
+        &mut self,
+        _page: &str,
+        rows: &Schema<u32>,
+        edits: &Edits<u32>,
+        _s: &mut Forest,
+        cx: &mut dyn Cx,
+    ) {
         if edits.changed.contains(&0) {
             self.0 = rows.number(&0).unwrap_or(self.0);
+            cx.info("Density set");
         }
     }
     fn write(&self, to: &mut dyn ElementWriter) -> Result<(), Error> {
@@ -460,16 +472,29 @@ fn polls_reach_the_state_and_workers_wake_the_host() {
 
 #[test]
 fn a_settings_section_edits_its_draft_and_round_trips() {
-    let section = SettingsSection::of::<Density>();
+    let mut host = host();
+    let mut trees = hosted(&host);
+    let section = trees.registered().settings[0];
     let mut draft = section.defaults();
     let value = std::sync::Arc::get_mut(&mut draft).unwrap();
-    // The host's sheet reports the edited row with its new value in place.
-    let rows = Density(0.8).page("Forest");
+    // The page is drawn lent the package's state; the host's sheet reports
+    // the edited row with its new value in place.
+    let rows = Density(0.8).page("Forest", &mut Forest::default(), &mut host);
+    let drawn = trees.with(|_, s| section.page(value, "Forest", s, &mut host));
+    assert_eq!(
+        drawn,
+        Density(0.5).page("Forest", &mut Forest::default(), &mut host)
+    );
+    assert_eq!(trees.state::<Forest>().pages, 1);
     let edits = Edits {
         changed: vec![0],
         ..Edits::default()
     };
-    section.apply(value, "Forest", &rows, &edits);
+    trees.with(|_, s| section.apply(value, ("Forest", &rows, &edits), s, &mut host));
+    assert!(
+        host.take_calls()
+            .contains(&HostCall::Info("Density set".into()))
+    );
     assert!(!section.eq(&*draft, &*section.defaults()));
     let mut element = MemoryElement::new("forest");
     element.write(|w| section.write(&*draft, w)).unwrap();
@@ -477,7 +502,6 @@ fn a_settings_section_edits_its_draft_and_round_trips() {
     assert!(section.eq(&*back, &*draft));
     assert_eq!(back.downcast_ref::<Density>(), Some(&Density(0.8)));
     // The host gives the applied section back typed.
-    let mut host = host();
     host.sections.insert(forest(), back);
     assert_eq!(host.section::<Density>(forest()), Some(&Density(0.8)));
     let empty = MemoryElement::new("forest");
@@ -508,5 +532,44 @@ fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
             package: acme,
             id: "toy.trees.forest",
         })
+    );
+}
+
+/// A body set through the host is the object's next body, of its kind only.
+#[test]
+fn a_body_is_set_whole_and_only_of_its_kind() {
+    #[derive(Debug)]
+    struct Grove(ObjectKindId);
+    impl kinogaki_studio_api::ObjectBody for Grove {
+        fn kind(&self) -> ObjectKindId {
+            self.0
+        }
+    }
+    let grove = ObjectKindId::declared("toy.trees.grove");
+    let mut host = host();
+    let object = ObjectRef(7);
+    host.scene.insert(
+        object,
+        studio_ui_api::testing::FakeObject {
+            name: "Grove".into(),
+            kind: grove,
+            body: None,
+            shown: None,
+        },
+    );
+    let other = ObjectKindId::declared("toy.trees.other");
+    assert!(
+        host.set_object_body(object, "Refresh", std::sync::Arc::new(Grove(other)))
+            .is_err()
+    );
+    host.set_object_body(object, "Refresh", std::sync::Arc::new(Grove(grove)))
+        .unwrap();
+    assert!(host.object_body(object).is_some());
+    assert_eq!(
+        host.take_calls(),
+        [
+            HostCall::SetBody(object, "Refresh".into()),
+            HostCall::SetBody(object, "Refresh".into())
+        ]
     );
 }

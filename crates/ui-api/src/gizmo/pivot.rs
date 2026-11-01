@@ -9,9 +9,9 @@ use kinogaki_studio_api::Vec3;
 /// [`ViewportSpec::default_pivot`](crate::package::ViewportSpec::default_pivot)).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Pivot {
-    /// The selection's centre.
+    /// The selection's center.
     #[default]
-    Centre,
+    Center,
     /// The space's origin (each object's own, at an object level).
     Origin,
 }
@@ -20,8 +20,8 @@ pub enum Pivot {
 /// object's components: the object's; a sketch: its plane's, X and Y).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PivotFrame {
-    /// The selection's centre.
-    pub centre: Vec3,
+    /// The selection's center.
+    pub center: Vec3,
     /// The space's origin.
     pub origin: Vec3,
     /// The selection's box along the space's axes: its least corner.

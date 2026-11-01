@@ -21,7 +21,7 @@ use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
 use crate::{Pos, Rect, Ui};
-use kinogaki_studio_api::{Components, ObjectKindId, Vec3};
+use kinogaki_studio_api::{Combine, Components, ObjectKindId, Vec3};
 use std::any::Any;
 use std::marker::PhantomData;
 
@@ -57,23 +57,18 @@ pub trait Levels<S: ?Sized>: Send + Sync {
         let _ = (s, cx);
         None
     }
-    /// The pointer over view `rect` (`None`: off it): show what lies under
-    /// it hovered.
-    fn hover(&self, s: &mut S, cx: &mut dyn Cx, rect: Rect, pointer: Option<Pos>) {
-        let _ = (s, cx, rect, pointer);
+    /// What the pointer is over at the active level, as the host picked it
+    /// through the open value's `Pickable` (`None`: nothing there): show it
+    /// hovered.
+    fn hovered(&self, s: &mut S, cx: &mut dyn Cx, hit: Option<Components>) {
+        let _ = (s, cx, hit);
     }
-    /// A click in view `rect`: select what lies under `pointer` (Shift
-    /// adds, Command removes).
-    fn click(
-        &self,
-        s: &mut S,
-        cx: &mut dyn Cx,
-        rect: Rect,
-        pointer: Pos,
-        shift: bool,
-        command: bool,
-    ) {
-        let _ = (s, cx, rect, pointer, shift, command);
+    /// A click, box or lasso at the active level, as the host picked it
+    /// through the open value's `Pickable` with its pick policy (`None`:
+    /// nothing there), combined with the selection as `how` says (Shift
+    /// adds, Command removes): the context decides what the hit selects.
+    fn picked(&self, s: &mut S, cx: &mut dyn Cx, hit: Option<Components>, how: Combine) {
+        let _ = (s, cx, hit, how);
     }
     /// The selection as the transform pivot reads it, in the context's
     /// space; `None`: nothing to pivot about (no pivot button). Called
@@ -211,9 +206,10 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         let _ = (s, cx);
         None
     }
-    /// What the open location's edited surface shows in view `view` this
-    /// frame (`None`: no edited surface). Called once per drawn view
-    /// after the views' input; core draws it with the rest of the scene.
+    /// What the context adds over the open object in view `view` this
+    /// frame: overlays, guides and style (`None`: nothing). Core draws the
+    /// object's value itself; called once per drawn view after the views'
+    /// input.
     fn edited(&self, s: &mut S, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
         let _ = (s, cx, view);
         None
@@ -317,7 +313,8 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     }
 }
 
-/// The inspector panel while the context is open.
+/// The inspector panel while the context is open, drawn under the node
+/// sheet of the inspected node (where there is one).
 pub trait Inspector<S: ?Sized>: Send + Sync {
     /// Draws the panel (its sheets through [`Ui::sheet`]).
     fn show(&self, s: &mut S, cx: &mut dyn InspectorCx, ui: &mut dyn Ui);
@@ -420,6 +417,12 @@ pub trait ObjectRows<S: ?Sized>: Send + Sync {
         let _ = (s, cx, object);
         false
     }
+    /// Object `object` is inspected for the first time since the document
+    /// opened (a printer reads its trays when it has none yet). Nothing by
+    /// default.
+    fn opened(&self, s: &mut S, cx: &mut dyn Cx, object: ObjectRef) {
+        let _ = (s, cx, object);
+    }
 }
 
 /// What the outliner lists inside objects of the kinds a context owns.
@@ -483,20 +486,11 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     fn components(&self, s: &dyn Any, cx: &dyn Cx) -> Option<(ObjectRef, Components)> {
         self.part.components(own(s), cx)
     }
-    fn hover(&self, s: &mut dyn Any, cx: &mut dyn Cx, rect: Rect, pointer: Option<Pos>) {
-        self.part.hover(own_mut(s), cx, rect, pointer)
+    fn hovered(&self, s: &mut dyn Any, cx: &mut dyn Cx, hit: Option<Components>) {
+        self.part.hovered(own_mut(s), cx, hit)
     }
-    fn click(
-        &self,
-        s: &mut dyn Any,
-        cx: &mut dyn Cx,
-        rect: Rect,
-        pointer: Pos,
-        shift: bool,
-        command: bool,
-    ) {
-        self.part
-            .click(own_mut(s), cx, rect, pointer, shift, command)
+    fn picked(&self, s: &mut dyn Any, cx: &mut dyn Cx, hit: Option<Components>, how: Combine) {
+        self.part.picked(own_mut(s), cx, hit, how)
     }
     fn pivot(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<PivotFrame> {
         self.part.pivot(own_mut(s), cx)
@@ -714,6 +708,9 @@ impl<S: 'static> ObjectRows<dyn Any> for Erased<S, dyn ObjectRows<S>> {
     }
     fn cooking(&self, s: &dyn Any, cx: &dyn Cx, object: ObjectRef) -> bool {
         self.part.cooking(own(s), cx, object)
+    }
+    fn opened(&self, s: &mut dyn Any, cx: &mut dyn Cx, object: ObjectRef) {
+        self.part.opened(own_mut(s), cx, object)
     }
 }
 

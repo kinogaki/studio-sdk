@@ -99,6 +99,10 @@ pub struct Reading<'a> {
     /// Whether the read is no longer wanted; long reads poll it and stop
     /// with [`Error::Cancelled`].
     pub cancelled: &'a (dyn Fn() -> bool + Sync),
+    /// The data type the host wants the file read as, for
+    /// [`Purpose::Node`]: the File node's output (a STEP file as B-rep or
+    /// as polygons); `None` for Import, which takes any.
+    pub wants: Option<DataTypeId>,
 }
 
 impl<'a> Reading<'a> {
@@ -111,6 +115,7 @@ impl<'a> Reading<'a> {
             origin: 0,
             settings: &[],
             cancelled: &|| false,
+            wants: None,
         }
     }
 
@@ -150,7 +155,8 @@ pub trait FileFormat: Send + Sync {
         false
     }
 
-    /// The data types its items hold.
+    /// The data types its items hold; empty for a format that only writes
+    /// (G-code), which nothing reads with.
     fn produces(&self) -> &[DataTypeId];
 
     /// Every option with its default value; none by default.
@@ -249,16 +255,78 @@ pub trait FormatWriter: Send + Sync {
         Schema::default()
     }
 
-    /// Writes `items` (parents before children), whose lengths are in
-    /// `units`, to `path` with `options`: every one of
-    /// [`options`](Self::options), each set or at its default.
+    /// Whether it writes a range of frames ([`Writing::frames`]); a writer
+    /// that doesn't is handed one time's items and no frames. No by
+    /// default.
+    fn frames(&self) -> bool {
+        false
+    }
+
+    /// Writes `items` (parents before children) to `path` as `writing`
+    /// says, with `options`: every one of [`options`](Self::options), each
+    /// set or at its default. Returns what was written with loss or
+    /// skipped, for the user.
     fn write(
         &self,
         path: &Path,
         items: &[FileItem],
-        units: Units,
+        writing: &Writing<'_>,
         options: &FormatOptions,
-    ) -> Result<(), Error>;
+    ) -> Result<Vec<String>, Error>;
+}
+
+/// What a write is for, besides the writer's options.
+#[derive(Clone, Copy)]
+pub struct Writing<'a> {
+    /// The project's units, which the items' lengths are in.
+    pub units: Units,
+    /// Whether the write is no longer wanted; long writes poll it and stop
+    /// with [`Error::Cancelled`].
+    pub cancelled: &'a (dyn Fn() -> bool + Sync),
+    /// An item's value as polygons, for a writer that writes only those
+    /// (a B-rep through the installed mesher); `None` when nothing meshes
+    /// it.
+    pub meshed: &'a (dyn Fn(&Data) -> Option<kinogaki_geometry::Polygons> + Sync),
+    /// The range being written, for a writer that writes
+    /// [`frames`](FormatWriter::frames); `None` writes `items` alone.
+    pub frames: Option<&'a dyn Frames>,
+}
+
+impl<'a> Writing<'a> {
+    /// A write in `units`, never cancelled, meshing nothing, of one time.
+    pub fn new(units: Units) -> Self {
+        Self {
+            units,
+            cancelled: &|| false,
+            meshed: &|_| None,
+            frames: None,
+        }
+    }
+
+    /// `Err(Error::Cancelled)` once the write is no longer wanted.
+    pub fn check(&self) -> Result<(), Error> {
+        if (self.cancelled)() {
+            Err(Error::Cancelled)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// A range of frames a writer writes ([`Writing::frames`]): the items at
+/// each, keeping their structure (the same items, parents and names) from
+/// frame to frame.
+pub trait Frames: Sync {
+    /// Frames a second.
+    fn fps(&self) -> f64;
+    /// How many frames.
+    fn len(&self) -> usize;
+    /// Whether it holds no frame.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    /// The items at frame `index` (from 0), cooked at its time.
+    fn items_at(&self, index: usize) -> Result<Vec<FileItem>, Error>;
 }
 
 #[cfg(test)]
@@ -324,10 +392,10 @@ mod tests {
                 &self,
                 _: &Path,
                 _: &[FileItem],
-                _: Units,
+                _: &Writing<'_>,
                 _: &FormatOptions,
-            ) -> Result<(), Error> {
-                Ok(())
+            ) -> Result<Vec<String>, Error> {
+                Ok(Vec::new())
             }
         }
         assert!(!Plain.options().is_empty());

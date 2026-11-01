@@ -1,5 +1,5 @@
 //! [`NetworkContext`]: a context's networks, declared as data.
-use crate::id::ContextId;
+use crate::id::{ContextId, NodeTypeId};
 
 /// A context whose objects hold networks of core's one node shape (a
 /// package's `kinogaki.mesh.network`): how they evaluate, the flags their
@@ -9,11 +9,14 @@ use crate::id::ContextId;
 /// then holds one in each of its objects.
 ///
 /// ```
-/// use kinogaki_studio_api::ContextId;
+/// use kinogaki_studio_api::{ContextId, NodeTypeId};
 /// use kinogaki_studio_api::network::{FlagSet, NetworkContext};
+/// let import = NodeTypeId::declared("acme.mesh.import");
 /// let context = NetworkContext::new(ContextId::declared("acme.trees.network"), "Trees", "trees")
-///     .flags(FlagSet::all());
+///     .flags(FlagSet::all())
+///     .adopts(import, "Model");
 /// assert!(context.heals && context.flags.freeze);
+/// assert_eq!((context.adopts[0].node_type, context.adopts[0].section.as_str()), (import, "Model"));
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct NetworkContext {
@@ -32,6 +35,21 @@ pub struct NetworkContext {
     pub storage: NetworkStorage,
     /// How its nodes are drawn in the network pane.
     pub layout: NodeLayout,
+    /// Other packages' node types its networks offer too, each listed under
+    /// a section of this context's (CAM's networks take Mesh's Import).
+    pub adopts: Vec<Adopted>,
+}
+
+/// A node type a context offers though its own package doesn't make it
+/// ([`NetworkContext::adopts`]). A node of a type no installed package
+/// declares loads as a placeholder, as any missing node type does.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Adopted {
+    /// The node type (`kinogaki.mesh.import`).
+    pub node_type: NodeTypeId,
+    /// The heading Tab and the menus list it under in this context
+    /// ("Model").
+    pub section: String,
 }
 
 impl NetworkContext {
@@ -48,7 +66,17 @@ impl NetworkContext {
                 element: element.into(),
             },
             layout: NodeLayout::Vertical,
+            adopts: Vec::new(),
         }
+    }
+
+    /// Offering `node_type`, another package's, listed under `section`.
+    pub fn adopts(mut self, node_type: NodeTypeId, section: impl Into<String>) -> Self {
+        self.adopts.push(Adopted {
+            node_type,
+            section: section.into(),
+        });
+        self
     }
 
     /// Its nodes drawn as `layout` says.

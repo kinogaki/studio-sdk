@@ -23,10 +23,9 @@ pub enum Fits {
     /// Objects and nodes whose result is of one of these data types
     /// (geometry: a Mesh object, a Part, a node in a Mesh network).
     Data(Vec<DataTypeId>),
-    /// Any Material: one of a Material Library's, or a slot of a printer.
+    /// Any Material: one of a Material Library's, or one an object
+    /// publishes (a printer's slot).
     Materials,
-    /// A printer's Material slots only.
-    MaterialSlots,
 }
 
 impl RefFilter {
@@ -40,13 +39,9 @@ impl RefFilter {
         Self::of(Fits::Data(types.into_iter().collect()))
     }
 
-    /// One Material: any, or with `slots_only` a printer's slot.
-    pub fn material(slots_only: bool) -> Self {
-        Self::of(if slots_only {
-            Fits::MaterialSlots
-        } else {
-            Fits::Materials
-        })
+    /// One Material.
+    pub fn material() -> Self {
+        Self::of(Fits::Materials)
     }
 
     /// Naming every match of a pattern too.

@@ -448,7 +448,7 @@ impl Default for ViewportSpec {
             analysis_modes: Vec::new(),
             snap_steps: true,
             own_snapping: None,
-            default_pivot: Pivot::Centre,
+            default_pivot: Pivot::Center,
             transform: false,
             popovers: Vec::new(),
         }

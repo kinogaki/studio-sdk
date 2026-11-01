@@ -1,12 +1,13 @@
-//! What the open location's edited surface shows in one view: the value a
-//! context's [`ViewportLayer::edited`](super::ViewportLayer::edited)
-//! returns each frame, and how its templated pieces are marked.
+//! What a context adds over the open object in one view: the value its
+//! [`ViewportLayer::edited`](super::ViewportLayer::edited) returns each
+//! frame (overlays, guides and style; core draws the object's value
+//! itself, drag previews included), and how its templated pieces are
+//! marked.
 //!
 //! Everything in it is shared: core turns it into its renderer's scene by
 //! borrowing, nothing is copied, and the renderer uploads only values
 //! whose `Arc` changed since the last frame. A context keeps the same
 //! `Arc`s while nothing changed, so a steady frame costs nothing.
-use kinogaki_studio_api::Data;
 use kinogaki_studio_api::viewport::{ElementKind, ElementSet};
 use kinogaki_viewport_api::{
     FaceNormals, GuideDraw, LineHighlight, OverlayDraw, PointWeights, SceneLines,
@@ -14,17 +15,15 @@ use kinogaki_viewport_api::{
 use std::fmt;
 use std::sync::Arc;
 
-/// What the open location's edited surface shows in one view this frame.
+/// What a context adds over the open object in one view this frame.
 ///
-/// Core prepares `value` through its type's `Displayable` and draws the
-/// rest with whichever packet it prepared. Layers bound to a topology
-/// (`overlays`, `face_normals`) show only with a packet of that topology,
-/// so ones made for another (a cook on its way) never draw on the wrong
-/// one. Core makes drag previews itself.
+/// Core draws the open object's shown value itself, through its type's
+/// `Displayable`, and its drag previews; it draws this over whichever
+/// packet it prepared. Layers bound to a topology (`overlays`,
+/// `face_normals`) show only with a packet of that topology, so ones made
+/// for another (a cook on its way) never draw on the wrong one.
 #[derive(Clone, Default)]
 pub struct Edited {
-    /// The value being edited.
-    pub value: Option<Data>,
     /// What is selected on it: faces (or whole objects), lines and markers,
     /// each set in its kind's slot ([`Edited::select`]).
     pub selection: [Option<ElementSet>; 3],
@@ -80,7 +79,6 @@ impl Edited {
 impl fmt::Debug for Edited {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edited")
-            .field("value", &self.value.is_some())
             .field("selection", &self.selection)
             .field("hover", &self.hover)
             .field("look", &self.look)

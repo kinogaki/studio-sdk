@@ -1,9 +1,11 @@
-//! Stored values: package-owned values the host saves in the project,
-//! headless.
+//! Stored values: package-owned values the host saves in the project or
+//! the user's settings, headless.
 //!
 //! What a project keeps for a package outside its objects: CAD's
 //! tolerances and display quality (one value for the project), CAD's
-//! rows of each view (one value per view). A package declares each as a
+//! rows of each view (one value per view); and what a user keeps across
+//! projects that cooks read (CAM's printers and filaments, one value for
+//! the user). A package declares each as a
 //! value type implementing [`Stored`] and registers it
 //! ([`StoredValue::of`], [`Package::with_stored`]). The host keeps every
 //! registered value in a [`StoredValues`] table (the project's, and one
@@ -15,6 +17,12 @@
 //! (the `package` metadata), so a project holding a value of a package
 //! that isn't installed skips it. Reading is strict: a project without an
 //! installed package's value does not read.
+//!
+//! **For the user.** A [`Scope::User`] value is that element in the
+//! user's settings folder, kept beside the user's settings, never in a
+//! project: a user without one starts from its defaults. Cooks read it
+//! with the project's ([`Project::user`](crate::cook::Project::user)), and
+//! a change recooks the nodes that read the project.
 //!
 //! Values are shared and copy-on-write, as session slots are: a clone of
 //! the table shares each value.
@@ -34,6 +42,8 @@ pub enum Scope {
     Project,
     /// One for each view of the project's viewport.
     View,
+    /// One for the user, across projects.
+    User,
 }
 
 /// A stored value's type, naming its element.
@@ -43,7 +53,8 @@ pub enum Scope {
 pub trait Stored: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
     /// Its element's name in the project ("cad"): an
     /// [`is_name`](crate::element::is_name), unique among the installed
-    /// packages' stored values of its scope.
+    /// packages' stored values of its scope (project and user values
+    /// share one set of names).
     fn id() -> &'static str;
     /// Where it belongs.
     fn scope() -> Scope;

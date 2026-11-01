@@ -51,7 +51,7 @@
 //! network pane, Tab and menus listing the context's listed node types,
 //! and its node inspector. A part adds to them or replaces them: the
 //! library's items come first and what it sets wins, the vocabulary runs
-//! the library's items, an inspector replaces the node sheet. Elsewhere a
+//! the library's items, an inspector adds under the node sheet. Elsewhere a
 //! part left out is nothing there.
 //!
 //! **Adding the UI** ([`WithUi::with_ui`]) erases the state's type: the
@@ -110,7 +110,7 @@ pub trait UiPackage: Send + Sync + 'static {
     fn contexts(&self) -> Vec<ContextPart<Self::State>>;
 
     /// Its settings sections (one per context that has user settings).
-    fn settings(&self) -> Vec<SettingsSection> {
+    fn settings(&self) -> Vec<SettingsSection<Self::State>> {
         Vec::new()
     }
 
@@ -357,7 +357,11 @@ impl WithUi for Package {
     fn with_ui(mut self, ui: impl UiPackage) -> Self {
         let registered = Registered {
             contexts: ui.contexts().into_iter().map(ContextPart::erase).collect(),
-            settings: ui.settings(),
+            settings: ui
+                .settings()
+                .into_iter()
+                .map(SettingsSection::erase)
+                .collect(),
             package: Arc::new(ui),
         };
         let contexts = registered.contexts.iter().map(|c| (c.id, c.mode)).collect();

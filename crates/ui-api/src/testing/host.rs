@@ -52,6 +52,9 @@ pub enum HostCall {
     GoTo(Place),
     /// [`HostDoc::set_time`].
     SetTime(Time),
+    /// [`HostDoc::set_object_body`], by object and step label, whether or
+    /// not the body was taken.
+    SetBody(ObjectRef, String),
     /// [`HostView::frame_bounds`].
     Frame(Bounds),
     /// [`HostView::redraw`].
@@ -156,6 +159,8 @@ pub struct FakeHost {
     pub sections: BTreeMap<ContextId, Arc<dyn Any + Send + Sync>>,
     /// The project's stored values.
     pub stored: kinogaki_studio_api::StoredValues,
+    /// The user's stored values.
+    pub user_stored: kinogaki_studio_api::StoredValues,
     /// Each view's stored values.
     pub view_stored: Vec<kinogaki_studio_api::StoredValues>,
     /// A text field has the keyboard.
@@ -211,6 +216,7 @@ impl FakeHost {
             prefs: HostPrefs::default(),
             sections: BTreeMap::new(),
             stored: Default::default(),
+            user_stored: Default::default(),
             view_stored: Vec::new(),
             keyboard_taken: false,
             editing: false,
@@ -419,6 +425,20 @@ impl HostDoc for FakeHost {
     fn object_body(&self, object: ObjectRef) -> Option<Arc<dyn ObjectBody>> {
         self.scene.get(&object)?.body.clone()
     }
+    fn set_object_body(
+        &mut self,
+        object: ObjectRef,
+        label: &str,
+        body: Arc<dyn ObjectBody>,
+    ) -> Result<(), String> {
+        self.calls.push(HostCall::SetBody(object, label.to_owned()));
+        let found = self.scene.get_mut(&object).ok_or("no such object")?;
+        if body.kind() != found.kind {
+            return Err(format!("{} is not a {}", object.0, found.kind.as_str()));
+        }
+        found.body = Some(body);
+        Ok(())
+    }
     fn objects_of_kind(&self, kind: ObjectKindId) -> Vec<ObjectRef> {
         self.scene
             .iter()
@@ -428,7 +448,7 @@ impl HostDoc for FakeHost {
     }
     fn stored_any(&self, id: &str, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)> {
         match view {
-            None => self.stored.get_any(id),
+            None => (self.stored.get_any(id)).or_else(|| self.user_stored.get_any(id)),
             Some(v) => self.view_stored.get(v)?.get_any(id),
         }
     }
@@ -439,7 +459,8 @@ impl HostDoc for FakeHost {
         value: Arc<dyn Any + Send + Sync>,
     ) -> bool {
         match view {
-            None => self.stored.set_any(id, value),
+            None if self.stored.get_any(id).is_some() => self.stored.set_any(id, value),
+            None => self.user_stored.set_any(id, value),
             Some(v) => self
                 .view_stored
                 .get_mut(v)

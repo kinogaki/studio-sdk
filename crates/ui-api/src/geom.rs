@@ -302,7 +302,7 @@ impl Rect {
         }
     }
 
-    /// The rectangle of `size` centred on `center`.
+    /// The rectangle of `size` centered on `center`.
     pub fn from_center_size(center: Pos, size: Vec2) -> Self {
         Rect {
             min: center - size * 0.5,

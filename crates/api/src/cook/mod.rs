@@ -67,7 +67,7 @@ pub struct Reads {
     /// resolve to changes.
     pub objects: bool,
     /// The project it cooks in ([`CookCx::project`]: its units, its
-    /// directory and its packages' stored values); otherwise it sees none
+    /// directory, its packages' stored values and the user's); otherwise it sees none
     /// and a change of the project doesn't recook it.
     pub project: bool,
     /// The network it holds ([`CookCx::inside`],
@@ -112,6 +112,8 @@ pub struct Project<'a> {
     pub directory: Option<&'a std::path::Path>,
     /// The project's stored values ([`crate::Stored`]).
     pub stored: &'a crate::StoredValues,
+    /// The user's stored values ([`Scope::User`](crate::Scope::User)).
+    pub user: &'a crate::StoredValues,
 }
 
 /// What a cook produced.

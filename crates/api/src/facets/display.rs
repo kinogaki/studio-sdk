@@ -109,15 +109,6 @@ impl fmt::Debug for Role {
     }
 }
 
-/// How a piece draws while its object is open.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WhenOpen {
-    /// Not at all: the open context draws it as its edited surface.
-    Hidden,
-    /// As it does anywhere.
-    Drawn,
-}
-
 /// One packet a value draws.
 #[derive(Clone)]
 pub struct Piece {
@@ -129,14 +120,11 @@ pub struct Piece {
     pub placements: Option<Arc<[[[f64; 4]; 4]]>>,
     /// What it is to its object.
     pub role: Role,
-    /// How it draws while its object is open.
-    pub when_open: WhenOpen,
 }
 
 impl Piece {
     /// `packet` as its object's own surface, drawn once where the object
-    /// is, with its edges and marks, left to the open context while its
-    /// object is open.
+    /// is, with its edges and marks.
     pub fn own(packet: Arc<dyn SurfaceSource>) -> Self {
         Self {
             packet,
@@ -146,7 +134,6 @@ impl Piece {
                 wires: false,
                 marks: true,
             },
-            when_open: WhenOpen::Hidden,
         }
     }
 }
@@ -157,7 +144,6 @@ impl fmt::Debug for Piece {
             .field("faces", &self.packet.face_count())
             .field("placements", &self.placements.as_ref().map(|p| p.len()))
             .field("role", &self.role)
-            .field("when_open", &self.when_open)
             .finish()
     }
 }

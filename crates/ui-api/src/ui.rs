@@ -178,7 +178,7 @@ pub trait Ui {
     /// A popover around `body`.
     fn popover(&mut self, spec: &PopoverSpec, body: Body<'_>) -> Response;
 
-    /// The heads-up value fields centred on `places` (screen points; fewer
+    /// The heads-up value fields centered on `places` (screen points; fewer
     /// places than fields draw fewer), holding the keyboard while shown
     /// when `hold_focus` (see [`value_fields`](crate::value_fields)).
     /// Returns each drawn field's rectangle.

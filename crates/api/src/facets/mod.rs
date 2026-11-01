@@ -22,7 +22,7 @@ mod snap;
 mod table;
 
 pub use display::{
-    DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally, WhenOpen,
+    DisplayQuality, DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally,
 };
 pub use glyph::{GlyphScale, Glyphs};
 pub use object::{Look, Materials, Matrix, ObjectPicking, WorldRay};

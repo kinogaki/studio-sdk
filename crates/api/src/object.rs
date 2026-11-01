@@ -16,7 +16,9 @@ use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
-use kinogaki_render_api::{Aov, Declared, EngineDescription, Engines, SettingValues};
+use kinogaki_render_api::{
+    Aov, Declared, EngineDescription, Engines, PreviewSurface, SettingValues,
+};
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -71,6 +73,28 @@ pub trait ObjectKindSpec: Send + Sync {
     /// which its network then yields. `None`: this kind doesn't take such
     /// values.
     fn adopts(&self, data: &Data) -> Option<Arc<dyn ObjectBody>>;
+
+    /// The value of an object holding `body` at scene path `path`
+    /// (`/Workshop/X1C`), when its kind holds no network
+    /// ([`context`](Self::context) `None`) and has a
+    /// [`result`](Self::result): a reference naming the object reads it,
+    /// and core reads it again when the body or the path changes (a
+    /// printer's value naming its slots' Materials by path). `None` by
+    /// default: a reference to it names nothing.
+    fn value(&self, body: &dyn ObjectBody, path: &str) -> Option<Data> {
+        let _ = (body, path);
+        None
+    }
+
+    /// The Materials `body`'s object publishes (a printer's slots), each
+    /// under the object's path by its key (`/X1C/AMS 1 · 2`): read-only,
+    /// listed wherever Materials are picked and resolved like a Material
+    /// Library's. Core asks again whenever the body changes. None by
+    /// default.
+    fn materials(&self, body: &dyn ObjectBody) -> Vec<PublishedMaterial> {
+        let _ = body;
+        Vec::new()
+    }
 
     /// Whether its objects live only at the scene's root (Fog, Render
     /// Settings).
@@ -171,18 +195,99 @@ impl KindCreation {
     }
 }
 
+/// A Material an object publishes ([`ObjectKindSpec::materials`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PublishedMaterial {
+    key: String,
+    /// What pickers call it ("AMS 1 · 2 PLA Basic").
+    pub label: String,
+    /// How it looks: renders and the viewport show it through the active
+    /// engine's preview surface.
+    pub preview: PreviewSurface,
+    /// Why it can't be used now ("the slot is empty"); a path naming it
+    /// then names nothing, saying why.
+    pub unavailable: Option<String>,
+}
+
+impl PublishedMaterial {
+    /// Material `key` (its path step below the object), called `label`,
+    /// looking as `preview`.
+    ///
+    /// # Panics
+    /// When `key` is not an [`is_path_step`] (a packaging error).
+    pub fn new(key: impl Into<String>, label: impl Into<String>, preview: PreviewSurface) -> Self {
+        let key = key.into();
+        assert!(is_path_step(&key), "{key:?} is not a path step");
+        Self {
+            key,
+            label: label.into(),
+            preview,
+            unavailable: None,
+        }
+    }
+
+    /// Its path step below its object.
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    /// Unavailable, saying `why`.
+    pub fn unavailable(mut self, why: impl Into<String>) -> Self {
+        self.unavailable = Some(why.into());
+        self
+    }
+}
+
+/// Whether `text` may name one step of a scene path: not empty, without
+/// `/`, the wildcards `*` and `?`, or space at either end, and neither `.`
+/// nor `..`. Spaces and any other characters are allowed.
+///
+/// ```
+/// use kinogaki_studio_api::object::is_path_step;
+/// assert!(is_path_step("AMS 1 · 2") && is_path_step("Crate 1"));
+/// assert!(!is_path_step("") && !is_path_step("a/b") && !is_path_step("..") && !is_path_step(" x"));
+/// ```
+pub fn is_path_step(text: &str) -> bool {
+    !text.is_empty()
+        && text.trim() == text
+        && text != "."
+        && text != ".."
+        && !text.contains(['/', '*', '?'])
+}
+
 /// What a kind's creations may depend on: the installed render engines,
-/// and the active Render Settings' engine, if any.
+/// the active Render Settings' engine, if any, and the user's settings.
 #[derive(Clone, Copy)]
 pub struct CreateCx<'a> {
     engines: &'a Engines,
     active: Option<&'a EngineDescription>,
+    settings: &'a dyn Fn(ContextId) -> Option<&'a (dyn Any + Send + Sync)>,
 }
 
 impl<'a> CreateCx<'a> {
-    /// Creating with `engines` installed, `active` rendering.
+    /// Creating with `engines` installed, `active` rendering, no user
+    /// settings.
     pub fn new(engines: &'a Engines, active: Option<&'a EngineDescription>) -> Self {
-        Self { engines, active }
+        Self {
+            engines,
+            active,
+            settings: &|_| None,
+        }
+    }
+
+    /// Reading the user's settings sections through `settings`, by context.
+    pub fn with_settings(
+        mut self,
+        settings: &'a dyn Fn(ContextId) -> Option<&'a (dyn Any + Send + Sync)>,
+    ) -> Self {
+        self.settings = settings;
+        self
+    }
+
+    /// Context `context`'s user settings section (the package's section
+    /// value; read it with `downcast_ref`), when it has one.
+    pub fn settings(&self, context: ContextId) -> Option<&'a (dyn Any + Send + Sync)> {
+        (self.settings)(context)
     }
     /// The installed engines.
     pub fn engines(&self) -> &'a Engines {

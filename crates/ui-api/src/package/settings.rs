@@ -7,28 +7,42 @@
 //! applied value and the Settings window's draft, draws each page from
 //! [`Section::page`]'s sheet, applies the edits it reports through
 //! [`Section::apply`], and saves the section with the rest of the user's
-//! settings. An installed package without a section starts from its
+//! settings. Both are lent the package's UI state and the call's context,
+//! as parts are, so a page can show what is live (a device's status, the
+//! printers on the network) and start what it shows. An installed package without a section starts from its
 //! defaults; a section of a package that isn't installed is kept and
 //! written back unchanged.
+use crate::host::Cx;
 use crate::sheet::{Edits, Schema};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::{ContextId, Error};
 use std::any::Any;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 /// A context's settings section, as its value type.
 pub trait Section: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
+    /// Its package's UI state ([`UiPackage::State`](super::UiPackage::State)),
+    /// lent to its pages.
+    type State: Any;
     /// The context it belongs to (one section a context).
     fn context() -> ContextId;
     /// Its pages in the Settings window, in order.
     fn pages() -> Vec<String>;
     /// The values a new user starts with.
     fn defaults() -> Self;
-    /// Page `page`'s rows, drawn by the host.
-    fn page(&self, page: &str) -> Schema<u32>;
+    /// Page `page`'s rows, drawn by the host while the page shows.
+    fn page(&self, page: &str, s: &mut Self::State, cx: &mut dyn Cx) -> Schema<u32>;
     /// The edits the host reported on page `page`'s rows.
-    fn apply(&mut self, page: &str, rows: &Schema<u32>, edits: &Edits<u32>);
+    fn apply(
+        &mut self,
+        page: &str,
+        rows: &Schema<u32>,
+        edits: &Edits<u32>,
+        s: &mut Self::State,
+        cx: &mut dyn Cx,
+    );
     /// Restores page `page`'s defaults (by default every value).
     fn reset(&mut self, page: &str) {
         let _ = page;
@@ -43,11 +57,14 @@ pub trait Section: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
 /// A shared section value.
 type Value = Arc<dyn Any + Send + Sync>;
 
+/// [`Section::apply`] over the erased value and state.
+type ApplyFn = fn(&mut dyn Any, &str, &Schema<u32>, &Edits<u32>, &mut dyn Any, &mut dyn Cx);
+
 /// A registered section: its context and pages, and what the host does
 /// with a value of its type without knowing the type. Made from the value
-/// type with [`SettingsSection::of`]; cheap to copy.
-#[derive(Clone, Copy)]
-pub struct SettingsSection {
+/// type with [`SettingsSection::of`] over its package's state `S`; the
+/// host holds it over the erased state (`dyn Any`). Cheap to copy.
+pub struct SettingsSection<S: ?Sized = dyn Any> {
     context: fn() -> ContextId,
     pages: fn() -> Vec<String>,
     type_name: &'static str,
@@ -55,12 +72,21 @@ pub struct SettingsSection {
     copy: fn(&dyn Any) -> Value,
     eq: fn(&dyn Any, &dyn Any) -> bool,
     debug: fn(&dyn Any, &mut fmt::Formatter<'_>) -> fmt::Result,
-    page: fn(&dyn Any, &str) -> Schema<u32>,
-    apply: fn(&mut dyn Any, &str, &Schema<u32>, &Edits<u32>),
+    page: fn(&dyn Any, &str, &mut dyn Any, &mut dyn Cx) -> Schema<u32>,
+    apply: ApplyFn,
     reset: fn(&mut dyn Any, &str),
     write: fn(&dyn Any, &mut dyn ElementWriter) -> Result<(), Error>,
     read: fn(&dyn ElementReader) -> Result<Value, Error>,
+    state: PhantomData<fn() -> Box<S>>,
 }
+
+impl<S: ?Sized> Clone for SettingsSection<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S: ?Sized> Copy for SettingsSection<S> {}
 
 fn typed<T: Section>(v: &dyn Any) -> &T {
     v.downcast_ref::<T>()
@@ -72,9 +98,14 @@ fn typed_mut<T: Section>(v: &mut dyn Any) -> &mut T {
         .expect("a section value of its section's type")
 }
 
-impl SettingsSection {
+fn state<T: Section>(s: &mut dyn Any) -> &mut T::State {
+    s.downcast_mut()
+        .expect("the host lends each section its package's state")
+}
+
+impl<S: 'static> SettingsSection<S> {
     /// The section `T` is.
-    pub fn of<T: Section>() -> Self {
+    pub fn of<T: Section<State = S>>() -> Self {
         SettingsSection {
             context: T::context,
             pages: T::pages,
@@ -83,14 +114,53 @@ impl SettingsSection {
             copy: |v| Arc::new(typed::<T>(v).clone()),
             eq: |a, b| a.downcast_ref::<T>() == b.downcast_ref::<T>(),
             debug: |v, f| fmt::Debug::fmt(typed::<T>(v), f),
-            page: |v, page| typed::<T>(v).page(page),
-            apply: |v, page, rows, edits| typed_mut::<T>(v).apply(page, rows, edits),
+            page: |v, page, s, cx| typed::<T>(v).page(page, state::<T>(s), cx),
+            apply: |v, page, rows, edits, s, cx| {
+                typed_mut::<T>(v).apply(page, rows, edits, state::<T>(s), cx)
+            },
             reset: |v, page| typed_mut::<T>(v).reset(page),
             write: |v, to| typed::<T>(v).write(to),
             read: |from| T::read(from).map(|v| Arc::new(v) as Value),
+            state: PhantomData,
         }
     }
 
+    /// The same section over the host's erased state.
+    pub fn erase(self) -> SettingsSection {
+        let Self {
+            context,
+            pages,
+            type_name,
+            defaults,
+            copy,
+            eq,
+            debug,
+            page,
+            apply,
+            reset,
+            write,
+            read,
+            state: _,
+        } = self;
+        SettingsSection {
+            context,
+            pages,
+            type_name,
+            defaults,
+            copy,
+            eq,
+            debug,
+            page,
+            apply,
+            reset,
+            write,
+            read,
+            state: PhantomData,
+        }
+    }
+}
+
+impl<S: ?Sized> SettingsSection<S> {
     /// The context it belongs to.
     pub fn context(&self) -> ContextId {
         (self.context)()
@@ -121,14 +191,27 @@ impl SettingsSection {
         (self.debug)(value, f)
     }
 
-    /// Page `page`'s rows for `value`.
-    pub fn page(&self, value: &dyn Any, page: &str) -> Schema<u32> {
-        (self.page)(value, page)
+    /// Page `page`'s rows for `value`, lent the package's `state`.
+    pub fn page(
+        &self,
+        value: &dyn Any,
+        page: &str,
+        state: &mut dyn Any,
+        cx: &mut dyn Cx,
+    ) -> Schema<u32> {
+        (self.page)(value, page, state, cx)
     }
 
-    /// Applies the edits of page `page`'s `rows` to `value`.
-    pub fn apply(&self, value: &mut dyn Any, page: &str, rows: &Schema<u32>, edits: &Edits<u32>) {
-        (self.apply)(value, page, rows, edits)
+    /// Applies the edits of page `page`'s `rows` to `value`, lent the
+    /// package's `state`.
+    pub fn apply(
+        &self,
+        value: &mut dyn Any,
+        (page, rows, edits): (&str, &Schema<u32>, &Edits<u32>),
+        state: &mut dyn Any,
+        cx: &mut dyn Cx,
+    ) {
+        (self.apply)(value, page, rows, edits, state, cx)
     }
 
     /// Restores page `page`'s defaults in `value`.
@@ -147,7 +230,7 @@ impl SettingsSection {
     }
 }
 
-impl fmt::Debug for SettingsSection {
+impl<S: ?Sized> fmt::Debug for SettingsSection<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SettingsSection")
             .field("context", &self.context())
