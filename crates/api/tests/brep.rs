@@ -1,0 +1,173 @@
+//! `kinogaki.core.brep` as a data type: its codec over the B-rep
+//! fixtures, refusals of broken saves, counts across bodies, and the
+//! registered meshers.
+use kinogaki_studio_api::conformance::Fixtures;
+use kinogaki_studio_api::element::{Field, MemoryElement};
+use kinogaki_studio_api::geometry::brep::{Body, Brep, FaceId};
+use kinogaki_studio_api::geometry::{Class, Detail, Polygons, Selection, Tolerances};
+use kinogaki_studio_api::standard::{self, BrepCodec};
+use kinogaki_studio_api::{
+    CancelToken, Data, DataCodec, DisplayRequest, Error, Meshed, Mesher, MesherId, Package,
+    PackageId, Registry,
+};
+
+fn fixture(name: &str) -> Brep {
+    let all = Fixtures::default().breps();
+    all.into_iter().find(|(n, _)| n == name).unwrap().1
+}
+
+fn save(data: &Data) -> MemoryElement {
+    let mut saved = MemoryElement::new("result");
+    saved.write(|w| BrepCodec.write(data, None, w)).unwrap();
+    saved
+}
+
+#[test]
+fn every_fixture_reads_back_equal_with_its_ids() {
+    for (name, value) in Fixtures::default().breps() {
+        let data = standard::brep().wrap(value.clone());
+        let saved = save(&data);
+        let read = saved.read(|r| BrepCodec.read(r, None)).unwrap();
+        let back = standard::brep().get(&read).unwrap();
+        assert_eq!(back, &value, "{name}");
+        // Saved again, the same save: nothing is reordered on the way.
+        assert_eq!(save(&read), saved, "{name}");
+        for (a, b) in value.bodies().iter().zip(back.bodies().iter()) {
+            assert_eq!(
+                a.topology().fingerprint(),
+                b.topology().fingerprint(),
+                "{name}"
+            );
+            assert_eq!(a.names().faces(), b.names().faces(), "{name}");
+            assert_eq!(a.kind(), b.kind(), "{name}");
+        }
+    }
+}
+
+#[test]
+fn a_value_with_every_part_keeps_each_part() {
+    let value = fixture("every part");
+    let data = standard::brep().wrap(value.clone());
+    let read = save(&data).read(|r| BrepCodec.read(r, None)).unwrap();
+    let back = standard::brep().get(&read).unwrap();
+    assert_eq!(back.history(), value.history());
+    assert_eq!(back.datums(), value.datums());
+    assert_eq!(back.curves(), value.curves());
+    assert_eq!(back.detail(), value.detail());
+    assert_eq!(back.bodies()[0].instances(), value.bodies()[0].instances());
+    assert_eq!(
+        back.bodies()[0].attributes(),
+        value.bodies()[0].attributes()
+    );
+}
+
+#[test]
+fn a_broken_save_does_not_read() {
+    let data = standard::brep().wrap(fixture("every part"));
+    let broken = |field: &str, value: Field| {
+        let mut bad = MemoryElement::new("result");
+        bad.write(|w| {
+            BrepCodec.write(&data, None, w)?;
+            w.set(field, value)
+        })
+        .unwrap();
+        bad.read(|r| BrepCodec.read(r, None))
+            .unwrap_err()
+            .to_string()
+    };
+    assert!(broken("name_tags", Field::U8s(vec![9])).contains("no name kind 9"));
+    assert!(broken("datum_kinds", Field::U8s(vec![0, 1, 7])).contains("no datum kind 7"));
+    // An axis whose direction isn't unit: the value's own rule refuses it.
+    let reals = [
+        [0.0; 12].as_slice(),
+        &[0.0, 0.0, 0.0, 0.0, 0.0, 2.0],
+        &[1.0, 2.0, 3.0],
+    ];
+    let mut plane = reals.concat();
+    plane[3..12].copy_from_slice(&[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
+    assert!(broken("datum_reals", Field::F64s(plane)).contains("datum"));
+}
+
+#[test]
+fn counts_and_selections_span_the_bodies() {
+    let value = fixture("every part");
+    // The box's 6 faces then the patch's 1; 8 + 4 vertices.
+    assert_eq!(standard::brep_count(&value, Class::Primitive), Some(7));
+    assert_eq!(standard::brep_count(&value, Class::Point), Some(12));
+    assert_eq!(standard::brep_count(&value, Class::Detail), Some(1));
+    assert_eq!(standard::brep_count(&Brep::empty(), Class::Primitive), None);
+    let data = standard::brep().wrap(value);
+    let s = Selection::new(Class::Primitive, vec![6, 0], Some(6), None).unwrap();
+    let components = standard::components(data.ty(), s.clone(), 7);
+    let mut saved = MemoryElement::new("components");
+    saved
+        .write(|w| {
+            BrepCodec
+                .write_components(&components, &data, w)
+                .map(|_| ())
+        })
+        .unwrap();
+    let back = saved.read(|r| BrepCodec.read_components(r, &data)).unwrap();
+    assert_eq!(back.selection(), Some(&s));
+}
+
+/// A mesher that meshes nothing.
+struct Nothing(&'static str);
+
+impl Mesher for Nothing {
+    fn id(&self) -> MesherId {
+        MesherId::declared(self.0)
+    }
+    fn label(&self) -> &str {
+        "Nothing"
+    }
+    fn mesh(
+        &self,
+        _: &Body,
+        _: Detail,
+        _: &Tolerances,
+        cancel: &CancelToken,
+    ) -> Result<Meshed, Error> {
+        cancel.check()?;
+        Ok(Meshed {
+            polygons: Polygons::empty(),
+            failed: vec![kinogaki_studio_api::Failed {
+                face: FaceId::from_index(&fixture("box").bodies()[0], 0).unwrap(),
+                reason: "not meshed".into(),
+            }],
+        })
+    }
+}
+
+#[test]
+fn meshers_register_once_under_their_vendor_first_party_first() {
+    let mut registry = Registry::new();
+    let theirs = Package::new(PackageId::declared("acme.mesher"), "Acme")
+        .with_mesher(Nothing("acme.mesher.fast"));
+    registry.register(theirs).unwrap();
+    let ours = Package::new(PackageId::declared("kinogaki.cadmesh"), "CAD")
+        .with_mesher(Nothing("kinogaki.cadmesh.mesher"));
+    registry.register(ours).unwrap();
+    let order: Vec<_> = registry.meshers().map(|m| m.id().as_str()).collect();
+    assert_eq!(order, ["kinogaki.cadmesh.mesher", "acme.mesher.fast"]);
+    let again = Package::new(PackageId::declared("acme.again"), "Again")
+        .with_mesher(Nothing("acme.mesher.fast"));
+    assert!(registry.register(again).is_err());
+    let foreign = Package::new(PackageId::declared("acme.other"), "Other")
+        .with_mesher(Nothing("kinogaki.cadmesh.stolen"));
+    assert!(registry.register(foreign).is_err());
+    let value = fixture("box");
+    let body = &value.bodies()[0];
+    let meshed = registry.meshers().next().unwrap().mesh(
+        body,
+        Detail::Viewport,
+        &Tolerances::default(),
+        &CancelToken::default(),
+    );
+    assert_eq!(meshed.unwrap().failed[0].reason, "not meshed");
+}
+
+#[test]
+fn a_display_request_carries_the_default_tolerances() {
+    assert_eq!(DisplayRequest::default().tolerances, Tolerances::default());
+}

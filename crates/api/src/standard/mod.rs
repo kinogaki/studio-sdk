@@ -16,18 +16,20 @@
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`PolygonsCodec`], [`CurvesCodec`]) are the ones core registers,
+//! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
 //! [`Tolerances`](crate::geometry::Tolerances) is the project value core
 //! keeps ([`Stored`](crate::Stored), `tolerances` in the project's
 //! settings).
 mod attributes;
+mod brep;
 mod curves;
 mod polygons;
 mod selection;
 mod tolerances;
 
+pub use brep::BrepCodec;
 pub use curves::CurvesCodec;
 pub use polygons::PolygonsCodec;
 
@@ -36,12 +38,16 @@ use crate::data::Typed;
 use crate::error::Error;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
+use kinogaki_geometry::brep::Brep;
 use kinogaki_geometry::{Class, Curves, GeometryError, Polygons, Selection};
 
 /// The id of [`Polygons`] values.
 pub const POLYGONS: &str = "kinogaki.core.polygons";
 /// The id of [`Curves`] values.
 pub const CURVES: &str = "kinogaki.core.curves";
+
+/// The id of [`Brep`] values.
+pub const BREP: &str = "kinogaki.core.brep";
 
 /// The handle on [`Polygons`] values ([`POLYGONS`]).
 pub fn polygons() -> Typed<Polygons> {
@@ -51,6 +57,19 @@ pub fn polygons() -> Typed<Polygons> {
 /// The handle on [`Curves`] values ([`CURVES`]).
 pub fn curves() -> Typed<Curves> {
     Typed::new(DataTypeId::declared(CURVES))
+}
+
+/// The handle on [`Brep`] values ([`BREP`]).
+pub fn brep() -> Typed<Brep> {
+    Typed::new(DataTypeId::declared(BREP))
+}
+
+/// How many elements of `class` a B-rep value holds: one Detail element,
+/// and each other class's elements summed over its bodies in body order
+/// (a body's faces follow the faces of the bodies before it), so a
+/// selection of a value's faces, edges or vertices spans its bodies.
+pub fn brep_count(value: &Brep, class: Class) -> Option<usize> {
+    brep::count(value, class)
 }
 
 /// `selection` of a value of data type `ty` with `count` elements of its

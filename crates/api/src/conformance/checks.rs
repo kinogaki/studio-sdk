@@ -3,7 +3,7 @@ use super::Consumer;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::MemoryElement;
-use crate::standard::{self, CurvesCodec, PolygonsCodec};
+use crate::standard::{self, BrepCodec, CurvesCodec, PolygonsCodec};
 use kinogaki_geometry::{Class, Curves, Polygons, Selection, Topology};
 
 /// Saves each standard value with its codec and reads it back: the read
@@ -21,6 +21,8 @@ impl Consumer for Codecs {
                 (&PolygonsCodec, p.count(Class::Point))
             } else if let Some(c) = standard::curves().get(data) {
                 (&CurvesCodec, c.count(Class::Point))
+            } else if let Some(b) = standard::brep().get(data) {
+                (&BrepCodec, standard::brep_count(b, Class::Point))
             } else {
                 return Ok(());
             };
@@ -62,9 +64,20 @@ fn same_bits(a: &Data, b: &Data) -> bool {
         (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
         _ => match (standard::curves().get(a), standard::curves().get(b)) {
             (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
-            _ => false,
+            _ => match (standard::brep().get(a), standard::brep().get(b)) {
+                // Equal values whose saves are equal: the same bits.
+                (Some(x), Some(y)) => x == y && saved(a) == saved(b),
+                _ => false,
+            },
         },
     }
+}
+
+/// What the B-rep codec writes of `data`.
+fn saved(data: &Data) -> Option<MemoryElement> {
+    let mut out = MemoryElement::new("result");
+    out.write(|w| BrepCodec.write(data, None, w)).ok()?;
+    Some(out)
 }
 
 /// Rebuilds each standard value from its parts through the validating

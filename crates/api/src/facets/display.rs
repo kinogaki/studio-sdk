@@ -7,6 +7,7 @@ use crate::math::Bounds;
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
 use crate::viewport::{ElementKind, ElementSet, SurfaceSource};
+use kinogaki_geometry::Tolerances;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
@@ -39,8 +40,10 @@ pub enum DrawPurpose {
 }
 
 /// What [`Displayable::prepare`] is asked for: the quality, what the
-/// value is drawn for, and the object's body when the value is an
-/// object's result (its display settings: a mesh's subdivision display).
+/// value is drawn for, the object's body when the value is an object's
+/// result (its display settings: a mesh's subdivision display), and the
+/// project's tolerances, which an approximate display (a B-rep's mesh, a
+/// sampled surface) is made to.
 #[derive(Clone, Default)]
 pub struct DisplayRequest {
     /// How finely.
@@ -49,6 +52,9 @@ pub struct DisplayRequest {
     pub purpose: DrawPurpose,
     /// The object's body, when the value is an object's result.
     pub body: Option<Arc<dyn ObjectBody>>,
+    /// The project's tolerances (the host fills them; the default
+    /// otherwise).
+    pub tolerances: Tolerances,
 }
 
 impl fmt::Debug for DisplayRequest {
@@ -57,6 +63,7 @@ impl fmt::Debug for DisplayRequest {
             .field("quality", &self.quality)
             .field("purpose", &self.purpose)
             .field("body", &self.body.is_some())
+            .field("tolerances", &self.tolerances)
             .finish()
     }
 }

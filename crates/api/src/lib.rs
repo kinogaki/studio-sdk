@@ -76,6 +76,7 @@ pub mod held;
 pub mod icon;
 pub mod id;
 pub mod math;
+pub mod mesher;
 pub mod network;
 pub mod object;
 pub mod package;
@@ -118,9 +119,11 @@ pub use format::{
 pub use held::HeldEdit;
 pub use icon::{Icon, IconError};
 pub use id::{
-    ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
+    ContextId, ConversionId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
+    SlotId,
 };
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
+pub use mesher::{Failed, Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     CreateCx, KindCreation, ObjectBody, ObjectKindSpec, Processing, PublishedMaterial, RenderSetup,

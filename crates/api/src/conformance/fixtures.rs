@@ -11,7 +11,9 @@ use kinogaki_geometry::{
 /// The SDK's fixtures: polygons (a quad grid; mixed triangles, quads and
 /// n-gons; concave polygons; polylines only; polygons and polylines
 /// sharing points; points only; every attribute kind on every class;
-/// groups with `.hidden` and `sharp`) and curves of every basis. With
+/// groups with `.hidden` and `sharp`), curves of every basis, and B-reps
+/// (a box, a cylinder, a cone, a sphere, a trimmed NURBS patch, and a
+/// value with every part the type has). With
 /// `large`, a 1000 × 1000 quad grid too (1M faces).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Fixtures {
@@ -20,6 +22,11 @@ pub struct Fixtures {
 }
 
 impl Fixtures {
+    /// The B-rep fixtures, by name.
+    pub fn breps(&self) -> Vec<(String, kinogaki_geometry::brep::Brep)> {
+        super::brep::breps()
+    }
+
     /// The polygons fixtures, by name.
     pub fn polygons(&self) -> Vec<(String, Polygons)> {
         let mut out = vec![
@@ -120,7 +127,11 @@ impl Producer for Fixtures {
             .curves()
             .into_iter()
             .map(|(n, c)| (n, standard::curves().wrap(c)));
-        polygons.chain(curves).collect()
+        let breps = self
+            .breps()
+            .into_iter()
+            .map(|(n, b)| (n, standard::brep().wrap(b)));
+        polygons.chain(curves).chain(breps).collect()
     }
 }
 

@@ -16,6 +16,7 @@ use crate::held::HeldEdit;
 use crate::id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
 };
+use crate::mesher::Mesher;
 use crate::network::{Evaluation, NetworkCompiler, NetworkContext};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
@@ -261,7 +262,7 @@ fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
 }
 
 /// Every package's registered data types, held edits, node types, network
-/// contexts, conversions, object kinds, formats and session slots.
+/// contexts, conversions, B-rep meshers, object kinds, formats and session slots.
 #[derive(Default)]
 pub struct Registry {
     packages: Vec<(PackageId, String)>,
@@ -279,6 +280,8 @@ pub struct Registry {
     #[cfg(feature = "wgpu")]
     runners: BTreeMap<ContextId, PackageId>,
     conversions: BTreeMap<ConversionId, Entry<dyn Conversion>>,
+    /// B-rep meshers, in registration order.
+    meshers: Vec<Entry<dyn Mesher>>,
     /// Each (from, to) pair's conversion.
     routes: BTreeMap<(DataTypeId, DataTypeId), ConversionId>,
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
@@ -331,6 +334,9 @@ impl Registry {
                 .insert((conversion.from(), conversion.to()), conversion.id());
             self.conversions
                 .insert(conversion.id(), Entry::new(id, conversion));
+        }
+        for mesher in package.meshers {
+            self.meshers.push(Entry::new(id, mesher));
         }
         for kind in package.object_kinds {
             self.object_kinds.insert(kind.id(), Entry::new(id, kind));
@@ -412,6 +418,10 @@ impl Registry {
                 c.id().as_str(),
                 owner(self.conversions.get(&c.id())),
             )?;
+        }
+        for m in &package.meshers {
+            let first = self.meshers.iter().find(|e| e.item.id() == m.id());
+            declare("mesher", m.id().as_str(), owner(first))?;
         }
         for k in &package.object_kinds {
             declare(
@@ -672,6 +682,15 @@ impl Registry {
         self.routes
             .get(&(from, to))
             .and_then(|&id| self.conversion(id))
+    }
+
+    /// The B-rep meshers, the preferred first: first-party (`kinogaki.*`)
+    /// packages' before others', each in registration order.
+    pub fn meshers(&self) -> impl Iterator<Item = &dyn Mesher> {
+        let first_party = |e: &&Entry<dyn Mesher>| e.package.vendor() == "kinogaki";
+        let ours = self.meshers.iter().filter(first_party);
+        let theirs = self.meshers.iter().filter(move |e| !first_party(e));
+        ours.chain(theirs).map(|e| &*e.item)
     }
 
     /// Object kind `id`.

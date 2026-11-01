@@ -73,7 +73,7 @@ The environment never looks inside a `Data`. It only calls the `DataType` regist
 
 ## Standard data types
 
-Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-exported as `kinogaki_studio_api::geometry` and `kinogaki_render_api::geometry`), and every package works on the same values. Core registers them as data types (`standard::POLYGONS`, `standard::CURVES`; read and wrapped through `standard::polygons()` and `standard::curves()`), so they exist with no package installed, and core displays, picks, tabulates, saves and renders them. Kernels are operations over them: a kernel never registers a type of its own for the same data, and several kernels may offer operations over one type with no conversion between them.
+Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-exported as `kinogaki_studio_api::geometry` and `kinogaki_render_api::geometry`), and every package works on the same values. Core registers them as data types (`standard::POLYGONS`, `standard::CURVES`, `standard::BREP`; read and wrapped through `standard::polygons()`, `standard::curves()` and `standard::brep()`), so they exist with no package installed, and core displays, picks, tabulates, saves and renders them. Kernels are operations over them: a kernel never registers a type of its own for the same data, and several kernels may offer operations over one type with no conversion between them.
 
 | Value | What |
 |---|---|
@@ -99,7 +99,7 @@ Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-
 
 The topology's `Index` (edges in canonical order, polygons and polylines per edge and per point, each primitive's edges) is the one standard cache: every kernel and core share its numbering, and Edge attributes follow it.
 
-**Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec` and `standard::CurvesCodec` are the codecs core registers, writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
+**Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec` and `standard::BrepCodec` are the codecs core registers, writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
 
 **Conformance.** `conformance` runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
 
@@ -127,6 +127,8 @@ If a type does not provide a facet, the surface that needs it simply leaves the 
 `Components` is a component selection described in the data type's own terms. A mesh uses element indices. A CAD body uses persistent topology names. The environment stores, undoes and counts a selection, but only the data type that made it reads what is inside.
 
 A `Conversion` is a declared function that turns one data type into another. The package that provides it depends on both kernels, so neither kernel needs to know about the other. The registry holds at most one conversion for each (from, to) pair.
+
+A `Mesher` (`Package::with_mesher`) is a kernel's display mesh of a B-rep body: its faces' polygons in face order (`face`), then one polyline per edge over the same shared points (`edge`), at a `Detail` and the project's `Tolerances`, with the faces it couldn't mesh and why. The B-rep value holds no triangles; core caches each body's mesh, and draws, picks, renders and exports from it. `Registry::meshers` lists them first-party first. With none installed a body shows grey, without faces.
 
 ## Cooking
 

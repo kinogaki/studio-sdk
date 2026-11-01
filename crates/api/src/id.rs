@@ -166,6 +166,12 @@ declare_id!(
     ConversionId,
     "conversion"
 );
+declare_id!(
+    /// A B-rep mesher (`kinogaki.cad.mesher`). Registered by a
+    /// [`Mesher`](crate::mesher::Mesher).
+    MesherId,
+    "mesher"
+);
 
 /// A package: `<vendor>.<package>` (`kinogaki.mesh`, `acme.trees`).
 /// Interned like the other ids.

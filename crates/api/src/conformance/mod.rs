@@ -16,6 +16,7 @@
 //! let report = conformance::run(&[&Fixtures::default()], &[&Codecs, &Invariants]);
 //! assert!(report.failures().is_empty(), "{report}");
 //! ```
+mod brep;
 mod checks;
 mod fixtures;
 

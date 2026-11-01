@@ -11,7 +11,7 @@ use std::sync::Arc;
 fn every_fixture_passes_the_sdk_consumers() {
     let report = conformance::run(&[&Fixtures::default()], &[&Codecs, &Invariants]);
     assert!(report.failures().is_empty(), "{report}");
-    assert_eq!(report.outcomes.len(), 2 * (9 + 7));
+    assert_eq!(report.outcomes.len(), 2 * (9 + 7 + 6));
 }
 
 #[test]

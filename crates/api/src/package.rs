@@ -7,6 +7,7 @@ use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::icon::Icon;
 use crate::id::{ContextId, PackageId};
+use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext};
 use crate::object::ObjectKindSpec;
 use crate::session::{SessionSlot, Slot};
@@ -17,6 +18,7 @@ use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
 /// types (a kernel's), held edits over them, conversions (a bridge's),
+/// B-rep meshers (a kernel's),
 /// node types' cooks, the network contexts its object kinds hold, object
 /// kinds, file formats, session slots, stored values and icons, and with
 /// the `wgpu` feature its render engines; and its UI, when it has one
@@ -43,6 +45,8 @@ pub struct Package {
     pub held_edits: Vec<Arc<dyn HeldEdit>>,
     /// The conversions it provides between registered data types.
     pub conversions: Vec<Arc<dyn Conversion>>,
+    /// How it meshes B-rep bodies for display, rendering and export.
+    pub meshers: Vec<Arc<dyn Mesher>>,
     /// What its node types compute.
     pub node_types: Vec<Arc<dyn NodeType>>,
     /// The network contexts it declares, whose networks core keeps in the
@@ -131,6 +135,7 @@ impl Package {
             data_types: Vec::new(),
             held_edits: Vec::new(),
             conversions: Vec::new(),
+            meshers: Vec::new(),
             node_types: Vec::new(),
             contexts: Vec::new(),
             compilers: Vec::new(),
@@ -188,6 +193,12 @@ impl Package {
     /// With conversion `conversion` too.
     pub fn with_conversion(mut self, conversion: impl Conversion + 'static) -> Self {
         self.conversions.push(Arc::new(conversion));
+        self
+    }
+
+    /// With B-rep mesher `mesher` too.
+    pub fn with_mesher(mut self, mesher: impl Mesher + 'static) -> Self {
+        self.meshers.push(Arc::new(mesher));
         self
     }
 
