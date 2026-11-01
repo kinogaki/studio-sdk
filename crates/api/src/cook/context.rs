@@ -1,7 +1,7 @@
 //! [`CookCx`]: everything one cook may read besides its inputs.
 use crate::cancel::CancelToken;
 use crate::components::Components;
-use crate::cook::{CookError, Project, Resolved};
+use crate::cook::{CookError, Inside, Project, Resolved};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::parallel::{self, Workers};
@@ -36,6 +36,7 @@ pub struct CookCx<'a> {
     resolved: &'a [(String, Resolved)],
     project: Option<&'a Project<'a>>,
     context: Option<ContextId>,
+    inside: Option<Inside<'a>>,
     scratch: &'a mut Option<Box<dyn Any + Send>>,
 }
 
@@ -70,8 +71,23 @@ impl<'a> CookCx<'a> {
             resolved: &[],
             project: None,
             context: None,
+            inside: None,
             scratch,
         }
+    }
+
+    /// With what the node's held network gave
+    /// ([`Reads::inside`](crate::cook::Reads::inside)): core sets it when the
+    /// node reads its inside.
+    pub fn with_inside(mut self, inside: Inside<'a>) -> Self {
+        self.inside = Some(inside);
+        self
+    }
+
+    /// What the network the node holds gave, when the node reads its inside
+    /// ([`Reads::inside`](crate::cook::Reads::inside)); `None` otherwise.
+    pub fn inside(&self) -> Option<Inside<'a>> {
+        self.inside
     }
 
     /// In a network of `context`.
@@ -361,5 +377,23 @@ mod tests {
         assert_eq!(cx.path("material"), Some("/Materials/Red"));
         assert!(cx.object("material").is_none() && cx.path("source").is_none());
         assert!(cx.project().is_none());
+    }
+
+    /// A holder sees what its inside gave only when core sets it.
+    #[test]
+    fn a_holder_reads_its_inside_when_core_sets_it() {
+        let number = Typed::<f64>::new(DataTypeId::declared("test.cx.number"));
+        let outputs = crate::cook::Outputs::one(number.wrap(3.0));
+        let parameters = Parameters::new();
+        let cancel = CancelToken::default();
+        let (mut a, mut b) = (None, None);
+        let plain = CookCx::new(&parameters, &cancel, &Serial, &mut a);
+        assert!(plain.inside().is_none());
+        let holder = CookCx::new(&parameters, &cancel, &Serial, &mut b)
+            .with_inside(Inside::Walked(&outputs));
+        match holder.inside() {
+            Some(Inside::Walked(o)) => assert_eq!(number.get(&o.data[0]), Some(&3.0)),
+            other => panic!("the walked inside, not {other:?}"),
+        }
     }
 }

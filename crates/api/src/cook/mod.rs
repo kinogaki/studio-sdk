@@ -70,6 +70,22 @@ pub struct Reads {
     /// directory and its packages' stored values); otherwise it sees none
     /// and a change of the project doesn't recook it.
     pub project: bool,
+    /// The network it holds ([`CookCx::inside`],
+    /// [`Description::holding`](crate::cook::Description::holding)): core
+    /// cooks the inside first and recooks the node when it changes;
+    /// otherwise the node neither waits for its inside nor recooks with it.
+    pub inside: bool,
+}
+
+/// What a holder's cook reads of the network it holds ([`Reads::inside`]).
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug)]
+pub enum Inside<'a> {
+    /// A walked context's displayed node's outputs (empty when it displays
+    /// nothing).
+    Walked(&'a Outputs),
+    /// A compiled context's plan for its displayed node.
+    Compiled(&'a crate::network::Compiled),
 }
 
 /// What core resolved one of a node's path parameters to
