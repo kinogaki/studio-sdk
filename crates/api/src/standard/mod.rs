@@ -17,7 +17,7 @@
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
 //! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`],
-//! [`PreviewMaterialsCodec`]) are the ones core registers,
+//! [`LightCodec`], [`PreviewMaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
 //! [`Tolerances`](crate::geometry::Tolerances) is the project value core
@@ -27,6 +27,7 @@ mod attributes;
 mod brep;
 mod camera;
 mod curves;
+mod light;
 mod materials;
 mod polygons;
 mod selection;
@@ -35,6 +36,7 @@ mod tolerances;
 pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use curves::CurvesCodec;
+pub use light::{LightCodec, light_value};
 pub use materials::PreviewMaterialsCodec;
 pub use polygons::PolygonsCodec;
 
@@ -77,6 +79,17 @@ pub const CAMERA: &str = "kinogaki.core.camera";
 /// units; make one with [`lens`].
 pub fn camera() -> Typed<kinogaki_render_api::Camera> {
     Typed::new(DataTypeId::declared(CAMERA))
+}
+
+/// The id of light values: an unplaced light ([`light_value`],
+/// [`LightCodec`]).
+pub const LIGHT: &str = "kinogaki.core.light";
+
+/// The handle on light values ([`LIGHT`]): render-api's standard
+/// [`Light`](kinogaki_render_api::standard::Light), unplaced, in UsdLux's
+/// terms; make one with [`light_value`].
+pub fn light() -> Typed<kinogaki_render_api::standard::Light> {
+    Typed::new(DataTypeId::declared(LIGHT))
 }
 
 /// The handle on [`Brep`] values ([`BREP`]).

@@ -99,7 +99,7 @@ Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-
 
 The topology's `Index` (edges in canonical order, polygons and polylines per edge and per point, each primitive's edges) is the one standard cache: every kernel and core share its numbering, and Edge attributes follow it.
 
-**Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec`, `standard::BrepCodec` and `standard::CameraCodec` are the codecs core registers (core's Camera objects save their lens through `CameraCodec` too), writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
+**Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec`, `standard::BrepCodec`, `standard::CameraCodec` and `standard::LightCodec` are the codecs core registers (core's Camera and Light objects save their lens and light through them too; a light value is unplaced and holds no dome image, a texture being one scene's), writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
 
 **Conformance.** `conformance` runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
 
