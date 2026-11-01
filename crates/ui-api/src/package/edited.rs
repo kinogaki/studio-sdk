@@ -12,6 +12,7 @@ use kinogaki_viewport_api::{
     FaceNormals, GuideDraw, LineHighlight, OverlayDraw, PointWeights, SceneLines,
 };
 use std::fmt;
+use std::ops::Range;
 use std::sync::Arc;
 
 /// What a context adds over the open object in one view this frame.
@@ -54,6 +55,11 @@ pub struct Edited {
     /// A section plane `[n.x, n.y, n.z, d]`, `n` unit length: what lies
     /// where `n · p + d > 0` is cut away (a sketch's Slice).
     pub section: Option<[f32; 4]>,
+    /// Which of the open object's own pieces draw in this view, by their
+    /// index in its `Drawn` (a print's layers up to the Timeline's, or one
+    /// alone); `None`: all of them. Choosing builds nothing: the pieces
+    /// are the value's, prepared once.
+    pub pieces: Option<Range<usize>>,
 }
 
 impl fmt::Debug for Edited {
@@ -61,6 +67,7 @@ impl fmt::Debug for Edited {
         f.debug_struct("Edited")
             .field("look", &self.look)
             .field("lines", &self.lines.len())
+            .field("pieces", &self.pieces)
             .finish_non_exhaustive()
     }
 }
