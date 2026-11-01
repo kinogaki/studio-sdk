@@ -73,7 +73,7 @@ The environment never looks inside a `Data`. It only calls the `DataType` regist
 
 ## Standard data types
 
-Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-exported as `kinogaki_studio_api::geometry` and `kinogaki_render_api::geometry`), and every package works on the same values. Core registers them as data types (`standard::POLYGONS`, `standard::CURVES`, `standard::BREP`; read and wrapped through `standard::polygons()`, `standard::curves()` and `standard::brep()`), so they exist with no package installed, and core displays, picks, tabulates, saves and renders them. Kernels are operations over them: a kernel never registers a type of its own for the same data, and several kernels may offer operations over one type with no conversion between them.
+Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-exported as `kinogaki_studio_api::geometry` and `kinogaki_render_api::geometry`), and every package works on the same values. Core registers them as data types (`standard::POLYGONS`, `standard::CURVES`, `standard::BREP`; read and wrapped through `standard::polygons()`, `standard::curves()` and `standard::brep()`), and a camera's lens beside them (`standard::CAMERA`, `standard::camera()`: render-api's `Camera`, unplaced, in UsdGeomCamera's units, made by `standard::lens`, which checks it; what core's Camera objects hold and formats read and write), so they exist with no package installed, and core displays, picks, tabulates, saves and renders them. Kernels are operations over them: a kernel never registers a type of its own for the same data, and several kernels may offer operations over one type with no conversion between them.
 
 | Value | What |
 |---|---|
@@ -99,7 +99,7 @@ Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-
 
 The topology's `Index` (edges in canonical order, polygons and polylines per edge and per point, each primitive's edges) is the one standard cache: every kernel and core share its numbering, and Edge attributes follow it.
 
-**Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec` and `standard::BrepCodec` are the codecs core registers, writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
+**Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec`, `standard::BrepCodec` and `standard::CameraCodec` are the codecs core registers (core's Camera objects save their lens through `CameraCodec` too), writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
 
 **Conformance.** `conformance` runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
 

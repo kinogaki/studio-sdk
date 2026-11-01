@@ -16,7 +16,7 @@
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`]) are the ones core registers,
+//! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
 //! [`Tolerances`](crate::geometry::Tolerances) is the project value core
@@ -24,12 +24,14 @@
 //! settings).
 mod attributes;
 mod brep;
+mod camera;
 mod curves;
 mod polygons;
 mod selection;
 mod tolerances;
 
 pub use brep::BrepCodec;
+pub use camera::{CameraCodec, lens};
 pub use curves::CurvesCodec;
 pub use polygons::PolygonsCodec;
 
@@ -57,6 +59,16 @@ pub fn polygons() -> Typed<Polygons> {
 /// The handle on [`Curves`] values ([`CURVES`]).
 pub fn curves() -> Typed<Curves> {
     Typed::new(DataTypeId::declared(CURVES))
+}
+
+/// The id of camera values: an unplaced lens ([`lens`], [`CameraCodec`]).
+pub const CAMERA: &str = "kinogaki.core.camera";
+
+/// The handle on camera values ([`CAMERA`]): render-api's
+/// [`Camera`](kinogaki_render_api::Camera), unplaced, in UsdGeomCamera's
+/// units; make one with [`lens`].
+pub fn camera() -> Typed<kinogaki_render_api::Camera> {
+    Typed::new(DataTypeId::declared(CAMERA))
 }
 
 /// The handle on [`Brep`] values ([`BREP`]).
