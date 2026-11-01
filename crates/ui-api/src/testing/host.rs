@@ -155,6 +155,8 @@ pub struct FakeHost {
     pub inspected: Inspected,
     /// The user's preferences.
     pub prefs: HostPrefs,
+    /// The host's theme.
+    pub theme: crate::Theme,
     /// Settings sections' applied values, by context.
     pub sections: BTreeMap<ContextId, Arc<dyn Any + Send + Sync>>,
     /// The project's stored values.
@@ -214,6 +216,7 @@ impl FakeHost {
             view: None,
             inspected: Inspected::default(),
             prefs: HostPrefs::default(),
+            theme: crate::Theme::default(),
             sections: BTreeMap::new(),
             stored: Default::default(),
             user_stored: Default::default(),
@@ -654,6 +657,9 @@ impl Cx for FakeHost {
     }
     fn units(&self) -> &dyn UnitsService {
         self
+    }
+    fn theme(&self) -> &crate::Theme {
+        &self.theme
     }
     /// Queues `job` (cancelling a queued job of `key`, which then never
     /// runs) until [`FakeHost::run_latest`].

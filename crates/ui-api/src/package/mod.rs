@@ -70,7 +70,7 @@ pub use data::{
     BarField, BarValue, Candidate, ContextObject, ContextView, LevelPreset, LevelSpec, NumericBar,
     OutlineRow, Status, TimeDomain, TimeMark, TimeUnits, ToolbarItem, Tools,
 };
-pub use edited::{Edited, Hover, SurfaceLook, TemplateMark};
+pub use edited::{Edited, SurfaceLook, TemplateMark};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
     LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT,

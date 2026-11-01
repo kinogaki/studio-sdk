@@ -8,7 +8,6 @@
 //! borrowing, nothing is copied, and the renderer uploads only values
 //! whose `Arc` changed since the last frame. A context keeps the same
 //! `Arc`s while nothing changed, so a steady frame costs nothing.
-use kinogaki_studio_api::viewport::{ElementKind, ElementSet};
 use kinogaki_viewport_api::{
     FaceNormals, GuideDraw, LineHighlight, OverlayDraw, PointWeights, SceneLines,
 };
@@ -24,9 +23,6 @@ use std::sync::Arc;
 /// for another (a cook on its way) never draw on the wrong one.
 #[derive(Clone, Default)]
 pub struct Edited {
-    /// What is selected on it: faces (or whole objects), lines and markers,
-    /// each set in its kind's slot ([`Edited::select`]).
-    pub selection: [Option<ElementSet>; 3],
     /// Diagnostic findings and edge marks over `value`'s points and
     /// polygons.
     pub overlays: Option<Arc<OverlayDraw>>,
@@ -45,9 +41,10 @@ pub struct Edited {
     /// The values the Scalar shading spans in this view, low to high;
     /// `None`: the view's own range.
     pub scalar_range: Option<[f32; 2]>,
-    /// What is under the pointer.
-    pub hover: Hover,
-    /// Which of the surface's parts draw.
+    /// Which of the surface's parts draw (the context's own display state:
+    /// points at a points level, hidden line classes). The selection and
+    /// the hover are core's: it draws them from the context's
+    /// `Levels::components` and the hit it handed `Levels::hovered`.
     pub look: SurfaceLook,
     /// This view's own world-space lines (CAD's combs, silhouettes).
     pub lines: Vec<Arc<SceneLines>>,
@@ -59,46 +56,13 @@ pub struct Edited {
     pub section: Option<[f32; 4]>,
 }
 
-impl Edited {
-    /// The selection slot sets of `kind` go in.
-    pub fn slot(kind: ElementKind) -> usize {
-        match kind {
-            ElementKind::Face | ElementKind::Object => 0,
-            ElementKind::Edge => 1,
-            ElementKind::Point | ElementKind::Vertex => 2,
-        }
-    }
-
-    /// `set` in its kind's selection slot (replacing what was there).
-    pub fn select(&mut self, set: ElementSet) {
-        let slot = Self::slot(set.kind);
-        self.selection[slot] = Some(set);
-    }
-}
-
 impl fmt::Debug for Edited {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edited")
-            .field("selection", &self.selection)
-            .field("hover", &self.hover)
             .field("look", &self.look)
             .field("lines", &self.lines.len())
             .finish_non_exhaustive()
     }
-}
-
-/// What of the edited surface is under the pointer, by the ids its packet
-/// gives.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Hover {
-    /// A face, shown blended over the surface.
-    pub face: Option<u32>,
-    /// The hovered face's mirror under symmetry, tinted like it.
-    pub mirror: Option<u32>,
-    /// A face identifying the hovered object (a CAD body, a mesh piece).
-    pub object: Option<u32>,
-    /// A point marker, in its class's hover look.
-    pub point: Option<u32>,
 }
 
 /// Which of the edited surface's parts draw in a view.
@@ -147,24 +111,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sets_take_their_kinds_slots_and_the_look_starts_plain() {
-        let mut edited = Edited::default();
-        edited.select(ElementSet::new(ElementKind::Vertex, false, [4]));
-        edited.select(ElementSet::new(ElementKind::Object, false, [1]));
-        edited.select(ElementSet::new(ElementKind::Edge, false, [2]));
-        edited.select(ElementSet::new(ElementKind::Point, false, [3]));
-        let kinds = edited
-            .selection
-            .each_ref()
-            .map(|s| s.as_ref().map(|s| s.kind));
-        assert_eq!(
-            kinds,
-            [
-                Some(ElementKind::Object),
-                Some(ElementKind::Edge),
-                Some(ElementKind::Point)
-            ]
-        );
+    fn the_look_starts_plain() {
         let look = SurfaceLook::default();
         assert!(look.faces && look.wires && !look.points && !look.normals);
         assert_eq!((look.hidden_lines, look.hidden_points), (0, 0));

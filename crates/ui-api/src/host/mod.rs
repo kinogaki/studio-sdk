@@ -83,6 +83,10 @@ pub trait Cx:
     fn wake(&self) -> Waker;
     /// Numbers typed and shown in the user's units.
     fn units(&self) -> &dyn UnitsService;
+    /// The host's current theme: the one a part's [`Ui::theme`](crate::Ui::theme)
+    /// draws with, so what a viewport layer colors (edge marks from
+    /// [`Theme::marks`](crate::Theme::marks)) follows a changed theme.
+    fn theme(&self) -> &crate::Theme;
     /// Runs `job` on the host's worker lanes as the latest job of `key`
     /// (one of the package's own names): a job of `key` still running has
     /// its token cancelled, and its result is dropped. When `job` lands the
