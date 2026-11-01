@@ -243,6 +243,14 @@ pub enum SettingKind {
     },
 }
 
+impl SettingKind {
+    /// Whether a setting of this kind can be keyed over time unless its
+    /// engine says otherwise: every kind but a texture, which hosts set.
+    pub fn animatable(&self) -> bool {
+        !matches!(self, SettingKind::Texture)
+    }
+}
+
 /// What a number measures, for how a UI shows it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Unit {
@@ -371,6 +379,10 @@ pub struct SettingDescriptor {
     pub visible: Visibility,
     /// What its row shows after it.
     pub trailing: Option<Trailing>,
+    /// Whether a host may key it over time. Its kind gives the default
+    /// ([`SettingKind::animatable`]); an engine turns it off for a value
+    /// whose change should be one deliberate edit (a sample cap).
+    pub animatable: bool,
 }
 
 impl SettingDescriptor {
@@ -380,13 +392,20 @@ impl SettingDescriptor {
         SettingDescriptor {
             name: Arc::from(name),
             label: Arc::from(label),
-            kind,
             group: Arc::from(group),
             tooltip: None,
             requires: None,
             visible: Visibility::Always,
             trailing: None,
+            animatable: kind.animatable(),
+            kind,
         }
+    }
+
+    /// It, animatable or not (see [`animatable`](Self::animatable)).
+    pub fn animatable(mut self, on: bool) -> SettingDescriptor {
+        self.animatable = on;
+        self
     }
 
     /// It, with `tooltip`.

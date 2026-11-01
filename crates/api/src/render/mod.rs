@@ -11,7 +11,8 @@
 //!
 //! [`ShaderType`]s ([`shaders`]) are an engine's material vocabulary as
 //! node types of Studio's Shading context, which the engine's package
-//! registers.
+//! registers. An engine's settings and its declared prims' values are
+//! parameters to a host keying them over time ([`setting_parameter`]).
 use crate::math::Mat4;
 use std::fmt;
 use std::sync::Arc;
@@ -20,8 +21,10 @@ pub use kinogaki_render_api::{
     AttributeDomain, Detail, Extra, ImportedMaterial, Look, MeshAttribute, PlainTriangles,
     PreviewSurface, Ranges, TriangleSource,
 };
+pub use setting::{setting_from_value, setting_parameter, setting_to_value};
 pub use shader::{MATERIAL, SHADER_VALUE, SHADING, ShaderType, presets, shader_value, shaders};
 
+mod setting;
 mod shader;
 
 /// What a value renders as.

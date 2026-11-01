@@ -250,9 +250,9 @@ impl EngineDescription {
 }
 
 /// The engines a host can make, in the order it lists them; the first is
-/// its default. A host may have none (no render engine is installed): it
-/// then renders nothing.
-#[derive(Clone, Debug)]
+/// its default. A host may have none (no render engine is installed, the
+/// default): it then renders nothing.
+#[derive(Clone, Debug, Default)]
 pub struct Engines(Arc<[Arc<EngineDescription>]>);
 
 impl Engines {

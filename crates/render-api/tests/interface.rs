@@ -389,6 +389,10 @@ fn settings_fit_their_descriptors() {
     ] {
         assert!(settings::validate(&ds, &bad).is_err());
     }
+    // Animatable by its kind's default, unless the engine says otherwise;
+    // a texture never.
+    assert!(d.animatable && !d.clone().animatable(false).animatable);
+    assert!(!SettingDescriptor::new("t", "T", "main", SettingKind::Texture).animatable);
     let mut r = RenderSettings::default();
     r.set("samples", SettingValue::Int(3));
     r.set("samples", SettingValue::Int(4));
