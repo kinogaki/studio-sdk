@@ -258,7 +258,7 @@ impl FileFormat for XyzFormat {
     }
 }
 
-/// The points selected; place-bound, and a sketch-like mode clears it.
+/// The points selected; place-bound, and a level of another context clears it.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Selection(Vec<u32>);
 impl Slot for Selection {
@@ -270,7 +270,7 @@ impl Slot for Selection {
     }
     const PLACE_BOUND: bool = true;
     fn restored(&self, doc: &dyn SlotDoc) -> Option<Self> {
-        (doc.in_mode() && !self.0.is_empty()).then(Self::default)
+        (doc.context() != points_context() && !self.0.is_empty()).then(Self::default)
     }
     fn estimated_bytes(&self) -> usize {
         self.0.len() * 4
@@ -430,16 +430,15 @@ fn conversions_come_from_bridges() {
 }
 
 /// Where a slot test pretends the user is.
-struct Here {
-    mode: bool,
-}
+struct Here(ContextId);
 impl SlotDoc for Here {
     fn context(&self) -> ContextId {
-        ContextId::declared("toy.points.context")
+        self.0
     }
-    fn in_mode(&self) -> bool {
-        self.mode
-    }
+}
+
+fn points_context() -> ContextId {
+    ContextId::declared("toy.points.context")
 }
 
 #[test]
@@ -468,9 +467,9 @@ fn session_slots_start_initial_and_are_copied_on_write() {
     assert!(session.get_any(id).unwrap().is::<Selection>());
     // Restoring brings values in line; a new level starts place-bound
     // ones over.
-    session.keep(&Here { mode: false });
+    session.keep(&Here(points_context()));
     assert_eq!(session.get::<Selection>(), Some(&Selection(vec![3])));
-    session.keep(&Here { mode: true });
+    session.keep(&Here(ContextId::declared("toy.other.context")));
     assert_eq!(session.get::<Selection>(), Some(&Selection::default()));
     session.set(Selection(vec![4]));
     session.reset_place_bound();

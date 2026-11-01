@@ -357,6 +357,7 @@ impl NetworkRead for FakeNetwork {
             name: &n.name,
             node_type: n.node_type,
             parameters: &n.parameters,
+            animated: Vec::new(),
             inputs: n.inputs.clone(),
             flags: n.flags,
             level: n.level,

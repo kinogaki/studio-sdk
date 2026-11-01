@@ -1,8 +1,9 @@
 //! [`NetworkRead`]: a network as packages read it.
 use crate::data::Data;
 use crate::id::{ContextId, NodeTypeId};
-use crate::params::Parameters;
+use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
+use crate::time::Time;
 
 /// One network, read through the host (a package's UI reaches an
 /// object's through the UI API's `HostNetwork`). Nodes are named by the host's ids, which are unique through every
@@ -31,6 +32,14 @@ pub trait NetworkRead {
         let _ = node;
         None
     }
+    /// Parameter `row` of `node` at `time`: its keys' value there when it
+    /// is animated, else its value. `None` when the node or the row isn't
+    /// there, or the network doesn't animate (a package's handles read
+    /// the value at the scene's current time, not the static one).
+    fn value_at(&self, node: NodeRef, row: &str, time: Time) -> Option<Value> {
+        let _ = (node, row, time);
+        None
+    }
 }
 
 /// One node as [`NetworkRead::node`] reads it.
@@ -41,8 +50,12 @@ pub struct NodeInfo<'a> {
     /// Its type.
     pub node_type: NodeTypeId,
     /// Its parameters by name: every one its type declares, and the
-    /// spares its type declares for them.
+    /// spares its type declares for them. An animated row holds its static
+    /// value, the one it keeps when its keys are cleared
+    /// ([`NetworkRead::value_at`] reads its value at a moment).
     pub parameters: &'a Parameters,
+    /// Its animated parameters (rows with keys), by name.
+    pub animated: Vec<String>,
     /// Its input wires, one list a port in port order, in wire order.
     pub inputs: Vec<Vec<Wire>>,
     /// Its core flags.

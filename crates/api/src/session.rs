@@ -63,10 +63,6 @@ pub trait Slot: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
 pub trait SlotDoc {
     /// The open level's context (the scene's for an object level).
     fn context(&self) -> ContextId;
-
-    /// Whether the open level is a mode on one of its network's nodes
-    /// (CAD's sketch mode on a Sketch node).
-    fn in_mode(&self) -> bool;
 }
 
 /// A shared slot value.

@@ -19,7 +19,7 @@ use kinogaki_studio_api::params::{Severity, Unit};
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
     Bounds, ContextId, Data, Drawn, Error, ObjectBody, ObjectKindId, Package, SessionSlot,
-    SessionSlots, SlotId,
+    SessionSlots, SlotId, Time,
 };
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
@@ -50,6 +50,8 @@ pub enum HostCall {
     PickNode(NodeRef, bool),
     /// [`HostDoc::go_to`].
     GoTo(Place),
+    /// [`HostDoc::set_time`].
+    SetTime(Time),
     /// [`HostView::frame_bounds`].
     Frame(Bounds),
     /// [`HostView::redraw`].
@@ -135,6 +137,8 @@ pub struct FakeHost {
     pub place: Place,
     /// The document's revision.
     pub revision: u64,
+    /// The scene's current time.
+    pub time: Time,
     /// The scene's objects.
     pub scene: BTreeMap<ObjectRef, FakeObject>,
     /// The objects' networks, which [`HostNetwork`] reads and edits (one
@@ -198,6 +202,7 @@ impl FakeHost {
                 node: None,
             },
             revision: 1,
+            time: Time::ZERO,
             scene: BTreeMap::new(),
             networks: BTreeMap::new(),
             cameras: Vec::new(),
@@ -292,9 +297,6 @@ struct Here(Place);
 impl SlotDoc for Here {
     fn context(&self) -> ContextId {
         self.0.context
-    }
-    fn in_mode(&self) -> bool {
-        self.0.node.is_some() && !self.0.objects
     }
 }
 
@@ -449,6 +451,13 @@ impl HostDoc for FakeHost {
     }
     fn editing(&self) -> bool {
         self.editing
+    }
+    fn time(&self) -> Time {
+        self.time
+    }
+    fn set_time(&mut self, time: Time) {
+        self.calls.push(HostCall::SetTime(time));
+        self.time = time;
     }
 }
 

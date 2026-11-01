@@ -16,7 +16,7 @@ use std::panic::Location;
 /// Core builds it with [`new`](Self::new) and the `with_*` methods; a node
 /// reads it. What a node didn't declare in its
 /// [`Reads`](crate::cook::Reads) is withheld: a node that doesn't read
-/// time sees [`Time::default`], one that doesn't read input names sees
+/// time sees [`Time::ZERO`] at 24 frames a second, one that doesn't read input names sees
 /// none, one that doesn't read the selection sees none.
 pub struct CookCx<'a> {
     parameters: &'a Parameters,
@@ -31,6 +31,7 @@ pub struct CookCx<'a> {
     cancel: &'a CancelToken,
     workers: &'a dyn Workers,
     time: Time,
+    fps: f64,
     node: u64,
     resolved: &'a [(String, Resolved)],
     project: Option<&'a Project<'a>>,
@@ -63,7 +64,8 @@ impl<'a> CookCx<'a> {
             incoming: None,
             cancel,
             workers,
-            time: Time::default(),
+            time: Time::ZERO,
+            fps: 24.0,
             node: 0,
             resolved: &[],
             project: None,
@@ -119,6 +121,12 @@ impl<'a> CookCx<'a> {
     /// At `time`.
     pub fn with_time(mut self, time: Time) -> Self {
         self.time = time;
+        self
+    }
+
+    /// In a document showing `fps` frames a second.
+    pub fn with_fps(mut self, fps: f64) -> Self {
+        self.fps = fps;
         self
     }
 
@@ -269,6 +277,12 @@ impl<'a> CookCx<'a> {
     /// The scene time the cook runs at.
     pub fn time(&self) -> Time {
         self.time
+    }
+
+    /// The document's frames a second: what [`time`](Self::time) is in
+    /// frames ([`Time::frame`]), and a frame's length.
+    pub fn fps(&self) -> f64 {
+        self.fps
     }
 
     /// The node's scratch value of type `T`, made with `T::default()` when

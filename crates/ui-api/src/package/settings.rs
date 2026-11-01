@@ -7,8 +7,9 @@
 //! applied value and the Settings window's draft, draws each page from
 //! [`Section::page`]'s sheet, applies the edits it reports through
 //! [`Section::apply`], and saves the section with the rest of the user's
-//! settings. A file holding no section for an installed package's context
-//! does not read; a section of a package that isn't installed is skipped.
+//! settings. An installed package without a section starts from its
+//! defaults; a section of a package that isn't installed is kept and
+//! written back unchanged.
 use crate::sheet::{Edits, Schema};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::{ContextId, Error};

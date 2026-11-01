@@ -14,7 +14,7 @@ use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, NodeTypeId, ObjectBody, ObjectKindId, Parameters, SlotId,
+    Bounds, ContextId, Data, Drawn, NodeTypeId, ObjectBody, ObjectKindId, Parameters, SlotId, Time,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -163,6 +163,11 @@ pub trait HostDoc {
     /// Mesh): the library's entries for editing show, and a key store
     /// active while editing applies.
     fn editing(&self) -> bool;
+    /// The scene's current time: what cooks and keys are at.
+    fn time(&self) -> Time;
+    /// Shows the scene at `time`, kept inside its frame range (navigation,
+    /// not an undo step): a package's "go to key" button.
+    fn set_time(&mut self, time: Time);
 }
 
 /// Typed access to the stored values.

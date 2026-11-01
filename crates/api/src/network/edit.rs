@@ -1,11 +1,13 @@
 //! [`NetworkEdit`]: the edits a package makes to a network.
 use super::{Flag, NetworkRead, Wire};
+use crate::Key;
 use crate::cook::Outputs;
 use crate::data::Data;
 use crate::error::Error;
 use crate::id::NodeTypeId;
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
+use crate::time::Time;
 
 /// A network a package edits through the host, inside one undo step. Each
 /// call refuses what doesn't fit (an unknown node, a wire into a port the
@@ -92,6 +94,31 @@ pub trait NetworkEdit: NetworkRead {
         Err(Error::invalid(
             "this network holds no networks inside its nodes",
         ))
+    }
+
+    /// Sets `key` on parameter `row` of `node`, replacing its key at that
+    /// time: the row is animated from then on, its value at each moment
+    /// its keys'. Refused for a row its type doesn't let animate
+    /// ([`Parameter::animatable`](crate::params::Parameter::animatable)),
+    /// a value the row doesn't take and a row a subnet's parameter drives
+    /// (a row has one driver).
+    fn set_key(&mut self, node: NodeRef, row: &str, key: Key) -> Result<(), Error> {
+        let _ = (node, row, key);
+        Err(Error::invalid("this network's parameters don't animate"))
+    }
+
+    /// Removes the key at `time` of parameter `row` of `node`; removing
+    /// its last key is [`clear_channel`](Self::clear_channel).
+    fn remove_key(&mut self, node: NodeRef, row: &str, time: Time) -> Result<(), Error> {
+        let _ = (node, row, time);
+        Err(Error::invalid("this network's parameters don't animate"))
+    }
+
+    /// Stops animating parameter `row` of `node`: it keeps the value it
+    /// has at the scene's current time.
+    fn clear_channel(&mut self, node: NodeRef, row: &str) -> Result<(), Error> {
+        let _ = (node, row);
+        Err(Error::invalid("this network's parameters don't animate"))
     }
 
     /// Freezes `node` with `outputs`, the outputs it has now (one value

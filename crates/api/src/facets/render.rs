@@ -54,13 +54,13 @@ mod tests {
     #[test]
     fn a_render_asks_at_the_viewports_detail_unless_told() {
         let cancel = CancelToken::default();
-        let cx = RenderCx::new(Time::default(), &cancel);
+        let cx = RenderCx::new(Time::ZERO, &cancel);
         assert_eq!(cx.detail, Detail::Viewport);
         let fine = Detail::Render {
             chord: 0.01,
             angle: 5.0,
         };
         let cx = cx.with_detail(fine);
-        assert_eq!((cx.detail, cx.time), (fine, Time::default()));
+        assert_eq!((cx.detail, cx.time), (fine, Time::ZERO));
     }
 }
