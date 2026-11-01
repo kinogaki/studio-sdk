@@ -11,7 +11,9 @@
 //! defaults ([`FileFormat::options`]), shown by its [`Schema`]
 //! ([`FileFormat::schema`]) and saved by the format itself
 //! ([`FileFormat::write_options`]), so a File node's options and the
-//! application's import defaults keep the format's own spelling.
+//! application's import defaults keep the format's own spelling. A
+//! format's writer has options of its own ([`FormatWriter::options`],
+//! [`FormatWriter::schema`]): writing never gets the reading options.
 pub mod options;
 
 use crate::data::Data;
@@ -232,8 +234,24 @@ pub trait FormatWriter: Send + Sync {
     /// groups are kept).
     fn accepts(&self) -> &[DataTypeId];
 
+    /// Every option of its writing with its default (a STEP schema, AP214
+    /// or AP242): its own, apart from its format's reading options; none by
+    /// default.
+    fn options(&self) -> FormatOptions {
+        FormatOptions::new()
+    }
+
+    /// The Export dialog for `options`: a parameter per option, named as
+    /// the option and holding its current value; empty (no dialog) by
+    /// default.
+    fn schema(&self, options: &FormatOptions) -> Schema {
+        let _ = options;
+        Schema::default()
+    }
+
     /// Writes `items` (parents before children), whose lengths are in
-    /// `units`, to `path` with `options`.
+    /// `units`, to `path` with `options`: every one of
+    /// [`options`](Self::options), each set or at its default.
     fn write(
         &self,
         path: &Path,
@@ -293,6 +311,34 @@ mod tests {
             .write(|w| w.set("scale", Field::Text("2".into())))
             .unwrap();
         assert!(short.read(|r| Plain.read_options(r)).is_err());
+    }
+
+    #[test]
+    fn a_writer_has_no_options_by_default_whatever_its_reading_has() {
+        struct Writes;
+        impl FormatWriter for Writes {
+            fn accepts(&self) -> &[DataTypeId] {
+                &[]
+            }
+            fn write(
+                &self,
+                _: &Path,
+                _: &[FileItem],
+                _: Units,
+                _: &FormatOptions,
+            ) -> Result<(), Error> {
+                Ok(())
+            }
+        }
+        assert!(!Plain.options().is_empty());
+        assert!(Writes.options().is_empty());
+        assert!(
+            Writes
+                .schema(&Plain.options())
+                .parameters()
+                .next()
+                .is_none()
+        );
     }
 
     #[test]
