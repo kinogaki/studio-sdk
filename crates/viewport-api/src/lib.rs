@@ -49,7 +49,7 @@ pub use packet::{
 };
 pub use points::{PointClass, PointClassId, PointLook, PointShape, PointStyle};
 pub use preview::{MotionMask, PartMotion, Patch, PointWeights, PreviewUpdate, WeightedMotion};
-pub use selection::ElementSelection;
+pub use selection::{BoxRule, ElementSelection};
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,
 };

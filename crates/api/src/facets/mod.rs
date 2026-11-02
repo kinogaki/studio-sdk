@@ -23,7 +23,7 @@ mod table;
 
 pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally};
 pub use glyph::{GlyphScale, Glyphs};
-pub use object::{Look, Materials, Matrix, ObjectPicking, WorldRay};
+pub use object::{Look, Marquee, Materials, Matrix, ObjectPicking, WorldRay};
 pub use pick::{Combine, Pickable};
 pub use render::{RenderCx, Renderable};
 pub use snap::{SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable};

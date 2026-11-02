@@ -1,10 +1,11 @@
 //! [`ObjectPicking`] and [`Look`]: what the viewport asks of an object's
 //! result at the object levels beyond its pieces. The first covers where a
-//! ray meets it, whether a marquee holds it and its world box. The second
+//! ray meets it, whether a [`Marquee`] takes it and its world box. The second
 //! covers how it looks against the scene's [`Materials`].
 use crate::data::Data;
 use crate::facets::Drawn;
 use crate::math::Bounds;
+use crate::viewport::BoxRule;
 use kinogaki_render_api::Tint;
 use std::sync::Arc;
 
@@ -21,6 +22,20 @@ pub struct WorldRay {
     pub direction: [f64; 3],
 }
 
+/// A marquee over a view: its box, running 0–1 across the view and down
+/// from its top, and the rule it takes objects by.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Marquee {
+    /// The box's top left corner.
+    pub min: [f64; 2],
+    /// Its bottom right corner.
+    pub max: [f64; 2],
+    /// Which objects it takes. Core picks it from the drag, the same for
+    /// every kind: dragged left to right a window, right to left a
+    /// crossing.
+    pub rule: BoxRule,
+}
+
 /// How an object holding a value of the type is picked and framed at the
 /// object levels. Without it, core frames the value by
 /// [`DataType::bounds`](crate::DataType::bounds) and doesn't pick it.
@@ -29,17 +44,17 @@ pub trait ObjectPicking: Send + Sync {
     /// (drawn as `drawn`, placed at `world`) that the ray meets.
     fn ray(&self, data: &Data, drawn: &Drawn, world: &Matrix, ray: &WorldRay) -> Option<f64>;
 
-    /// Whether a point of it lies in the box from `min` to `max` of the
-    /// view whose world-to-clip is `view`. The box runs 0–1 across the
-    /// view, down from its top.
+    /// Whether `marquee`, over the view whose world-to-clip is `view`,
+    /// takes it by its rule: wholly inside its box ([`BoxRule::Window`]),
+    /// or a point of it inside ([`BoxRule::Crossing`]). A value with
+    /// nothing drawn lies in no box.
     fn in_box(
         &self,
         data: &Data,
         drawn: &Drawn,
         view: &Matrix,
         world: &Matrix,
-        min: [f64; 2],
-        max: [f64; 2],
+        marquee: &Marquee,
     ) -> bool;
 
     /// Its world box.
