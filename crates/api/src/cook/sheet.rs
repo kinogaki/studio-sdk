@@ -21,12 +21,14 @@ pub enum RowsFor {
 
 /// What [`NodeType::schema`](super::NodeType::schema) may shape a node's
 /// rows by: which of its input ports are wired, what each held when the
-/// node last cooked (an attribute menu from the input's attributes), and
-/// where the rows show.
+/// node last cooked (an attribute menu from the input's attributes), what
+/// the node itself made then (what an Auto choice resolved to), and where
+/// the rows show.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SchemaCx<'a> {
     wired: &'a [bool],
     inputs: &'a [Option<Data>],
+    outputs: &'a [Data],
     names: &'a [Vec<String>],
     kept: Option<&'a [f64]>,
     purpose: RowsFor,
@@ -40,6 +42,7 @@ impl<'a> SchemaCx<'a> {
         Self {
             wired,
             inputs,
+            outputs: &[],
             names: &[],
             kept: None,
             purpose: RowsFor::Inspector,
@@ -60,6 +63,14 @@ impl<'a> SchemaCx<'a> {
     /// With the names of the nodes wired into each port, in wire order.
     pub fn with_input_names(mut self, names: &'a [Vec<String>]) -> Self {
         self.names = names;
+        self
+    }
+
+    /// With the node's own `outputs` at its last cook, one a port, while
+    /// its stamp (its parameters and what it reads) is still the one it
+    /// cooked at; empty when it hasn't cooked at that stamp.
+    pub fn with_outputs(mut self, outputs: &'a [Data]) -> Self {
+        self.outputs = outputs;
         self
     }
 
@@ -89,6 +100,14 @@ impl<'a> SchemaCx<'a> {
     /// What input `port` held at the node's last cook, if it cooked.
     pub fn input(&self, port: usize) -> Option<&'a Data> {
         self.inputs.get(port)?.as_ref()
+    }
+
+    /// What the node's own output `port` held at its last cook, while its
+    /// stamp holds (see [`with_outputs`](Self::with_outputs)). An output
+    /// nothing read then may hold an empty value of its type
+    /// ([`Outputs::data`](super::Outputs::data)).
+    pub fn output(&self, port: usize) -> Option<&'a Data> {
+        self.outputs.get(port)
     }
 }
 
@@ -150,6 +169,11 @@ mod tests {
         let cx = SchemaCx::new(&[true, false], &[None, None]);
         assert!(cx.wired(0) && !cx.wired(1) && !cx.wired(5));
         assert!(cx.input(0).is_none() && cx.input(9).is_none());
+        assert!(cx.output(0).is_none());
+        let made =
+            [crate::Typed::<f64>::new(crate::DataTypeId::declared("acme.trees.count")).wrap(2.0)];
+        let cooked = cx.with_outputs(&made);
+        assert!(cooked.output(0).is_some() && cooked.output(1).is_none());
         assert!(!SchemaCx::default().wired(0));
         assert_eq!(cx.kept(), None);
         assert!(cx.input_names(0).is_empty());
