@@ -90,6 +90,11 @@ pub struct SnapHit {
     pub kind: SnapKind,
     /// Where.
     pub position: [f64; 3],
+    /// The surface's shading normal there, unit length, for a hit on a
+    /// surface ([`SnapKind::Face`]); `None` for points and edges. A type
+    /// answers in the object's space; the host hands a tool's snap
+    /// (`ViewCx::snap`) the world's.
+    pub normal: Option<[f64; 3]>,
 }
 
 /// How a value is snapped to.
