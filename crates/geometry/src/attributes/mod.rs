@@ -432,9 +432,12 @@ fn remove<T>(map: &mut Named<T>, class: Class, name: &str) {
 
 /// The first element whose value is NaN or infinite.
 fn first_not_finite(values: &AttributeValues) -> Option<usize> {
+    const BLOCK: usize = 65_536;
     match values {
-        AttributeValues::Float(v) => v.iter().position(|x| !x.is_finite()),
-        AttributeValues::Vector(v) => v.iter().position(|x| !x.iter().all(|c| c.is_finite())),
+        AttributeValues::Float(v) => crate::parallel::first_refused(v, BLOCK, |x| x.is_finite()),
+        AttributeValues::Vector(v) => crate::parallel::first_refused(v, BLOCK, |x| {
+            x[0].is_finite() & x[1].is_finite() & x[2].is_finite()
+        }),
         AttributeValues::Integer(_) | AttributeValues::Text(_) => None,
     }
 }

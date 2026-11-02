@@ -99,6 +99,33 @@ fn the_first_bad_position_is_reported_on_large_values() {
 }
 
 #[test]
+fn the_first_bad_attribute_value_is_reported_on_large_values() {
+    let n = 300_000;
+    let t = Topology::new(n, vec![0].into(), Vec::new().into(), 0).unwrap();
+    let p = Polygons::new(vec![[0.0; 3]; n].into(), t, Attributes::new()).unwrap();
+    let mut w = vec![0.0; n];
+    w[250_000] = f64::NAN;
+    w[200_001] = f64::NEG_INFINITY;
+    let mut dir = vec![[0.0; 3]; n];
+    dir[299_999][2] = f64::INFINITY;
+    dir[131_072][1] = f64::NAN;
+    for (name, attribute, first) in [
+        ("w", Attribute::float(w), 200_001),
+        ("dir", Attribute::vector(dir, TypeInfo::None), 131_072),
+    ] {
+        let table = Attributes::new()
+            .with(Class::Point, name, attribute)
+            .unwrap();
+        let e = p.with_attributes(table).unwrap_err();
+        assert_eq!(e.element(), Some(first), "{name}");
+        assert_eq!(
+            e.message(),
+            format!("point attribute {name}'s value {first} is not finite")
+        );
+    }
+}
+
+#[test]
 fn one_past_the_point_limit_is_refused() {
     let t = Topology::new(MAX_POINTS + 1, vec![0].into(), Vec::new().into(), 0);
     assert_eq!(t.unwrap_err().kind(), ErrorKind::Limit);

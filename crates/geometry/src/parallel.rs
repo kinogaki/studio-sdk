@@ -52,6 +52,25 @@ pub(crate) fn map_blocks<R: Send>(
     done.into_iter().map(|(_, r)| r).collect()
 }
 
+/// The first of `values` that `fine` refuses, searched in blocks of
+/// `block`: a branch-free pass says whether a block holds one, and only
+/// then is it searched (what validation does on large columns).
+pub(crate) fn first_refused<T: Sync>(
+    values: &[T],
+    block: usize,
+    fine: impl Fn(&T) -> bool + Sync,
+) -> Option<usize> {
+    let bad = map_blocks(values.len(), block, |range| {
+        let start = range.start;
+        let values = &values[range];
+        if values.iter().fold(true, |ok, v| ok & fine(v)) {
+            return None;
+        }
+        values.iter().position(|v| !fine(v)).map(|i| start + i)
+    });
+    bad.into_iter().flatten().next()
+}
+
 /// `work(i)` for every `i` in `0..len`, in blocks of `block`.
 pub(crate) fn each(len: usize, block: usize, work: impl Fn(usize) + Sync) {
     map_blocks(len, block, |range| range.for_each(&work));
@@ -107,5 +126,20 @@ mod tests {
         });
         assert!(values.iter().enumerate().all(|(i, &v)| i == v));
         assert!(map_blocks(0, 10, |r| r.len()).is_empty());
+    }
+
+    #[test]
+    fn the_first_refused_value_is_found_in_any_block() {
+        let mut values = vec![0.0_f64; 10_000];
+        let finite = |x: &f64| x.is_finite();
+        assert_eq!(first_refused(&values, 100, finite), None);
+        values[7_777] = f64::INFINITY;
+        values[9_000] = f64::NAN;
+        values[123] = f64::NAN;
+        for block in [1, 7, 100, 10_000, 20_000] {
+            let found = first_refused(&values, block, finite);
+            assert_eq!(found, values.iter().position(|x| !x.is_finite()), "{block}");
+        }
+        assert_eq!(first_refused(&[] as &[f64], 100, finite), None);
     }
 }

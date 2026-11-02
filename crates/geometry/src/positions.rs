@@ -11,25 +11,13 @@ const BLOCK: usize = 65_536;
 /// Checks `positions`; the error names the first bad point in order.
 pub(crate) fn check(positions: &Column<[f64; 3]>) -> Result<(), GeometryError> {
     limits::check(positions.len(), MAX_POINTS, "points")?;
-    let bad = parallel::map_blocks(positions.len(), BLOCK, |range| {
-        let start = range.start;
-        let block = &positions[range];
-        // A branch-free pass finds whether the block has a bad point; only
-        // then is it searched. NaN fails every comparison.
-        let fine = block.iter().fold(true, |ok, p| {
-            ok & (p[0].abs() <= MAX_COORDINATE)
-                & (p[1].abs() <= MAX_COORDINATE)
-                & (p[2].abs() <= MAX_COORDINATE)
-        });
-        if fine {
-            return None;
-        }
-        block
-            .iter()
-            .position(|p| !p.iter().all(|c| c.abs() <= MAX_COORDINATE))
-            .map(|i| start + i)
-    });
-    match bad.into_iter().flatten().next() {
+    // NaN fails every comparison.
+    let fine = |p: &[f64; 3]| {
+        (p[0].abs() <= MAX_COORDINATE)
+            & (p[1].abs() <= MAX_COORDINATE)
+            & (p[2].abs() <= MAX_COORDINATE)
+    };
+    match parallel::first_refused(positions, BLOCK, fine) {
         Some(i) => Err(GeometryError::at(
             ErrorKind::Position,
             i,
