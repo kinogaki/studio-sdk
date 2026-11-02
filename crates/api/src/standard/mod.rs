@@ -104,14 +104,6 @@ pub fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
     Typed::new(DataTypeId::declared(PREVIEW_MATERIALS))
 }
 
-/// How many elements of `class` a B-rep value holds: one Detail element,
-/// and each other class's elements summed over its bodies in body order
-/// (a body's faces follow the faces of the bodies before it), so a
-/// selection of a value's faces, edges or vertices spans its bodies.
-pub fn brep_count(value: &Brep, class: Class) -> Option<usize> {
-    brep::count(value, class)
-}
-
 /// `selection` of a value of data type `ty` with `count` elements of its
 /// class, as the [`Components`] the host keeps, shows and counts.
 pub fn components(ty: DataTypeId, selection: Selection, count: usize) -> Components {

@@ -234,6 +234,11 @@ impl<'a> CookCx<'a> {
         self.typed(name, "text", Value::text)
     }
 
+    /// Data parameter `name`'s value, or a failure naming it.
+    pub fn data(&self, name: &str) -> Result<&Data, CookError> {
+        self.typed(name, "data", Value::data)
+    }
+
     fn typed<'v, T>(
         &'v self,
         name: &str,

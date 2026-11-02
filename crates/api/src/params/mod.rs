@@ -20,6 +20,7 @@ pub use schema::{
     segments,
 };
 
+use crate::data::Data;
 use std::collections::BTreeMap;
 
 /// A parameter's value. Which variant a parameter holds follows from its
@@ -40,6 +41,10 @@ pub enum Value {
     Text(String),
     /// Several texts: a list of names (the outputs a node writes).
     Texts(Vec<String>),
+    /// A value of a registered data type ([`ParameterKind::Data`]): a
+    /// structured record a node's tools author (a sketch). Equal by type
+    /// and allocation ([`Data`]'s rule).
+    Data(Data),
 }
 
 impl Value {
@@ -90,6 +95,14 @@ impl Value {
             _ => None,
         }
     }
+
+    /// The data, when it is a data type's value.
+    pub fn data(&self) -> Option<&Data> {
+        match self {
+            Self::Data(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 impl From<f64> for Value {
@@ -128,6 +141,12 @@ impl From<Vec<f64>> for Value {
     }
 }
 
+impl From<Data> for Value {
+    fn from(v: Data) -> Self {
+        Self::Data(v)
+    }
+}
+
 /// Values by parameter name (`"distance"`, `"merge_shells"`): a node's
 /// parameters when it cooks, a format's options when it reads or writes.
 /// Every declared parameter is present. A node may hold more than its
@@ -151,5 +170,11 @@ mod tests {
         let texts = Value::from(vec!["beauty".to_owned(), "depth".to_owned()]);
         assert_eq!(texts.texts().map(<[String]>::len), Some(2));
         assert_eq!(texts.text(), None);
+        let data = crate::Typed::<f64>::new(crate::DataTypeId::declared("acme.points.count"));
+        let value = Value::from(data.wrap(1.0));
+        assert_eq!(value.data().and_then(|d| data.get(d)), Some(&1.0));
+        assert_eq!(value.clone(), value);
+        assert_ne!(Value::from(data.wrap(1.0)), value);
+        assert_eq!(value.text(), None);
     }
 }

@@ -67,6 +67,17 @@ impl Data {
     }
 }
 
+/// Equal when they are one value: of one data type and one allocation
+/// ([`ptr_eq`](Data::ptr_eq)). Values are immutable, so an edit always
+/// makes a new allocation and identity is exact; content equality, where
+/// something needs it across allocations (a value read back from a file),
+/// is the data type's [`stamp`](crate::DataType::stamp).
+impl PartialEq for Data {
+    fn eq(&self, other: &Self) -> bool {
+        self.ty == other.ty && self.ptr_eq(other)
+    }
+}
+
 impl fmt::Debug for Data {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Data({} @ {:#x})", self.ty, self.identity())
@@ -187,8 +198,10 @@ mod tests {
         let data = cloud().wrap(Cloud(vec![1.0]));
         let clone = data.clone();
         assert!(data.ptr_eq(&clone) && data.identity() == clone.identity());
+        assert_eq!(data, clone);
         let equal_but_new = cloud().wrap(Cloud(vec![1.0]));
         assert!(!data.ptr_eq(&equal_but_new));
+        assert_ne!(data, equal_but_new);
         let arc = Arc::new(Cloud(vec![]));
         let a = cloud().wrap_arc(arc.clone());
         let b = cloud().wrap_arc(arc);
