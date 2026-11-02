@@ -69,10 +69,11 @@ fn edge(curve: CurveId, interval: [f64; 2], vertices: [VertexId; 2]) -> EdgeSpec
 // The second kernel.
 
 /// A polyhedron of `points` and `faces` (each a cycle of point indices,
-/// counter-clockwise seen from outside): planes, lines and chart lines.
-fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]]) -> BrepBuilder {
+/// counter-clockwise seen from outside): planes, lines and chart lines,
+/// its entities named from `first`.
+fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]], first: u32) -> BrepBuilder {
     let mut b = BrepBuilder::new(name(1000), P);
-    let mut names = 0..;
+    let mut names = first..;
     let vertices: Vec<VertexId> = points
         .iter()
         .map(|&p| b.vertex(p, None, name(names.next().unwrap())))
@@ -129,6 +130,22 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]]) -> BrepBuilder {
 }
 
 fn cuboid(lo: [f64; 3], hi: [f64; 3]) -> BrepBuilder {
+    cuboid_faces(lo, hi, &BOX_FACES, 0)
+}
+
+/// A box's six faces over its corners (bit 0 x, bit 1 y, bit 2 z).
+const BOX_FACES: [&[usize]; 6] = [
+    &[0, 2, 3, 1],
+    &[4, 5, 7, 6],
+    &[0, 1, 5, 4],
+    &[2, 6, 7, 3],
+    &[0, 4, 6, 2],
+    &[1, 3, 7, 5],
+];
+
+/// A box from `lo` to `hi` bounded by `faces` over its corners, its
+/// entities named from `first`.
+fn cuboid_faces(lo: [f64; 3], hi: [f64; 3], faces: &[&[usize]], first: u32) -> BrepBuilder {
     let p = |i: usize| {
         [
             if i & 1 == 0 { lo[0] } else { hi[0] },
@@ -137,17 +154,7 @@ fn cuboid(lo: [f64; 3], hi: [f64; 3]) -> BrepBuilder {
         ]
     };
     let points: Vec<[f64; 3]> = (0..8).map(p).collect();
-    polyhedron(
-        &points,
-        &[
-            &[0, 2, 3, 1],
-            &[4, 5, 7, 6],
-            &[0, 1, 5, 4],
-            &[2, 6, 7, 3],
-            &[0, 4, 6, 2],
-            &[1, 3, 7, 5],
-        ],
-    )
+    polyhedron(&points, faces, first)
 }
 
 /// A closed cylinder of `radius` and `height` on the world z axis: a side
@@ -690,6 +697,64 @@ fn caches_live_on_the_shared_parts() {
         body.topology().fingerprint(),
         other.topology().fingerprint()
     );
+}
+
+/// The fingerprints say whether ids still mean the same elements: a
+/// resize (a box's sizes, a cylinder's radius: other edge
+/// parameter ranges over the same structure) keeps them, a split face,
+/// another structure or other names change them.
+#[test]
+fn fingerprints_follow_structure_and_names_never_geometry() {
+    let one = |b: BrepBuilder| {
+        let body = b.build(Attributes::new()).unwrap();
+        let value = Brep::new(
+            vec![body.clone()],
+            Curves::empty(),
+            Vec::new(),
+            Attributes::new(),
+            History::default(),
+        )
+        .unwrap();
+        (body, value)
+    };
+    let (unit, unit_value) = one(cuboid([0.0; 3], [1.0; 3]));
+    let (resized, resized_value) = one(cuboid([0.0; 3], [2.0, 3.0, 4.0]));
+    assert_ne!(
+        unit.topology()
+            .edge(EdgeId::from_index(&unit, 0).unwrap())
+            .interval(),
+        resized
+            .topology()
+            .edge(EdgeId::from_index(&resized, 0).unwrap())
+            .interval()
+    );
+    assert_eq!(
+        unit.topology().fingerprint(),
+        resized.topology().fingerprint()
+    );
+    assert_eq!(unit_value.fingerprint(), resized_value.fingerprint());
+    let (thin, thin_value) = one(cylinder(1.0, 1.0));
+    let (wide, wide_value) = one(cylinder(2.5, 1.0));
+    assert_eq!(thin.topology().fingerprint(), wide.topology().fingerprint());
+    assert_eq!(thin_value.fingerprint(), wide_value.fingerprint());
+    // The top split into two triangles: a face and an edge more.
+    let mut split: Vec<&[usize]> = BOX_FACES.to_vec();
+    split[1] = &[4, 5, 7];
+    split.push(&[4, 7, 6]);
+    let (halves, halves_value) = one(cuboid_faces([0.0; 3], [1.0; 3], &split, 0));
+    assert_ne!(
+        unit.topology().fingerprint(),
+        halves.topology().fingerprint()
+    );
+    assert_ne!(unit_value.fingerprint(), halves_value.fingerprint());
+    assert_ne!(unit_value.fingerprint(), thin_value.fingerprint());
+    // The same structure under other names.
+    let (renamed, renamed_value) = one(cuboid_faces([0.0; 3], [1.0; 3], &BOX_FACES, 100));
+    assert_eq!(
+        unit.topology().fingerprint(),
+        renamed.topology().fingerprint()
+    );
+    assert_ne!(unit_value.fingerprint(), renamed_value.fingerprint());
 }
 
 #[test]

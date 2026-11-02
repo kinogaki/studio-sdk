@@ -7,7 +7,7 @@ use super::{
 use crate::column::Column;
 use crate::derived::Derived;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Whether an entity runs with its carrier or against it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -426,10 +426,12 @@ impl BrepTopology {
         self.derived.get_or_build(|| build(self))
     }
 
-    /// A stable 32-byte content hash of the topology (BLAKE3 of its
-    /// tables; see [`super`] for the stream), the same for equal
-    /// topologies in every session: what a [`Selection`](crate::Selection)
-    /// made on it records. Cached.
+    /// A stable 32-byte hash of the topology's structure, its counts and
+    /// adjacency alone (no parameter ranges, precisions, carriers or other
+    /// geometry), the same for equal structures in every session: whether
+    /// its face, edge and vertex ids still mean the same elements, which a
+    /// resize keeps and a face added or split changes. What a
+    /// [`Selection`](crate::Selection) made on it records. Cached.
     pub fn fingerprint(&self) -> [u8; 32] {
         struct Fingerprint([u8; 32]);
         self.derived(|t| Fingerprint(super::fingerprint::of(t))).0
@@ -461,14 +463,30 @@ impl fmt::Debug for BrepTopology {
 
 /// The persistent names of a body's faces, edges and vertices, each table
 /// by its id; within a body, the names of one kind are distinct.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Names {
     pub(crate) faces: Column<Name>,
     pub(crate) edges: Column<Name>,
     pub(crate) vertices: Column<Name>,
+    /// Their fingerprint, once asked for.
+    pub(crate) fingerprint: OnceLock<[u8; 32]>,
+}
+
+/// Names are equal when their tables are.
+impl PartialEq for Names {
+    fn eq(&self, other: &Self) -> bool {
+        self.faces == other.faces && self.edges == other.edges && self.vertices == other.vertices
+    }
 }
 
 impl Names {
+    /// The names' fingerprint ([`super::fingerprint`]'s names stream):
+    /// what [`Brep::fingerprint`](super::Brep::fingerprint) hashes beside
+    /// each body's topology. Cached.
+    pub(crate) fn fingerprint(&self) -> [u8; 32] {
+        *(self.fingerprint).get_or_init(|| super::fingerprint::names(self))
+    }
+
     /// Face `f`'s name.
     pub fn face(&self, f: FaceId) -> &Name {
         &self.faces[f.index()]

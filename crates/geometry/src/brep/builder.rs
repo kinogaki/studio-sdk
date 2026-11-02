@@ -198,6 +198,7 @@ impl BrepBuilder {
             faces: self.face_names.into(),
             edges: self.edge_names.into(),
             vertices: self.vertex_names.into(),
+            fingerprint: std::sync::OnceLock::new(),
         });
         Body::checked(
             self.name,

@@ -120,16 +120,19 @@ impl Brep {
 
     /// What its numbering stands on, as one 32-byte hash: BLAKE3 of the
     /// body count, each body's [topology fingerprint](super::BrepTopology::fingerprint)
-    /// in body order, then the free curves' count and the datums'
-    /// counts of each class (planes, axes, points), each as a
-    /// little-endian `u64`. Equal fingerprints, the same elements under
-    /// the same ids: a selection made on one value still means the same
-    /// on the other, and a stale one is seen when they differ.
+    /// and the fingerprint of its persistent names in body order, then
+    /// the free curves' count and the datums' counts of each class
+    /// (planes, axes, points), each count a little-endian `u64`. It hashes
+    /// structure and names alone, never geometry: equal fingerprints, the
+    /// same elements under the same ids, so a selection made on one value
+    /// still means the same on the other (a resize keeps it), and a stale
+    /// one is seen when they differ (a face added or split).
     pub fn fingerprint(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
         h.update(&(self.bodies.len() as u64).to_le_bytes());
         for body in self.bodies.iter() {
             h.update(&body.topology().fingerprint());
+            h.update(&body.names().fingerprint());
         }
         h.update(&(self.curves.curves() as u64).to_le_bytes());
         for class in [Class::Primitive, Class::Edge, Class::Point] {
