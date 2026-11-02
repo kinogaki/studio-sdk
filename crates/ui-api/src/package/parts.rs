@@ -18,6 +18,7 @@ use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
 use crate::{Pos, Rect, Ui};
+use kinogaki_studio_api::geometry::Polygons;
 use kinogaki_studio_api::{Combine, Components, ObjectKindId, Vec3};
 use std::any::Any;
 use std::marker::PhantomData;
@@ -193,6 +194,17 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn tools(&self, s: &mut S, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
         let _ = (s, cx, ui);
         Tools::default()
+    }
+    /// The open object's own snap targets beyond its shown value (a
+    /// curve's control points, a sketch's points and lines), in its space:
+    /// points snap as points, polylines as edges, their middles and where
+    /// they cross. [`ViewCx::snap`] searches them with the shown value, in
+    /// one order and with one feedback. Asked once a frame, before the
+    /// views' [`tools`](Self::tools); the same value (its positions and
+    /// topology shared) while nothing changed costs nothing. `None`: none.
+    fn own_targets(&self, s: &S, cx: &dyn Cx) -> Option<Polygons> {
+        let _ = (s, cx);
+        None
     }
     /// Draws over a view after its navigation and pointer handling, so
     /// what it places follows this frame's camera: labels, handles,
@@ -514,6 +526,9 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn tools(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
         self.part.tools(own_mut(s), cx, ui)
+    }
+    fn own_targets(&self, s: &dyn Any, cx: &dyn Cx) -> Option<Polygons> {
+        self.part.own_targets(own(s), cx)
     }
     fn overlay(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) {
         self.part.overlay(own_mut(s), cx, ui)

@@ -14,6 +14,7 @@ use crate::host::{
 use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
 use kinogaki_studio_api::CancelToken;
+use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::{Severity, Unit};
 use kinogaki_studio_api::session::SlotDoc;
@@ -186,6 +187,9 @@ pub struct FakeHost {
     pub clipboard: Option<String>,
     /// What [`Cx::node_rows`] answers (it draws nothing).
     pub node_rows: NodeRows,
+    /// What [`ViewCx::snap`] answers, for any query (a fake host searches
+    /// no values).
+    pub snap: Option<SnapHit>,
     /// The [`Cx::latest`] jobs not yet run, by key, with their tokens;
     /// [`FakeHost::run_latest`] runs them.
     latest: BTreeMap<String, (CancelToken, LatestJob)>,
@@ -234,6 +238,7 @@ impl FakeHost {
             rendering: BTreeSet::new(),
             clipboard: None,
             node_rows: NodeRows::default(),
+            snap: None,
             latest: BTreeMap::new(),
             landed: BTreeMap::new(),
             undo: Vec::new(),
@@ -731,6 +736,16 @@ impl ViewCx for FakeHost {
     }
     fn gizmo(&self) -> &dyn GizmoService {
         self
+    }
+    /// Its `snap` field.
+    fn snap(
+        &mut self,
+        _at: Pos,
+        _targets: SnapTargets,
+        _radius: f64,
+        _on: Option<ObjectRef>,
+    ) -> Option<SnapHit> {
+        self.snap
     }
 }
 

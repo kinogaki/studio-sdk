@@ -49,6 +49,7 @@ pub use network::HostNetwork;
 
 use crate::gizmo::{GizmoFrame, Handle, TransformTool};
 use crate::{Pos, Projection, Rect};
+use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::{CancelToken, RowsFor};
 use std::any::Any;
@@ -123,6 +124,25 @@ pub trait ViewCx: Cx {
     fn view(&self) -> &View;
     /// The transform gizmo, drawn by the host in this view.
     fn gizmo(&self) -> &dyn GizmoService;
+    /// The best of `targets` within `radius` pixels of screen point `at`
+    /// in this view, as the host's gizmo snaps: the shown value of `on`
+    /// (`None`: the open object, with the targets its layer adds through
+    /// [`ViewportLayer::own_targets`](crate::package::ViewportLayer::own_targets))
+    /// asked through its type's `Snappable`, nothing of it moving, hidden
+    /// targets left out; a point before an edge before a surface, each the
+    /// nearest. The hit is in the open object's space, whichever object it
+    /// is on. `None`: nothing near, or `on` is hidden or shows nothing.
+    /// The host marks the last hit of a frame in this view, as it marks
+    /// its gizmo's: a tool draws no snap feedback of its own. Whether to
+    /// snap at all (the user's [`HostTransform::snapping`], Command) is
+    /// the tool's to decide.
+    fn snap(
+        &mut self,
+        at: Pos,
+        targets: SnapTargets,
+        radius: f64,
+        on: Option<ObjectRef>,
+    ) -> Option<SnapHit>;
 }
 
 /// The context of an inspector part's call.
