@@ -108,7 +108,8 @@ The topology's `Index` (edges in canonical order, polygons and polylines per edg
 Every data type answers a fixed set of questions:
 - its label and wire color;
 - the value's stamp, memory, bounds and info rows;
-- its codec.
+- its codec;
+- optionally its empty value (`empty`: what a bypassed node gives) and whether a value holds nothing (`is_empty`: the menus' "Create geometry first"). Hosts ask `is_empty` of shown values every frame, so it reads the value's counts; a stamp hashes the whole value and belongs to cooks.
 
 Facets are optional:
 

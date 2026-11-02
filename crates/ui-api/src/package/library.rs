@@ -122,9 +122,10 @@ pub struct When {
     /// With nothing selected, it shows at every level (a tool that then
     /// works on the whole value), whatever `levels` says.
     pub unselected_any_level: bool,
-    /// Only while the open object's shown value is (`Some(true)`) or isn't
-    /// (`Some(false)`) its data type's empty value ("Create geometry
-    /// first").
+    /// Only while the open object's shown value holds nothing
+    /// (`Some(true)`, its data type's
+    /// [`is_empty`](kinogaki_studio_api::DataType::is_empty)) or something
+    /// (`Some(false)`) ("Create geometry first").
     pub shown_empty: Option<bool>,
     /// Only while input `.0` of the displayed node is (`.1` true) or isn't
     /// wired (a held edit's Surface input).
@@ -142,8 +143,9 @@ pub struct Situation<'a> {
     pub selected: bool,
     /// The displayed node is a held edit.
     pub editing: bool,
-    /// Whether the open object's shown value is its type's empty value;
-    /// `None`: no object is open, or its type has no empty value.
+    /// Whether the open object's shown value holds nothing (its data
+    /// type's [`is_empty`](kinogaki_studio_api::DataType::is_empty));
+    /// `None`: no object is open, or its type can't tell.
     pub shown_empty: Option<bool>,
     /// The displayed node's inputs, each wired or not; empty: no node is
     /// displayed.

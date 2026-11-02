@@ -136,4 +136,11 @@ pub trait DataType: Send + Sync {
     fn empty(&self) -> Option<Data> {
         None
     }
+
+    /// Whether a value holds nothing (a mesh without points or faces),
+    /// answered from what it holds, never by hashing it: hosts ask it of
+    /// shown values every frame. `None` by default: the type can't tell.
+    fn is_empty(&self, _: &Data) -> Option<bool> {
+        None
+    }
 }
