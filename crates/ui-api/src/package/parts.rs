@@ -48,10 +48,13 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     }
     /// The open object and its selected components, as components of the
     /// value it shows ([`HostDoc::shown`](crate::host::HostDoc::shown)):
-    /// what a Material dropped on that object takes, and the selection the
-    /// spreadsheet shows (an empty set while nothing is). `None`: the
-    /// context keeps no component selection there.
-    fn components(&self, s: &S, cx: &dyn Cx) -> Option<(ObjectRef, Components)> {
+    /// one set per element kind the selection holds (edges and faces after
+    /// a Shift-mixed pick), no kind twice, each highlighted with its own
+    /// kind's style; what a Material dropped on that object takes, and the
+    /// selection the spreadsheet shows. A set may be empty: its level shows
+    /// with nothing selected at it (an empty point set still draws the
+    /// points). `None`: the context keeps no component selection there.
+    fn components(&self, s: &S, cx: &dyn Cx) -> Option<(ObjectRef, Vec<Components>)> {
         let _ = (s, cx);
         None
     }
@@ -450,7 +453,7 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     fn selected(&self, s: &dyn Any, cx: &dyn Cx) -> Option<usize> {
         self.part.selected(own(s), cx)
     }
-    fn components(&self, s: &dyn Any, cx: &dyn Cx) -> Option<(ObjectRef, Components)> {
+    fn components(&self, s: &dyn Any, cx: &dyn Cx) -> Option<(ObjectRef, Vec<Components>)> {
         self.part.components(own(s), cx)
     }
     fn hovered(&self, s: &mut dyn Any, cx: &mut dyn Cx, hit: Option<Components>) {
