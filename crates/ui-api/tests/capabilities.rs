@@ -1,7 +1,7 @@
 //! The fake host's answers to the capabilities a context's tools lean on:
 //! restarting a gesture, render views, Console records, the clipboard,
-//! latest-wins jobs, the inspector's row hooks, a held node's base and
-//! result, and a library's viewport chrome.
+//! latest-wins jobs, the inspector's row hooks, the vocabulary's node
+//! edit, a held node's base and result, and a library's viewport chrome.
 use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire};
 use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::{
@@ -16,7 +16,8 @@ use studio_ui_api::host::{
     Cx, HostShell, HostSlotsExt, HostStatus, HostUndo, HostView, InspectorCx, LatestResult,
 };
 use studio_ui_api::package::{
-    ContextPart, Inspector, Library, RowAction, UiPackage, ViewportSpec, WithUi,
+    ContextPart, Inspector, Invoked, Library, RowAction, UiPackage, ViewportSpec, Vocabulary,
+    WithUi,
 };
 use studio_ui_api::testing::{FakeHost, FakeNetwork, HostCall, Hosting};
 
@@ -140,6 +141,18 @@ impl Inspector<Heard> for Rows {
     }
 }
 
+struct Edits;
+
+impl Vocabulary<Heard> for Edits {
+    fn name(&self) -> &str {
+        "acme.counts"
+    }
+    fn run(&self, _: &mut Heard, _: &mut dyn Cx, _: &str, _: Invoked) {}
+    fn edit(&self, s: &mut Heard, _: &mut dyn Cx, node: NodeRef) {
+        s.0.push(format!("edit {}", node.0));
+    }
+}
+
 struct Counts;
 
 impl UiPackage for Counts {
@@ -148,12 +161,16 @@ impl UiPackage for Counts {
         Heard::default()
     }
     fn contexts(&self) -> Vec<ContextPart<Heard>> {
-        vec![ContextPart::new(context()).with_inspector(Rows)]
+        vec![
+            ContextPart::new(context())
+                .with_inspector(Rows)
+                .with_vocabulary(Edits),
+        ]
     }
 }
 
 #[test]
-fn row_actions_and_typing_reach_the_contexts_inspector() {
+fn row_actions_typing_and_node_edits_reach_the_contexts_parts() {
     let mut host = host();
     let package = Package::new(PackageId::declared("acme.counts"), "Counts").with_ui(Counts);
     let mut hosted = Hosting::new(package, &host);
@@ -162,10 +179,17 @@ fn row_actions_and_typing_reach_the_contexts_inspector() {
         inspector.row_action(s, &mut host, NodeRef(4), "group", RowAction::Pick);
         inspector.typing(s, &mut host, NodeRef(4), "group", Some("top"));
         inspector.typing(s, &mut host, NodeRef(4), "group", None);
+        let vocabulary = p.contexts[0].vocabulary.as_ref().unwrap();
+        vocabulary.edit(s, &mut host, NodeRef(4));
     });
     assert_eq!(
         hosted.state::<Heard>().0,
-        ["4 group Pick", "4 group Some(\"top\")", "4 group None"]
+        [
+            "4 group Pick",
+            "4 group Some(\"top\")",
+            "4 group None",
+            "edit 4"
+        ]
     );
 }
 

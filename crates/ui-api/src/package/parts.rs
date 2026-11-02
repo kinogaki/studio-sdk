@@ -358,6 +358,13 @@ pub trait Vocabulary<S: ?Sized>: Send + Sync {
         let _ = (s, cx, item);
         None
     }
+    /// The user double-clicked node `node` of the open network, which
+    /// opens nothing the host knows (no subnet, no network it holds): the
+    /// context may edit it (a tool node's tool live again on it). Nothing
+    /// by default.
+    fn edit(&self, s: &mut S, cx: &mut dyn Cx, node: NodeRef) {
+        let _ = (s, cx, node);
+    }
 }
 
 /// Where an item was run from: what running it means.
@@ -630,6 +637,9 @@ impl<S: 'static> Vocabulary<dyn Any> for Erased<S, dyn Vocabulary<S>> {
     }
     fn label(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> Option<String> {
         self.part.label(own(s), cx, item)
+    }
+    fn edit(&self, s: &mut dyn Any, cx: &mut dyn Cx, node: NodeRef) {
+        self.part.edit(own_mut(s), cx, node)
     }
 }
 
