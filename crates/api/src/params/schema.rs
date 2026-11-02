@@ -149,6 +149,14 @@ pub struct Parameter {
     /// Why its value is faulty (a group expression that doesn't parse):
     /// the row shows as an error with this as its tooltip. `None`: it isn't.
     pub problem: Option<String>,
+    /// A [`Texts`](ParameterKind::Texts) row of references the viewport
+    /// picks (a tool's edges, its target body): it shows this summary in
+    /// place of the names ("4", "Body 1") and offers the pick button a
+    /// [`Group`](ParameterKind::Group) row offers, answered by the open
+    /// context's inspector (`Inspector::row_action` with `RowAction::Pick`).
+    /// Filled by [`NodeType::schema`](crate::NodeType::schema). `None`: the
+    /// names are listed.
+    pub picked: Option<String>,
     /// The entries of a [`Choice`](ParameterKind::Choice) that can't apply
     /// now, by index: the host shows them greyed.
     pub unavailable: Vec<usize>,
@@ -192,6 +200,7 @@ impl Parameter {
             menu: Vec::new(),
             list: false,
             problem: None,
+            picked: None,
             unavailable: Vec::new(),
             language: None,
             read_only: false,
@@ -253,6 +262,12 @@ impl Parameter {
     /// Faulty, `why` (see [`problem`](Self::problem)).
     pub fn problem(mut self, why: impl Into<String>) -> Self {
         self.problem = Some(why.into());
+        self
+    }
+
+    /// Picked in the viewport, showing `summary` (see [`picked`](Self::picked)).
+    pub fn picked(mut self, summary: impl Into<String>) -> Self {
+        self.picked = Some(summary.into());
         self
     }
 

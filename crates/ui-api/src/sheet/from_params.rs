@@ -46,8 +46,12 @@ impl From<&params::Schema> for Schema<String> {
 /// search.
 fn field(p: &params::Parameter) -> Field<String> {
     let value = match (&p.value, &p.kind) {
-        // Texts show as one read-only line of their names.
-        (params::Value::Texts(names), _) => params::Value::Text(names.join(", ")),
+        // Picked references show as their summary; other texts as one
+        // read-only line of their names.
+        (params::Value::Texts(names), _) => match &p.picked {
+            Some(summary) => params::Value::Text(summary.clone()),
+            None => params::Value::Text(names.join(", ")),
+        },
         // A wire chosen from a menu shows as the menu's index.
         (params::Value::Number(at), ParameterKind::Integer { .. }) if !p.menu.is_empty() => {
             params::Value::Index((at.max(0.0) as usize).min(p.menu.len() - 1))
@@ -67,9 +71,11 @@ fn field(p: &params::Parameter) -> Field<String> {
 }
 
 /// Parameter `p`'s field kind: its kind's, with what its schema filled
-/// in (an attribute row's menu, a wire menu, unavailable choices).
+/// in (an attribute row's menu, a wire menu, unavailable choices, a
+/// picked row's summary).
 fn kind(p: &params::Parameter) -> Kind {
     match &p.kind {
+        ParameterKind::Texts if p.picked.is_some() => Kind::Picks { pick: None },
         ParameterKind::Choice(items) => choice(items, &p.unavailable),
         ParameterKind::Integer { .. } if !p.menu.is_empty() => Kind::Dropdown {
             items: p.menu.iter().map(|n| n.clone().into()).collect(),
@@ -409,6 +415,30 @@ mod tests {
         );
         assert!(field("group").error);
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
+    }
+
+    /// A picked texts row shows its summary as a pick row (the host adds
+    /// its button); one not picked lists its names.
+    #[test]
+    fn picked_texts_show_their_summary() {
+        let names = vec!["F3.e1".to_owned(), "F3.e4".to_owned()];
+        let schema = params::Schema::default()
+            .parameter(
+                Parameter::new("edges", "Edges", ParameterKind::Texts, names.clone()).picked("2"),
+            )
+            .parameter(Parameter::new(
+                "outputs",
+                "Outputs",
+                ParameterKind::Texts,
+                names,
+            ));
+        let sheet = Schema::<String>::from(&schema);
+        let edges = sheet.field(&"edges".to_owned()).unwrap();
+        assert_eq!(edges.kind, Kind::Picks { pick: None });
+        assert_eq!(edges.value, Some(Value::Text("2".into())));
+        let outputs = sheet.field(&"outputs".to_owned()).unwrap();
+        assert_eq!(outputs.kind, Kind::Info);
+        assert_eq!(outputs.value, Some(Value::Text("F3.e1, F3.e4".into())));
     }
 
     /// Read-only parameters are read-only fields, enabled: the host draws
