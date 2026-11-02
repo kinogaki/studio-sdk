@@ -29,8 +29,11 @@ pub enum SettingValue {
     ColorRamp(Arc<[ramp::Key]>),
     /// Two numbers (an offset across a plane).
     Vector2([f64; 2]),
-    /// An image the host decoded and sent as a Texture prim (none: no
-    /// image). Hosts set it; UIs do not edit it.
+    /// An image file's path, as typed (empty: no image): what values and
+    /// projects hold.
+    File(Arc<str>),
+    /// The Texture prim the host decoded a file to (none: no image, or
+    /// one not read yet): what an engine receives.
     Texture(Option<TextureId>),
 }
 
@@ -79,6 +82,14 @@ impl SettingValue {
     pub fn as_vector2(&self) -> Option<[f64; 2]> {
         match self {
             SettingValue::Vector2(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// An image file's path.
+    pub fn as_file(&self) -> Option<&str> {
+        match self {
+            SettingValue::File(path) => Some(path),
             _ => None,
         }
     }
@@ -218,8 +229,10 @@ pub enum SettingKind {
         /// How much a drag changes them a pixel.
         step: f64,
     },
-    /// An image the host decodes and sends (none by default); never shown.
-    Texture,
+    /// An image file read as color: values hold its path
+    /// ([`SettingValue::File`], none by default), and the host decodes it
+    /// and sends its Texture prim ([`SettingValue::Texture`]).
+    Image,
     /// One of named choices; `menu` shows them as a dropdown (else as
     /// segments).
     Choice {
@@ -245,9 +258,9 @@ pub enum SettingKind {
 
 impl SettingKind {
     /// Whether a setting of this kind can be keyed over time unless its
-    /// engine says otherwise: every kind but a texture, which hosts set.
+    /// engine says otherwise: every kind but an image.
     pub fn animatable(&self) -> bool {
-        !matches!(self, SettingKind::Texture)
+        !matches!(self, SettingKind::Image)
     }
 }
 
@@ -299,8 +312,6 @@ pub enum Visibility {
     Always,
     /// While a setting holds a value (a rectangle's width).
     When(Condition),
-    /// Never: the host sets it (a dome's image).
-    Never,
 }
 
 /// What a UI shows after a setting's row.
@@ -436,12 +447,6 @@ impl SettingDescriptor {
         self
     }
 
-    /// It, never shown.
-    pub fn hidden(mut self) -> SettingDescriptor {
-        self.visible = Visibility::Never;
-        self
-    }
-
     /// It, with `trailing` after its row.
     pub fn trailing(mut self, trailing: Trailing) -> SettingDescriptor {
         self.trailing = Some(trailing);
@@ -453,7 +458,6 @@ impl SettingDescriptor {
         match &self.visible {
             Visibility::Always => true,
             Visibility::When(c) => c.met(values),
-            Visibility::Never => false,
         }
     }
 
@@ -474,7 +478,7 @@ impl SettingDescriptor {
             SettingKind::Color { default } => SettingValue::Color(*default),
             SettingKind::ColorRamp { default } => SettingValue::ColorRamp(default.clone()),
             SettingKind::Vector2 { default, .. } => SettingValue::Vector2(*default),
-            SettingKind::Texture => SettingValue::Texture(None),
+            SettingKind::Image => SettingValue::File(Arc::from("")),
         }
     }
 
@@ -494,7 +498,7 @@ impl SettingDescriptor {
             (SettingKind::Vector2 { min, max, .. }, SettingValue::Vector2(v)) => {
                 v.iter().all(|c| c.is_finite() && (min..=max).contains(&c))
             }
-            (SettingKind::Texture, SettingValue::Texture(_)) => true,
+            (SettingKind::Image, SettingValue::File(_) | SettingValue::Texture(_)) => true,
             _ => false,
         }
     }

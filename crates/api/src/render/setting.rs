@@ -12,14 +12,13 @@
 //! | Color | Color | `Numbers` (3) |
 //! | Choice | Choice (labels) | `Index`, by the descriptor's order |
 //! | ColorRamp | Ramp (color) | `Numbers`: [`ramp::encode`] at [`MAX_RAMP_STOPS`] keys |
-//! | Texture | none: hosts set it | none |
+//! | Image | File | `Text`: the file's path |
 use crate::params::{Number, Parameter, ParameterKind, Unit, Value, ramp};
 use kinogaki_render_api::settings::MAX_RAMP_STOPS;
 use kinogaki_render_api::{SettingDescriptor, SettingKind, SettingValue};
 use std::sync::Arc;
 
-/// Setting `d` as a parameter at its default, animatable as `d` says;
-/// `None` for a texture.
+/// Setting `d` as a parameter at its default, animatable as `d` says.
 pub fn setting_parameter(d: &SettingDescriptor) -> Option<Parameter> {
     let kind = match &d.kind {
         SettingKind::Bool { .. } => ParameterKind::Toggle,
@@ -59,7 +58,7 @@ pub fn setting_parameter(d: &SettingDescriptor) -> Option<Parameter> {
             ParameterKind::Choice(choices.iter().map(|c| c.label.to_string()).collect())
         }
         SettingKind::ColorRamp { .. } => ParameterKind::Ramp { color: true },
-        SettingKind::Texture => return None,
+        SettingKind::Image => ParameterKind::File,
     };
     let value = setting_to_value(&d.default_value(), d)?;
     let p = Parameter::new(&*d.name, &*d.label, kind, value).animatable(d.animatable);
@@ -80,7 +79,8 @@ fn unit(unit: &kinogaki_render_api::Unit) -> Unit {
 }
 
 /// Setting value `v` of setting `d` as a parameter's value; `None` for a
-/// texture, or a value of another kind than `d`'s (a choice it lacks).
+/// sent texture, or a value of another kind than `d`'s (a choice it
+/// lacks).
 pub fn setting_to_value(v: &SettingValue, d: &SettingDescriptor) -> Option<Value> {
     Some(match (v, &d.kind) {
         (SettingValue::Bool(on), SettingKind::Bool { .. }) => Value::Bool(*on),
@@ -98,6 +98,7 @@ pub fn setting_to_value(v: &SettingValue, d: &SettingDescriptor) -> Option<Value
             };
             Value::Numbers(ramp::encode(&ramp, MAX_RAMP_STOPS))
         }
+        (SettingValue::File(path), SettingKind::Image) => Value::Text(path.to_string()),
         _ => return None,
     })
 }
@@ -127,6 +128,7 @@ pub fn setting_from_value(v: &Value, d: &SettingDescriptor) -> Option<SettingVal
         (SettingKind::ColorRamp { .. }, Value::Numbers(n)) => {
             SettingValue::ColorRamp(Arc::from(ramp::decode(n, true).keys))
         }
+        (SettingKind::Image, Value::Text(path)) => SettingValue::File(Arc::from(&**path)),
         _ => return None,
     };
     d.accepts(&value).then_some(value)
@@ -241,13 +243,20 @@ mod tests {
     }
 
     #[test]
-    fn textures_and_values_a_setting_lacks_have_no_parameter() {
-        let texture = descriptor(SettingKind::Texture);
-        assert!(!texture.animatable && setting_parameter(&texture).is_none());
-        assert_eq!(
-            setting_to_value(&SettingValue::Texture(None), &texture),
-            None
-        );
+    fn an_image_is_its_file_and_values_a_setting_lacks_have_none() {
+        let image = descriptor(SettingKind::Image);
+        let p = setting_parameter(&image).unwrap();
+        assert_eq!(p.kind, ParameterKind::File);
+        assert!(!p.animatable && !image.animatable);
+        assert_eq!(p.value, Value::Text(String::new()));
+        let sky = SettingValue::File(Arc::from("sky/noon.exr"));
+        let value = setting_to_value(&sky, &image).unwrap();
+        assert_eq!(value, Value::Text("sky/noon.exr".into()));
+        assert_eq!(setting_from_value(&value, &image), Some(sky));
+        // What an engine receives is no parameter's.
+        let sent = SettingValue::Texture(None);
+        assert!(image.accepts(&sent));
+        assert_eq!(setting_to_value(&sent, &image), None);
         let (choice, _) = kinds().remove(5);
         let missing = SettingValue::Choice(Arc::from("c"));
         assert_eq!(setting_to_value(&missing, &choice), None);

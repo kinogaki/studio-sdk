@@ -390,9 +390,9 @@ fn settings_fit_their_descriptors() {
         assert!(settings::validate(&ds, &bad).is_err());
     }
     // Animatable by its kind's default, unless the engine says otherwise;
-    // a texture never.
+    // an image never.
     assert!(d.animatable && !d.clone().animatable(false).animatable);
-    assert!(!SettingDescriptor::new("t", "T", "main", SettingKind::Texture).animatable);
+    assert!(!SettingDescriptor::new("t", "T", "main", SettingKind::Image).animatable);
     let mut r = RenderSettings::default();
     r.set("samples", SettingValue::Int(3));
     r.set("samples", SettingValue::Int(4));
@@ -489,10 +489,28 @@ fn standard_lights_and_fog_round_trip_through_their_prims() {
         },
         standard::Light {
             shape: standard::Shape::Dome {
-                texture: None,
+                image: None,
                 ground: Some([0.2, 0.1, 0.05]),
             },
             emission: standard::Emission::of_key("D65").unwrap(),
+            ..standard::Light::default()
+        },
+        // A dome's image: its file in a value, the decoded prim as sent.
+        standard::Light {
+            shape: standard::Shape::Dome {
+                image: Some(standard::ImageRef::File(Arc::from("sky/noon.exr"))),
+                ground: None,
+            },
+            ..standard::Light::default()
+        },
+        standard::Light {
+            shape: standard::Shape::Dome {
+                image: Some(standard::ImageRef::Prim(TextureId {
+                    slot: 3,
+                    generation: 1,
+                })),
+                ground: None,
+            },
             ..standard::Light::default()
         },
         standard::Light {
@@ -577,9 +595,26 @@ fn rows_show_and_apply_by_the_values_beside_them() {
         area.param("emission").unwrap().trailing,
         Some(Trailing::EmissionSwatch)
     );
-    // A dome's image is the host's: never shown.
+    // A dome's image shows while it has no ground; an empty file is none.
     let dome = standard::dome_light();
-    assert!(!dome.param("texture").unwrap().is_shown(&dome.defaults()));
+    let mut sky = dome.defaults();
+    let image = dome.param("texture").unwrap();
+    assert!(image.is_shown(&sky));
+    assert_eq!(
+        settings::value(&sky, "texture"),
+        Some(&SettingValue::File(Arc::from("")))
+    );
+    let imageless = standard::Shape::Dome {
+        image: None,
+        ground: None,
+    };
+    let prim = Declared::new(standard::DOME_LIGHT, sky.clone());
+    assert_eq!(
+        standard::Light::decode(&prim).map(|l| l.shape),
+        Some(imageless)
+    );
+    settings::set_value(&mut sky, "ground", SettingValue::Bool(true));
+    assert!(!image.is_shown(&sky));
     // Fitting keeps what fits by name, defaults the rest, drops strangers.
     let spot = standard::spot_light();
     let from_area = settings::fit(&spot.params, &values);

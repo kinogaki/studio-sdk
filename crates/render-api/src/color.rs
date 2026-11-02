@@ -55,7 +55,15 @@ pub trait ColorService: Send + Sync + Debug {
         binding: u32,
     ) -> Option<ViewTransform>;
 
-    /// Changes whenever a conversion or a view transform would.
+    /// The space the configuration's file rules give the file at `path`
+    /// (an image's colors are in it); none when no rule names one, by
+    /// default.
+    fn file_space(&self, _path: &str) -> Option<String> {
+        None
+    }
+
+    /// Changes whenever a conversion, a file's space or a view transform
+    /// would.
     fn revision(&self) -> u64;
 
     /// The spaces a working space can be (the config's scene-linear

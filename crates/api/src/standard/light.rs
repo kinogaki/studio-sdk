@@ -1,13 +1,15 @@
 //! Lights as a data type: a light shaped as UsdLux shapes one
 //! (render-api's standard [`Light`], unplaced). Where a light is belongs
 //! to what holds it (an object's placement, a file item's), never to the
-//! value. A dome's image is a texture of one scene, so a value holds
-//! none.
+//! value. A dome's image is its file (an asset path, as typed); the
+//! Texture prim a host decodes it to belongs to one scene, never to a
+//! value.
 //!
 //! ```text
 //! type (RectLight, DiskLight, DomeLight, DistantLight, SphereLight),
 //! width, height (RectLight), radius (DiskLight, SphereLight),
-//! groundColor (DomeLight, when it has one), angle (DistantLight),
+//! groundColor, texture (DomeLight, each when it has one),
+//! angle (DistantLight),
 //! coneAngle, coneSoftness (SphereLight), emission, color, intensity,
 //! exposure, normalize, colorTemperature, visible
 //! ```
@@ -17,7 +19,7 @@ use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
 use kinogaki_render_api::IDENTITY;
-use kinogaki_render_api::standard::{Emission, Light, Shape};
+use kinogaki_render_api::standard::{Emission, ImageRef, Light, Shape};
 
 /// The largest size, intensity or temperature a light takes.
 const MAX_VALUE: f32 = 1e12;
@@ -27,8 +29,8 @@ const MAX_VALUE: f32 = 1e12;
 /// least 0, a color temperature above 0, a cone angle of 0 to 180 degrees
 /// and a softness of 0 to 1, colors finite (a component below 0 is a
 /// color outside the space's gamut, as a file in a narrower space than
-/// the scene's holds). Its transform and a dome's image are dropped: what
-/// a light value holds.
+/// the scene's holds), and a dome's image a file whose path isn't blank.
+/// Its transform is dropped: where a light is isn't the value's.
 ///
 /// ```
 /// use kinogaki_render_api::standard::{Light, Shape};
@@ -46,19 +48,26 @@ pub fn light_value(light: Light) -> Result<Light, Error> {
     let within = |v: f32| v.is_finite() && v.abs() <= MAX_VALUE;
     let positive = |v: f32| within(v) && v > 0.0;
     let at_least_0 = |v: f32| within(v) && v >= 0.0;
-    let shape = match light.shape {
-        Shape::Rect { width, height } => positive(width) && positive(height),
-        Shape::Disk { radius } => positive(radius),
-        Shape::Dome { ground, .. } => ground.is_none_or(|g| g.into_iter().all(within)),
-        Shape::Distant { angle } => at_least_0(angle) && angle <= 180.0,
+    let shape = match &light.shape {
+        Shape::Rect { width, height } => positive(*width) && positive(*height),
+        Shape::Disk { radius } => positive(*radius),
+        Shape::Dome { image, ground } => {
+            ground.is_none_or(|g| g.into_iter().all(within))
+                && match image {
+                    None => true,
+                    Some(ImageRef::File(path)) => !path.trim().is_empty(),
+                    Some(ImageRef::Prim(_)) => false,
+                }
+        }
+        Shape::Distant { angle } => at_least_0(*angle) && *angle <= 180.0,
         Shape::Spot {
             radius,
             cone_angle,
             cone_softness,
         } => {
-            positive(radius)
-                && (0.0..=180.0).contains(&cone_angle)
-                && (0.0..=1.0).contains(&cone_softness)
+            positive(*radius)
+                && (0.0..=180.0).contains(cone_angle)
+                && (0.0..=1.0).contains(cone_softness)
         }
     };
     let ok = shape
@@ -69,15 +78,7 @@ pub fn light_value(light: Light) -> Result<Light, Error> {
     if !ok {
         return Err(Error::invalid("invalid light"));
     }
-    let shape = match light.shape {
-        Shape::Dome { ground, .. } => Shape::Dome {
-            texture: None,
-            ground,
-        },
-        other => other,
-    };
     Ok(Light {
-        shape,
         transform: IDENTITY,
         ..light
     })
@@ -95,24 +96,33 @@ impl LightCodec {
     /// The element refusing a field.
     pub fn write_light(light: &Light, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let float = |v: f32| Field::Float(f64::from(v));
-        let ty = match light.shape {
+        let ty = match &light.shape {
             Shape::Rect { width, height } => {
-                out.set("width", float(width))?;
-                out.set("height", float(height))?;
+                out.set("width", float(*width))?;
+                out.set("height", float(*height))?;
                 "RectLight"
             }
             Shape::Disk { radius } => {
-                out.set("radius", float(radius))?;
+                out.set("radius", float(*radius))?;
                 "DiskLight"
             }
-            Shape::Dome { ground, .. } => {
+            Shape::Dome { image, ground } => {
                 if let Some(g) = ground {
                     out.set("groundColor", Field::F32s(g.to_vec()))?;
+                }
+                match image {
+                    Some(ImageRef::File(path)) => {
+                        out.set("texture", Field::Text(path.to_string()))?
+                    }
+                    Some(ImageRef::Prim(_)) => {
+                        return Err(Error::invalid("a light value names its image by file"));
+                    }
+                    None => {}
                 }
                 "DomeLight"
             }
             Shape::Distant { angle } => {
-                out.set("angle", float(angle))?;
+                out.set("angle", float(*angle))?;
                 "DistantLight"
             }
             Shape::Spot {
@@ -120,9 +130,9 @@ impl LightCodec {
                 cone_angle,
                 cone_softness,
             } => {
-                out.set("radius", float(radius))?;
-                out.set("coneAngle", float(cone_angle))?;
-                out.set("coneSoftness", float(cone_softness))?;
+                out.set("radius", float(*radius))?;
+                out.set("coneAngle", float(*cone_angle))?;
+                out.set("coneSoftness", float(*cone_softness))?;
                 "SphereLight"
             }
         };
@@ -161,7 +171,10 @@ impl LightCodec {
                 radius: scalar("radius")?,
             },
             "DomeLight" => Shape::Dome {
-                texture: None,
+                image: match e.field("texture") {
+                    Some(_) => Some(ImageRef::File(e.text("texture")?.into())),
+                    None => None,
+                },
                 ground: match e.field("groundColor") {
                     Some(_) => Some(color("groundColor")?),
                     None => None,
@@ -235,11 +248,11 @@ mod tests {
             },
             Shape::Disk { radius: 0.25 },
             Shape::Dome {
-                texture: None,
+                image: None,
                 ground: Some([0.2, 0.1, 0.05]),
             },
             Shape::Dome {
-                texture: None,
+                image: Some(ImageRef::File(Arc::from("sky/noon.exr"))),
                 ground: None,
             },
             Shape::Distant { angle: 0.53 },
@@ -301,8 +314,12 @@ mod tests {
                 cone_softness: 1.5,
             },
             Shape::Dome {
-                texture: None,
+                image: None,
                 ground: Some([f32::NAN, 0.0, 0.0]),
+            },
+            Shape::Dome {
+                image: Some(ImageRef::File(Arc::from(" "))),
+                ground: None,
             },
         ];
         for shape in bad {
@@ -332,15 +349,13 @@ mod tests {
     }
 
     #[test]
-    fn a_value_is_unplaced_and_holds_no_image() {
+    fn a_value_is_unplaced_and_names_its_image_by_file() {
+        let sky = Shape::Dome {
+            image: Some(ImageRef::File(Arc::from("sky/noon.exr"))),
+            ground: None,
+        };
         let placed = Light {
-            shape: Shape::Dome {
-                texture: Some(TextureId {
-                    slot: 7,
-                    generation: 0,
-                }),
-                ground: None,
-            },
+            shape: sky.clone(),
             transform: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
@@ -350,14 +365,21 @@ mod tests {
             ..Light::default()
         };
         let value = light_value(placed).unwrap();
-        assert_eq!(value.transform, IDENTITY);
-        assert_eq!(
-            value.shape,
-            Shape::Dome {
-                texture: None,
-                ground: None
-            }
-        );
+        assert_eq!((value.transform, &value.shape), (IDENTITY, &sky));
+        // A Texture prim is one scene's.
+        let sent = Light {
+            shape: Shape::Dome {
+                image: Some(ImageRef::Prim(TextureId {
+                    slot: 7,
+                    generation: 0,
+                })),
+                ground: None,
+            },
+            ..Light::default()
+        };
+        assert!(light_value(sent.clone()).is_err());
+        let mut e = MemoryElement::new("light");
+        assert!(e.write(|w| LightCodec::write_light(&sent, w)).is_err());
     }
 
     #[test]

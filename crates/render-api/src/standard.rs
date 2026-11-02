@@ -283,9 +283,10 @@ pub fn area_light() -> PrimType {
 }
 
 /// UsdLux's DomeLight: light from every direction, optionally a lat-long
-/// image whose center looks down the light's -Z, its top +Y (`texture`,
-/// set by the host); without an image, below the horizon it may shine
-/// `groundColor` instead (`ground`: a hemisphere gradient).
+/// image whose center looks down the light's -Z, its top +Y (`texture`:
+/// its file, which the host sends decoded); without an image, below the
+/// horizon it may shine `groundColor` instead (`ground`: a hemisphere
+/// gradient, the image's row hidden while it is on).
 pub fn dome_light() -> PrimType {
     light_type(
         DOME_LIGHT,
@@ -304,8 +305,8 @@ pub fn dome_light() -> PrimType {
                 },
             )
             .requires("ground", SettingValue::Bool(true), "Used with Ground on"),
-            SettingDescriptor::new("texture", "Texture", LIGHT_GROUP, SettingKind::Texture)
-                .hidden(),
+            SettingDescriptor::new("texture", "Image", LIGHT_GROUP, SettingKind::Image)
+                .shown_when("ground", SettingValue::Bool(false)),
         ],
     )
 }
@@ -423,8 +424,41 @@ pub fn fog() -> PrimType {
     }
 }
 
+/// A dome's image: its file in a light value, the Texture prim the host
+/// decoded it to in a prim an engine receives.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ImageRef {
+    /// An image file's path, as typed (never empty).
+    File(Arc<str>),
+    /// The Texture prim its file was decoded to.
+    Prim(TextureId),
+}
+
+impl ImageRef {
+    /// A dome's image as setting `value` holds it (none: no image, or one
+    /// not read yet).
+    pub fn of_value(value: &SettingValue) -> Option<ImageRef> {
+        match value {
+            SettingValue::File(path) if !path.trim().is_empty() => {
+                Some(ImageRef::File(path.clone()))
+            }
+            SettingValue::Texture(Some(id)) => Some(ImageRef::Prim(*id)),
+            _ => None,
+        }
+    }
+
+    /// It as a setting's value (none: an empty file).
+    pub fn value(image: Option<&ImageRef>) -> SettingValue {
+        match image {
+            Some(ImageRef::File(path)) => SettingValue::File(path.clone()),
+            Some(ImageRef::Prim(id)) => SettingValue::Texture(Some(*id)),
+            None => SettingValue::File(Arc::from("")),
+        }
+    }
+}
+
 /// A standard light's shape.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Shape {
     /// A RectLight: `width` × `height` in its XY plane, emitting down -Z.
     Rect {
@@ -441,7 +475,7 @@ pub enum Shape {
     /// A DomeLight.
     Dome {
         /// The image (none: its color, evenly).
-        texture: Option<TextureId>,
+        image: Option<ImageRef>,
         /// An imageless dome's hemisphere gradient: below the horizon it
         /// shines this color, linear ACEScg, times its intensity and
         /// exposure; above it, its emission. None: one color all round.
@@ -519,10 +553,7 @@ impl Light {
                 height: prim.float("height"),
             },
             DOME_LIGHT => Shape::Dome {
-                texture: prim
-                    .value("texture")
-                    .and_then(SettingValue::as_texture)
-                    .flatten(),
+                image: prim.value("texture").and_then(ImageRef::of_value),
                 ground: prim.bool("ground").then(|| prim.color("groundColor")),
             },
             DISTANT_LIGHT => Shape::Distant {
@@ -565,32 +596,32 @@ impl Light {
         let mut set = |name: &str, v: SettingValue| set_value(&mut values, name, v);
         let float = |v: f32| SettingValue::Float(f64::from(v));
         let color = |c: [f32; 3]| SettingValue::Color(c.map(f64::from));
-        match self.shape {
+        match &self.shape {
             Shape::Rect { width, height } => {
                 set("shape", choice("rectangle"));
-                set("width", float(width));
-                set("height", float(height));
+                set("width", float(*width));
+                set("height", float(*height));
             }
             Shape::Disk { radius } => {
                 set("shape", choice("disk"));
-                set("radius", float(radius));
+                set("radius", float(*radius));
             }
-            Shape::Dome { texture, ground } => {
-                set("texture", SettingValue::Texture(texture));
+            Shape::Dome { image, ground } => {
+                set("texture", ImageRef::value(image.as_ref()));
                 set("ground", SettingValue::Bool(ground.is_some()));
                 if let Some(g) = ground {
-                    set("groundColor", color(g));
+                    set("groundColor", color(*g));
                 }
             }
-            Shape::Distant { angle } => set("angle", float(angle)),
+            Shape::Distant { angle } => set("angle", float(*angle)),
             Shape::Spot {
                 radius,
                 cone_angle,
                 cone_softness,
             } => {
-                set("radius", float(radius));
-                set("coneAngle", float(cone_angle));
-                set("coneSoftness", float(cone_softness));
+                set("radius", float(*radius));
+                set("coneAngle", float(*cone_angle));
+                set("coneSoftness", float(*cone_softness));
             }
         }
         set("emission", choice(self.emission.key()));
