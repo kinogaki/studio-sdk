@@ -3,8 +3,8 @@
 //! registered meshers.
 use kinogaki_studio_api::conformance::Fixtures;
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::brep::{Body, Brep, FaceId};
-use kinogaki_studio_api::geometry::{Class, Detail, Polygons, Selection, Tolerances};
+use kinogaki_studio_api::geometry::brep::{Body, Brep, Element, FaceId};
+use kinogaki_studio_api::geometry::{Class, Curves, Detail, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, BrepCodec};
 use kinogaki_studio_api::{
     CancelToken, Data, DataCodec, DisplayRequest, Error, Meshed, Mesher, MesherId, Package,
@@ -91,14 +91,37 @@ fn a_broken_save_does_not_read() {
 #[test]
 fn counts_and_selections_span_the_bodies() {
     let value = fixture("every part");
-    // The box's 6 faces then the patch's 1; 8 + 4 vertices.
-    assert_eq!(standard::brep_count(&value, Class::Primitive), Some(7));
-    assert_eq!(standard::brep_count(&value, Class::Point), Some(12));
-    assert_eq!(standard::brep_count(&value, Class::Detail), Some(1));
-    assert_eq!(standard::brep_count(&Brep::empty(), Class::Primitive), None);
+    // The box's 6 faces, the patch's 1, then the plane; 8 + 4 vertices,
+    // then the datum point; 12 + 4 edges, the free curve, then the axis.
+    assert_eq!(value.count(Class::Primitive), Some(8));
+    assert_eq!(value.count(Class::Point), Some(13));
+    assert_eq!(value.count(Class::Edge), Some(18));
+    assert_eq!(value.count(Class::Detail), Some(1));
+    assert_eq!(value.count(Class::Vertex), None);
+    assert_eq!(Brep::empty().count(Class::Primitive), Some(0));
+    let body = |body, index| Element::Body { body, index };
+    for (class, id, element) in [
+        (Class::Primitive, 0, body(0, 0)),
+        (Class::Primitive, 6, body(1, 0)),
+        (Class::Primitive, 7, Element::Datum(0)),
+        (Class::Edge, 15, body(1, 3)),
+        (Class::Edge, 16, Element::Curve(0)),
+        (Class::Edge, 17, Element::Datum(1)),
+        (Class::Point, 12, Element::Datum(2)),
+    ] {
+        assert_eq!(value.element(class, id), Some(element), "{class:?} {id}");
+        assert_eq!(value.id(class, element), Some(id), "{element:?}");
+    }
+    assert_eq!(value.element(Class::Primitive, 8), None);
+    assert_eq!(value.id(Class::Point, Element::Datum(0)), None);
+    assert_eq!(value.id(Class::Primitive, Element::Curve(0)), None);
+    // The numbering's fingerprint moves with what it stands on.
+    let fewer = value.with_curves(Curves::empty());
+    assert_ne!(fewer.fingerprint(), value.fingerprint());
+    assert_eq!(value.clone().fingerprint(), value.fingerprint());
     let data = standard::brep().wrap(value);
     let s = Selection::new(Class::Primitive, vec![6, 0], Some(6), None).unwrap();
-    let components = standard::components(data.ty(), s.clone(), 7);
+    let components = standard::components(data.ty(), s.clone(), 8);
     let mut saved = MemoryElement::new("components");
     saved
         .write(|w| {

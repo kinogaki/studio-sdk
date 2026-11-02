@@ -8,11 +8,11 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
+use kinogaki_geometry::GeometryError;
 use kinogaki_geometry::brep::{
     Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, Frame,
     History, Placement, Sense,
 };
-use kinogaki_geometry::{Class, GeometryError};
 
 /// Saves [`Brep`]: one table of every persistent name the value holds
 /// (`name_tags`, `name_words`, `name_texts`), which everything else names
@@ -33,7 +33,8 @@ use kinogaki_geometry::{Class, GeometryError};
 /// Reading rebuilds every body through [`BrepBuilder`], so it checks every
 /// rule again, and the ids come back as they were. A round trip is
 /// bit-exact. Components save as the standard
-/// [`Selection`](kinogaki_geometry::Selection).
+/// [`Selection`](kinogaki_geometry::Selection), numbered as
+/// [`Brep::count`] numbers the value's elements.
 ///
 /// ```
 /// use kinogaki_studio_api::DataCodec;
@@ -107,24 +108,8 @@ impl DataCodec for BrepCodec {
         let value = brep()
             .get(data)
             .ok_or_else(|| Error::invalid("not a B-rep"))?;
-        selection::read(element, data.ty(), |class| count(value, class))
+        selection::read(element, data.ty(), |class| value.count(class))
     }
-}
-
-/// How many elements of `class` `value` holds: Detail one, the others
-/// summed over its bodies in body order (a body's elements follow the
-/// bodies before it).
-pub(super) fn count(value: &Brep, class: Class) -> Option<usize> {
-    if class == Class::Detail {
-        return Some(1);
-    }
-    let mut total = None;
-    for body in value.bodies().iter() {
-        if let Some(n) = body.count(class) {
-            total = Some(total.unwrap_or(0) + n);
-        }
-    }
-    total
 }
 
 fn sense(s: Sense) -> u8 {

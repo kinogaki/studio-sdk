@@ -171,7 +171,8 @@ pub trait FileFormat: Send + Sync {
 
     /// Writes `options` into the element `out` fills. By default each
     /// option is a field named as it: a number a real, a toggle a boolean,
-    /// a choice its index, text as text, numbers and texts arrays.
+    /// a choice its index, text as text, numbers and texts arrays (an
+    /// option holds no data).
     fn write_options(
         &self,
         options: &FormatOptions,
@@ -185,6 +186,11 @@ pub trait FileFormat: Send + Sync {
                 Value::Index(v) => Field::Int(*v as i64),
                 Value::Text(v) => Field::Text(v.clone()),
                 Value::Texts(v) => Field::Texts(v.clone()),
+                Value::Data(_) => {
+                    return Err(Error::invalid(format_args!(
+                        "option {name}: a format's options hold no data"
+                    )));
+                }
             };
             out.set(name, field)?;
         }

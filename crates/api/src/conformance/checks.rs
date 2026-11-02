@@ -22,7 +22,7 @@ impl Consumer for Codecs {
             } else if let Some(c) = standard::curves().get(data) {
                 (&CurvesCodec, c.count(Class::Point))
             } else if let Some(b) = standard::brep().get(data) {
-                (&BrepCodec, standard::brep_count(b, Class::Point))
+                (&BrepCodec, b.count(Class::Point))
             } else {
                 return Ok(());
             };

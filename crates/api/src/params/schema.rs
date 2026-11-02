@@ -1,6 +1,8 @@
 //! [`Schema`]: how parameters are presented, as data. The host turns it
 //! into its inspector's rows; edits come back as new [`Value`]s.
 use super::{Diagnostic, Parameters, Value};
+use crate::data::Data;
+use crate::id::DataTypeId;
 
 /// What a parameter dialog or inspector shows, top to bottom: sections and
 /// parameters.
@@ -196,6 +198,13 @@ impl Parameter {
             remembered: false,
             animatable,
         }
+    }
+
+    /// Data parameter `name` labelled `label` holding values of `empty`'s
+    /// data type, starting at `empty` (the type's
+    /// [`empty`](crate::DataType::empty)): [`ParameterKind::Data`].
+    pub fn data(name: impl Into<String>, label: impl Into<String>, empty: Data) -> Self {
+        Self::new(name, label, ParameterKind::Data(empty.ty()), empty)
     }
 
     /// Animatable or not (see [`animatable`](Self::animatable)).
@@ -397,6 +406,15 @@ pub enum ParameterKind {
     /// [`Value::Texts`]: names the node keeps (the outputs it writes),
     /// listed, not edited.
     Texts,
+    /// [`Value::Data`] of this registered data type: a structured record
+    /// its node's tools author (a sketch's curves and constraints), set
+    /// through `set_parameter` alone. No inspector row shows it (the
+    /// node's schema adds rows of its own: a summary, buttons); it is
+    /// never animated. A project saves it through the type's codec, its
+    /// content stamp is part of the node's cook key, and its memory is
+    /// counted through the type. A new node starts at the type's empty
+    /// value ([`Parameter::data`]).
+    Data(DataTypeId),
 }
 
 /// One channel of [`ParameterKind::ToneCurves`]: its name and its curve's
@@ -414,7 +432,7 @@ impl ParameterKind {
     /// type says otherwise: numbers, integers, vectors, colors, channels,
     /// toggles, choices, ramps, tone curves and palettes can; text of every
     /// kind (text, code, files, paths, references, attributes, groups,
-    /// texts) can't.
+    /// texts) and data can't.
     pub fn animatable(&self) -> bool {
         match self {
             Self::Number(_)
@@ -434,12 +452,13 @@ impl ParameterKind {
             | Self::Reference(_)
             | Self::Attribute
             | Self::Group
-            | Self::Texts => false,
+            | Self::Texts
+            | Self::Data(_) => false,
         }
     }
 
-    /// Whether `value` is of the variant this kind holds (and, for vectors
-    /// and colors, has the right count).
+    /// Whether `value` is of the variant this kind holds (for vectors and
+    /// colors, of the right count; for data, of the kind's data type).
     pub fn accepts(&self, value: &Value) -> bool {
         match (self, value) {
             (Self::Number(_) | Self::Integer { .. }, Value::Number(_)) => true,
@@ -469,6 +488,7 @@ impl ParameterKind {
             }
             (Self::Channels(_), Value::Numbers(v)) => v.len() == 4,
             (Self::Texts, Value::Texts(_)) => true,
+            (Self::Data(ty), Value::Data(data)) => data.ty() == *ty,
             _ => false,
         }
     }
@@ -611,6 +631,22 @@ mod tests {
         assert_eq!(names, ["distance", "cap"]);
         assert_eq!(schema.values()["distance"], Value::Number(1.5));
         assert!(schema.parameters().all(|p| p.kind.accepts(&p.value)));
+    }
+
+    /// A data parameter takes values of its data type alone, starts at the
+    /// empty value it was declared with and is never animated.
+    #[test]
+    fn a_data_parameter_takes_values_of_its_type_alone() {
+        let sketch = crate::Typed::<Vec<f64>>::new(DataTypeId::declared("acme.cad.sketch"));
+        let other = crate::Typed::<Vec<f64>>::new(DataTypeId::declared("acme.cad.other"));
+        let p = Parameter::data("sketch", "Sketch", sketch.wrap(Vec::new()));
+        assert_eq!(p.kind, ParameterKind::Data(sketch.id()));
+        assert!(!p.animatable && !p.kind.animatable());
+        assert!(p.check(&p.value).is_ok());
+        assert!(p.check(&Value::Data(sketch.wrap(vec![1.0]))).is_ok());
+        assert!(p.check(&Value::Data(other.wrap(Vec::new()))).is_err());
+        assert!(p.check(&Value::Number(1.0)).is_err());
+        assert!(!ParameterKind::Text.accepts(&p.value));
     }
 
     #[test]

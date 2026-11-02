@@ -5,12 +5,14 @@ use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
 /// each parameter a field keyed by its name, with its help as the tooltip
-/// and its keywords for search.
+/// and its keywords for search. A data parameter has no field: its node's
+/// schema adds rows of its own.
 impl From<&params::Schema> for Schema<String> {
     fn from(schema: &params::Schema) -> Self {
         let items = schema
             .items
             .iter()
+            .filter(|item| !matches!(item, SchemaItem::Parameter(p) if matches!(p.kind, ParameterKind::Data(_))))
             .map(|item| match item {
                 SchemaItem::Section(s) => Item::Section(Section {
                     key: s.key.clone().into(),
@@ -186,7 +188,9 @@ impl From<&ParameterKind> for Kind {
                 number: number.into(),
                 linked: false,
             },
-            ParameterKind::Texts => Kind::Info,
+            // Never a field (see the schema's sheet); read-only text if
+            // one is made of it alone.
+            ParameterKind::Texts | ParameterKind::Data(_) => Kind::Info,
         }
     }
 }
@@ -236,8 +240,18 @@ mod tests {
                 "Source",
                 ParameterKind::Reference(RefFilter::material()),
                 Value::Text("/Materials/Red".into()),
+            ))
+            .parameter(Parameter::data(
+                "sketch",
+                "Sketch",
+                kinogaki_studio_api::Typed::<f64>::new(kinogaki_studio_api::DataTypeId::declared(
+                    "acme.cad.sketch",
+                ))
+                .wrap(0.0),
             ));
         let sheet = Schema::<String>::from(&schema);
+        // A data parameter has no row.
+        assert!(sheet.field(&"sketch".to_owned()).is_none());
         assert!(
             matches!(&sheet.items[0], Item::Section(s) if s.key == "shape" && s.open && !s.sub)
         );

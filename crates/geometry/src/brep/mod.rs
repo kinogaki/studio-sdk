@@ -179,6 +179,7 @@ mod fingerprint;
 mod geometry;
 mod ids;
 mod names;
+mod numbering;
 mod nurbs;
 mod topology;
 
@@ -193,6 +194,7 @@ pub use ids::{
     VertexId,
 };
 pub use names::{End, History, Name, NameNode, OperationId, Role};
+pub use numbering::Element;
 pub use nurbs::{NurbsCurve, NurbsSurface, SeamContinuity};
 pub use topology::{
     BodyKind, BrepTopology, Coedge, Counts, Edge, Face, Loop, Lump, Names, Sense, Shell, Vertex,
@@ -261,6 +263,9 @@ pub struct Datum {
 /// **Classes:** Detail (one element) on the value; each body has its own
 /// ([`Body`]). Free curves are [`Curves`] (exact by definition: rational
 /// NURBS hold arcs exactly), each named by its Primitive `name`.
+/// **Numbering:** the value's faces, edges and vertices are numbered as
+/// one, across its bodies, free curves and datums ([`Brep::count`],
+/// [`Brep::element`]); a selection keeps [`Brep::fingerprint`].
 ///
 /// **Rules** ([`Brep::new`]): at most [`MAX_ENTITIES`] bodies and datums;
 /// Detail attributes only, one element each; each datum finite, an axis's

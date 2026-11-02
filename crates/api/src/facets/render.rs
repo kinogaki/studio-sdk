@@ -4,6 +4,7 @@ use crate::data::Data;
 use crate::error::Error;
 use crate::render::{Detail, RenderItem};
 use crate::time::Time;
+use kinogaki_geometry::Tolerances;
 
 /// How a data type renders: as neutral [`RenderItem`]s every engine draws,
 /// whatever kernel made the value.
@@ -27,16 +28,22 @@ pub struct RenderCx<'a> {
     pub time: Time,
     /// How fine to make the geometry.
     pub detail: Detail,
+    /// The project's tolerances, which an approximate value (a B-rep's
+    /// mesh) is made to, as its display is (the host fills them; the
+    /// default otherwise).
+    pub tolerances: Tolerances,
     /// Set when the render no longer wants the items.
     pub cancel: &'a CancelToken,
 }
 
 impl<'a> RenderCx<'a> {
-    /// A render at `time` at the viewport's detail.
+    /// A render at `time` at the viewport's detail and the default
+    /// tolerances.
     pub fn new(time: Time, cancel: &'a CancelToken) -> Self {
         Self {
             time,
             detail: Detail::Viewport,
+            tolerances: Tolerances::default(),
             cancel,
         }
     }
@@ -44,6 +51,11 @@ impl<'a> RenderCx<'a> {
     /// At `detail` instead.
     pub fn with_detail(self, detail: Detail) -> Self {
         Self { detail, ..self }
+    }
+
+    /// At the project's `tolerances`.
+    pub fn with_tolerances(self, tolerances: Tolerances) -> Self {
+        Self { tolerances, ..self }
     }
 }
 
@@ -60,7 +72,11 @@ mod tests {
             chord: 0.01,
             angle: 5.0,
         };
+        assert_eq!(cx.tolerances, Tolerances::default());
         let cx = cx.with_detail(fine);
         assert_eq!((cx.detail, cx.time), (fine, Time::ZERO));
+        let inches = Tolerances::default().with_unit(25.4).unwrap();
+        let cx = cx.with_tolerances(inches);
+        assert_eq!((cx.tolerances, cx.detail), (inches, fine));
     }
 }
