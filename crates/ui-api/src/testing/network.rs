@@ -192,7 +192,8 @@ impl FakeNetwork {
     /// passes its first input's first wire on, a frozen one gives the
     /// outputs it keeps, a held one applies its delta through its held
     /// edit, any other cooks through its type, with [`Serial`] workers and
-    /// a scratch slot of its own each time.
+    /// a scratch slot of its own each time, its handles checked
+    /// ([`Outputs::check_handles`]).
     ///
     /// # Errors
     /// The first failing node's error; a node `node` doesn't hold, or a
@@ -251,7 +252,11 @@ impl FakeNetwork {
                     .collect();
                 held.apply(&mut cx, base, delta, &rest)
             }
-            _ => code.cook(&mut cx, &inputs),
+            _ => {
+                let mut outputs = code.cook(&mut cx, &inputs)?;
+                outputs.check_handles(&self.types.nodes[&at.node_type].1.parameters);
+                Ok(outputs)
+            }
         }
     }
 
@@ -367,6 +372,10 @@ impl NetworkRead for FakeNetwork {
             result: cooked
                 .as_mut()
                 .and_then(|o| (!o.data.is_empty()).then(|| o.data.swap_remove(0))),
+            handles: cooked
+                .as_mut()
+                .map(|o| std::mem::take(&mut o.handles))
+                .unwrap_or_default(),
             selection: cooked.and_then(|o| o.selection),
         })
     }

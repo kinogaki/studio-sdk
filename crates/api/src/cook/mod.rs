@@ -132,16 +132,44 @@ pub struct Outputs {
     pub selection: Option<Components>,
     /// Problems that left the result usable (warnings, notes).
     pub warnings: Vec<Diagnostic>,
+    /// Handles placed from this result (an extrusion's distance arrow on
+    /// its profile, a blend's radius at its first edge): places fixed, in
+    /// the node's output space, numbers bound by name to the node's own
+    /// parameters. Studio shows them with the type's declared handles
+    /// while the node is the active one. Empty: none.
+    pub handles: Vec<Handle>,
 }
 
 impl Outputs {
     /// `result` as the only output, carrying no selection, without
-    /// warnings.
+    /// warnings or handles.
     pub fn one(result: Data) -> Self {
         Self {
             data: vec![result],
             ..Self::default()
         }
+    }
+
+    /// With `handles` placed from the result.
+    pub fn with_handles(mut self, handles: Vec<Handle>) -> Self {
+        self.handles = handles;
+        self
+    }
+
+    /// Drops each handle that doesn't [`check`](Handle::check) against
+    /// `parameters` (its node type's), with a warning naming it: what a
+    /// host does to every cook's handles, as it would refuse their writes.
+    pub fn check_handles(&mut self, parameters: &Schema) {
+        let warnings = &mut self.warnings;
+        self.handles
+            .retain(|handle| match handle.check(parameters) {
+                Ok(()) => true,
+                Err(why) => {
+                    let message = format!("The {} handle is left out: {why}", handle.label);
+                    warnings.push(Diagnostic::warning(message));
+                    false
+                }
+            });
     }
 }
 

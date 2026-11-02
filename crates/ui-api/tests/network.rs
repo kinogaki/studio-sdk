@@ -1,7 +1,7 @@
 //! The fake host's networks: a package's node types in an in-memory
 //! network, edited through `HostNetwork` as one undo step an edit and
 //! cooked as core cooks them.
-use kinogaki_studio_api::cook::{NodeType, Port};
+use kinogaki_studio_api::cook::{Handle, HandleKind, NodeType, Port, Vector};
 use kinogaki_studio_api::network::{
     Flag, FlagSet, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, Place, Wire,
 };
@@ -41,8 +41,18 @@ impl NodeType for Source {
             .output(Port::new("number", "Number", NUMBER.id()))
             .parameters(Schema::default().parameter(value_parameter("value", "Value", 1.0)))
     }
+    /// Its value's arrow along X, and one naming a parameter it hasn't.
     fn cook(&self, cx: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
-        Ok(Outputs::one(NUMBER.wrap(cx.number("value")?)))
+        let arrow = |label: &str, number: &str| {
+            let kind = HandleKind::Distance {
+                distance: number.into(),
+                origin: Vector::fixed([0.0; 3]),
+                direction: Vector::fixed([1.0, 0.0, 0.0]),
+            };
+            Handle::new(label, kind)
+        };
+        let handles = vec![arrow("Value", "value"), arrow("Height", "height")];
+        Ok(Outputs::one(NUMBER.wrap(cx.number("value")?)).with_handles(handles))
     }
 }
 
@@ -296,4 +306,21 @@ fn a_node_holds_a_network_of_another_context() {
     assert!(net.edit_inside(NodeRef(99), &mut |_| Ok(())).is_err());
     net.remove(held).unwrap();
     assert!(net.inside(held).is_none());
+}
+
+/// A cook's handles reach the node's reads checked as core checks them:
+/// one naming a parameter the type doesn't have is left out, with a
+/// warning naming it.
+#[test]
+fn a_cooks_handles_are_checked_and_read_back() {
+    let mut net = network();
+    let source = add(&mut net, SOURCE);
+    let outputs = net.cook(source).unwrap();
+    let labels: Vec<&str> = outputs.handles.iter().map(|h| h.label.as_str()).collect();
+    assert_eq!(labels, ["Value"]);
+    let [warning] = &outputs.warnings[..] else {
+        panic!("{:?}", outputs.warnings);
+    };
+    assert!(warning.message.contains("Height"), "{}", warning.message);
+    assert_eq!(net.node(source).unwrap().handles, outputs.handles);
 }

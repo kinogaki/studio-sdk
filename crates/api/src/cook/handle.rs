@@ -1,7 +1,7 @@
 //! [`Handle`]: a viewport handle a node type binds to its parameters.
 use super::binding::{Scalar, Vector};
 use super::frame::Frame;
-use crate::params::{Parameters, Value};
+use crate::params::{ParameterKind, Parameters, Schema, Value};
 
 /// What a handle edits, and so how it looks and drags. Places and
 /// directions are in the handle's [`Frame`] when it has one, otherwise in
@@ -118,6 +118,42 @@ pub enum HandleKind {
         /// The cone `angle` is a fraction of; `None`: `angle` is the angle.
         within: Option<Scalar>,
     },
+    /// A dot on a ring of `radius` about the line through `center` along
+    /// `axis`, `angle` degrees from `reference` (right-handed about
+    /// `axis`), dragged round the ring: a revolve's angle, a bend's twist.
+    /// The drag adds the angle the pointer sweeps about the ring's middle
+    /// on screen, signed by which way `axis` faces the view, and carries
+    /// on past a full turn. `radius: None` keeps the ring a fixed size on
+    /// screen, as the Rotate gizmo's rings are.
+    Turn {
+        /// The angle it sets, in degrees.
+        angle: Scalar,
+        /// A point on the ring's axis: its middle.
+        center: Vector,
+        /// The ring's axis (any length).
+        axis: Vector,
+        /// Where angle 0 is, seen from `center` (any length; what lies
+        /// along `axis` is ignored).
+        reference: Vector,
+        /// The ring's radius; `None`: a fixed size on screen.
+        radius: Option<f64>,
+    },
+}
+
+/// One thing a handle binds: a number, or three.
+enum Binding<'a> {
+    Number(&'a Scalar),
+    Vector(&'a Vector),
+}
+
+impl<'a> Binding<'a> {
+    /// The parameters it names, in order.
+    fn names(self) -> Vec<&'a str> {
+        match self {
+            Self::Number(scalar) => scalar.name().into_iter().collect(),
+            Self::Vector(vector) => vector.names(),
+        }
+    }
 }
 
 impl HandleKind {
@@ -136,6 +172,24 @@ impl HandleKind {
             Self::Box { center, size } | Self::Sphere { center, size } => vec![center, size],
             Self::Orient { frame } => vec![&frame.position, &frame.up],
             Self::Angle { origin, axis, .. } => vec![origin, axis],
+            Self::Turn {
+                center,
+                axis,
+                reference,
+                ..
+            } => vec![center, axis, reference],
+        }
+    }
+
+    /// The numbers it reads and writes: its own number, then the cone an
+    /// angle is a fraction of.
+    fn numbers(&self) -> Vec<&Scalar> {
+        match self {
+            Self::Distance { distance: n, .. }
+            | Self::Radius { radius: n, .. }
+            | Self::Turn { angle: n, .. } => vec![n],
+            Self::Angle { angle, within, .. } => std::iter::once(angle).chain(within).collect(),
+            _ => Vec::new(),
         }
     }
 }
@@ -175,7 +229,10 @@ pub enum Constraint {
 /// the bound parameters as the pointer moves (the node recooks through
 /// the usual cooking, incrementally where the node type is
 /// [`Incremental`](super::Incremental)) and records the whole drag as one
-/// undo step.
+/// undo step; inside a live tool's open gesture the drag is part of that
+/// gesture instead, and Escape puts back the drag alone. A handle reads
+/// and writes its numbers at the scene's current time: an animated row is
+/// keyed there.
 ///
 /// The transform kinds use Studio's transform gizmo: [`HandleKind::Translate`]
 /// its Move arrows, plane squares and middle, [`HandleKind::Rotate`] and
@@ -192,6 +249,12 @@ pub enum Constraint {
 /// however it is placed. Its [`Handle::anchor`] says which point of a
 /// shape its center names: a box built upward from its base is anchored
 /// at the base.
+///
+/// A handle whose place is on what the cook made (an extrusion's arrow on
+/// its profile, a blend's radius at its edge) comes from the cook instead:
+/// [`Outputs::handles`](super::Outputs::handles) holds handles with fixed
+/// places and numbers bound by name, which Studio shows after the
+/// declared ones and runs the same way.
 ///
 /// A tool that needs more than a binding (one that draws a stroke, cuts,
 /// or picks components) draws its own handles with the UI API's gizmo
@@ -327,29 +390,83 @@ impl Handle {
 
     /// The parameters it reads and writes, in order, then its frame's.
     pub fn parameters(&self) -> Vec<&str> {
-        let number = match &self.kind {
-            HandleKind::Distance { distance: n, .. }
-            | HandleKind::Radius { radius: n, .. }
-            | HandleKind::Angle { angle: n, .. } => n.name(),
-            _ => None,
-        };
-        let within = match &self.kind {
-            HandleKind::Angle {
-                within: Some(cone), ..
-            } => cone.name(),
-            _ => None,
-        };
-        let turn = match &self.kind {
-            HandleKind::Orient { frame } => frame.turn.name(),
-            _ => None,
-        };
-        number
+        self.bindings()
             .into_iter()
-            .chain(within)
-            .chain(self.kind.vectors().into_iter().flat_map(Vector::names))
-            .chain(turn)
-            .chain(self.frame.iter().flat_map(Frame::names))
+            .flat_map(Binding::names)
             .collect()
+    }
+
+    /// Whether `parameters` (a node type's) has every parameter it binds,
+    /// each of a kind it writes: a number a number or integer parameter,
+    /// three numbers a parameter of three, a component one of a parameter
+    /// of numbers. The error says what is wrong. Studio checks the handles
+    /// a cook places ([`Outputs::check_handles`](super::Outputs::check_handles)).
+    ///
+    /// # Errors
+    /// A parameter it names is missing, or of another kind.
+    pub fn check(&self, parameters: &Schema) -> Result<(), String> {
+        let kind = |name: &str| {
+            (parameters.parameters().find(|p| p.name == name))
+                .map(|p| &p.kind)
+                .ok_or_else(|| format!("{name} is not a parameter of the node"))
+        };
+        let wrong = |name: &str, what: &str| Err(format!("{name} is not {what}"));
+        let number = |scalar: &Scalar| match scalar {
+            Scalar::Parameter(name) => match kind(name)? {
+                ParameterKind::Number(_) | ParameterKind::Integer { .. } => Ok(()),
+                _ => wrong(name, "a number"),
+            },
+            Scalar::Component(name, index) => match numbers(kind(name)?) {
+                Some(count) if *index < count => Ok(()),
+                _ => wrong(name, &format!("a vector of {} numbers or more", index + 1)),
+            },
+            Scalar::Fixed(_) => Ok(()),
+        };
+        for binding in self.bindings() {
+            match binding {
+                Binding::Number(scalar) => number(scalar)?,
+                Binding::Vector(Vector::Parameter(name)) => {
+                    if numbers(kind(name)?) != Some(3) {
+                        wrong(name, "a vector of three numbers")?;
+                    }
+                }
+                Binding::Vector(Vector::Components(scalars)) => {
+                    scalars.iter().try_for_each(number)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// What it binds, in the order [`Handle::parameters`] lists.
+    fn bindings(&self) -> Vec<Binding<'_>> {
+        let turn = match &self.kind {
+            HandleKind::Orient { frame } => Some(&frame.turn),
+            _ => None,
+        };
+        let frame = self.frame.iter().flat_map(|f| {
+            [
+                Binding::Vector(&f.position),
+                Binding::Vector(&f.up),
+                Binding::Number(&f.turn),
+            ]
+        });
+        (self.kind.numbers().into_iter().map(Binding::Number))
+            .chain(self.kind.vectors().into_iter().map(Binding::Vector))
+            .chain(turn.map(Binding::Number))
+            .chain(frame)
+            .collect()
+    }
+}
+
+/// How many numbers a parameter of `kind` holds, when it holds a fixed
+/// count of them.
+fn numbers(kind: &ParameterKind) -> Option<usize> {
+    match kind {
+        ParameterKind::Vector { components, .. } => Some(usize::from(*components)),
+        ParameterKind::Color => Some(3),
+        ParameterKind::Channels(_) => Some(4),
+        _ => None,
     }
 }
 
@@ -402,6 +519,76 @@ mod tests {
             cone("softness", Some("cone")).parameters(),
             ["softness", "cone"]
         );
+    }
+
+    /// A turn reads its angle, then its ring's center, axis and reference.
+    #[test]
+    fn a_turn_reads_its_angle_then_its_ring() {
+        let turn = Handle::new(
+            "angle",
+            HandleKind::Turn {
+                angle: "angle".into(),
+                center: Vector::parameter("center"),
+                axis: Vector::fixed([0.0, 1.0, 0.0]),
+                reference: Vector::fixed([1.0, 0.0, 0.0]),
+                radius: None,
+            },
+        );
+        assert_eq!(turn.parameters(), ["angle", "center"]);
+    }
+
+    /// A handle checks out against a schema with every parameter it binds,
+    /// each of a kind it writes, and names the first that isn't.
+    #[test]
+    fn a_handle_checks_the_parameters_it_binds() {
+        use crate::params::{Number, Parameter};
+        let schema = Schema::default()
+            .parameter(Parameter::new(
+                "depth",
+                "Depth",
+                ParameterKind::Number(Number::length()),
+                1.0,
+            ))
+            .parameter(Parameter::new(
+                "size",
+                "Size",
+                ParameterKind::Vector {
+                    components: 2,
+                    number: Number::length(),
+                },
+                Value::Numbers(vec![1.0, 1.0]),
+            ))
+            .parameter(Parameter::new("on", "On", ParameterKind::Toggle, true));
+        let distance = |number: Scalar| {
+            Handle::new(
+                "depth",
+                HandleKind::Distance {
+                    distance: number,
+                    origin: Vector::fixed([0.0; 3]),
+                    direction: Vector::fixed([0.0, 0.0, 1.0]),
+                },
+            )
+        };
+        assert_eq!(distance("depth".into()).check(&schema), Ok(()));
+        assert_eq!(
+            distance(Scalar::component("size", 1)).check(&schema),
+            Ok(())
+        );
+        let missing = distance("height".into()).check(&schema);
+        assert_eq!(missing, Err("height is not a parameter of the node".into()));
+        assert!(distance("on".into()).check(&schema).is_err(), "a toggle");
+        assert!(
+            distance(Scalar::component("size", 2))
+                .check(&schema)
+                .is_err()
+        );
+        let pivot = Handle::new(
+            "size",
+            HandleKind::Pivot {
+                position: Vector::parameter("size"),
+            },
+        );
+        assert!(pivot.check(&schema).is_err(), "two numbers, not three");
     }
 
     /// A handle in a frame reads the frame's parameters after its own; an

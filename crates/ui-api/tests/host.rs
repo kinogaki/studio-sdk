@@ -386,6 +386,7 @@ fn view(pointer: Option<Pos>, modifiers: Modifiers) -> View {
         response: Response::new(Default::default(), rect()),
         over_chrome: false,
         over_cube: false,
+        over_handle: false,
         pointer,
         modifiers,
         stacking: false,

@@ -85,6 +85,9 @@ pub struct View {
     pub over_chrome: bool,
     /// The view cube took the pointer this frame.
     pub over_cube: bool,
+    /// A handle Studio shows is under the pointer in this view, or one is
+    /// being dragged: a live tool leaves the press to it.
+    pub over_handle: bool,
     /// The pointer, when it is over the view.
     pub pointer: Option<Pos>,
     /// The modifiers held.
@@ -180,6 +183,7 @@ mod tests {
             response: Response::new(Id::new("view"), rect),
             over_chrome: false,
             over_cube: false,
+            over_handle: false,
             pointer,
             modifiers: Modifiers::default(),
             stacking: false,

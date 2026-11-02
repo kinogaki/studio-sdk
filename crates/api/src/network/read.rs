@@ -1,5 +1,6 @@
 //! [`NetworkRead`]: a network as packages read it.
 use crate::components::Components;
+use crate::cook::Handle;
 use crate::data::Data;
 use crate::id::{ContextId, NodeTypeId};
 use crate::params::{Parameters, Value};
@@ -80,6 +81,11 @@ pub struct NodeInfo<'a> {
     /// expression. `None` when it hasn't cooked at that stamp, or when the
     /// cache budget dropped it.
     pub selection: Option<Components>,
+    /// The handles its last cook placed
+    /// ([`Outputs::handles`](crate::Outputs::handles)), while its stamp is
+    /// still the one it cooked at; empty otherwise. A live tool that
+    /// measures its own drags reads its frame here.
+    pub handles: Vec<Handle>,
 }
 
 /// A wire into a node: the node it leaves and which of its outputs.
