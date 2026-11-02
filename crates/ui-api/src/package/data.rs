@@ -2,7 +2,9 @@
 //! list's candidates, what live tools take, the numeric bar, its time and
 //! its outliner rows. The host draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
+use crate::Pos;
 use crate::host::{NodeRef, ObjectRef};
+use kinogaki_studio_api::facets::Marquee;
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::viewport::ElementKind;
 use std::sync::Arc;
@@ -21,6 +23,22 @@ pub struct LevelSpec {
     pub level: ElementKind,
     /// Whether it may be active together with others (Shift+number).
     pub combines: bool,
+    /// The package draws this level's elements itself (a curve's CVs, a
+    /// sketch's points: what the shown value doesn't hold), so it picks
+    /// them too: while the level is active, a click or a box asks
+    /// [`Levels::hit`](super::Levels::hit) first, and core's own picks
+    /// leave the level out.
+    pub own: bool,
+}
+
+/// A click or a box in a view, as [`Levels::hit`](super::Levels::hit)
+/// gets it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Pick {
+    /// A click at this point on screen: what lies nearest under it.
+    Click(Pos),
+    /// A box dragged over the view: what it takes by its rule.
+    Box(Marquee),
 }
 
 /// A button after a context's levels that turns several of them on at

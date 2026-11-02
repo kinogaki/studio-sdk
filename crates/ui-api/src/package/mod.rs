@@ -66,8 +66,8 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, TimeDomain,
-    TimeMark, TimeUnits, Tools,
+    BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, Pick,
+    TimeDomain, TimeMark, TimeUnits, Tools,
 };
 pub use edited::{Edited, Moving, SurfaceLook};
 pub use library::{

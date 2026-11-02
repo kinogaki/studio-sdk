@@ -11,7 +11,9 @@
 //! The host erases `S` when a package registers: [`Erased`] turns each
 //! part over `S` into the same part over `dyn Any`, downcasting the state
 //! the host lends back to `S`.
-use super::data::{Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, TimeDomain, Tools};
+use super::data::{
+    Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, Pick, TimeDomain, Tools,
+};
 use super::edited::Edited;
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
@@ -70,6 +72,17 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     /// adds, Command removes): the context decides what the hit selects.
     fn picked(&self, s: &mut S, cx: &mut dyn Cx, hit: Option<Components>, how: Combine) {
         let _ = (s, cx, hit, how);
+    }
+    /// What a click or a box in the call's view takes of what the package
+    /// draws itself, at its active [`own`](LevelSpec::own) levels, asked
+    /// before core's picks: a click while one of them is active, a box
+    /// while the primary level is one (a box selects at the primary
+    /// level). `Some` goes to [`picked`](Self::picked) in place of core's
+    /// hit, through the same selection and undo path; `None` leaves a
+    /// click to core's picks at the other active levels.
+    fn hit(&self, s: &S, cx: &dyn ViewCx, pick: Pick) -> Option<Components> {
+        let _ = (s, cx, pick);
+        None
     }
     /// The selection as the transform pivot reads it, in the context's
     /// space; `None`: nothing to pivot about (no pivot button). Called
@@ -461,6 +474,9 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     }
     fn picked(&self, s: &mut dyn Any, cx: &mut dyn Cx, hit: Option<Components>, how: Combine) {
         self.part.picked(own_mut(s), cx, hit, how)
+    }
+    fn hit(&self, s: &dyn Any, cx: &dyn ViewCx, pick: Pick) -> Option<Components> {
+        self.part.hit(own(s), cx, pick)
     }
     fn pivot(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<PivotFrame> {
         self.part.pivot(own_mut(s), cx)

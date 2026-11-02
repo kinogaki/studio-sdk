@@ -207,6 +207,7 @@ impl Levels<Pinning> for PinLevels {
                 icon: "cube".into(),
                 level,
                 combines: false,
+                own: false,
             })
             .into()
     }
