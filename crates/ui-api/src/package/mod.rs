@@ -61,6 +61,7 @@ mod data;
 mod edited;
 mod library;
 mod parts;
+mod project;
 mod settings;
 mod view;
 
@@ -79,6 +80,7 @@ pub use parts::{
     Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, RowAction, ViewportLayer,
     Vocabulary,
 };
+pub use project::{ProjectSection, ProjectSettingsSection};
 pub use settings::{Section, SettingsSection};
 pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 
@@ -108,6 +110,12 @@ pub trait UiPackage: Send + Sync + 'static {
 
     /// Its settings sections (one per context that has user settings).
     fn settings(&self) -> Vec<SettingsSection<Self::State>> {
+        Vec::new()
+    }
+
+    /// Its sections of Settings ▸ Project, over the project's stored
+    /// values.
+    fn project_sections(&self) -> Vec<ProjectSettingsSection<Self::State>> {
         Vec::new()
     }
 
@@ -266,6 +274,8 @@ pub struct Registered {
     pub contexts: Vec<ContextPart<dyn Any>>,
     /// Its settings sections.
     pub settings: Vec<SettingsSection>,
+    /// Its sections of Settings ▸ Project.
+    pub project_sections: Vec<ProjectSettingsSection>,
     package: Arc<dyn Calls>,
 }
 
@@ -325,6 +335,7 @@ impl fmt::Debug for Registered {
         f.debug_struct("Registered")
             .field("contexts", &self.contexts)
             .field("settings", &self.settings)
+            .field("project_sections", &self.project_sections)
             .finish()
     }
 }
@@ -345,6 +356,9 @@ impl WithUi for Package {
                 .settings()
                 .into_iter()
                 .map(SettingsSection::erase)
+                .collect(),
+            project_sections: (ui.project_sections().into_iter())
+                .map(ProjectSettingsSection::erase)
                 .collect(),
             package: Arc::new(ui),
         };

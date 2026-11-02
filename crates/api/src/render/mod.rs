@@ -18,8 +18,8 @@ use std::fmt;
 use std::sync::Arc;
 
 pub use kinogaki_render_api::{
-    AttributeDomain, Detail, Extra, ImportedMaterial, Look, MeshAttribute, PlainTriangles,
-    PreviewSurface, Ranges, TriangleSource,
+    AttributeDomain, ColorService, Detail, Extra, ImportedMaterial, Look, MeshAttribute,
+    PlainTriangles, PreviewSurface, Ranges, TriangleSource,
 };
 pub use setting::{setting_from_value, setting_parameter, setting_to_value};
 pub use shader::{MATERIAL, SHADER_VALUE, SHADING, ShaderType, presets, shader_value, shaders};

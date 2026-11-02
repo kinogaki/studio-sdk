@@ -674,6 +674,10 @@ impl Cx for FakeHost {
     fn units(&self) -> &dyn UnitsService {
         self
     }
+    /// No color management: every space the working one.
+    fn colors(&self) -> &dyn kinogaki_studio_api::render::ColorService {
+        &kinogaki_studio_api::conformance::Unconverted
+    }
     fn theme(&self) -> &crate::Theme {
         &self.theme
     }

@@ -86,6 +86,10 @@ pub trait Cx:
     fn wake(&self) -> Waker;
     /// Numbers typed and shown in the user's units.
     fn units(&self) -> &dyn UnitsService;
+    /// The host's color service: the applied project's, and in a section
+    /// of Settings ▸ Project the one of the page's draft (so a config just
+    /// chosen lists its own spaces before it is applied).
+    fn colors(&self) -> &dyn kinogaki_studio_api::render::ColorService;
     /// The host's current theme: the one a part's [`Ui::theme`](crate::Ui::theme)
     /// draws with, so what a viewport layer colors (edge marks from
     /// [`Theme::marks`](crate::Theme::marks)) follows a changed theme.

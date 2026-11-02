@@ -57,6 +57,18 @@ pub trait ColorService: Send + Sync + Debug {
 
     /// Changes whenever a conversion or a view transform would.
     fn revision(&self) -> u64;
+
+    /// The spaces a working space can be (the config's scene-linear
+    /// ones), by name; by default the working space alone.
+    fn spaces(&self) -> Vec<String> {
+        vec![self.working().to_owned()]
+    }
+
+    /// What its configuration got wrong (an unreadable config, a space it
+    /// lacks), with what stands in; none by default.
+    fn problem(&self) -> Option<String> {
+        None
+    }
 }
 
 /// Which display and view a view transform is for.

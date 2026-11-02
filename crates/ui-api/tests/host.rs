@@ -6,15 +6,18 @@
 //! and a nested call is refused.
 use kinogaki_studio_api::RowsFor;
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
-use kinogaki_studio_api::{ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId};
+use kinogaki_studio_api::{
+    ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId, StoredValues,
+};
 use studio_ui_api::host::{
     Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows,
     ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
     ContextPart, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library,
-    MarkingDefault, MenuDefaults, Places, Registered, Section, SettingsSection, Shared, Situation,
-    Tools, UiPackage, ViewportLayer, VocabularyItem, When, WithUi,
+    MarkingDefault, MenuDefaults, Places, ProjectSection, ProjectSettingsSection, Registered,
+    Section, SettingsSection, Shared, Situation, Tools, UiPackage, ViewportLayer, VocabularyItem,
+    When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -83,6 +86,9 @@ impl UiPackage for Trees {
     }
     fn settings(&self) -> Vec<SettingsSection<Forest>> {
         vec![SettingsSection::of::<Density>()]
+    }
+    fn project_sections(&self) -> Vec<ProjectSettingsSection<Forest>> {
+        vec![ProjectSettingsSection::of::<SpacingPage>()]
     }
     fn poll(&self, s: &mut Forest, _cx: &mut dyn Cx) {
         s.polls += 1;
@@ -271,6 +277,58 @@ impl Section for Density {
     }
     fn read(from: &dyn ElementReader) -> Result<Self, Error> {
         Ok(Density(from.float("density")?))
+    }
+}
+
+/// The forest's spacing, a project setting of its own.
+#[derive(Clone, Debug, PartialEq)]
+struct Spacing(f64);
+
+impl kinogaki_studio_api::Stored for Spacing {
+    fn id() -> &'static str {
+        "trees_spacing"
+    }
+    fn scope() -> kinogaki_studio_api::Scope {
+        kinogaki_studio_api::Scope::Project
+    }
+    fn defaults() -> Self {
+        Spacing(2.0)
+    }
+    fn write(&self, to: &mut dyn ElementWriter) -> Result<(), Error> {
+        to.set("spacing", Field::Float(self.0))
+    }
+    fn read(from: &dyn ElementReader) -> Result<Self, Error> {
+        Ok(Spacing(from.float("spacing")?))
+    }
+}
+
+/// Settings ▸ Project's Trees section: the spacing.
+struct SpacingPage;
+
+impl ProjectSection for SpacingPage {
+    type State = Forest;
+    fn label() -> String {
+        "Trees".into()
+    }
+    fn rows(project: &StoredValues, s: &mut Forest, _cx: &mut dyn Cx) -> Schema<u32> {
+        s.pages += 1;
+        let spacing = project.get::<Spacing>().map_or(0.0, |s| s.0);
+        let mut rows = Schema::new();
+        rows.push(Row::number(0, "Spacing", spacing, Number::length()));
+        rows
+    }
+    fn apply(
+        project: &mut StoredValues,
+        rows: &Schema<u32>,
+        edits: &Edits<u32>,
+        _s: &mut Forest,
+        _cx: &mut dyn Cx,
+    ) {
+        if edits.changed.contains(&0)
+            && let Some(v) = rows.number(&0)
+        {
+            project.set(Spacing(v));
+        }
     }
 }
 
@@ -497,6 +555,26 @@ fn a_settings_section_edits_its_draft_and_round_trips() {
     assert_eq!(host.section::<Density>(forest()), Some(&Density(0.8)));
     let empty = MemoryElement::new("forest");
     assert!(empty.read(|r| section.read(r)).is_err());
+}
+
+#[test]
+fn a_project_section_edits_the_project_values_it_is_lent() {
+    let mut host = host();
+    let mut trees = hosted(&host);
+    let section = trees.registered().project_sections[0];
+    assert_eq!(section.label(), "Trees");
+    let mut project = StoredValues::new([kinogaki_studio_api::StoredValue::of::<Spacing>()]);
+    let drawn = trees.with(|_, s| section.rows(&project, s, &mut host));
+    assert_eq!(drawn.number(&0), Some(2.0));
+    assert_eq!(trees.state::<Forest>().pages, 1);
+    let mut edited = Schema::new();
+    edited.push(Row::number(0, "Spacing", 3.5, Number::length()));
+    let edits = Edits {
+        changed: vec![0],
+        ..Edits::default()
+    };
+    trees.with(|_, s| section.apply(&mut project, (&edited, &edits), s, &mut host));
+    assert_eq!(project.get::<Spacing>(), Some(&Spacing(3.5)));
 }
 
 /// The registry checks a UI's contexts like every id a package declares:
