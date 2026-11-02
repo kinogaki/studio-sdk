@@ -412,7 +412,7 @@ Build against the kit as in the node walkthrough (step 7), adding the UI layer's
 
 ```sh
 cat > target/root.rs <<'EOF'
-extern crate kinogaki_shared;
+kinogaki_shared::link!();
 #[path = "../src/lib.rs"]
 mod plugin;
 pub use plugin::*;

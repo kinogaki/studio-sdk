@@ -433,13 +433,13 @@ cargo test
 
 ## 7. Build against the kit
 
-Studio loads plugins built against its **plugin kit**: the build of the SDK the release ships (`deps/`, with `libkinogaki_shared` holding every SDK crate), its standard library (`sysroot/`) and the kit's id (`kinogaki-kit`). The kit's README names the exact compiler. A plugin built against another kit is refused unopened.
+Studio loads plugins built against its **plugin kit**: the build of the SDK the release ships (`deps/`, with `libkinogaki_shared` holding every SDK crate) and its standard library (`sysroot/`). The kit's README names the exact compiler. Each plugin library records the build of `libkinogaki_shared` it was compiled against, and Studio refuses one recording another build before it calls anything in it.
 
-Build the library with `rustc`, from a small root file that links the kit's shared library once and includes the plugin's own `src/lib.rs`. Here `$KIT` is the unpacked kit, and the commands are macOS's (Linux: `.so`; Windows: `.dll`):
+Build the library with `rustc`, from a small root file that links the kit's shared library once (`kinogaki_shared::link!()`, which also writes that record) and includes the plugin's own `src/lib.rs`. Here `$KIT` is the unpacked kit, and the commands are macOS's (Linux: `.so`; Windows: `.dll`):
 
 ```sh
 cat > target/root.rs <<'EOF'
-extern crate kinogaki_shared;
+kinogaki_shared::link!();
 #[path = "../src/lib.rs"]
 mod plugin;
 pub use plugin::*;
@@ -467,7 +467,6 @@ cat > "$PLUGINS/nodes/boxes.prisma" <<EOF
 def Plugin "plugin" {
     str id = "acme.boxes"
     str kind = "nodes"
-    str kit = "$(cat "$KIT/kinogaki-kit")"
     str version = "0.1.0"
 }
 EOF

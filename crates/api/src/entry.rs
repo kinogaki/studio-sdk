@@ -3,9 +3,10 @@
 //! A plugin is a Rust dylib built with the toolchain and SDK build of the
 //! Studio release it targets: the host and every plugin share one standard
 //! library and one copy of each shared crate, so the entry hands its
-//! [`Package`] over as a plain Rust value. Studio reads the plugin's
-//! manifest and checks that it was built for this Studio before it loads
-//! the library at all; it then calls the entry once, and never unloads the
+//! [`Package`] over as a plain Rust value. Studio checks that the library
+//! was compiled against the build of the shared libraries it runs with (a
+//! record the plugin's build writes beside the entry) before it calls
+//! anything in it; it then calls the entry once, and never unloads the
 //! library.
 //!
 //! [`export_package!`](crate::export_package) writes the entry, so a
