@@ -8,8 +8,8 @@ use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
     HostSlots, HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx,
-    LatestJob, LatestResult, NodeRef, NodeRows, ObjectRef, Place, UnitsService, View, ViewCamera,
-    ViewCx, Waker,
+    LatestJob, LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View,
+    ViewCamera, ViewCx, Waker,
 };
 use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
@@ -753,7 +753,7 @@ impl ViewCx for FakeHost {
         _at: Pos,
         _targets: SnapTargets,
         _radius: f64,
-        _on: Option<ObjectRef>,
+        _on: SnapOn,
     ) -> Option<SnapHit> {
         self.snap
     }

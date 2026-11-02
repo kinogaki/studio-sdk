@@ -129,24 +129,31 @@ pub trait ViewCx: Cx {
     /// The transform gizmo, drawn by the host in this view.
     fn gizmo(&self) -> &dyn GizmoService;
     /// The best of `targets` within `radius` pixels of screen point `at`
-    /// in this view, as the host's gizmo snaps: the shown value of `on`
-    /// (`None`: the open object, with the targets its layer adds through
-    /// [`ViewportLayer::own_targets`](crate::package::ViewportLayer::own_targets))
+    /// in this view, as the host's gizmo snaps: the value `on` names
     /// asked through its type's `Snappable`, nothing of it moving, hidden
     /// targets left out; a point before an edge before a surface, each the
-    /// nearest. The hit is in the open object's space, whichever object it
-    /// is on. `None`: nothing near, or `on` is hidden or shows nothing.
+    /// nearest. The hit is in the open object's space, whichever value it
+    /// is on. `None`: nothing near, `on`'s object is hidden or its value
+    /// shows nothing, or (a node's) the value is still being cooked: the
+    /// host asks for it, and a later call finds it.
     /// The host marks the last hit of a frame in this view, as it marks
     /// its gizmo's: a tool draws no snap feedback of its own. Whether to
     /// snap at all (the user's [`HostTransform::snapping`], Command) is
     /// the tool's to decide.
-    fn snap(
-        &mut self,
-        at: Pos,
-        targets: SnapTargets,
-        radius: f64,
-        on: Option<ObjectRef>,
-    ) -> Option<SnapHit>;
+    fn snap(&mut self, at: Pos, targets: SnapTargets, radius: f64, on: SnapOn) -> Option<SnapHit>;
+}
+
+/// The value a [`ViewCx::snap`] searches.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SnapOn {
+    /// The open object's shown value, with the targets its layer adds
+    /// through [`ViewportLayer::own_targets`](crate::package::ViewportLayer::own_targets).
+    Open,
+    /// That object's shown value.
+    Object(ObjectRef),
+    /// That node's cooked value, the node of that object's network (a
+    /// tool's input upstream of what the object shows).
+    Node(ObjectRef, NodeRef),
 }
 
 /// The context of an inspector part's call.

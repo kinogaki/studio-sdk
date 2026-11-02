@@ -10,6 +10,7 @@
 //! whose `Arc` changed since the last frame. A context keeps the same
 //! `Arc`s while nothing changed, so a steady frame costs nothing.
 use kinogaki_studio_api::geometry::WeightedMove;
+use kinogaki_studio_api::{NodeRef, ObjectRef};
 use kinogaki_viewport_api::{
     FaceNormals, GuideDraw, LineHighlight, OverlayDraw, PointWeights, SceneLines,
 };
@@ -65,6 +66,11 @@ pub struct Edited {
     /// The points a drag is moving, shown moved over the open object's
     /// polygons until the edit it commits is shown; `None`: no drag.
     pub moving: Option<Moving>,
+    /// Nodes' cooked values core draws ghosted in this view, each placed
+    /// by its object (a tool's input beside what it makes). Core cooks and
+    /// prepares each as it does an object's shown value, kept while the
+    /// value stays; one still cooking draws once its answer arrives.
+    pub ghosts: Vec<(ObjectRef, NodeRef)>,
 }
 
 /// A drag of some of the open polygons' points, which core previews over
@@ -99,6 +105,7 @@ impl fmt::Debug for Edited {
             .field("lines", &self.lines.len())
             .field("pieces", &self.pieces)
             .field("moving", &self.moving.as_ref().map(|m| m.points.len()))
+            .field("ghosts", &self.ghosts)
             .finish_non_exhaustive()
     }
 }
