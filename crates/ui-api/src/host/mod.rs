@@ -121,8 +121,11 @@ pub trait Cx:
     ) -> NodeRows;
 }
 
-/// The context of a call about one view (a viewport layer's pointer
-/// handling and overlays).
+/// The context of a call about one view: a viewport layer's
+/// [`controls`](crate::package::ViewportLayer::controls),
+/// [`tools`](crate::package::ViewportLayer::tools),
+/// [`overlay`](crate::package::ViewportLayer::overlay) and
+/// [`edited`](crate::package::ViewportLayer::edited).
 pub trait ViewCx: Cx {
     /// The view.
     fn view(&self) -> &View;
@@ -141,6 +144,11 @@ pub trait ViewCx: Cx {
     /// snap at all (the user's [`HostTransform::snapping`], Command) is
     /// the tool's to decide.
     fn snap(&mut self, at: Pos, targets: SnapTargets, radius: f64, on: SnapOn) -> Option<SnapHit>;
+    /// Whether switch `id` is on in this view: as the user set it there
+    /// (the display popover's Overlays), else its declaration's default
+    /// ([`ViewSwitch`](crate::package::ViewSwitch)). `false` for a switch
+    /// the open context doesn't declare.
+    fn switched(&self, id: &str) -> bool;
 }
 
 /// The value a [`ViewCx::snap`] searches.

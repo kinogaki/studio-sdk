@@ -79,7 +79,9 @@ pub struct View {
     pub modal: bool,
     /// The view's own response this frame (its clicks and drags).
     pub response: Response,
-    /// The pointer is over the viewport's own controls.
+    /// The pointer is over the viewport's controls: core's, and the
+    /// context's own ([`controls`](crate::package::ViewportLayer::controls),
+    /// which isn't told its own).
     pub over_chrome: bool,
     /// The view cube took the pointer this frame.
     pub over_cube: bool,

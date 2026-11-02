@@ -73,8 +73,8 @@ pub use edited::{Edited, Moving, SurfaceLook};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
     LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT,
-    Shared, SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec,
-    VocabularyItem, When,
+    Shared, SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewSwitch,
+    ViewportSpec, VocabularyItem, When,
 };
 pub use parts::{
     Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, RowAction, ViewportLayer,

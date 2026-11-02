@@ -131,11 +131,14 @@ pub trait Levels<S: ?Sized>: Send + Sync {
 /// viewport is core's: the left toolbar, the status bar, framing, the
 /// gizmo, pivot picks and component picks (through [`Levels`]).
 ///
-/// A view's frame calls, in order: [`controls`](Self::controls) and
-/// [`holds`](Self::holds) (what the pointer may reach), [`tools`](Self::tools)
-/// before the camera's navigation, then core's gizmo, handles and picks,
-/// then [`overlay`](Self::overlay); after every view,
-/// [`cards`](Self::cards), and [`edited`](Self::edited) for each view drawn.
+/// A frame calls, in order: [`holds`](Self::holds), then each view's
+/// [`controls`](Self::controls) (what the pointer may reach) and
+/// [`tools`](Self::tools) before the camera's navigation, then core's
+/// gizmo, handles and picks, then each view's [`overlay`](Self::overlay);
+/// after every view, [`cards`](Self::cards), and at the frame's end
+/// [`edited`](Self::edited) for each view drawn. The calls about one view
+/// get its [`ViewCx`], which also answers the view's switches
+/// ([`ViewCx::switched`]).
 pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     /// Escape, an undo, or the location leaving the context: end live
     /// drags and gestures.
@@ -177,13 +180,13 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn apply_numeric(&self, s: &mut S, cx: &mut dyn Cx, field: usize, current: f64, value: f64) {
         let _ = (s, cx, field, current, value);
     }
-    /// What the context adds over the open object in view `view` this
+    /// What the context adds over the open object in the call's view this
     /// frame: overlays, guides, lines and style (`None`: nothing). Core
-    /// draws the object's value itself; called once per drawn view after
-    /// the views' input, so it is also where a context refreshes what its
-    /// drawing needs.
-    fn edited(&self, s: &mut S, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
-        let _ = (s, cx, view);
+    /// draws the object's value itself; called once per drawn view at the
+    /// frame's end, after every input and command of the frame, so it is
+    /// also where a context refreshes what its drawing needs.
+    fn edited(&self, s: &mut S, cx: &mut dyn ViewCx) -> Option<Edited> {
+        let _ = (s, cx);
         None
     }
     /// A live tool's input in a view, before camera navigation: its drags,
@@ -253,14 +256,16 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     fn cards(&self, s: &mut S, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         let _ = (s, cx, ui, rect);
     }
-    /// Where the context's floating controls are over the view at `view`
-    /// this frame (its cards, its panels in the view): the pointer over
-    /// one is theirs, not the view's tools. A popup taking the pointer over
-    /// every view gives `view` itself. Said from the state the controls
+    /// Where the context's floating controls are over the call's view this
+    /// frame (its cards, its panels in the view): the pointer over one is
+    /// theirs, not the view's tools. A popup taking the pointer over every
+    /// view gives the view's rect itself. Said from the state the controls
     /// draw from, never recorded while drawing, so it holds for the frame
-    /// that draws them.
-    fn controls(&self, s: &S, cx: &dyn Cx, view: Rect) -> Vec<Rect> {
-        let _ = (s, cx, view);
+    /// that draws them. Asked before the view's [`tools`](Self::tools):
+    /// the view's [`over_chrome`](crate::host::View::over_chrome) counts
+    /// core's controls alone here.
+    fn controls(&self, s: &S, cx: &dyn ViewCx) -> Vec<Rect> {
+        let _ = (s, cx);
         Vec::new()
     }
     /// The context's own time, which the Timeline shows instead of the
@@ -521,8 +526,8 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
         self.part
             .apply_numeric(own_mut(s), cx, field, current, value)
     }
-    fn edited(&self, s: &mut dyn Any, cx: &mut dyn Cx, view: usize) -> Option<Edited> {
-        self.part.edited(own_mut(s), cx, view)
+    fn edited(&self, s: &mut dyn Any, cx: &mut dyn ViewCx) -> Option<Edited> {
+        self.part.edited(own_mut(s), cx)
     }
     fn tools(&self, s: &mut dyn Any, cx: &mut dyn ViewCx, ui: &mut dyn Ui) -> Tools {
         self.part.tools(own_mut(s), cx, ui)
@@ -554,8 +559,8 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     fn cards(&self, s: &mut dyn Any, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
         self.part.cards(own_mut(s), cx, ui, rect)
     }
-    fn controls(&self, s: &dyn Any, cx: &dyn Cx, view: Rect) -> Vec<Rect> {
-        self.part.controls(own(s), cx, view)
+    fn controls(&self, s: &dyn Any, cx: &dyn ViewCx) -> Vec<Rect> {
+        self.part.controls(own(s), cx)
     }
     fn time(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<TimeDomain> {
         self.part.time(own_mut(s), cx)

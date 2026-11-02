@@ -39,9 +39,11 @@ pub struct Holds {
 
 /// The viewport's popovers whose rows a context gives, each showing where
 /// the context's library lists it
-/// ([`ViewportSpec::popovers`](super::ViewportSpec::popovers)). Shading,
-/// Viewport, Camera and Snap are core's: a context declares what it takes
-/// of them as data (its `ViewportSpec`, its values' `SnapTargets`).
+/// ([`ViewportSpec::popovers`](super::ViewportSpec::popovers)). Each
+/// view's display popover and Camera menu, and the Snap popover, are
+/// core's: a context declares what it takes of them as data (its
+/// `ViewportSpec`'s shared rows, analysis mode and switches; its values'
+/// `SnapTargets`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Popover {
     /// The toolbar's gear: the transform tool's settings here (soft

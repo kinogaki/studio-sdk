@@ -14,10 +14,10 @@ use studio_ui_api::host::{
     ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
-    ContextPart, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library,
-    MarkingDefault, MenuDefaults, Places, ProjectSection, ProjectSettingsSection, Registered,
-    Section, SettingsSection, Shared, Situation, Tools, UiPackage, ViewportLayer, VocabularyItem,
-    When, WithUi,
+    ContextPart, Edited, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels,
+    Library, MarkingDefault, MenuDefaults, Places, ProjectSection, ProjectSettingsSection,
+    Registered, Section, SettingsSection, Shared, Situation, Tools, UiPackage, ViewSwitch,
+    ViewportLayer, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
@@ -179,6 +179,13 @@ impl Levels<Forest> for TreeLevels {
 
 struct TreeView;
 
+/// The forest's per-view switch: leaves drawn over the trees.
+const LEAVES: ViewSwitch = ViewSwitch {
+    id: "toy.trees.leaves",
+    label: "Leaves",
+    default: false,
+};
+
 impl ViewportLayer<Forest> for TreeView {
     fn tools(&self, _s: &mut Forest, cx: &mut dyn ViewCx, _ui: &mut dyn Ui) -> Tools {
         Tools {
@@ -193,6 +200,16 @@ impl ViewportLayer<Forest> for TreeView {
         };
         let stroke = Stroke::new(1.0, Color::WHITE);
         ui.painter().circle_stroke(at, 4.0, stroke);
+    }
+    /// Leaves over the trees in the views where they are switched on.
+    fn edited(&self, _s: &mut Forest, cx: &mut dyn ViewCx) -> Option<Edited> {
+        cx.switched(LEAVES.id).then(Edited::default)
+    }
+    /// The card's place, over the view's top left corner while Plant runs.
+    fn controls(&self, s: &Forest, cx: &dyn ViewCx) -> Vec<Rect> {
+        let at = cx.view().rect.min;
+        let card = Rect::from_min_size(at, Vec2::new(120.0, 80.0));
+        s.planting.map(|_| card).into_iter().collect()
     }
     /// Plant's card: its node's rows, More while some are left out, Done
     /// ending it.
@@ -494,6 +511,33 @@ fn a_viewport_layer_reads_its_view_and_draws_through_the_painter() {
     assert!(tools.busy);
     assert_eq!(ui.painter_record().shapes().len(), 1);
     assert_eq!(trees.state::<Forest>().overlays, 1);
+}
+
+#[test]
+fn a_views_calls_answer_its_own_switches_and_place() {
+    let mut host = host();
+    let mut trees = hosted(&host);
+    host.switched.insert((1, LEAVES.id.into()));
+    trees.with(|_, s| s.downcast_mut::<Forest>().unwrap().planting = Some(NodeRef(3)));
+    let at = |index: usize| View {
+        index,
+        rect: Rect::from_min_size(Pos::new(index as f32 * 400.0, 0.0), Vec2::new(400.0, 300.0)),
+        ..view(None, Modifiers::NONE)
+    };
+    let asked = |host: &mut FakeHost, trees: &mut Hosting, index| {
+        host.view = Some(at(index));
+        trees.with(|p, s| {
+            let layer = p.contexts[0].viewport.as_ref().unwrap();
+            let controls = layer.controls(s, host);
+            (layer.edited(s, host).is_some(), controls)
+        })
+    };
+    let (leaves, controls) = asked(&mut host, &mut trees, 0);
+    assert!(!leaves, "view 0 has them off");
+    assert_eq!(controls[0].min, Pos::ZERO);
+    let (leaves, controls) = asked(&mut host, &mut trees, 1);
+    assert!(leaves, "view 1 has them on");
+    assert_eq!(controls[0].min, Pos::new(400.0, 0.0), "over its own view");
 }
 
 #[test]
