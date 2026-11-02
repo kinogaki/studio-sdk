@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use crate::prim::{IDENTITY, Matrix};
+use crate::prim::{IDENTITY, Matrix, Motion};
 use crate::settings::{
     SettingDescriptor, SettingGroup, SettingValue, SettingValues, defaults, value,
 };
@@ -87,6 +87,8 @@ pub struct Declared {
     pub values: SettingValues,
     /// Prim to world (unused by atmospheres).
     pub transform: Matrix,
+    /// Prim to world across the shutter.
+    pub motion: Motion<Matrix>,
     /// Whether the camera sees it itself (a light lights the scene either
     /// way).
     pub visible: bool,
@@ -99,6 +101,7 @@ impl Declared {
             type_id: Arc::from(type_id),
             values,
             transform: IDENTITY,
+            motion: Motion::none(),
             visible: true,
         }
     }

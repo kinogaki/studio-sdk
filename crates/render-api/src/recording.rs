@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::aov::{AovDesc, AovSpec, standard as aov};
-use crate::description::{EngineDescription, MaterialRules, PreviewSetup, Tint};
+use crate::description::{EngineDescription, MaterialRules, MotionSupport, PreviewSetup, Tint};
 use crate::dirty::Dirty;
 use crate::engine::{Outputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
 use crate::exchange::PreviewSurface;
@@ -122,6 +122,10 @@ fn description() -> EngineDescription {
         material_presets: Vec::new(),
         aovs: vec![AovSpec::new(aov::beauty(), true)],
         realtime: false,
+        motion: MotionSupport {
+            transforms: true,
+            velocities: false,
+        },
         preview: PreviewSetup {
             settings: Vec::new(),
             floor: empty(),

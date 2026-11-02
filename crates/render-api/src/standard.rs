@@ -634,6 +634,7 @@ impl Light {
             type_id: ty.id,
             values,
             transform: self.transform,
+            motion: crate::Motion::none(),
             visible: self.visible,
         }
     }

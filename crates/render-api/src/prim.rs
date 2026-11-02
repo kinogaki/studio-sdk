@@ -24,6 +24,53 @@ pub const IDENTITY: Matrix = [
     [0.0, 0.0, 0.0, 1.0],
 ];
 
+/// A prim's placements across the shutter, for motion blur: `values[k]`
+/// at `times[k]`, in frames relative to the frame rendered, ascending.
+/// Empty: it doesn't move, its rest placement holding all the shutter. A
+/// host sends samples only to an engine whose
+/// [`MotionSupport`](crate::MotionSupport) takes them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Motion<T> {
+    /// The sample times.
+    pub times: Arc<[f32]>,
+    /// One placement a time.
+    pub values: Arc<[T]>,
+}
+
+impl<T> Motion<T> {
+    /// No motion.
+    pub fn none() -> Motion<T> {
+        Motion {
+            times: Arc::from([]),
+            values: Arc::from([]),
+        }
+    }
+
+    /// `values` at `times`, when there is one a time and the times are
+    /// finite and ascending.
+    pub fn new(times: impl Into<Arc<[f32]>>, values: impl Into<Arc<[T]>>) -> Option<Motion<T>> {
+        let (times, values) = (times.into(), values.into());
+        let ascending = times.windows(2).all(|t| t[0] < t[1]);
+        let fits = times.len() == values.len() && times.iter().all(|t| t.is_finite());
+        (ascending && fits).then_some(Motion { times, values })
+    }
+
+    /// Whether it holds no samples: the prim doesn't move.
+    pub fn is_empty(&self) -> bool {
+        self.times.is_empty()
+    }
+}
+
+impl<T> Default for Motion<T> {
+    fn default() -> Motion<T> {
+        Motion::none()
+    }
+}
+
+/// An Instancer's copies' placements: each the matrix's first three rows,
+/// row-major.
+pub type Copies = Arc<[[[f32; 4]; 3]]>;
+
 /// A triangle mesh in its own space.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mesh {
@@ -45,6 +92,8 @@ pub struct Mesh {
     pub attributes: Arc<[MeshAttribute]>,
     /// Object to world.
     pub transform: Matrix,
+    /// Object to world across the shutter.
+    pub motion: Motion<Matrix>,
     /// Whether it is rendered.
     pub visible: bool,
     /// The object id the ObjectId output writes.
@@ -119,8 +168,10 @@ impl MeshAttribute {
 pub struct Instancer {
     /// The Mesh prim copied.
     pub prototype: PrimId,
-    /// Each copy's placement: the matrix's first three rows, row-major.
-    pub transforms: Arc<[[[f32; 4]; 3]]>,
+    /// Each copy's placement.
+    pub transforms: Copies,
+    /// Each copy's placement across the shutter: all the copies a time.
+    pub motion: Motion<Copies>,
     /// Whether the copies are rendered.
     pub visible: bool,
 }
@@ -137,7 +188,7 @@ pub enum Projection {
 
 /// A camera after UsdGeomCamera. It looks down its local -Z with +Y up, and
 /// its film back fits the image horizontally.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Camera {
     /// The projection.
     pub projection: Projection,
@@ -161,8 +212,20 @@ pub struct Camera {
     /// Millimetres in one scene unit (1000 for metres): what turns the lens
     /// and an orthographic film back into scene units.
     pub mm_per_unit: f32,
+    /// When the shutter opens and closes, in frames relative to the frame
+    /// rendered (`shutter:open`, `shutter:close`); equal: no motion blur.
+    pub shutter: [f32; 2],
     /// Camera to world.
     pub transform: Matrix,
+    /// Camera to world across the shutter.
+    pub motion: Motion<Matrix>,
+}
+
+impl Camera {
+    /// Whether its shutter stays open a while: what blurs motion.
+    pub fn blurs(&self) -> bool {
+        self.shutter[1] > self.shutter[0]
+    }
 }
 
 impl Default for Camera {
@@ -178,7 +241,9 @@ impl Default for Camera {
             f_stop: 0.0,
             focus_distance: 5.0,
             mm_per_unit: 1000.0,
+            shutter: [0.0, 0.0],
             transform: IDENTITY,
+            motion: Motion::none(),
         }
     }
 }

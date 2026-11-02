@@ -439,7 +439,14 @@ pub struct RenderSetup {
     pub values: SettingValues,
     /// What its render shows: a Comp network's result, or the raw render.
     pub processing: Processing,
+    /// How many placements across the shutter a moving prim sends an
+    /// engine that blurs motion ([`MOTION_SAMPLES`]): core samples them.
+    pub motion_samples: u32,
 }
+
+/// The motion samples a render setup takes, and their default
+/// ([`RenderSetup::motion_samples`]).
+pub const MOTION_SAMPLES: (std::ops::RangeInclusive<u32>, u32) = (2..=16, 3);
 
 /// What a render shows: the raw render, or a Comp network's result (the
 /// host resolves the nodes against the network and compiles them).

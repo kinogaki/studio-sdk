@@ -15,6 +15,7 @@ fn mesh(points: usize) -> Prim {
         attributes: Arc::from([]),
         materials: Arc::from(Vec::new()),
         transform: IDENTITY,
+        motion: Motion::none(),
         visible: true,
         id: 1,
         path: Arc::from("/mesh"),
@@ -830,4 +831,34 @@ fn outputs_have_one_id_each_and_engines_list_theirs() {
     assert_eq!(d.aov("beauty"), Some(&standard::beauty()));
     assert_eq!(d.aov("direct"), None);
     assert_eq!(d.default_aovs(), vec![standard::beauty()]);
+}
+
+#[test]
+fn motion_is_one_placement_a_time_ascending() {
+    let moved = [[2.0, 0.0, 0.0, 1.0]; 4];
+    let two = Motion::new([-0.25, 0.25], [IDENTITY, moved]).unwrap();
+    assert!(!two.is_empty() && Motion::<Matrix>::none().is_empty());
+    assert!(
+        Motion::new([0.25, -0.25], [IDENTITY, moved]).is_none(),
+        "descending"
+    );
+    assert!(
+        Motion::new([0.0, 0.0], [IDENTITY, moved]).is_none(),
+        "twice at a time"
+    );
+    assert!(
+        Motion::new([0.0], [IDENTITY, moved]).is_none(),
+        "a placement a time"
+    );
+    assert!(Motion::new([f32::NAN], [IDENTITY]).is_none());
+    // An Instancer's samples are its copies a time.
+    let copies: Copies = Arc::from([[[1.0, 0.0, 0.0, 0.0]; 3]]);
+    assert!(Motion::new([0.0, 0.5], [copies.clone(), copies]).is_some());
+    // A camera blurs while its shutter is open.
+    let open = Camera {
+        shutter: [-0.25, 0.25],
+        ..Camera::default()
+    };
+    assert!(open.blurs() && !Camera::default().blurs());
+    assert_eq!(format!("{:?}", Dirty::MOTION), "Dirty(MOTION)");
 }

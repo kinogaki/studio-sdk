@@ -7,23 +7,24 @@
 //! ```text
 //! projection, focalLength, horizontalAperture, verticalAperture,
 //! horizontalApertureOffset, verticalApertureOffset, clippingRange,
-//! focusDistance, fStop
+//! focusDistance, fStop, shutterOpen, shutterClose
 //! ```
 use super::camera;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
-use kinogaki_render_api::{Camera, IDENTITY, Projection};
+use kinogaki_render_api::{Camera, IDENTITY, Motion, Projection};
 
 /// The largest lens, film or distance value a camera takes.
 const MAX_VALUE: f32 = 1e12;
 
 /// The lens of `camera`, when it is one: positive focal length, film back
 /// and near distance, a far distance beyond the near one, a focus distance
-/// and f-number of at least 0, every value finite and within range. Its
-/// transform and scale are dropped (the identity, a metre a unit): what a
-/// camera value holds.
+/// and f-number of at least 0, a shutter closing no earlier than it opens,
+/// every value finite and within range. Its transform, motion and scale
+/// are dropped (the identity, none, a metre a unit): what a camera value
+/// holds.
 ///
 /// # Errors
 /// A value out of range.
@@ -41,17 +42,21 @@ pub fn lens(camera: Camera) -> Result<Camera, Error> {
         far,
         camera.focus_distance,
         camera.f_stop,
+        camera.shutter[0],
+        camera.shutter[1],
     ];
     let ok = positive.iter().all(|v| *v > 0.0)
         && (positive.iter().chain(&others)).all(|v| v.is_finite() && v.abs() <= MAX_VALUE)
         && far > near
         && camera.focus_distance >= 0.0
-        && camera.f_stop >= 0.0;
+        && camera.f_stop >= 0.0
+        && camera.shutter[1] >= camera.shutter[0];
     if !ok {
         return Err(Error::invalid("invalid camera"));
     }
     Ok(Camera {
         transform: IDENTITY,
+        motion: Motion::none(),
         mm_per_unit: Camera::default().mm_per_unit,
         ..camera
     })
@@ -89,6 +94,8 @@ impl CameraCodec {
             ("verticalApertureOffset", c.vertical_aperture_offset),
             ("focusDistance", c.focus_distance),
             ("fStop", c.f_stop),
+            ("shutterOpen", c.shutter[0]),
+            ("shutterClose", c.shutter[1]),
         ];
         for (name, v) in scalars {
             out.set(name, Field::Float(f64::from(v)))?;
@@ -133,6 +140,7 @@ impl CameraCodec {
             clipping_range,
             focus_distance: scalar("focusDistance")?,
             f_stop: scalar("fStop")?,
+            shutter: [scalar("shutterOpen")?, scalar("shutterClose")?],
             ..Camera::default()
         };
         lens(camera).map_err(|_| Error::invalid(format_args!("{}: invalid camera", at())))
@@ -170,11 +178,12 @@ mod tests {
             horizontal_aperture_offset: 1.5,
             clipping_range: [0.5, 900.0],
             f_stop: 2.8,
+            shutter: [-0.25, 0.25],
             ..Camera::default()
         })
         .unwrap();
         let mut e = MemoryElement::new("camera");
-        e.write(|w| CameraCodec.write(&camera().wrap(lens), None, w))
+        e.write(|w| CameraCodec.write(&camera().wrap(lens.clone()), None, w))
             .unwrap();
         let back = e.read(|r| CameraCodec.read(r, None)).unwrap();
         assert_eq!(camera().get(&back), Some(&lens));
@@ -194,7 +203,11 @@ mod tests {
             focus_distance: f32::INFINITY,
             ..Camera::default()
         };
-        for bad in [reversed, blind, infinite] {
+        let backwards = Camera {
+            shutter: [0.5, 0.0],
+            ..Camera::default()
+        };
+        for bad in [reversed, blind, infinite, backwards] {
             assert!(lens(bad).is_err());
         }
         let placed = Camera {
@@ -205,6 +218,7 @@ mod tests {
                 [1.0, 2.0, 3.0, 1.0],
             ],
             mm_per_unit: 10.0,
+            motion: Motion::new([0.0], [IDENTITY]).unwrap(),
             ..Camera::default()
         };
         assert_eq!(lens(placed).unwrap(), Camera::default(), "unplaced");

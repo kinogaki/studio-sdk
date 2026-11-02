@@ -33,8 +33,10 @@ impl Dirty {
     pub const PIXELS: Dirty = Dirty(1 << 9);
     /// Mesh attributes the materials read (names, layout or values).
     pub const ATTRIBUTES: Dirty = Dirty(1 << 10);
+    /// A placed prim's placements across the shutter (its `motion`) alone.
+    pub const MOTION: Dirty = Dirty(1 << 11);
     /// How many bits there are.
-    pub const COUNT: usize = 11;
+    pub const COUNT: usize = 12;
     /// Every bit.
     pub const ALL: Dirty = Dirty((1 << Dirty::COUNT) - 1);
 
@@ -50,6 +52,7 @@ impl Dirty {
         "NETWORK",
         "PIXELS",
         "ATTRIBUTES",
+        "MOTION",
     ];
 
     /// The raw bits.

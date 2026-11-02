@@ -104,6 +104,23 @@ pub trait MaterialRules: Send + Sync {
     fn import_preview_surface(&self, surface: &PreviewSurface) -> MaterialNetwork;
 }
 
+/// The motion an engine blurs while a camera's shutter is open.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MotionSupport {
+    /// Placed prims moving: their placements across the shutter
+    /// ([`crate::Motion`]).
+    pub transforms: bool,
+    /// Points moving by their velocities (the `v` attribute).
+    pub velocities: bool,
+}
+
+impl MotionSupport {
+    /// Whether it blurs anything.
+    pub fn any(self) -> bool {
+        self.transforms || self.velocities
+    }
+}
+
 /// An engine, as a host sees it before making one.
 #[derive(Clone)]
 pub struct EngineDescription {
@@ -132,6 +149,8 @@ pub struct EngineDescription {
     /// Whether each pass is a whole frame, fast enough to follow a moving
     /// camera at full size: hosts then never shrink a moving view's film.
     pub realtime: bool,
+    /// The motion it blurs (none: hosts send no motion samples).
+    pub motion: MotionSupport,
     /// How it renders material previews.
     pub preview: PreviewSetup,
     /// What its materials are to others.

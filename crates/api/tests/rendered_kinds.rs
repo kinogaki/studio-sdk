@@ -95,6 +95,7 @@ impl RenderSetupKind for Setups {
             outputs: Vec::new(),
             values: SettingValues::default(),
             processing: Processing::Network { source: None },
+            motion_samples: kinogaki_studio_api::MOTION_SAMPLES.1,
         })
     }
     fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>> {

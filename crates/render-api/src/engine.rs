@@ -23,7 +23,7 @@ pub type Wake = Arc<dyn Fn() + Send + Sync>;
 pub struct ViewId(pub u32);
 
 /// Where a view looks from.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ViewCamera {
     /// Through a Camera prim.
     Prim(PrimId),
@@ -45,7 +45,7 @@ pub enum ViewMode {
 }
 
 /// A view's camera, film size and mode.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ViewDesc {
     /// Where it looks from.
     pub camera: ViewCamera,
