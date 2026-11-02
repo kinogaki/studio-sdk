@@ -648,6 +648,46 @@ fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
     );
 }
 
+/// A fake host hands a context the drawn polygons it was given for an
+/// object (a B-rep's join: each polygon's `face` naming the value's face),
+/// sharing them; none for an object it draws no polygons for.
+#[test]
+fn shown_polygons_are_the_ones_the_object_draws() {
+    use kinogaki_studio_api::geometry::{Attribute, Class};
+    let mut host = host();
+    let (_, grid) = (kinogaki_studio_api::conformance::Fixtures::default().polygons())
+        .into_iter()
+        .next()
+        .unwrap();
+    let faces: Vec<i64> = (0..grid.topology().polygons() as i64).rev().collect();
+    let named = (grid.attributes())
+        .with(
+            Class::Primitive,
+            kinogaki_studio_api::mesher::FACE,
+            Attribute::integer(faces.clone()),
+        )
+        .unwrap();
+    let joined = grid.with_attributes(named).unwrap();
+    let object = ObjectRef(7);
+    host.scene.insert(
+        object,
+        studio_ui_api::testing::FakeObject {
+            name: "Body".into(),
+            kind: ObjectKindId::declared("toy.trees.body"),
+            body: None,
+            shown: None,
+            polygons: Some(joined.clone()),
+        },
+    );
+    let shown = host.shown_polygons(object).unwrap();
+    assert!(shown.positions().ptr_eq(joined.positions()));
+    let face = shown
+        .attributes()
+        .integer(Class::Primitive, kinogaki_studio_api::mesher::FACE);
+    assert_eq!(face.unwrap().as_slice(), faces.as_slice());
+    assert!(host.shown_polygons(ObjectRef(8)).is_none());
+}
+
 /// A body set through the host is the object's next body, of its kind only.
 #[test]
 fn a_body_is_set_whole_and_only_of_its_kind() {
@@ -668,6 +708,7 @@ fn a_body_is_set_whole_and_only_of_its_kind() {
             kind: grove,
             body: None,
             shown: None,
+            polygons: None,
         },
     );
     let other = ObjectKindId::declared("toy.trees.other");

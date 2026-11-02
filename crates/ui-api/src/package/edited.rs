@@ -40,7 +40,12 @@ pub struct Edited {
     pub highlight: Option<Arc<LineHighlight>>,
     /// Linear RGB9E5 words by face or by face corner (0: the clay).
     pub colors: Option<Arc<[u32]>>,
-    /// A value per position for the Scalar shading (CAD's deviation).
+    /// A value per point of the open object's drawn polygons, in their
+    /// point order, for the Scalar shading (CAD's deviation): the points of
+    /// [`HostDoc::shown_polygons`](crate::host::HostDoc::shown_polygons)
+    /// (a B-rep's joined mesh, whose `face` names each polygon's face), on
+    /// which the drawn surface's points are numbered. Values of another
+    /// count than the drawn surface's points (a cook on its way) don't draw.
     pub scalars: Option<Arc<[f32]>>,
     /// The values the Scalar shading spans in this view, low to high;
     /// `None`: the view's own range.

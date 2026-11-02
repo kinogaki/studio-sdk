@@ -10,6 +10,7 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
+use kinogaki_studio_api::geometry::Polygons;
 use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
@@ -170,6 +171,16 @@ pub trait HostDoc {
     /// open object: what it displays) and its draw pieces, as the host
     /// last published them.
     fn shown(&self, object: ObjectRef) -> Option<(Data, Drawn)>;
+    /// The polygons the host draws object `object`'s shown result as,
+    /// sharing the drawn columns (no copy): a polygons value itself; a
+    /// B-rep's bodies meshed by the installed mesher and joined at their
+    /// placements, `face` and `edge` naming the value's faces and edges
+    /// (in the value's numbering), `N` and `uv` on the polygons' corners
+    /// as the mesher made them. Per-point values a context draws over the
+    /// object ([`Edited::scalars`](crate::package::Edited::scalars)) are
+    /// numbered by these polygons' points. `None` while it isn't meshed
+    /// yet, or for a value drawn otherwise (curves).
+    fn shown_polygons(&self, object: ObjectRef) -> Option<Polygons>;
     /// Whether the node the open network displays is a held edit (an Edit
     /// Mesh): the library's entries for editing show, and a key store
     /// active while editing applies.
