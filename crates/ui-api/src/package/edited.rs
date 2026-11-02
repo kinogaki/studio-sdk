@@ -72,10 +72,36 @@ pub struct Edited {
     /// polygons until the edit it commits is shown; `None`: no drag.
     pub moving: Option<Moving>,
     /// Nodes' cooked values core draws ghosted in this view, each placed
-    /// by its object (a tool's input beside what it makes). Core cooks and
-    /// prepares each as it does an object's shown value, kept while the
-    /// value stays; one still cooking draws once its answer arrives.
-    pub ghosts: Vec<(ObjectRef, NodeRef)>,
+    /// by its object and in its tone (a tool's input beside what it makes,
+    /// what a cut removes). Core cooks and prepares each as it does an
+    /// object's shown value, kept while the value stays; one still cooking
+    /// draws once its answer arrives.
+    pub ghosts: Vec<Ghost>,
+}
+
+/// A node's cooked value drawn ghosted ([`Edited::ghosts`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ghost {
+    /// The object whose network holds the node, which places it.
+    pub object: ObjectRef,
+    /// The node.
+    pub node: NodeRef,
+    /// What it shows as.
+    pub tone: GhostTone,
+}
+
+/// What a ghost shows as: the host tints it with its theme's color for
+/// that role, never a color of the context's.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum GhostTone {
+    /// A value beside the edit (a tool's input): the plain ghost.
+    #[default]
+    Neutral,
+    /// What the edit adds (a join's tool bodies): the theme's accent.
+    Add,
+    /// What the edit takes away (a cut's removed volume): the theme's
+    /// error color.
+    Remove,
 }
 
 /// A drag of some of the open polygons' points, which core previews over
@@ -152,9 +178,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_look_starts_plain() {
+    fn the_look_and_a_ghost_start_plain() {
         let look = SurfaceLook::default();
         assert!(look.faces && look.wires && !look.points && !look.normals);
         assert_eq!((look.hidden_lines, look.hidden_points), (0, 0));
+        assert_eq!(
+            GhostTone::default(),
+            GhostTone::Neutral,
+            "a ghost starts plain"
+        );
     }
 }
