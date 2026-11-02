@@ -228,9 +228,10 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         false
     }
     /// A transform drag of the selection, in the host's undo gesture:
-    /// show `step` (a preview, not yet an edit) while it `Began` or
-    /// `Moved`, make it the edit on `Released`, and put back what the
-    /// drag showed on `Cancelled` (the host cancels its gesture).
+    /// show `step` (a preview, not yet an edit: points moved through
+    /// [`Edited::moving`]) while it `Began` or `Moved`, make it the edit
+    /// on `Released`, and put back what the drag showed on `Cancelled`
+    /// (the host cancels its gesture).
     fn transform(&self, s: &mut S, cx: &mut dyn Cx, phase: TransformPhase, step: &TransformStep) {
         let _ = (s, cx, phase, step);
     }

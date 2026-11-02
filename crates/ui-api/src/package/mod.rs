@@ -68,7 +68,7 @@ pub use data::{
     BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, TimeDomain,
     TimeMark, TimeUnits, Tools,
 };
-pub use edited::{Edited, SurfaceLook};
+pub use edited::{Edited, Moving, SurfaceLook};
 pub use library::{
     AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
     LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT,
