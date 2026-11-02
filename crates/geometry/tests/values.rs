@@ -1,5 +1,7 @@
-//! Selection, Detail and Tolerances: their rules.
-use kinogaki_geometry::{Class, Column, Detail, ErrorKind, Selection, Tolerances, Topology};
+//! Selection, Detail, DisplayQuality and Tolerances: their rules.
+use kinogaki_geometry::{
+    Class, Column, Detail, DisplayQuality, ErrorKind, Selection, Tolerances, Topology,
+};
 
 #[test]
 fn selections_are_sorted_distinct_and_hold_their_active_element() {
@@ -49,8 +51,10 @@ fn a_selection_on_another_topology_is_stale() {
 
 #[test]
 fn render_detail_is_in_range() {
-    assert_eq!(Detail::default(), Detail::Viewport);
-    assert!(Detail::Viewport.check().is_ok());
+    assert_eq!(Detail::default(), Detail::Viewport(DisplayQuality::Medium));
+    for q in DisplayQuality::ALL {
+        assert!(Detail::Viewport(q).check().is_ok());
+    }
     assert!(Detail::render(0.001, 90.0).is_ok());
     for (chord, angle) in [
         (0.0, 5.0),

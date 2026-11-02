@@ -40,8 +40,9 @@ pub const EDGE: &str = "edge";
 ///   `uv`, and the mesh doesn't carry them.
 ///
 /// **Sizes.** [`Detail::Viewport`] is the mesher's own interactive
-/// preset: the project has no display chord or angle, and its tangent
-/// tolerance is not one. [`Detail::Render`] gives the chord and angle; a
+/// preset for its [`DisplayQuality`](kinogaki_geometry::DisplayQuality),
+/// one preset a step, coarse to fine: the project has no display chord
+/// or angle, and its tangent tolerance is not one. [`Detail::Render`] gives the chord and angle; a
 /// mesher may clamp them to the range it supports, and its documentation
 /// states that range. Either way no facet is sized below the chord floor,
 /// the larger of the project's positional tolerance (`tolerances`) and

@@ -14,7 +14,7 @@
 //! | [`Attributes`] | named [`Attribute`] columns and [`Group`]s per [`Class`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`] | selected elements of one class, with the active one |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
-//! | [`Detail`] | how fine geometry is made for a render |
+//! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
 //! | [`Tolerances`] | the project's modeling tolerances |
 //!
 //! **Validated values.** Every value's fields are private. It is made only
@@ -118,7 +118,7 @@ pub use attributes::{
 };
 pub use column::Column;
 pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
-pub use detail::Detail;
+pub use detail::{Detail, DisplayQuality};
 pub use error::{ErrorKind, GeometryError};
 pub use motion::{Axis, Mirror, Side, WeightedMove};
 pub use polygons::Polygons;

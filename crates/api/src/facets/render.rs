@@ -26,7 +26,8 @@ pub trait Renderable: Send + Sync {
 pub struct RenderCx<'a> {
     /// The scene time it renders.
     pub time: Time,
-    /// How fine to make the geometry.
+    /// How fine to make the geometry: for a render view, the object's
+    /// [`Detail::Viewport`] at its display quality (the host fills it).
     pub detail: Detail,
     /// The project's tolerances, which an approximate value (a B-rep's
     /// mesh) is made to, as its display is (the host fills them; the
@@ -37,12 +38,12 @@ pub struct RenderCx<'a> {
 }
 
 impl<'a> RenderCx<'a> {
-    /// A render at `time` at the viewport's detail and the default
-    /// tolerances.
+    /// A render at `time` at the viewport's detail of the default display
+    /// quality and the default tolerances.
     pub fn new(time: Time, cancel: &'a CancelToken) -> Self {
         Self {
             time,
-            detail: Detail::Viewport,
+            detail: Detail::default(),
             tolerances: Tolerances::default(),
             cancel,
         }
@@ -67,7 +68,7 @@ mod tests {
     fn a_render_asks_at_the_viewports_detail_unless_told() {
         let cancel = CancelToken::default();
         let cx = RenderCx::new(Time::ZERO, &cancel);
-        assert_eq!(cx.detail, Detail::Viewport);
+        assert_eq!(cx.detail, Detail::Viewport(Default::default()));
         let fine = Detail::Render {
             chord: 0.01,
             angle: 5.0,

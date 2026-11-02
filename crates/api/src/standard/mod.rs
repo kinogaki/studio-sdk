@@ -20,11 +20,12 @@
 //! [`LightCodec`], [`PreviewMaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
-//! [`ColorConfiguration`] and
-//! [`Tolerances`](crate::geometry::Tolerances) are project values core
-//! keeps ([`Stored`](crate::Stored), `color` and `tolerances` in the
-//! project's settings). A package keeps project settings of its own the
-//! same way: a [`Stored`](crate::Stored) type of
+//! [`ColorConfiguration`],
+//! [`Tolerances`](crate::geometry::Tolerances) and
+//! [`DisplayQuality`](crate::geometry::DisplayQuality) are project values
+//! core keeps ([`Stored`](crate::Stored), `color`, `tolerances` and
+//! `display_quality` in the project's settings). A package keeps project
+//! settings of its own the same way: a [`Stored`](crate::Stored) type of
 //! [`Scope::Project`](crate::Scope::Project) it registers
 //! (`Package::with_stored`), saved in the project under its id.
 mod attributes;
@@ -35,6 +36,7 @@ mod curves;
 mod light;
 mod materials;
 mod polygons;
+mod quality;
 mod selection;
 mod tolerances;
 

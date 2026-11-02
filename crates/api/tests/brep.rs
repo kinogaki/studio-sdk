@@ -183,7 +183,7 @@ fn meshers_register_once_under_their_vendor_first_party_first() {
     let body = &value.bodies()[0];
     let meshed = registry.meshers().next().unwrap().mesh(
         body,
-        Detail::Viewport,
+        Detail::default(),
         &Tolerances::default(),
         &CancelToken::default(),
     );

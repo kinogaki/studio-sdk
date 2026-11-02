@@ -7,24 +7,10 @@ use crate::math::{Bounds, Units};
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
 use crate::viewport::{ElementKind, ElementSet, SurfaceSource};
-use kinogaki_geometry::Tolerances;
+use kinogaki_geometry::{DisplayQuality, Tolerances};
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
-
-/// How finely to prepare a value for display. Types whose display is
-/// approximate (a CAD body's tessellation, a subdivision preview) pick a
-/// tolerance from it; exact types ignore it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum DisplayQuality {
-    /// While the user drags or plays: fast, coarse.
-    Interactive,
-    /// The resting display.
-    #[default]
-    Normal,
-    /// Close inspection and captures.
-    Fine,
-}
 
 /// What a value is drawn for.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -39,16 +25,23 @@ pub enum DrawPurpose {
     Template,
 }
 
-/// What [`Displayable::prepare`] is asked for: the quality, what the
-/// value is drawn for, the object's body when the value is an object's
+/// What [`Displayable::prepare`] is asked for: the object's display
+/// quality, whether a gesture is under way, what the value is drawn for, the object's body when the value is an object's
 /// result (its display settings: a mesh's subdivision display), the
 /// project's tolerances, which an approximate display (a B-rep's mesh, a
 /// sampled surface) is made to, and the project's units, which a display
 /// of physical sizes (a printer's bed in millimetres) draws in.
 #[derive(Clone, Default)]
 pub struct DisplayRequest {
-    /// How finely.
+    /// How finely the object shows: types whose display is tessellated (a
+    /// B-rep's mesh, a sampled surface) make it at
+    /// [`Detail::Viewport`](kinogaki_geometry::Detail::Viewport) of it;
+    /// exact types ignore it. The host gives the object's own, else the
+    /// project's.
     pub quality: DisplayQuality,
+    /// The user is dragging or playing: prepare fast, leaving finer work
+    /// to [`Displayable::refine`] once the scene rests.
+    pub interactive: bool,
     /// What it is drawn for.
     pub purpose: DrawPurpose,
     /// The object's body, when the value is an object's result.
@@ -64,6 +57,7 @@ impl fmt::Debug for DisplayRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DisplayRequest")
             .field("quality", &self.quality)
+            .field("interactive", &self.interactive)
             .field("purpose", &self.purpose)
             .field("body", &self.body.is_some())
             .field("tolerances", &self.tolerances)

@@ -1,10 +1,10 @@
-//! The standard data types: handles, codecs, the tolerances value and the
-//! conformance suite.
+//! The standard data types: handles, codecs, the tolerances and display
+//! quality values and the conformance suite.
 use kinogaki_studio_api::conformance::{self, Codecs, Consumer, Fixtures, Invariants};
 use kinogaki_studio_api::element::{Field, MemoryElement};
 use kinogaki_studio_api::geometry::{Class, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, PolygonsCodec};
-use kinogaki_studio_api::{Data, DataCodec, StoredValue};
+use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue};
 use std::sync::Arc;
 
 #[test]
@@ -137,6 +137,27 @@ fn the_tolerances_save_as_a_project_value() {
             value.write(&inches, w)?;
             w.set("positional_mm", Field::Float(5.0))
         })
+        .unwrap();
+    assert!(wrong.read(|r| value.read(r)).is_err());
+}
+
+#[test]
+fn the_display_quality_saves_as_a_project_value_by_its_label() {
+    use kinogaki_studio_api::geometry::DisplayQuality;
+    let value = StoredValue::of::<DisplayQuality>();
+    assert_eq!(
+        (value.id(), value.scope()),
+        ("display_quality", Scope::Project)
+    );
+    for q in DisplayQuality::ALL {
+        let mut saved = MemoryElement::new("display_quality");
+        saved.write(|w| value.write(&q, w)).unwrap();
+        let read = saved.read(|r| value.read(r)).unwrap();
+        assert_eq!(read.downcast_ref::<DisplayQuality>(), Some(&q));
+    }
+    let mut wrong = MemoryElement::new("display_quality");
+    wrong
+        .write(|w| w.set("quality", Field::Text("Ultra".into())))
         .unwrap();
     assert!(wrong.read(|r| value.read(r)).is_err());
 }

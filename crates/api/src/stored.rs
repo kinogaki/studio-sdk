@@ -2,7 +2,7 @@
 //! the user's settings, headless.
 //!
 //! What a project keeps for a package outside its objects: CAD's
-//! tolerances and display quality (one value for the project), CAD's
+//! tolerances (one value for the project), CAD's
 //! rows of each view (one value per view); and what a user keeps across
 //! projects that cooks read (CAM's printers and filaments, one value for
 //! the user). A package declares each as a

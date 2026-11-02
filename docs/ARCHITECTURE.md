@@ -82,7 +82,8 @@ Studio defines each kind of geometry once, in the `kinogaki-geometry` crate (re-
 | `brep::Brep` | boundary-representation bodies (`brep::Body`: shared `Geometry`, `BrepTopology`, persistent `Names` and `Attributes`, placements and the positional tolerance it was built to), free `Curves` and datums, with the operation's `History`; its faces, edges and vertices are numbered as one across bodies, free curves and datums (`Brep::count`, `Brep::element`, a datum plane a face, an axis or curve an edge, a datum point a vertex), and `Brep::fingerprint` is what a selection of it keeps; made by `BrepBuilder`, which checks structure and consistency at ends and joins. The module's rustdoc is the contract two kernels agree on: charts, senses, loops, seams, poles, tolerances. A kernel's mesher turns a body into `Polygons`; core doesn't tessellate |
 | `Attributes` | named columns (`Float`, `Integer`, `Vector` with a `TypeInfo`, indexed `Text`) and `Group`s per `Class` (Detail, Object, Instance, Primitive, Piece, Edge, Point, Vertex); the standard names (`P`, `N`, `v`, `uv`, `Cd`, `Alpha`, `width`, `material`, `name`, `part`, `instance`, the `sharp` Edge group and the `.hidden` Primitive group) always have their standard types |
 | `Selection` | selected elements of one class (or all), the active one and the fingerprint of the topology it was made on; a standard type's `Components` hold one (`Components::selection`) |
-| `Detail` | how fine geometry is made for a render (see Rendering) |
+| `Detail` | how fine geometry is made for a view or a render: `Viewport(DisplayQuality)` or `Render { chord, angle }` (see Rendering) |
+| `DisplayQuality` | how finely an object whose display is tessellated shows: `Coarse`, `Medium`, `Fine`, `Finest`, which a producer maps to presets of its own; the project's (a project value core keeps), unless the object overrides it |
 | `Tolerances` | the project's modeling tolerances (positional, fit, tangent, curvature, with their ranges, and the model unit), a project value core keeps |
 
 **Validated values.** Every value's fields are private; it is made only through a constructor or builder that checks its rules (each type's rustdoc lists them), and refused with a `GeometryError` naming the element at fault. So code reading a value relies on its rules: offsets in range, points that exist, attributes sized to their class. Enums are `#[non_exhaustive]`, and each says what a reader does with a variant it doesn't know. The product limits (`limits`: 8,388,608 points and primitives, 33,554,432 vertices, 256-byte names, finite positions within 1e100) hold for every value.
@@ -129,7 +130,7 @@ If a type does not provide a facet, the surface that needs it simply leaves the 
 
 A `Conversion` is a declared function that turns one data type into another. The package that provides it depends on both kernels, so neither kernel needs to know about the other. The registry holds at most one conversion for each (from, to) pair.
 
-A `Mesher` (`Package::with_mesher`) is a kernel's display mesh of a B-rep body: its faces' polygons in face order (`face`), then one polyline per edge over the same shared points (`edge`), at a `Detail` and the project's `Tolerances`, with the faces it couldn't mesh and why. The B-rep value holds no triangles; core caches each body's mesh, and draws, picks, renders and exports from it. `Registry::meshers` lists them first-party first. With none installed a body shows grey, without faces.
+A `Mesher` (`Package::with_mesher`) is a kernel's display mesh of a B-rep body: its faces' polygons in face order (`face`), then one polyline per edge over the same shared points (`edge`), at a `Detail` (in a view, `Viewport` of the object's display quality, one mesher preset a step) and the project's `Tolerances`, with the faces it couldn't mesh and why. The B-rep value holds no triangles; core caches each body's mesh, and draws, picks, renders and exports from it. `Registry::meshers` lists them first-party first. With none installed a body shows grey, without faces.
 
 ## Cooking
 
@@ -261,7 +262,7 @@ Session state is never saved in the project.
 
 ## Stored values
 
-Some values belong to a package and to the project rather than to an object: CAD's tolerances and display quality for the project, its rows for each view; and some to the user, across projects, read by cooks: CAM's printers and filaments. A package declares each as a value type implementing `Stored` and registers it (`StoredValue::of::<T>()`, `Package::with_stored`):
+Some values belong to a package and to the project rather than to an object: CAD's tolerances for the project, its rows for each view; and some to the user, across projects, read by cooks: CAM's printers and filaments. A package declares each as a value type implementing `Stored` and registers it (`StoredValue::of::<T>()`, `Package::with_stored`):
 - `id`, the name of its element in the project;
 - `scope`: one value for the project (`Scope::Project`), one per view (`Scope::View`), or one for the user (`Scope::User`, kept in the user's settings folder, never in a project);
 - `defaults`, what a new project or view starts with;
@@ -287,7 +288,7 @@ Long work polls a `CancelToken`: preparing a display, converting, reading a file
 
 ## Rendering
 
-Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport` or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, a standard value that render-api re-exports, the project's `Tolerances` an approximate value is made to, and a cancel token), and returns `RenderItem::Triangles { part, source, placements, label }`:
+Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport(DisplayQuality)`, the object's, or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, a standard value that render-api re-exports, the project's `Tolerances` an approximate value is made to, and a cancel token), and returns `RenderItem::Triangles { part, source, placements, label }`:
 - `part` is a key stable across recooks (a CAD body's index), so the host matches the items of successive values;
 - `source` is a `TriangleSource`, an immutable snapshot with shared arrays;
 - `placements` are relative to the object: the first is the item, the rest are copies sharing its acceleration structure;
