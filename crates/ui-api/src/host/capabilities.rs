@@ -15,6 +15,7 @@ use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
     Bounds, ContextId, Data, Drawn, NodeTypeId, ObjectBody, ObjectKindId, Parameters, SlotId, Time,
+    Vec3,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -296,6 +297,15 @@ pub trait HostTransform {
     fn transform_space(&self) -> TransformSpace;
     /// Chooses the current tool's space (saved with the user's settings).
     fn set_transform_space(&mut self, space: TransformSpace);
+    /// The transform pivot, in the open context's space: the user's choice
+    /// (kept per context, starting at
+    /// [`ViewportSpec::default_pivot`](crate::package::ViewportSpec::default_pivot))
+    /// resolved against the frame the context's
+    /// [`Levels::pivot`](crate::package::Levels::pivot) last gave; `None`
+    /// while that gives none. A live tool reads it to turn or scale about
+    /// it, and again when told the choice changed
+    /// ([`Levels::pivot_changed`](crate::package::Levels::pivot_changed)).
+    fn pivot(&self) -> Option<Vec3>;
 }
 
 /// The tools' memory and the tool a card still adjusts, the same for every

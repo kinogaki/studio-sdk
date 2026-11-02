@@ -174,6 +174,8 @@ pub struct FakeHost {
     pub editing: bool,
     /// The transform tool's space.
     pub space: TransformSpace,
+    /// The transform pivot ([`HostTransform::pivot`]).
+    pub pivot: Option<kinogaki_studio_api::Vec3>,
     /// The tools' remembered parameters, by node type (a fake host knows
     /// no declared defaults: `starting` is what was remembered).
     pub remembered: BTreeMap<kinogaki_studio_api::NodeTypeId, kinogaki_studio_api::Parameters>,
@@ -232,6 +234,7 @@ impl FakeHost {
             keyboard_taken: false,
             editing: false,
             space: TransformSpace::World,
+            pivot: None,
             remembered: BTreeMap::new(),
             adjustable: None,
             wakes: Arc::default(),
@@ -597,6 +600,9 @@ impl HostTransform for FakeHost {
     fn set_transform_space(&mut self, space: TransformSpace) {
         self.calls.push(HostCall::SetTransformSpace(space));
         self.space = space;
+    }
+    fn pivot(&self) -> Option<kinogaki_studio_api::Vec3> {
+        self.pivot
     }
 }
 
