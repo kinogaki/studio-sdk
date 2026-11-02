@@ -149,11 +149,11 @@
 //! the face as failed.
 //!
 //! ```
-//! use kinogaki_geometry::Attributes;
 //! use kinogaki_geometry::brep::{
-//!     BodyKind, BrepBuilder, Circle, Circle2, CoedgeSpec, Curve, EdgeSpec, FaceSpec, Frame,
-//!     Name, OperationId, PCurve, Plane, Role, Sense, Surface,
+//!     BodyKind, BrepBuilder, Circle, Circle2, CoedgeSpec, Curve, EdgeSpec, FaceSpec, Name,
+//!     OperationId, PCurve, Plane, Role, Sense, Surface,
 //! };
+//! use kinogaki_geometry::{Attributes, Frame};
 //! use std::f64::consts::TAU;
 //!
 //! // A unit disc: one plane face bounded by one circular edge.
@@ -186,8 +186,8 @@ mod topology;
 pub use body::{Body, Placement};
 pub use builder::{BrepBuilder, CoedgeSpec, EdgeSpec, FaceSpec};
 pub use geometry::{
-    Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Frame, Geometry, Line,
-    Line2, Offset, PCurve, Plane, Revolution, Sphere, Surface, Torus,
+    Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Geometry, Line, Line2,
+    Offset, PCurve, Plane, Revolution, Sphere, Surface, Torus,
 };
 pub use ids::{
     CoedgeId, CurveId, EdgeId, Entity, FaceId, LoopId, LumpId, PCurveId, ShellId, SurfaceId,
@@ -200,6 +200,7 @@ pub use topology::{
     BodyKind, BrepTopology, Coedge, Counts, Edge, Face, Loop, Lump, Names, Sense, Shell, Vertex,
 };
 
+use crate::Frame;
 #[cfg(doc)]
 use crate::Tolerances;
 use crate::attributes::{Attributes, Class};

@@ -2,11 +2,12 @@
 //! alone builds (a box, a closed cylinder with no seam, a cone with its
 //! apex a pole edge, a whole sphere with no loops, a trimmed NURBS patch),
 //! and one value holding all of them with every part the type has.
+use kinogaki_geometry::Frame;
 use kinogaki_geometry::brep::{
     Brep, BrepBuilder, Circle, Circle2, CoedgeSpec, Cone, Curve, CurveId, Cylinder, Datum,
-    DatumHint, DatumKind, EdgeId, EdgeSpec, End, FaceSpec, Frame, History, Line, Line2, Name,
-    NurbsCurve, NurbsSurface, OperationId, PCurve, PCurveId, Placement, Plane, Role, Sense, Sphere,
-    Surface, SurfaceId, VertexId,
+    DatumHint, DatumKind, EdgeId, EdgeSpec, End, FaceSpec, History, Line, Line2, Name, NurbsCurve,
+    NurbsSurface, OperationId, PCurve, PCurveId, Placement, Plane, Role, Sense, Sphere, Surface,
+    SurfaceId, VertexId,
 };
 use kinogaki_geometry::{Attribute, Attributes, Basis, Class, Column, Curves, Text, TypeInfo};
 use std::f64::consts::TAU;

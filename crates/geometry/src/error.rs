@@ -36,6 +36,9 @@ pub enum ErrorKind {
     /// A polygon can't be triangulated strictly: its outline crosses or
     /// collapses ([`crate::Polygons::triangulate_strict`]).
     Triangulation,
+    /// A frame's origin isn't finite, or its axes aren't orthonormal and
+    /// right-handed ([`crate::Frame`]).
+    Frame,
     /// A B-rep body, its geometry or a value holding it breaks a rule of
     /// [`crate::brep`] ([`GeometryError::entity`] names the entity at
     /// fault).

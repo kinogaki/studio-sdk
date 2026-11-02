@@ -8,10 +8,11 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
+use kinogaki_geometry::Frame;
 use kinogaki_geometry::GeometryError;
 use kinogaki_geometry::brep::{
-    Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, Frame,
-    History, Placement, Sense,
+    Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, History,
+    Placement, Sense,
 };
 
 /// Saves [`Brep`]: one table of every persistent name the value holds

@@ -7,10 +7,10 @@ use super::super::invalid;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
 use kinogaki_geometry::Column;
+use kinogaki_geometry::Frame;
 use kinogaki_geometry::brep::{
-    Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Frame, Line, Line2,
-    NurbsCurve, NurbsSurface, Offset, PCurve, Plane, Revolution, SeamContinuity, Sphere, Surface,
-    Torus,
+    Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Line, Line2, NurbsCurve,
+    NurbsSurface, Offset, PCurve, Plane, Revolution, SeamContinuity, Sphere, Surface, Torus,
 };
 use std::sync::Arc;
 

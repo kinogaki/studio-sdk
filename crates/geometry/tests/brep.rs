@@ -4,7 +4,7 @@
 //! them by the documented conventions alone, and edits make new bodies
 //! from old ones. Then each rule the builder checks is broken once.
 use kinogaki_geometry::brep::*;
-use kinogaki_geometry::{Attribute, Attributes, Class, Column, Curves, ErrorKind, TypeInfo};
+use kinogaki_geometry::{Attribute, Attributes, Class, Column, Curves, ErrorKind, Frame, TypeInfo};
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};
 use std::sync::Arc;
 

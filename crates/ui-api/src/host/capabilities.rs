@@ -10,6 +10,7 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
+use kinogaki_studio_api::geometry::Frame;
 use kinogaki_studio_api::geometry::Polygons;
 use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
@@ -256,6 +257,20 @@ pub trait HostView {
     /// Frames the active view on `bounds` (in the edited object's space),
     /// as F frames the selection.
     fn frame_bounds(&mut self, bounds: Bounds);
+    /// Turns view `view` to look squarely at `frame` (in the edited
+    /// object's space) and projects it `orthographic` or in perspective:
+    /// down its −z with its y up on screen, its origin in the middle, as
+    /// far as the view was (a sketch's plane seen flat, Look At). A view
+    /// looking through a Camera object leaves it first. Its camera as it
+    /// was is kept for [`restore`](Self::restore) until the user turns the
+    /// view (an orbit, a view chosen), so a second look keeps the first
+    /// camera. Navigation, as the user's: never an undo step. Nothing for
+    /// no such view.
+    fn look_at(&mut self, view: usize, frame: Frame, orthographic: bool);
+    /// Puts view `view`'s camera back as it was before
+    /// [`look_at`](Self::look_at) turned it; nothing once the user turned
+    /// the view since (their view stays) or when no look turned it.
+    fn restore(&mut self, view: usize);
     /// Asks for one more frame (a package's own state changed outside an
     /// event: a worker's result it just adopted). Never a timer.
     fn redraw(&mut self);

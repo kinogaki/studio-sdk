@@ -15,6 +15,7 @@ use crate::package::{Registered, State};
 use crate::{Pos, Projection, Rect};
 use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
+use kinogaki_studio_api::geometry::Frame;
 use kinogaki_studio_api::geometry::Polygons;
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::{Severity, Unit};
@@ -59,6 +60,10 @@ pub enum HostCall {
     SetBody(ObjectRef, String),
     /// [`HostView::frame_bounds`].
     Frame(Bounds),
+    /// [`HostView::look_at`]: the view, the frame and whether orthographic.
+    LookAt(usize, Frame, bool),
+    /// [`HostView::restore`].
+    Restore(usize),
     /// [`HostView::redraw`].
     Redraw,
     /// [`HostStatus::fail`].
@@ -549,6 +554,12 @@ impl HostView for FakeHost {
     }
     fn frame_bounds(&mut self, bounds: Bounds) {
         self.calls.push(HostCall::Frame(bounds));
+    }
+    fn look_at(&mut self, view: usize, frame: Frame, orthographic: bool) {
+        self.calls.push(HostCall::LookAt(view, frame, orthographic));
+    }
+    fn restore(&mut self, view: usize) {
+        self.calls.push(HostCall::Restore(view));
     }
     fn redraw(&mut self) {
         self.calls.push(HostCall::Redraw);
