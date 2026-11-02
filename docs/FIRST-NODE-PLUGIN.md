@@ -325,9 +325,6 @@ impl ObjectKindSpec for BoxesKind {
     fn codec(&self) -> &dyn ObjectCodec {
         self
     }
-    fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
-        None
-    }
 }
 
 /// A Boxes body saves nothing but its kind.

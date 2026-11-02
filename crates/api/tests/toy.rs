@@ -219,10 +219,12 @@ impl ObjectKindSpec for CloudObject {
     fn codec(&self) -> &dyn ObjectCodec {
         &CloudBodyCodec
     }
-    fn adopts(&self, data: &Data) -> Option<Arc<dyn ObjectBody>> {
-        CLOUD
-            .is(data)
-            .then(|| Arc::new(CloudBody(data.clone())) as Arc<dyn ObjectBody>)
+    fn adopted(&self) -> Vec<DataTypeId> {
+        vec![CLOUD.id()]
+    }
+    fn adopts(&self, data: &Data, _: &CreateCx<'_>) -> Option<Adoption> {
+        let body = CLOUD.is(data).then(|| Arc::new(CloudBody(data.clone())))?;
+        Some(Adoption::new(body))
     }
 }
 
@@ -379,20 +381,23 @@ fn objects_adopt_imported_values_of_their_result_type() {
         )
         .unwrap();
     let value = imported.items[0].data.as_ref().unwrap();
+    let engines = kinogaki_render_api::Engines::new(Vec::new());
+    let cx = CreateCx::new(&engines, None);
     let kind = registry
         .object_kinds()
-        .find(|k| k.adopts(value).is_some())
+        .find(|k| k.adopted().contains(&value.ty()))
         .unwrap();
     assert_eq!(kind.id(), ObjectKindId::declared("toy.points.object"));
-    let body = kind.adopts(value).unwrap();
+    let adoption = kind.adopts(value, &cx).unwrap();
+    assert!(adoption.network.is_none() && adoption.renamed.is_empty());
+    let body = adoption.body;
     assert!(body.downcast_ref::<CloudBody>().unwrap().0.ptr_eq(value));
-    assert!(kind.adopts(&COUNT.wrap(1)).is_none());
+    assert!(kind.adopts(&COUNT.wrap(1), &cx).is_none());
     // The body round-trips through its kind's codec.
     let mut element = MemoryElement::new(kind.id().as_str());
     element
         .write(|out| kind.codec().write(&*body, out))
         .unwrap();
-    let engines = kinogaki_render_api::Engines::new(Vec::new());
     let back = element
         .read(|r| kind.codec().read(r, &ReadCx::new(&engines)))
         .unwrap();

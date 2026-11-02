@@ -101,9 +101,6 @@ impl ObjectKindSpec for BoardKind {
     fn codec(&self) -> &dyn ObjectCodec {
         &BoardCodec
     }
-    fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
-        None
-    }
     /// The Pin Board in Create, Tab and the A menu: a new board opens,
     /// ready for pinning.
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {

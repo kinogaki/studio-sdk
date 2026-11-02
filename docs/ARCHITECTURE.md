@@ -220,7 +220,7 @@ An `ObjectKindSpec` describes one kind of object. It gives:
 - the data type of their result;
 - a new body;
 - a codec;
-- `adopts`, which turns an imported value into a new body;
+- `adopted` and `adopts` (none by default): the data types it can be made from, and what an object made from an imported value starts as (an `Adoption`: its body, its network's content as a `NetworkSeed` when the kind builds it, and the references to the file's keys that now resolve inside it);
 - for a kind that holds no network, `value(body, path)`: what a reference naming the object reads (a printer's description). The path is the object's own, so a rename, like a body change, makes core read it again and recook its readers;
 - `materials(body)`: Materials the object publishes (a printer's slots), each a `PublishedMaterial` under the object's path by its key (`/X1C/AMS 1 · 2`; a key is any `is_path_step`, spaces and `·` included), read-only, with a `PreviewSurface` and, while it can't be used, why (`unavailable`: a path naming it then names nothing). Core asks again whenever the body changes, and pickers and renders take them as they take a Material Library's;
 - `creations` and `create`, the ways an object level makes its objects, given a `CreateCx`: the installed engines, the active one, and the user's settings sections by context (`CreateCx::settings`, read through the host's `UserSettings`: a printer saved in Settings becomes a creation).
@@ -245,7 +245,7 @@ It reads a file (`read(path, options, &Reading)`) into `Imported`, a list of `Fi
 
 `format::options` holds what formats share about options: reading a typed option (`option`, `choice`), saving a choice by its own token so a saved setting survives a reordered list (`choice_value`, `read_token`), and the rows most import dialogs show (`section`, `units`, `scale`, `toggle`). A file's materials travel beside its geometry as `standard::preview_materials()` (`kinogaki.core.preview_materials`, which core registers with `PreviewMaterialsCodec`), a list of `ImportedMaterial` (the key its polygons name, a library name, a `PreviewSurface`); File ▸ Import is to turn it into a Material Library (P90b).
 
-To import, the environment passes each value to the first object kind that `adopts` it. With no formats installed, nothing can be imported.
+To import, the environment passes each value to the first object kind that `adopts` it, lending it the engines (a Material Library adopts a file's materials, each Material's inside seeded from the active engine's `import_preview_surface` through `render::seed_of`). Formats are offered the types kinds declare as `adopted`, not their results: what an object can be made from and what it gives are separate. With no formats installed, nothing can be imported.
 
 ## Session slots
 

@@ -205,6 +205,63 @@ impl NewNode {
     }
 }
 
+/// A network to start a node's inside with: its nodes in order (each
+/// displayed as it says, at most one), the wires between them, and the
+/// insides of those that hold networks of their own (a Material in a
+/// library). Studio lays the nodes out, makes and wires them in one step,
+/// and refuses a wire naming a node or port that isn't there.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct NetworkSeed {
+    /// The nodes; wires and insides name them by index.
+    pub nodes: Vec<NewNode>,
+    /// The wires.
+    pub wires: Vec<SeedWire>,
+    /// The nodes' own insides, by node index.
+    pub insides: Vec<(usize, NetworkSeed)>,
+}
+
+/// A wire of a [`NetworkSeed`]: output `output` of node `from` into input
+/// `input` of node `to`, ports by name.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SeedWire {
+    /// The source node's index.
+    pub from: usize,
+    /// Its output port's name.
+    pub output: String,
+    /// The driven node's index.
+    pub to: usize,
+    /// Its input port's name.
+    pub input: String,
+}
+
+impl NetworkSeed {
+    /// `node` added; its index.
+    pub fn node(&mut self, node: NewNode) -> usize {
+        self.nodes.push(node);
+        self.nodes.len() - 1
+    }
+
+    /// A wire from `from`'s output `output` into `to`'s input `input`.
+    pub fn wire(&mut self, from: usize, output: &str, to: usize, input: &str) {
+        self.wires.push(SeedWire {
+            from,
+            output: output.to_owned(),
+            to,
+            input: input.to_owned(),
+        });
+    }
+
+    /// Node `at`'s inside started with `inside`.
+    pub fn inside(&mut self, at: usize, inside: NetworkSeed) {
+        self.insides.push((at, inside));
+    }
+
+    /// Whether it holds no node.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+}
+
 /// Another way Tab and the menus make a node: a node of `node.node_type`
 /// with its parameters set, and its inside started with nodes (a Material
 /// of an engine's preset). A package declares it
@@ -225,11 +282,10 @@ pub struct NodeCreation {
     pub aliases: Vec<String>,
     /// The node made; `name` `None` names it after `label`.
     pub node: NewNode,
-    /// The nodes its inside starts with, in order, each displayed as it
-    /// says, laid out by Studio and wired to nothing; the type must hold
-    /// a network ([`Description::inside`](crate::cook::Description::inside))
-    /// when any is given.
-    pub inside: Vec<NewNode>,
+    /// The network its inside starts with; the type must hold a network
+    /// ([`Description::inside`](crate::cook::Description::inside)) when it
+    /// isn't empty.
+    pub inside: NetworkSeed,
 }
 
 impl NodeCreation {
@@ -241,7 +297,7 @@ impl NodeCreation {
             family: String::new(),
             aliases: Vec::new(),
             node,
-            inside: Vec::new(),
+            inside: NetworkSeed::default(),
         }
     }
 
@@ -257,9 +313,15 @@ impl NodeCreation {
         self
     }
 
-    /// With `node` next inside.
+    /// With `node` next inside, wired to nothing.
     pub fn inside(mut self, node: NewNode) -> Self {
-        self.inside.push(node);
+        self.inside.node(node);
+        self
+    }
+
+    /// With its inside started from `seed`.
+    pub fn seeded(mut self, seed: NetworkSeed) -> Self {
+        self.inside = seed;
         self
     }
 }

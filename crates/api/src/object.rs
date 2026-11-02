@@ -68,11 +68,21 @@ pub trait ObjectKindSpec: Send + Sync {
     /// How its bodies save into a project.
     fn codec(&self) -> &dyn ObjectCodec;
 
-    /// A new body for an object holding `data` (an imported value), when
-    /// this kind takes values of its type: a Mesh object adopts a mesh,
-    /// which its network then yields. `None`: this kind doesn't take such
-    /// values.
-    fn adopts(&self, data: &Data) -> Option<Arc<dyn ObjectBody>>;
+    /// The data types an object of this kind can be made from (an
+    /// imported value, [`adopts`](Self::adopts)): what Import offers formats
+    /// to read into. None by default.
+    fn adopted(&self) -> Vec<DataTypeId> {
+        Vec::new()
+    }
+
+    /// What an object made from `data` (an imported value of one of its
+    /// [`adopted`](Self::adopted) types) starts as, made with the engines
+    /// `cx` gives: a Mesh object adopts a mesh, which its network then
+    /// yields; a Material Library adopts a file's materials as Materials.
+    /// `None` (the default): this kind doesn't take this value.
+    fn adopts(&self, _data: &Data, _cx: &CreateCx<'_>) -> Option<Adoption> {
+        None
+    }
 
     /// The value of an object holding `body` at scene path `path`
     /// (`/Workshop/X1C`), when its kind holds no network
@@ -220,6 +230,45 @@ impl Valued {
     /// With `line` said of what it leaves out.
     pub fn line(mut self, line: impl Into<String>) -> Self {
         self.lines.push(line.into());
+        self
+    }
+}
+
+/// What an object made from an imported value starts as
+/// ([`ObjectKindSpec::adopts`]): its body; its network's content when the
+/// kind builds it from the value (otherwise the network shows the value
+/// from a Stash); and the references the file's other items make that now
+/// resolve inside it: `key` to `<the object's path>/<below>` (a file's
+/// material key to a Material's name).
+#[derive(Clone)]
+pub struct Adoption {
+    /// The body.
+    pub body: Arc<dyn ObjectBody>,
+    /// Its network's content, when the kind builds it.
+    pub network: Option<crate::network::NetworkSeed>,
+    /// References to `.0` resolve to the object's path and `.1` below it.
+    pub renamed: Vec<(String, String)>,
+}
+
+impl Adoption {
+    /// An object of `body`, its network (if any) showing the value.
+    pub fn new(body: Arc<dyn ObjectBody>) -> Self {
+        Self {
+            body,
+            network: None,
+            renamed: Vec::new(),
+        }
+    }
+
+    /// Its network starting as `seed`.
+    pub fn network(mut self, seed: crate::network::NetworkSeed) -> Self {
+        self.network = Some(seed);
+        self
+    }
+
+    /// References to `key` resolving to `below` the object.
+    pub fn renamed(mut self, key: impl Into<String>, below: impl Into<String>) -> Self {
+        self.renamed.push((key.into(), below.into()));
         self
     }
 }

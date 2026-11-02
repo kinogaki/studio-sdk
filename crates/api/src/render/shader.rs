@@ -17,14 +17,15 @@ use crate::cook::{
     Category, CookCx, CookError, Description, NodeType, Outputs, Port, Ports, PortsCx, SchemaCx,
 };
 use crate::data::Data;
+use crate::error::Error;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
-use crate::network::{NewNode, NodeCreation};
+use crate::network::{NetworkSeed, NewNode, NodeCreation};
 use crate::params::{Number, Parameter, ParameterKind, Parameters, Schema, Value};
 use kinogaki_render_api::vocabulary::{
     self as vocabulary, InputEdit, NodeLayout, ParamKind, ParamSpec, ParamValue, Params,
     SocketSpec, param,
 };
-use kinogaki_render_api::{EngineDescription, MaterialPreset};
+use kinogaki_render_api::{EngineDescription, MaterialNetwork, MaterialPreset};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -102,6 +103,46 @@ pub fn presets(package: PackageId, engine: &EngineDescription) -> Vec<NodeCreati
         .collect()
 }
 
+/// `network`, a material of `engine`, as the Shading network a Material
+/// starts with: a node of `package`'s shader type for each of its nodes,
+/// its settings and set constants as a preset's are, a wire for each link,
+/// and the node no link leaves (the surface) displayed. How a Material
+/// adopts an imported preview surface ([`EngineDescription`]'s
+/// `import_preview_surface`).
+///
+/// # Errors
+/// A node of a type the engine's vocabulary lacks, or a link naming a node
+/// past the end.
+pub fn seed_of(
+    package: PackageId,
+    engine: &EngineDescription,
+    network: &MaterialNetwork,
+) -> Result<NetworkSeed, Error> {
+    let mut seed = NetworkSeed::default();
+    for node in &network.nodes {
+        let vocabulary = (engine.material_nodes.iter())
+            .find(|v| v.name == node.kind)
+            .ok_or_else(|| {
+                Error::invalid(format_args!("{} has no node type {}", engine.id, node.kind))
+            })?;
+        let values = (node.values.iter()).map(|(n, c)| (&**n, c.triple().map(f64::from)));
+        seed.node(ShaderType::new(package, vocabulary).node(&node.params, values));
+    }
+    let count = network.nodes.len();
+    for link in &network.links {
+        let (from, to) = (link.from as usize, link.to as usize);
+        if from >= count || to >= count {
+            return Err(Error::invalid("a link names a node past the end"));
+        }
+        seed.wire(from, &link.output, to, &link.input);
+    }
+    let leaves = (0..count).filter(|&n| !network.links.iter().any(|l| l.from as usize == n));
+    if let [surface] = leaves.collect::<Vec<_>>()[..] {
+        seed.nodes[surface].display = true;
+    }
+    Ok(seed)
+}
+
 impl ShaderType {
     /// `vocabulary` as a shader node type of `package`.
     ///
@@ -166,8 +207,20 @@ impl ShaderType {
 
     /// A node of this type with `preset`'s settings and inputs set.
     fn preset(&self, preset: &MaterialPreset) -> NewNode {
+        let values = (preset.values.iter()).map(|(n, v)| (&**n, *v));
+        self.node(&preset.params, values)
+    }
+
+    /// A node of this type with settings `params` and the constants
+    /// `values` (by socket) of its edited inputs: what presets and
+    /// adopted materials make.
+    fn node<'a>(
+        &self,
+        params: &Params,
+        values: impl Iterator<Item = (&'a str, [f64; 3])>,
+    ) -> NewNode {
         let t = &self.vocabulary;
-        let settings = t.fit(&preset.params);
+        let settings = t.fit(params);
         let layout = t.layout(&settings);
         let mut node = NewNode::new(self.id);
         for spec in &layout.params {
@@ -175,8 +228,8 @@ impl ShaderType {
                 node = node.with(&*spec.name, encode(spec, value));
             }
         }
-        for (socket, v) in &preset.values {
-            let edited = |s: &&SocketSpec| s.name == *socket && constant_kind(&s.edit).is_some();
+        for (socket, v) in values {
+            let edited = |s: &&SocketSpec| &*s.name == socket && constant_kind(&s.edit).is_some();
             let Some(spec) = layout.inputs.iter().find(edited) else {
                 continue;
             };
@@ -185,7 +238,7 @@ impl ShaderType {
                 InputEdit::Toggle => Value::Bool(v[0] != 0.0),
                 _ => Value::Numbers(v.to_vec()),
             };
-            node = node.with(&**socket, value);
+            node = node.with(socket, value);
         }
         node
     }
@@ -637,7 +690,51 @@ mod tests {
             .with("base_color", Value::Numbers(vec![1.0, 0.0, 0.0]))
             .with("thin", true)
             .displayed();
-        assert_eq!(glass.inside, [surface]);
+        assert_eq!(glass.inside.nodes, [surface]);
+    }
+
+    #[test]
+    fn an_engines_network_seeds_a_material_wired_its_surface_displayed() {
+        use kinogaki_render_api::{Constant, Link, ShaderNode};
+        let engine = engine();
+        let network = MaterialNetwork {
+            engine: Arc::from("toy"),
+            nodes: vec![
+                ShaderNode::new("mix")
+                    .with_param("mode", ParamValue::Choice(Arc::from("mul")))
+                    .with("factor", Constant::Number(0.25)),
+                ShaderNode::new("toy_surface").with("thin", Constant::Number(0.0)),
+            ],
+            links: vec![Link {
+                from: 0,
+                output: Arc::from("out"),
+                to: 1,
+                input: Arc::from("base_color"),
+            }],
+        };
+        let seed = seed_of(toy(), &engine, &network).unwrap();
+        let mix = NewNode::new(NodeTypeId::declared("kinogaki.toy.mix"))
+            .with("mode", Value::Index(1))
+            .with("count", 2.0)
+            .with("channel", Value::Index(0))
+            .with("factor", 0.25);
+        let surface = NewNode::new(NodeTypeId::declared("kinogaki.toy.toy_surface"))
+            .with("thin", false)
+            .displayed();
+        assert_eq!(seed.nodes, [mix, surface]);
+        assert_eq!(seed.wires.len(), 1);
+        let w = &seed.wires[0];
+        assert_eq!(
+            (w.from, w.output.as_str(), w.to, w.input.as_str()),
+            (0, "out", 1, "base_color")
+        );
+        // A node the vocabulary lacks, or a link past the end, is refused.
+        let mut unknown = network.clone();
+        unknown.nodes.push(ShaderNode::new("glow"));
+        assert!(seed_of(toy(), &engine, &unknown).is_err());
+        let mut dangling = network;
+        dangling.links[0].to = 7;
+        assert!(seed_of(toy(), &engine, &dangling).is_err());
     }
 
     fn names(schema: &Schema) -> Vec<&str> {

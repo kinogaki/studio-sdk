@@ -312,9 +312,6 @@ impl ObjectKindSpec for BoxesKind {
     fn codec(&self) -> &dyn ObjectCodec {
         self
     }
-    fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
-        None
-    }
     /// In Create, Tab and the A menu: an empty Boxes object, which opens
     /// for its first node, and a Box: a Boxes object already holding a Box
     /// node.

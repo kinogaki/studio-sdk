@@ -114,7 +114,7 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
     assert!(made[1].family.is_empty() && made[1].inside.is_empty());
     assert_eq!(oak.node.name.as_deref(), Some("oak"));
     assert_eq!(oak.node.parameters["rate"], Value::Number(2.0));
-    assert!(oak.inside[0].display);
+    assert!(oak.inside.nodes[0].display);
 }
 
 #[test]

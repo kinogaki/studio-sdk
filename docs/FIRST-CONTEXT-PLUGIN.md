@@ -117,9 +117,6 @@ impl ObjectKindSpec for BoardKind {
     fn codec(&self) -> &dyn ObjectCodec {
         &BoardCodec
     }
-    fn adopts(&self, _data: &Data) -> Option<Arc<dyn ObjectBody>> {
-        None
-    }
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
         let mut board = KindCreation::new(board().as_str(), "Pin Board");
         board.aliases = vec!["corkboard".into()];

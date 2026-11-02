@@ -134,9 +134,6 @@ impl ObjectKindSpec for Kind {
     fn codec(&self) -> &dyn ObjectCodec {
         &Unsaved
     }
-    fn adopts(&self, _: &Data) -> Option<Arc<dyn ObjectBody>> {
-        None
-    }
     fn renders(&self) -> Option<&dyn RenderedKind> {
         self.rendered.as_ref().map(|r| r as &dyn RenderedKind)
     }

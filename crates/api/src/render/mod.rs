@@ -22,7 +22,9 @@ pub use kinogaki_render_api::{
     PlainTriangles, PreviewSurface, Ranges, TriangleSource,
 };
 pub use setting::{setting_from_value, setting_parameter, setting_to_value};
-pub use shader::{MATERIAL, SHADER_VALUE, SHADING, ShaderType, presets, shader_value, shaders};
+pub use shader::{
+    MATERIAL, SHADER_VALUE, SHADING, ShaderType, presets, seed_of, shader_value, shaders,
+};
 
 mod setting;
 mod shader;

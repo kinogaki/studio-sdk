@@ -57,9 +57,6 @@ impl ObjectKindSpec for Kind {
     fn codec(&self) -> &dyn ObjectCodec {
         &Unsaved
     }
-    fn adopts(&self, _: &Data) -> Option<Arc<dyn ObjectBody>> {
-        None
-    }
     fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
         let engine = cx.active().map(|_| self.engine_made);
         (self.made.iter().copied().chain(engine))
