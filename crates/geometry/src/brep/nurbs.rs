@@ -137,6 +137,15 @@ fn check_weights(weights: Option<&[f64]>, count: usize) -> Result<(), GeometryEr
 /// assert!(NurbsCurve::new(2, vec![0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
 ///     vec![[0.0, 0.0], [1.0, 1.0], [2.0, 0.0]], None).is_err());
 /// ```
+///
+/// `D` is 2 or 3: the evaluator works in homogeneous `[x, y, z, w]`, so a
+/// curve of any other dimension doesn't build.
+///
+/// ```compile_fail
+/// use kinogaki_geometry::brep::NurbsCurve;
+///
+/// let line = NurbsCurve::new(1, vec![0.0, 0.0, 1.0, 1.0], vec![[0.0; 4], [1.0; 4]], None);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct NurbsCurve<const D: usize> {
     degree: u8,
@@ -146,6 +155,11 @@ pub struct NurbsCurve<const D: usize> {
 }
 
 impl<const D: usize> NurbsCurve<D> {
+    /// The dimensions the evaluator holds in its homogeneous `[x, y, z, w]`:
+    /// a chart's 2 or space's 3. Asked by [`new`](Self::new), so a curve of
+    /// another `D` fails to compile.
+    const DIMENSION: () = assert!(D == 2 || D == 3, "a NURBS curve is of 2 or 3 dimensions");
+
     /// The curve of `degree` over `knots` with control `points` and, when
     /// rational, their `weights`.
     ///
@@ -157,6 +171,7 @@ impl<const D: usize> NurbsCurve<D> {
         points: impl Into<Column<[f64; D]>>,
         weights: Option<Column<f64>>,
     ) -> Result<Self, GeometryError> {
+        let () = Self::DIMENSION;
         let (knots, points) = (knots.into(), points.into());
         check_knots(degree, &knots, points.len())?;
         check_points(&points)?;
