@@ -168,13 +168,13 @@ impl Levels<Forest> for TreeLevels {
     fn primary(&self, s: &Forest, _cx: &dyn Cx) -> usize {
         s.level
     }
-    fn choose(&self, s: &mut Forest, cx: &mut dyn Cx, level: usize) {
-        s.level = level;
+    fn choose(&self, s: &mut Forest, cx: &mut dyn Cx, levels: &[usize]) {
+        s.level = levels[0];
         // Choosing a level converts the selection, within the open step.
         cx.edit_slot("Change Level", |p: &mut Picked| p.0.clear());
     }
     fn toggle(&self, s: &mut Forest, cx: &mut dyn Cx, level: usize) {
-        self.choose(s, cx, level);
+        self.choose(s, cx, &[level]);
     }
 }
 
@@ -231,7 +231,7 @@ impl Panels<Forest> for TreeView {
     }
     /// Its node's rows, More while some are left out, Done ending it.
     fn panel(&self, s: &mut Forest, cx: &mut dyn Cx, panel: &Panel, ui: &mut dyn Ui) {
-        let (Some(node), Some(object)) = (s.planting, cx.place().object) else {
+        let (Some(node), Some(object)) = (s.planting, cx.place().object()) else {
             return;
         };
         let spec = studio_ui_api::CardSpec {
@@ -371,15 +371,19 @@ impl PageRows<Forest> for SpacingPage {
     }
 }
 
+/// Inside `object` of the forest, with `subnet` open.
+fn inside(object: ObjectRef, subnet: Option<NodeRef>) -> Place {
+    Place::Inside {
+        context: forest(),
+        object,
+        subnet,
+        node: None,
+    }
+}
+
 fn host() -> FakeHost {
     let mut host = FakeHost::new(scene(), package().slots);
-    host.place = Place {
-        context: forest(),
-        object: Some(ObjectRef(7)),
-        objects: false,
-        subnet: None,
-        node: None,
-    };
+    host.place = inside(ObjectRef(7), None);
     host
 }
 
@@ -481,7 +485,7 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
             .levels
             .as_ref()
             .unwrap()
-            .choose(s, &mut host, 1)
+            .choose(s, &mut host, &[1])
     });
     host.finish_gesture(level).unwrap();
     assert_eq!(host.history(), ["Pick", "Change Level"]);
@@ -560,12 +564,9 @@ fn a_views_calls_answer_its_own_display_options_and_place() {
 fn another_level_starts_place_bound_slots_over() {
     let mut host = host();
     host.edit_slot("Pick", |slot| *slot = Picked(vec![3]));
-    let mut place = host.place;
-    place.subnet = Some(NodeRef(2));
-    host.go_to(place).unwrap();
+    host.go_to(inside(ObjectRef(7), Some(NodeRef(2)))).unwrap();
     assert_eq!(host.slot::<Picked>(), &Picked(vec![3]));
-    place.object = Some(ObjectRef(8));
-    host.go_to(place).unwrap();
+    host.go_to(inside(ObjectRef(8), Some(NodeRef(2)))).unwrap();
     assert_eq!(host.slot::<Picked>(), &Picked::default());
 }
 

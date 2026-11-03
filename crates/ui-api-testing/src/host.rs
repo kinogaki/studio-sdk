@@ -165,12 +165,9 @@ impl FakeHost {
             slots: SessionSlots::new(slots),
             objects: Vec::new(),
             nodes: Vec::new(),
-            place: Place {
+            place: Place::Objects {
                 context: scene,
-                object: None,
-                objects: true,
-                subnet: None,
-                node: None,
+                parent: None,
             },
             revision: 1,
             time: Time::ZERO,
@@ -275,7 +272,7 @@ struct Here(Place);
 
 impl SlotDoc for Here {
     fn context(&self) -> ContextId {
-        self.0.context
+        self.0.context()
     }
 }
 
@@ -389,7 +386,7 @@ impl HostDoc for FakeHost {
     }
     fn go_to(&mut self, place: Place) -> Result<(), Error> {
         self.calls.push(HostCall::GoTo(place));
-        if place.context != self.place.context || place.object != self.place.object {
+        if place.context() != self.place.context() || place.object() != self.place.object() {
             self.slots.reset_place_bound();
         }
         self.place = place;

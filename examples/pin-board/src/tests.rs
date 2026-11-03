@@ -67,7 +67,7 @@ fn levels_choose_and_commands_are_undo_steps() {
     let (mut host, mut hosted) = host();
     hosted.with(|p, s| {
         let levels = p.contexts[0].levels.as_ref().unwrap();
-        levels.choose(s, &mut host, 1);
+        levels.choose(s, &mut host, &[1]);
         assert_eq!(levels.active(s, &host), [1]);
     });
     let shown = |hosted: &mut Hosting, host: &FakeHost| {

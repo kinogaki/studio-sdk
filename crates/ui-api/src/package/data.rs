@@ -25,9 +25,10 @@ pub struct LevelSpec {
     pub combines: bool,
 }
 
-/// A button after a context's levels that turns several of them on at
-/// once, on the number key after the last level's. Which levels it turns on is the context's own
-/// [`active`](super::Levels::active) while it is on.
+/// A button after a context's levels that makes several of them active
+/// at once ([`Levels::choose`](super::Levels::choose)), on the number key
+/// after the last level's. It is on while the active levels are its
+/// `levels`; turned off, the primary level is active alone.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LevelPreset {
     /// Its stable name for settings keys.
@@ -36,6 +37,8 @@ pub struct LevelPreset {
     pub label: String,
     /// Its icon, by name.
     pub icon: String,
+    /// The levels it makes active, by index, in order.
+    pub levels: Vec<usize>,
 }
 
 /// One thing under the pointer, a row of the stacked list

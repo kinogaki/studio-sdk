@@ -18,8 +18,9 @@ part! {
         fn active(&self, s: &S, cx: &dyn Cx) -> Vec<usize>;
         /// The level selections are kept at and the marking menus show.
         fn primary(&self, s: &S, cx: &dyn Cx) -> usize;
-        /// Makes `level` the only active level, converting the selection to it.
-        fn choose(&self, s: &mut S, cx: &mut dyn Cx, level: usize);
+        /// Makes `levels` the active ones (a level on its own, or the
+        /// preset's), converting the selection to them.
+        fn choose(&self, s: &mut S, cx: &mut dyn Cx, levels: &[usize]);
         /// Adds `level` to the active levels, or removes it (never the last).
         fn toggle(&self, s: &mut S, cx: &mut dyn Cx, level: usize);
         /// The level of what is selected, by index (an edge selected while
@@ -74,15 +75,8 @@ part! {
         }
         /// Its preset after its levels, if it has one (read once, as
         /// [`levels`](Self::levels)).
-        fn preset(&self) -> Option<LevelPreset> {None}
-        /// Whether its preset is on.
-        fn preset_on(&self, s: &S, cx: &dyn Cx) -> bool {
-            let _ = (s, cx);
-            false
-        }
-        /// Turns its preset on or off (the button, or its number key).
-        fn toggle_preset(&self, s: &mut S, cx: &mut dyn Cx) {
-            let _ = (s, cx);
+        fn preset(&self) -> Option<LevelPreset> {
+            None
         }
         /// What lies under `pointer` in view `rect` at the active levels,
         /// nearest first: the stacked list's rows. Empty: the list holds

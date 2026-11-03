@@ -219,11 +219,11 @@ impl Levels<Pinning> for PinLevels {
     fn primary(&self, s: &Pinning, _cx: &dyn Cx) -> usize {
         s.level
     }
-    fn choose(&self, s: &mut Pinning, _cx: &mut dyn Cx, level: usize) {
-        s.level = level;
+    fn choose(&self, s: &mut Pinning, _cx: &mut dyn Cx, levels: &[usize]) {
+        s.level = levels[0];
     }
     fn toggle(&self, s: &mut Pinning, cx: &mut dyn Cx, level: usize) {
-        self.choose(s, cx, level);
+        self.choose(s, cx, &[level]);
     }
 }
 

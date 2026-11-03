@@ -10,19 +10,43 @@ pub use kinogaki_studio_api::{NodeRef, ObjectRef};
 /// Where the user is: an object level, or a place inside an object (its
 /// context's network, a subnet in it, a node the level is opened on).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Place {
+pub enum Place {
+    /// An object level.
+    Objects {
+        /// The scene's context.
+        context: ContextId,
+        /// The group or Part whose children show (`None`: the scene root).
+        parent: Option<ObjectRef>,
+    },
+    /// Inside an object.
+    Inside {
+        /// The open level's context.
+        context: ContextId,
+        /// The object whose inside is open.
+        object: ObjectRef,
+        /// The subnet open inside the object's network.
+        subnet: Option<NodeRef>,
+        /// The node the level is opened on (a Material's shading network, a
+        /// mode such as a sketch).
+        node: Option<NodeRef>,
+    },
+}
+
+impl Place {
     /// The open level's context (the scene's at an object level).
-    pub context: ContextId,
-    /// The object whose inside is open; at an object level, the group or
-    /// Part whose children show (`None`: the scene root).
-    pub object: Option<ObjectRef>,
-    /// Whether this is an object level.
-    pub objects: bool,
-    /// The subnet open inside the object's network.
-    pub subnet: Option<NodeRef>,
-    /// The node the level is opened on (a Material's shading network, a
-    /// mode such as CAD's sketch).
-    pub node: Option<NodeRef>,
+    pub fn context(&self) -> ContextId {
+        match *self {
+            Self::Objects { context, .. } | Self::Inside { context, .. } => context,
+        }
+    }
+
+    /// The object whose inside is open; `None` at an object level.
+    pub fn object(&self) -> Option<ObjectRef> {
+        match *self {
+            Self::Objects { .. } => None,
+            Self::Inside { object, .. } => Some(object),
+        }
+    }
 }
 
 /// What [`Cx::node_rows`](super::Cx::node_rows) did.
