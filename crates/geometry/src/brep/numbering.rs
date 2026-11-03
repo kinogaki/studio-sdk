@@ -1,8 +1,10 @@
 //! A B-rep value's one element numbering ([`Brep::count`],
 //! [`Brep::element`], [`Brep::id`]) and its fingerprint
 //! ([`Brep::fingerprint`]), which a selection made on it keeps.
-use super::{Brep, DatumKind};
-use crate::attributes::Class;
+use super::{Brep, Datum, DatumKind};
+use crate::attributes::{Class, Text};
+use crate::kept::Kept;
+use std::sync::Arc;
 
 /// One element of a B-rep value as [`Brep::element`] names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -121,45 +123,73 @@ impl Brep {
     /// What its numbering stands on, as one 32-byte hash: BLAKE3 of the
     /// body count, each body's [topology fingerprint](super::BrepTopology::fingerprint)
     /// and the fingerprint of its persistent names in body order; then the
-    /// free curves' count and each curve's Primitive `name` in order (its
-    /// byte length and bytes, `u64::MAX` for none); then, for planes, axes
-    /// and points in turn, their datums' count and each one's persistent
-    /// name in datum order. Counts are little-endian `u64`. It hashes
-    /// structure and names alone, never geometry: equal fingerprints, the
-    /// same elements under the same ids, so a selection made on one value
-    /// still means the same on the other (a resize or a datum moved keeps
-    /// it), and a stale one is seen when they differ (a face added or
-    /// split, two datums or free curves swapped).
+    /// free curves' count and the hash of their Primitive `name`s in order
+    /// (each its byte length and bytes, `u64::MAX` for none; 32 zero bytes
+    /// without the attribute); then the hash of the datums, for planes,
+    /// axes and points in turn their count and each one's persistent name
+    /// in datum order. Counts are little-endian `u64`; the names' hashes
+    /// are cached on their columns. It hashes structure and names alone,
+    /// never geometry: equal fingerprints, the same elements under the
+    /// same ids, so a selection made on one value still means the same on
+    /// the other (a resize or a datum moved keeps it), and a stale one is
+    /// seen when they differ (a face added or split, two datums or free
+    /// curves swapped).
     pub fn fingerprint(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        let count = |h: &mut blake3::Hasher, n: usize| {
-            h.update(&(n as u64).to_le_bytes());
-        };
-        count(&mut h, self.bodies.len());
+        h.update(&(self.bodies.len() as u64).to_le_bytes());
         for body in self.bodies.iter() {
             h.update(&body.topology().fingerprint());
             h.update(&body.names().fingerprint());
         }
-        let curves = self.curves.curves();
-        count(&mut h, curves);
+        h.update(&(self.curves.curves() as u64).to_le_bytes());
         let names = (self.curves.attributes()).text(Class::Primitive, crate::names::NAME);
-        for curve in 0..curves {
-            match names.and_then(|n| n.get(curve)) {
-                Some(name) => {
-                    count(&mut h, name.len());
-                    h.update(name.as_bytes());
-                }
-                None => {
-                    h.update(&u64::MAX.to_le_bytes());
-                }
-            }
-        }
-        for class in [Class::Primitive, Class::Edge, Class::Point] {
-            count(&mut h, self.datums_of(class).count());
-            for datum in self.datums_of(class) {
-                super::fingerprint::hash_name(&mut h, &self.datums[datum].name);
-            }
-        }
+        h.update(&names.map_or([0; 32], text_hash));
+        h.update(
+            &self
+                .datums
+                .derived(|datums| DatumNames(datums_hash(datums)))
+                .0,
+        );
         *h.finalize().as_bytes()
     }
 }
+
+/// The hash of a datums column's names, kept on it.
+struct DatumNames([u8; 32]);
+
+fn datums_hash(datums: &[Datum]) -> [u8; 32] {
+    let mut h = blake3::Hasher::new();
+    for class in [Class::Primitive, Class::Edge, Class::Point] {
+        let of = || datums.iter().filter(|d| datum_class(&d.kind) == class);
+        h.update(&(of().count() as u64).to_le_bytes());
+        for datum in of() {
+            super::fingerprint::hash_name(&mut h, &datum.name);
+        }
+    }
+    *h.finalize().as_bytes()
+}
+
+/// The hash of `names` in order, kept on its index column for its table.
+fn text_hash(names: &Text) -> [u8; 32] {
+    let kept = names.indices().derived(|_| TextHashes::default());
+    if let Some(hash) = kept.find(|table| Arc::ptr_eq(table, names.table())) {
+        return *hash;
+    }
+    let mut h = blake3::Hasher::new();
+    for name in names.iter() {
+        match name {
+            Some(name) => {
+                h.update(&(name.len() as u64).to_le_bytes());
+                h.update(name.as_bytes());
+            }
+            None => {
+                h.update(&u64::MAX.to_le_bytes());
+            }
+        }
+    }
+    let hash = *h.finalize().as_bytes();
+    kept.keep(names.table().clone(), Arc::new(hash));
+    hash
+}
+
+type TextHashes = Kept<Arc<[Arc<str>]>, [u8; 32]>;

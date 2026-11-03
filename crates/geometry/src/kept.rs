@@ -1,12 +1,13 @@
-//! [`Kept`]: results derived from a positions column together with other
-//! parts of a value (the topology, attribute columns), kept on that
-//! column for the last two sets of other parts.
+//! [`Kept`]: results derived from a column together with other parts of a
+//! value (a positions column with the topology or attribute columns, a
+//! text's indices with its table), kept on that column for the last two
+//! sets of other parts.
 use std::sync::{Arc, Mutex};
 
 /// How many sets of other parts a column keeps a result for.
 const KEPT: usize = 2;
 
-/// A positions column's results, each with the other parts it was derived
+/// A column's results, each with the other parts it was derived
 /// from. Each key holds those parts (shared buffers), so comparing them by
 /// identity stays valid while they are kept (the crate's cache rule).
 pub(crate) struct Kept<K, V> {
