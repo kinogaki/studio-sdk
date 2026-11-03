@@ -134,11 +134,12 @@ fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
     assert_eq!(ty.info(&data)[0].value, "2 × 3 × 4");
 
     let cancel = CancelToken::default();
-    let items = ty
+    let rendered = ty
         .renderable()
         .unwrap()
-        .items(&data, &RenderCx::new(Time::ZERO, &cancel))
+        .items(&data, None, &RenderCx::new(Time::ZERO, &cancel))
         .unwrap();
+    let items = &rendered.items;
     let RenderItem::Triangles { source, .. } = &items[0];
     assert_eq!((items.len(), source.triangle_count()), (1, 12));
     // Every triangle faces away from the center.

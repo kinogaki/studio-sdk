@@ -5,19 +5,67 @@ use crate::error::Error;
 use crate::render::{Detail, RenderItem};
 use crate::time::Time;
 use kinogaki_geometry::Tolerances;
+use std::any::Any;
+use std::sync::Arc;
 
 /// How a data type renders: as neutral [`RenderItem`]s every engine draws,
 /// whatever kernel made the value.
 pub trait Renderable: Send + Sync {
-    /// `data` as render items at `cx`'s time and detail, placed relative to its object
-    /// (the host places the object in the world). The host matches items
-    /// of successive values by their `part` and compares their sources by
-    /// identity, so a type returns the same source for an unchanged part
-    /// and a derived one (same topology, [`moved_since`]) for a dragged
-    /// one.
+    /// `data` as render items at `cx`'s time and detail, placed relative
+    /// to its object (the host places the object in the world), given
+    /// what this facet answered for the value the object rendered before,
+    /// when there was one (as [`Displayable::prepare`] is): a type whose
+    /// values change a little at a time (a drag's next state) builds on
+    /// it. The host matches items of successive values by their `part` and
+    /// compares their sources by identity, so a type returns the same
+    /// source for an unchanged part and a derived one (same topology,
+    /// [`moved_since`]) for a dragged one.
     ///
+    /// [`Displayable::prepare`]: crate::facets::Displayable::prepare
     /// [`moved_since`]: crate::render::TriangleSource::moved_since
-    fn items(&self, data: &Data, cx: &RenderCx<'_>) -> Result<Vec<RenderItem>, Error>;
+    fn items(
+        &self,
+        data: &Data,
+        previous: Option<&Rendered>,
+        cx: &RenderCx<'_>,
+    ) -> Result<Rendered, Error>;
+}
+
+/// What [`Renderable::items`] answers: the items, and beside them any
+/// detail of the type's own its next call reads (the sources it made, so
+/// the next value's are made after them).
+#[derive(Clone)]
+pub struct Rendered {
+    /// The render items, in order.
+    pub items: Arc<[RenderItem]>,
+    detail: Option<Arc<dyn Any + Send + Sync>>,
+}
+
+impl Rendered {
+    /// `items` with no detail beside them.
+    pub fn new(items: Vec<RenderItem>) -> Self {
+        Self {
+            items: items.into(),
+            detail: None,
+        }
+    }
+
+    /// With `detail` beside the items, for the type's own later calls.
+    pub fn with_detail<T: Any + Send + Sync>(mut self, detail: T) -> Self {
+        self.detail = Some(Arc::new(detail));
+        self
+    }
+
+    /// The detail, when it is a `T`.
+    pub fn detail<T: Any>(&self) -> Option<&T> {
+        self.detail.as_deref().and_then(|d| d.downcast_ref())
+    }
+}
+
+impl std::fmt::Debug for Rendered {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.items.iter()).finish()
+    }
 }
 
 /// What a render asks of [`Renderable::items`].

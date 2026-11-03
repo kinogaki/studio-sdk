@@ -25,6 +25,6 @@ pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, 
 pub use glyph::{GlyphScale, Glyphs};
 pub use object::{Look, Marquee, Materials, Matrix, ObjectPicking, WorldRay};
 pub use pick::{Combine, Pickable};
-pub use render::{RenderCx, Renderable};
+pub use render::{RenderCx, Renderable, Rendered};
 pub use snap::{SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable};
 pub use table::{CellKind, Cells, Table, TableColumn, Tabular};
