@@ -11,10 +11,9 @@
 //! | Vector2 | Vector of 2 | `Numbers` (2) |
 //! | Color | Color | `Numbers` (3) |
 //! | Choice | Choice (labels) | `Index`, by the descriptor's order |
-//! | ColorRamp | Ramp (color) | `Numbers`: [`ramp::encode`] at [`MAX_RAMP_STOPS`] keys |
+//! | ColorRamp | Ramp (color) | `Numbers`: [`ramp::encode`] at the setting's `most` keys |
 //! | Image | File | `Text`: the file's path |
 use crate::params::{Number, Parameter, ParameterKind, Unit, Value, ramp};
-use kinogaki_render_api::settings::MAX_RAMP_STOPS;
 use kinogaki_render_api::{SettingDescriptor, SettingKind, SettingValue};
 use std::sync::Arc;
 
@@ -78,27 +77,34 @@ fn unit(unit: &kinogaki_render_api::Unit) -> Unit {
     }
 }
 
+/// The largest whole number a parameter's number (an f64) holds exactly:
+/// an integer setting's value past it has no parameter value (it would
+/// come back as another number).
+const EXACT: u64 = 1 << 53;
+
 /// Setting value `v` of setting `d` as a parameter's value (a color's
 /// channels as they are: both are authored, in the working space,
-/// [`kinogaki_render_api::color`]); `None` for a
+/// [`kinogaki_render_api::color`]); `None` for an integer past 2^53, a
 /// sent texture, or a value of another kind than `d`'s (a choice it
 /// lacks).
 pub fn setting_to_value(v: &SettingValue, d: &SettingDescriptor) -> Option<Value> {
     Some(match (v, &d.kind) {
         (SettingValue::Bool(on), SettingKind::Bool { .. }) => Value::Bool(*on),
-        (SettingValue::Int(n), SettingKind::Int { .. }) => Value::Number(*n as f64),
+        (SettingValue::Int(n), SettingKind::Int { .. }) if n.unsigned_abs() <= EXACT => {
+            Value::Number(*n as f64)
+        }
         (SettingValue::Float(x), SettingKind::Float { .. }) => Value::Number(*x),
         (SettingValue::Vector2(v), SettingKind::Vector2 { .. }) => Value::Numbers(v.to_vec()),
         (SettingValue::Color(c), SettingKind::Color { .. }) => Value::Numbers(c.to_vec()),
         (SettingValue::Choice(name), SettingKind::Choice { choices, .. }) => {
             Value::Index(choices.iter().position(|c| c.name == *name)?)
         }
-        (SettingValue::ColorRamp(keys), SettingKind::ColorRamp { .. }) => {
+        (SettingValue::ColorRamp(keys), SettingKind::ColorRamp { most, .. }) => {
             let ramp = ramp::Ramp {
                 keys: keys.to_vec(),
                 color: true,
             };
-            Value::Numbers(ramp::encode(&ramp, MAX_RAMP_STOPS))
+            Value::Numbers(ramp::encode(&ramp, *most)?)
         }
         (SettingValue::File(path), SettingKind::Image) => Value::Text(path.to_string()),
         _ => return None,
@@ -113,7 +119,7 @@ pub fn setting_to_value(v: &SettingValue, d: &SettingDescriptor) -> Option<Value
 pub fn setting_from_value(v: &Value, d: &SettingDescriptor) -> Option<SettingValue> {
     let value = match (&d.kind, v) {
         (SettingKind::Bool { .. }, Value::Bool(on)) => SettingValue::Bool(*on),
-        (SettingKind::Int { .. }, Value::Number(n)) if n.is_finite() => {
+        (SettingKind::Int { .. }, Value::Number(n)) if n.abs() <= EXACT as f64 => {
             SettingValue::Int(n.round() as i64)
         }
         (SettingKind::Float { .. }, Value::Number(x)) => SettingValue::Float(*x),
@@ -204,6 +210,7 @@ mod tests {
             (
                 descriptor(SettingKind::ColorRamp {
                     default: Arc::from([Key::color(0.0, [1.0; 3], Interpolation::Linear)]),
+                    most: 16,
                 }),
                 SettingValue::ColorRamp(ramp),
             ),
@@ -222,6 +229,45 @@ mod tests {
                 assert_eq!(setting_from_value(&value, &d), Some(v));
             }
         }
+    }
+
+    #[test]
+    fn a_ramp_keeps_every_key_up_to_its_engines_limit() {
+        let keys: Vec<Key> = (0..20)
+            .map(|k| Key::color(f64::from(k) / 19.0, [0.5; 3], Interpolation::Linear))
+            .collect();
+        let ramp = |most| {
+            descriptor(SettingKind::ColorRamp {
+                default: Arc::from(&keys[..1]),
+                most,
+            })
+        };
+        let twenty = SettingValue::ColorRamp(Arc::from(keys.clone()));
+        let wide = ramp(32);
+        let value = setting_to_value(&twenty, &wide).expect("twenty keys fit");
+        assert_eq!(setting_from_value(&value, &wide), Some(twenty.clone()));
+        // An engine taking 16 keys refuses twenty: nothing is cut short.
+        assert_eq!(setting_to_value(&twenty, &ramp(16)), None);
+        assert!(!ramp(16).accepts(&twenty));
+    }
+
+    #[test]
+    fn an_integer_is_a_parameter_only_while_a_number_holds_it_exactly() {
+        let int = descriptor(SettingKind::Int {
+            default: 0,
+            min: i64::MIN,
+            max: i64::MAX,
+        });
+        let edge = SettingValue::Int(1 << 53);
+        let value = setting_to_value(&edge, &int).expect("2^53 is exact");
+        assert_eq!(setting_from_value(&value, &int), Some(edge));
+        // 2^53 + 1 would come back as 2^53: it has no parameter value.
+        assert_eq!(
+            setting_to_value(&SettingValue::Int((1 << 53) + 1), &int),
+            None
+        );
+        let past = Value::Number(2f64.powi(60));
+        assert_eq!(setting_from_value(&past, &int), None);
     }
 
     #[test]

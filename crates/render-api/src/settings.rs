@@ -104,13 +104,10 @@ impl SettingValue {
     }
 }
 
-/// The most keys a color ramp holds.
-pub const MAX_RAMP_STOPS: usize = 16;
-
-/// Whether `keys` make a color ramp: 1 to [`MAX_RAMP_STOPS`] keys,
-/// positions ascending in 0..=1, colors finite and not negative.
-fn is_ramp(keys: &[ramp::Key]) -> bool {
-    (1..=MAX_RAMP_STOPS).contains(&keys.len())
+/// Whether `keys` make a color ramp of at most `most` keys: at least
+/// one, positions ascending in 0..=1, colors finite and not negative.
+fn is_ramp(keys: &[ramp::Key], most: usize) -> bool {
+    (1..=most).contains(&keys.len())
         && keys.windows(2).all(|p| p[0].position <= p[1].position)
         && keys
             .iter()
@@ -255,6 +252,9 @@ pub enum SettingKind {
     ColorRamp {
         /// Its default keys.
         default: Arc<[ramp::Key]>,
+        /// The most keys the engine takes: a ramp with more is refused
+        /// ([`SettingDescriptor::accepts`]), never cut short.
+        most: usize,
     },
 }
 
@@ -478,7 +478,7 @@ impl SettingDescriptor {
             SettingKind::Float { default, .. } => SettingValue::Float(*default),
             SettingKind::Choice { default, .. } => SettingValue::Choice(default.clone()),
             SettingKind::Color { default } => SettingValue::Color(*default),
-            SettingKind::ColorRamp { default } => SettingValue::ColorRamp(default.clone()),
+            SettingKind::ColorRamp { default, .. } => SettingValue::ColorRamp(default.clone()),
             SettingKind::Vector2 { default, .. } => SettingValue::Vector2(*default),
             SettingKind::Image => SettingValue::File(Arc::from("")),
         }
@@ -496,7 +496,9 @@ impl SettingDescriptor {
                 choices.iter().any(|c| c.name == *name)
             }
             (SettingKind::Color { .. }, SettingValue::Color(c)) => is_color(c),
-            (SettingKind::ColorRamp { .. }, SettingValue::ColorRamp(keys)) => is_ramp(keys),
+            (SettingKind::ColorRamp { most, .. }, SettingValue::ColorRamp(keys)) => {
+                is_ramp(keys, *most)
+            }
             (SettingKind::Vector2 { min, max, .. }, SettingValue::Vector2(v)) => {
                 v.iter().all(|c| c.is_finite() && (min..=max).contains(&c))
             }

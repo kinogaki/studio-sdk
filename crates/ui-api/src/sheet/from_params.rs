@@ -239,7 +239,7 @@ mod tests {
                 "falloff",
                 "Falloff",
                 ParameterKind::Ramp { color: false },
-                ramp::encode(&ramp::Ramp::default_of(false), 4),
+                ramp::encode(&ramp::Ramp::default_of(false), 4).unwrap(),
             ))
             .parameter(Parameter::new(
                 "source",

@@ -409,6 +409,7 @@ fn colors_and_color_ramps_fit_their_descriptors_and_ramps_blend() {
     ]);
     let ramp = SettingKind::ColorRamp {
         default: stops.clone(),
+        most: 4,
     };
     let row = |name: &str, kind| SettingDescriptor::new(name, name, "main", kind);
     let ds = vec![
@@ -426,7 +427,7 @@ fn colors_and_color_ramps_fit_their_descriptors_and_ramps_blend() {
     );
     settings::validate(&ds, &settings::defaults(&ds)).unwrap();
     let unordered = Arc::from(vec![stops[2], stops[0]]);
-    let too_many = Arc::from(vec![stops[0]; MAX_RAMP_STOPS + 1]);
+    let too_many = Arc::from(vec![stops[0]; 5]);
     for bad in [
         (Arc::from("ramp"), SettingValue::ColorRamp(unordered)),
         (Arc::from("ramp"), SettingValue::ColorRamp(too_many)),

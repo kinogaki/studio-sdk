@@ -248,11 +248,16 @@ pub fn capacity(color: bool, len: usize) -> usize {
     len.saturating_sub(1) / stride(color)
 }
 
-/// `ramp` as numbers holding `capacity` keys: the count (at most
-/// `capacity`), then position, value and interpolation code a key, the
-/// keys past the count zeros.
-pub fn encode(ramp: &Ramp, capacity: usize) -> Vec<f64> {
-    let count = ramp.keys.len().min(capacity);
+/// `ramp` as numbers holding `capacity` keys: the count, then position,
+/// value and interpolation code a key, the keys past the count zeros (a
+/// fixed width, so two ramps of one capacity blend number by number).
+/// `None` when the ramp holds more keys than `capacity`: no key is ever
+/// left out.
+pub fn encode(ramp: &Ramp, capacity: usize) -> Option<Vec<f64>> {
+    let count = ramp.keys.len();
+    if count > capacity {
+        return None;
+    }
     let channels = ramp.channels();
     let mut out = Vec::with_capacity(width(ramp.color, capacity));
     out.push(count as f64);
@@ -262,7 +267,7 @@ pub fn encode(ramp: &Ramp, capacity: usize) -> Vec<f64> {
         out.push(key.interpolation.code());
     }
     out.resize(width(ramp.color, capacity), 0.0);
-    out
+    Some(out)
 }
 
 /// The ramp [`encode`] wrote. The count is clamped to what the numbers
@@ -491,13 +496,13 @@ mod tests {
                 Key::color(1.0, [0.0, 0.0, 1.0], Interpolation::Linear),
             ],
         };
-        let numbers = encode(&ramp, 4);
+        let numbers = encode(&ramp, 4).unwrap();
         assert_eq!(numbers.len(), width(true, 4));
         assert_eq!(numbers[0], 3.0);
         assert!(numbers[1 + 3 * 5..].iter().all(|&v| v == 0.0));
         assert_eq!(decode(&numbers, true), ramp);
-        // Keys past the capacity are left out.
-        assert_eq!(decode(&encode(&ramp, 2), true).keys.len(), 2);
+        // A ramp past the capacity is refused, never cut short.
+        assert_eq!(encode(&ramp, 2), None);
         // A wild count is clamped, NaN keys dropped, keys sorted, unknown
         // codes linear.
         let mut bad = numbers.clone();
@@ -713,7 +718,7 @@ mod tests {
                 Interpolation::from_code(self.0[3 + k * 3]).unwrap()
             }
         }
-        let numbers = encode(&line(Interpolation::BSpline), 6);
+        let numbers = encode(&line(Interpolation::BSpline), 6).unwrap();
         let read = decode(&numbers, false);
         for k in 0..=20 {
             let t = f64::from(k) / 20.0;
