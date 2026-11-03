@@ -14,10 +14,10 @@ use studio_ui_api::host::{
     NodeRows, ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
-    ContextPart, Edited, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels,
-    Library, MarkingDefault, MenuDefaults, Places, ProjectSection, ProjectSettingsSection,
-    Registered, Section, SettingsSection, Shared, Situation, Tools, UiPackage, ViewSwitch,
-    ViewportLayer, VocabularyItem, When, WithUi,
+    ContextPart, DisplayKind, DisplayOption, DisplayScope, Edited, Held, Inspector, KeyBinding,
+    KeyStore, KeysActive, LevelSpec, Levels, Library, MarkingDefault, MenuDefaults, Places,
+    ProjectSection, ProjectSettingsSection, Registered, Section, SettingsSection, Shared,
+    Situation, Tools, UiPackage, ViewportLayer, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::{
@@ -183,11 +183,12 @@ impl Levels<Forest> for TreeLevels {
 
 struct TreeView;
 
-/// The forest's per-view switch: leaves drawn over the trees.
-const LEAVES: ViewSwitch = ViewSwitch {
+/// The forest's per-view display option: leaves drawn over the trees.
+const LEAVES: DisplayOption = DisplayOption {
     id: "toy.trees.leaves",
     label: "Leaves",
-    default: false,
+    scope: DisplayScope::PerView,
+    kind: DisplayKind::Toggle { on: false },
 };
 
 impl ViewportLayer<Forest> for TreeView {
@@ -205,9 +206,9 @@ impl ViewportLayer<Forest> for TreeView {
         let stroke = Stroke::new(1.0, Color::WHITE);
         ui.painter().circle_stroke(at, 4.0, stroke);
     }
-    /// Leaves over the trees in the views where they are switched on.
+    /// Leaves over the trees in the views showing them.
     fn edited(&self, _s: &mut Forest, cx: &mut dyn ViewCx) -> Option<Edited> {
-        cx.switched(LEAVES.id).then(Edited::default)
+        (cx.displayed(LEAVES.id) == 1).then(Edited::default)
     }
     /// The card's place, over the view's top left corner while Plant runs.
     fn controls(&self, s: &Forest, cx: &dyn ViewCx) -> Vec<Rect> {
@@ -520,10 +521,10 @@ fn a_viewport_layer_reads_its_view_and_draws_through_the_painter() {
 }
 
 #[test]
-fn a_views_calls_answer_its_own_switches_and_place() {
+fn a_views_calls_answer_its_own_display_options_and_place() {
     let mut host = host();
     let mut trees = hosted(&host);
-    host.switched.insert((1, LEAVES.id.into()));
+    host.displayed.insert((1, LEAVES.id.into()), 1);
     trees.with(|_, s| s.downcast_mut::<Forest>().unwrap().planting = Some(NodeRef(3)));
     let at = |index: usize| View {
         index,

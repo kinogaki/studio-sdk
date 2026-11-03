@@ -140,11 +140,13 @@ pub trait ViewCx: Cx {
     /// snap at all (the user's [`HostTransform::snapping`], Command) is
     /// the tool's to decide.
     fn snap(&mut self, at: Pos, targets: SnapTargets, radius: f64, on: SnapOn) -> Option<SnapHit>;
-    /// Whether switch `id` is on in this view: as the user set it there
-    /// (the display popover's Overlays), else its declaration's default
-    /// ([`ViewSwitch`](crate::package::ViewSwitch)). `false` for a switch
-    /// the open context doesn't declare.
-    fn switched(&self, id: &str) -> bool;
+    /// Display option `id`'s value in this view: as the user set it (this
+    /// view's, or the context's for a
+    /// [`Context`](crate::package::DisplayScope::Context) option), else its
+    /// declaration's default ([`DisplayOption`](crate::package::DisplayOption)):
+    /// a toggle's 1 or 0, a choice's index. 0 for an option the open
+    /// context doesn't declare.
+    fn displayed(&self, id: &str) -> usize;
 }
 
 /// The value a [`ViewCx::snap`] searches.

@@ -200,9 +200,8 @@ fn row_actions_and_typing_reach_the_contexts_parts() {
 fn a_library_without_a_viewport_spec_gets_cores_scene_view() {
     assert_eq!(Library::default().viewport, None);
     let scene = ViewportSpec::scene();
-    assert!(scene.shared_rows.tint_back_faces && !scene.shared_rows.flat_shaded);
     assert_eq!(scene.default_pivot, Pivot::Origin);
-    assert_eq!(scene.popovers, [studio_ui_api::package::Popover::Gear]);
+    assert!(scene.display.is_empty(), "core's display rows alone");
 }
 
 static NUMBER: LazyLock<Typed<f64>> =

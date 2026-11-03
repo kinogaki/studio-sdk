@@ -136,10 +136,10 @@ pub struct FakeHost {
     /// What [`ViewCx::snap`] answers, for any query (a fake host searches
     /// no values).
     pub snap: Option<SnapHit>,
-    /// The switches on in each view, by the view's index and the switch's
-    /// id ([`ViewCx::switched`]; a fake host knows no declarations, so
-    /// every other switch is off).
-    pub switched: BTreeSet<(usize, String)>,
+    /// The display options' values in each view, by the view's index and
+    /// the option's id ([`ViewCx::displayed`]; a fake host knows no
+    /// declarations, so every other option is 0).
+    pub displayed: BTreeMap<(usize, String), usize>,
     /// The [`Cx::latest`] jobs not yet run, by key, with their tokens;
     /// [`FakeHost::run_latest`] runs them.
     latest: BTreeMap<String, (CancelToken, LatestJob)>,
@@ -193,7 +193,7 @@ impl FakeHost {
             clipboard: None,
             node_rows: NodeRows::default(),
             snap: None,
-            switched: BTreeSet::new(),
+            displayed: BTreeMap::new(),
             latest: BTreeMap::new(),
             landed: BTreeMap::new(),
             undo: Vec::new(),
@@ -684,10 +684,10 @@ impl ViewCx for FakeHost {
     ) -> Option<SnapHit> {
         self.snap
     }
-    /// Whether its `switched` holds `id` for its view.
-    fn switched(&self, id: &str) -> bool {
+    /// Its `displayed` value of `id` for its view.
+    fn displayed(&self, id: &str) -> usize {
         let view = self.view().index;
-        (self.switched.iter()).any(|(v, s)| *v == view && s == id)
+        (self.displayed.get(&(view, id.to_owned()))).map_or(0, |&v| v)
     }
 }
 

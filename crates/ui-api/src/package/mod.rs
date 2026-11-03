@@ -58,6 +58,7 @@
 //! ([`Registered::of`]), whose parts take the state as `dyn Any` and
 //! downcast it back.
 mod data;
+mod display;
 mod edited;
 mod library;
 mod parts;
@@ -69,18 +70,18 @@ pub use data::{
     BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, TimeDomain, TimeMark,
     TimeUnits, Tools,
 };
+pub use display::{DisplayKind, DisplayOption, DisplayScope};
 pub use edited::{Edited, Ghost, GhostTone};
 pub use library::{
     BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive, LevelItems,
-    Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT, Shared,
-    SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewSwitch,
-    ViewportSpec, VocabularyItem, When,
+    Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT, Shared, Shelf,
+    ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
 pub(crate) use parts::Erased;
 pub use parts::{Inspector, Invoked, Levels, ObjectRows, RowAction, ViewportLayer, Vocabulary};
 pub use project::{ProjectSection, ProjectSettingsSection};
 pub use settings::{Section, SettingsSection};
-pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
+pub use view::{Holds, KeyPress};
 
 use crate::host::{Cx, Waker};
 use kinogaki_studio_api::{ContextId, Package, PackageUi};

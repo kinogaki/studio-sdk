@@ -17,7 +17,7 @@
 //! so several contexts can share one set ([`Shared::Of`]). The right-click
 //! menu and the menu bar ([`ViewMenus`]) are fixed: the context's as
 //! given, never edited by the user.
-use super::Popover;
+use super::DisplayOption;
 use crate::Key;
 use crate::gizmo::Pivot;
 use crate::input::Modifiers;
@@ -414,12 +414,9 @@ pub struct LevelItems {
 /// The viewport chrome a context takes from the host.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ViewportSpec {
-    /// The display popover's shared rows it offers; a row it leaves out
-    /// is absent, and its views draw as at that row's default.
-    pub shared_rows: SharedRows,
-    /// Its per-view switches, the display popover's Overlays: what its
-    /// views draw is each view's own to switch ([`ViewSwitch`]).
-    pub switches: Vec<ViewSwitch>,
+    /// Its display options: rows of each view's Display popover, after
+    /// core's own ([`DisplayOption`]).
+    pub display: Vec<DisplayOption>,
     /// Whether the Snap popover shows the shared steps (Snap from, Rotate
     /// and Scale step): the moves here use them.
     pub snap_steps: bool,
@@ -433,26 +430,19 @@ pub struct ViewportSpec {
     /// The host's transform tools for the context's selection: the left
     /// toolbar's Select, Move, Rotate, Scale, Manipulator and Pivot, and
     /// the Gear's tool settings (the tool's space) before the context's
-    /// own [rows](super::ViewportLayer::rows). The gizmo itself shows where
+    /// own [rows](super::ViewportLayer::gear). The gizmo itself shows where
     /// [`ViewportLayer::transforms`](super::ViewportLayer::transforms) says.
     pub transform: bool,
-    /// The popovers among Gear and Components whose buttons show, with the
-    /// context's [rows](super::ViewportLayer::rows). Each view's display
-    /// popover, Camera menu and the Snap popover are core's and always
-    /// show.
-    pub popovers: Vec<Popover>,
 }
 
 impl Default for ViewportSpec {
     fn default() -> Self {
         ViewportSpec {
-            shared_rows: SharedRows::ALL,
-            switches: Vec::new(),
+            display: Vec::new(),
             snap_steps: true,
             own_snapping: None,
             default_pivot: Pivot::Center,
             transform: false,
-            popovers: Vec::new(),
         }
     }
 }
@@ -460,88 +450,18 @@ impl Default for ViewportSpec {
 impl ViewportSpec {
     /// Core's chrome for views showing the scene (what a library without
     /// its own spec gets, and what a context's own spec may start from):
-    /// back faces' tint and the shared analysis modes, each object's own
-    /// pivot, the Gear popover.
+    /// each object's own pivot.
     pub fn scene() -> Self {
         ViewportSpec {
-            shared_rows: SharedRows {
-                tint_back_faces: true,
-                analysis: true,
-                ..SharedRows::NONE
-            },
             default_pivot: Pivot::Origin,
-            popovers: vec![Popover::Gear],
             ..ViewportSpec::default()
         }
     }
 
-    /// Switch `id` among its [`switches`](Self::switches).
-    pub fn switch(&self, id: &str) -> Option<&ViewSwitch> {
-        self.switches.iter().find(|s| s.id == id)
+    /// Display option `id` among its [`display`](Self::display) options.
+    pub fn option(&self, id: &str) -> Option<&DisplayOption> {
+        self.display.iter().find(|o| o.id == id)
     }
-}
-
-/// The display popover's rows the host owns, each offered or not.
-/// Wireframe, Solid and the grid always show.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SharedRows {
-    /// Flat or Shaded (under Solid).
-    pub flat_shaded: bool,
-    /// The wireframe over Solid.
-    pub wire_on_solid: bool,
-    /// Back faces tinted (under Solid).
-    pub tint_back_faces: bool,
-    /// Back faces culled.
-    pub backface_culling: bool,
-    /// The shared analysis modes under Shaded (Zebra, Isophotes,
-    /// Curvature, Draft, Normal colors) and their settings.
-    pub analysis: bool,
-}
-
-impl SharedRows {
-    /// Every row.
-    pub const ALL: SharedRows = SharedRows {
-        flat_shaded: true,
-        wire_on_solid: true,
-        tint_back_faces: true,
-        backface_culling: true,
-        analysis: true,
-    };
-    /// No row.
-    pub const NONE: SharedRows = SharedRows {
-        flat_shaded: false,
-        wire_on_solid: false,
-        tint_back_faces: false,
-        backface_culling: false,
-        analysis: false,
-    };
-}
-
-/// A per-view switch a context declares: a row of the display popover's
-/// Overlays, on or off in each view apart. The host keeps each view's
-/// switches with the view (saved with the project, never undone) and
-/// answers a view call's [`ViewCx::switched`](crate::host::ViewCx::switched);
-/// the context draws what the switch shows (in its
-/// [`edited`](super::ViewportLayer::edited) or
-/// [`overlay`](super::ViewportLayer::overlay)). Contexts declaring the
-/// same id share its state in a view.
-///
-/// ```
-/// use studio_ui_api::package::{ViewSwitch, ViewportSpec};
-///
-/// const LEAVES: ViewSwitch = ViewSwitch { id: "acme.trees.leaves", label: "Leaves", default: true };
-/// let spec = ViewportSpec { switches: vec![LEAVES], ..ViewportSpec::scene() };
-/// assert_eq!(spec.switch(LEAVES.id), Some(&LEAVES));
-/// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ViewSwitch {
-    /// Its id: unique among installed packages' switches, its package's
-    /// name first ("acme.trees.leaves").
-    pub id: &'static str,
-    /// Its row's label ("Leaves").
-    pub label: &'static str,
-    /// Whether it is on in a view where the user never set it.
-    pub default: bool,
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@
 //! the host lends back to `S`.
 use super::data::{Candidate, LevelPreset, LevelSpec, NumericBar, TimeDomain, Tools};
 use super::edited::Edited;
-use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
+use super::view::{Holds, KeyPress};
 use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
 use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef, ViewCx};
 use crate::sheet::{Edits, Schema};
@@ -130,7 +130,7 @@ pub trait Levels<S: ?Sized>: Send + Sync {
 
 /// What a context adds to the viewport: its live tools (their input in a
 /// view, overlays, cards and numeric bar), what it draws over the open
-/// object, its keys, its popovers' rows and its time. The rest of the
+/// object, its keys, its Gear's rows and its time. The rest of the
 /// viewport is core's: the left toolbar, the status bar, framing, the
 /// gizmo, pivot picks and component picks (through [`Levels`]).
 ///
@@ -140,8 +140,8 @@ pub trait Levels<S: ?Sized>: Send + Sync {
 /// gizmo, handles and picks, then each view's [`overlay`](Self::overlay);
 /// after every view, [`cards`](Self::cards), and at the frame's end
 /// [`edited`](Self::edited) for each view drawn. The calls about one view
-/// get its [`ViewCx`], which also answers the view's switches
-/// ([`ViewCx::switched`]).
+/// get its [`ViewCx`], which also answers the context's display options
+/// ([`ViewCx::displayed`]).
 pub trait ViewportLayer<S: ?Sized>: Send + Sync {
     /// Escape, an undo, or the location leaving the context: end live
     /// drags and gestures.
@@ -162,20 +162,18 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         let _ = (s, cx);
         Holds::default()
     }
-    /// The context's rows of `popover`, called while it is open.
-    fn rows(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
-        let _ = (s, cx, popover);
-        Vec::new()
+    /// The Gear's rows: the transform tool's settings here (soft
+    /// selection, symmetry), under core's space row; the Gear shows while
+    /// it has rows. A live tool's settings are its card. Asked once a
+    /// frame, so it is built from the state as it is.
+    fn gear(&self, s: &S, cx: &dyn Cx) -> Schema<u32> {
+        let _ = (s, cx);
+        Schema::new()
     }
-    /// Whether `popover` has rows of the context's: asked once a frame for
-    /// the Gear, to know whether it shows. A context whose rows cost
-    /// something to build answers without building them.
-    fn shows(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover) -> bool {
-        !self.rows(s, cx, popover).is_empty()
-    }
-    /// An edit of one of [`rows`](Self::rows)'s rows.
-    fn apply_row(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
-        let _ = (s, cx, popover, edit);
+    /// The edits of [`gear`](Self::gear)'s rows, `rows` holding the edited
+    /// values.
+    fn apply_gear(&self, s: &mut S, cx: &mut dyn Cx, rows: &Schema<u32>, edits: &Edits<u32>) {
+        let _ = (s, cx, rows, edits);
     }
     /// The numeric bar of a live tool: while `Some`, it stands in the
     /// transform tool's place under the active view.
@@ -491,14 +489,11 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     fn holds(&self, s: &dyn Any, cx: &dyn Cx) -> Holds {
         self.part.holds(own(s), cx)
     }
-    fn rows(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
-        self.part.rows(own_mut(s), cx, popover)
+    fn gear(&self, s: &dyn Any, cx: &dyn Cx) -> Schema<u32> {
+        self.part.gear(own(s), cx)
     }
-    fn shows(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover) -> bool {
-        self.part.shows(own_mut(s), cx, popover)
-    }
-    fn apply_row(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
-        self.part.apply_row(own_mut(s), cx, popover, edit)
+    fn apply_gear(&self, s: &mut dyn Any, cx: &mut dyn Cx, rows: &Schema<u32>, edits: &Edits<u32>) {
+        self.part.apply_gear(own_mut(s), cx, rows, edits)
     }
     fn numeric_bar(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<NumericBar> {
         self.part.numeric_bar(own_mut(s), cx)
