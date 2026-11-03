@@ -1,8 +1,9 @@
 //! [`Instances`]: placements of prototypes of any type, the standard value
 //! `kinogaki.core.instances`, and [`InstancesCodec`], how it saves.
-use super::{attributes, instances};
+use super::{attributes, instances, selection};
 use crate::Error;
 use crate::codec::DataCodec;
+use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use kinogaki_geometry::{Attributes, Column, Domain, Xform};
@@ -244,6 +245,8 @@ fn check(
 /// prototypes, each prototype as the child `i<k>` through its own type's
 /// codec ([`ElementWriter::data`], once per save for every value sharing
 /// it), and the attributes as children. A round trip is bit-exact.
+/// Components save as the standard [`Selection`](kinogaki_geometry::Selection)
+/// of the Instance domain.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct InstancesCodec;
 
@@ -296,5 +299,23 @@ impl DataCodec for InstancesCodec {
         let value = Instances::new(prototypes, xforms, prototype, attributes)
             .map_err(|e| Error::invalid(format_args!("{at}: {e}")))?;
         Ok(instances().wrap(value))
+    }
+
+    fn write_components(
+        &self,
+        components: &Components,
+        _data: &Data,
+        out: &mut dyn ElementWriter,
+    ) -> Result<bool, Error> {
+        selection::write(components, out)
+    }
+
+    fn read_components(
+        &self,
+        element: &dyn ElementReader,
+        data: &Data,
+    ) -> Result<Components, Error> {
+        let value = (instances().get(data)).ok_or_else(|| Error::invalid("not instances"))?;
+        selection::read(element, data.ty(), |domain| value.count(domain))
     }
 }

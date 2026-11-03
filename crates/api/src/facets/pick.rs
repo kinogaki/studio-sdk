@@ -1,9 +1,10 @@
 //! [`Pickable`]: turning the viewport's picks into component selections.
 use crate::components::Components;
 use crate::data::Data;
-use crate::facets::Drawn;
+use crate::facets::{Drawn, Marquee};
 use crate::viewport::{ElementKind, ElementSet, Hit};
 use kinogaki_edit::select::Expand;
+use kinogaki_geometry::{Projective, Ray};
 
 /// How a new selection meets the current one (click, Shift, Ctrl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -37,6 +38,28 @@ pub trait Pickable: Send + Sync {
     fn expand(&self, data: &Data, picked: &Components, how: &Expand) -> Components {
         let _ = (data, how);
         picked.clone()
+    }
+
+    /// What `ray`, in the value's own space, takes at
+    /// [`ElementKind::Instance`], whose elements are placements rather than
+    /// elements of a packet: the nearest instance it meets, active. `None`:
+    /// it meets none, or the type has no instances.
+    fn pick_instance(&self, data: &Data, drawn: &Drawn, ray: &Ray) -> Option<Components> {
+        let _ = (data, drawn, ray);
+        None
+    }
+
+    /// The instances `marquee` touches, over the view whose value-to-clip
+    /// is `view`; `None` when the type has no instances.
+    fn select_instances(
+        &self,
+        data: &Data,
+        drawn: &Drawn,
+        view: &Projective,
+        marquee: &Marquee,
+    ) -> Option<Components> {
+        let _ = (data, drawn, view, marquee);
+        None
     }
 
     /// `current` and `new` (both of `data`, at one level) combined by

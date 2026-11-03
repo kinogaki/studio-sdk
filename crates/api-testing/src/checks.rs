@@ -88,9 +88,21 @@ fn instances_round_trip(value: &Instances, data: &Data) -> Result<(), String> {
             .iter()
             .zip(value.prototypes())
             .all(|(a, b)| a.ptr_eq(b));
-    match same {
+    if !same {
+        return Err("the instances read back differ".into());
+    }
+    let picked = Elements::from_fn(value.len(), |i| i % 2 == 0);
+    let active = picked.iter().last();
+    let selection = Selection::new(Domain::Instance, picked, active).map_err(|e| e.to_string())?;
+    let components = standard::components(data.ty(), selection);
+    let mut saved = MemoryElement::new("components");
+    (saved.write(|w| InstancesCodec.write_components(&components, data, w)))
+        .map_err(|e| format!("write components: {e}"))?;
+    let back = (saved.read(|r| InstancesCodec.read_components(r, data)))
+        .map_err(|e| format!("read components: {e}"))?;
+    match back.selection() == components.selection() && back.len() == components.len() {
         true => Ok(()),
-        false => Err("the instances read back differ".into()),
+        false => Err("the selection read back differs".into()),
     }
 }
 

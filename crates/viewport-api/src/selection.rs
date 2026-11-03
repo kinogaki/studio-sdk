@@ -91,7 +91,7 @@ enum Slot {
 impl Slot {
     fn of(kind: ElementKind) -> Self {
         match kind {
-            ElementKind::Face | ElementKind::Object => Self::Faces,
+            ElementKind::Face | ElementKind::Object | ElementKind::Instance => Self::Faces,
             ElementKind::Edge => Self::Edges,
             ElementKind::Point | ElementKind::Vertex => Self::Points,
         }

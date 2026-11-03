@@ -98,6 +98,11 @@ pub enum ElementKind {
     Vertex,
     /// Whole objects, addressed by any of their faces.
     Object,
+    /// A value's instances, by instance: placements, not elements of a
+    /// packet, so a packet holds none and no [`ElementSelection`](crate::ElementSelection)
+    /// shows them (a scene object draws the marked ones at their own
+    /// placements).
+    Instance,
 }
 
 /// Selected element ids, sorted and unique. Immutable: each value gets a
@@ -320,6 +325,7 @@ pub trait SurfaceSource: Any + Send + Sync {
                 .unwrap_or(0),
             ElementKind::Point => self.points().len(),
             ElementKind::Vertex => self.column_len(Column::Vertices),
+            ElementKind::Instance => 0,
         }
     }
     /// Logical upload size, excluding GPU allocation padding.

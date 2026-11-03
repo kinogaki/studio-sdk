@@ -128,6 +128,7 @@ pub fn level(domain: Domain) -> ElementKind {
         Domain::Edge => ElementKind::Edge,
         Domain::Vertex => ElementKind::Vertex,
         Domain::Primitive => ElementKind::Face,
+        Domain::Instance => ElementKind::Instance,
         _ => ElementKind::Object,
     }
 }

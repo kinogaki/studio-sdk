@@ -132,6 +132,10 @@ pub struct Piece {
     /// Where it sits in its object, once a placement (instances' pieces
     /// share their placements column); `None`: once, where the object is.
     pub placements: Option<Column<Xform>>,
+    /// The instance each of its placements draws, when they aren't the
+    /// instances themselves in order (several prototypes, a prototype
+    /// placing its own piece many times).
+    pub instances: Option<Column<u32>>,
     /// What it is to its object.
     pub role: Role,
 }
@@ -143,6 +147,7 @@ impl Piece {
         Self {
             packet,
             placements: None,
+            instances: None,
             role: Role::Own {
                 edges: true,
                 wires: false,
