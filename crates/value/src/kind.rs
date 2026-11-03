@@ -150,9 +150,8 @@ impl ValueKind {
 
     /// Whether a value of this kind can be keyed over time unless its
     /// owner says otherwise: numbers, integers, vectors, colors, channels,
-    /// toggles and choices can; ramps and tone curves (whose keys come and
-    /// go, so two of their values needn't blend), text of every kind and
-    /// data can't.
+    /// toggles, choices, ramps and tone curves (blended between keys of
+    /// different key counts) can; text of every kind and data can't.
     pub fn animatable(&self) -> bool {
         match self {
             Self::Number(_)
@@ -161,10 +160,10 @@ impl ValueKind {
             | Self::Color
             | Self::Channels(_)
             | Self::Toggle
-            | Self::Choice { .. } => true,
-            Self::Ramp { .. }
-            | Self::ToneCurves { .. }
-            | Self::Text
+            | Self::Choice { .. }
+            | Self::Ramp { .. }
+            | Self::ToneCurves { .. } => true,
+            Self::Text
             | Self::Code { .. }
             | Self::File
             | Self::Path
@@ -506,6 +505,11 @@ mod tests {
         assert!(ValueKind::choice(vec![Choice::new("a", "A")]).animatable());
         assert!(!ValueKind::Code { language: None }.animatable());
         assert!(!ValueKind::Texts.animatable());
+        let ramp = ValueKind::Ramp {
+            color: true,
+            most: None,
+        };
+        assert!(ramp.animatable());
         let sketch = Typed::<Vec<f64>>::new(DataTypeId::declared("acme.cad.sketch"));
         let kind = ValueKind::Data(sketch.id());
         assert!(!kind.animatable());
