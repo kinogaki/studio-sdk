@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use crate::id::TextureId;
+use crate::id::{EngineId, TextureId};
 
 /// What a socket carries, for linking and drawing. Every output drives
 /// every input: a Float spreads to three, three-wide values pass as they
@@ -267,7 +267,7 @@ pub type Layout = Arc<dyn Fn(&str, &Params) -> NodeLayout + Send + Sync>;
 #[derive(Clone)]
 pub struct NodeType {
     /// The engine it belongs to (its [`crate::EngineDescription::id`]).
-    pub engine: Arc<str>,
+    pub engine: EngineId,
     /// Its name in files and networks (`openpbr_surface`).
     pub name: Arc<str>,
     /// What a UI calls it, and the stem new nodes are numbered from.

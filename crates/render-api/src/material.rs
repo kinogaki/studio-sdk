@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use crate::id::EngineId;
 use crate::vocabulary::{ParamValue, Params};
 
 /// A node's index in its network.
@@ -137,10 +138,10 @@ pub enum NetworkError {
 }
 
 /// A material: one engine's nodes and the links between them.
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MaterialNetwork {
     /// The engine whose vocabulary the nodes are of.
-    pub engine: Arc<str>,
+    pub engine: EngineId,
     /// The nodes; links name them by index.
     pub nodes: Vec<ShaderNode>,
     /// The links, in the order they were made (engines may emit in it).
@@ -148,10 +149,19 @@ pub struct MaterialNetwork {
 }
 
 impl MaterialNetwork {
-    /// A network of `engine` holding the single node `node`.
-    pub fn single(engine: &str, node: ShaderNode) -> MaterialNetwork {
+    /// A network of `engine` with no nodes.
+    pub fn new(engine: EngineId) -> MaterialNetwork {
         MaterialNetwork {
-            engine: Arc::from(engine),
+            engine,
+            nodes: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+
+    /// A network of `engine` holding the single node `node`.
+    pub fn single(engine: EngineId, node: ShaderNode) -> MaterialNetwork {
+        MaterialNetwork {
+            engine,
             nodes: vec![node],
             links: Vec::new(),
         }

@@ -1,6 +1,7 @@
 //! Admission: whether a package may register ([`Registry::check`]).
 use super::{Registry, RegistryError, owner};
 use crate::cook::SPARE;
+use crate::icon::IconError;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
@@ -8,8 +9,9 @@ use crate::package::Package;
 use kinogaki_render_api::Engines;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Creation name `text` of `package` as an id's text, when well formed.
-fn creation_id(package: PackageId, text: &str) -> Result<&'static str, RegistryError> {
+/// Id `text` `package` declares as an id's text, when well formed (a
+/// creation's name, an engine's id: text, not yet an id type).
+fn declared_id(package: PackageId, text: &str) -> Result<&'static str, RegistryError> {
     if crate::id::well_formed(text) {
         Ok(crate::id::intern(text))
     } else {
@@ -112,11 +114,15 @@ impl Registry {
             let first = (self.object_kinds.values())
                 .find(|e| made(&*e.item).any(|t| t == text))
                 .map(|e| e.package);
-            declare("object creation", creation_id(id, &text)?, first)?;
+            declare("object creation", declared_id(id, &text)?, first)?;
         }
         for c in &package.creations {
             let first = self.creations.iter().find(|e| e.item.id == c.id);
-            declare("node creation", creation_id(id, &c.id)?, owner(first))?;
+            declare("node creation", declared_id(id, &c.id)?, owner(first))?;
+        }
+        for e in &package.engines {
+            let first = self.engines.get(&e.id).copied();
+            declare("render engine", declared_id(id, e.id.as_str())?, first)?;
         }
         for f in &package.formats {
             declare("format", f.id().as_str(), owner(self.formats.get(&f.id())))?;
@@ -157,37 +163,97 @@ impl Registry {
                 });
             }
         }
-        self.check_engines(package)?;
+        #[cfg(feature = "wgpu")]
+        self.check_makers(package)?;
+        self.check_names(package)?;
         self.check_compilers(package)?;
         self.check_insides(package)?;
         self.check_references(package)
     }
 
-    /// Each render engine `package` describes is new (engine ids are
-    /// files' names, `pixel`, under no vendor), and each maker it brings
-    /// makes one it describes.
-    fn check_engines(&self, package: &Package) -> Result<(), RegistryError> {
-        let id = package.id;
-        for (at, engine) in package.engines.iter().enumerate() {
-            let twice = package.engines[..at].iter().any(|e| e.id == engine.id);
-            let first = self.engines.get(&engine.id).copied();
-            if let Some(first) = first.or(twice.then_some(id)) {
-                return Err(RegistryError::DuplicateEngine {
-                    package: id,
-                    engine: engine.id.clone(),
-                    first,
-                });
-            }
-        }
-        #[cfg(feature = "wgpu")]
+    /// Each render engine maker `package` brings makes an engine it
+    /// describes.
+    #[cfg(feature = "wgpu")]
+    fn check_makers(&self, package: &Package) -> Result<(), RegistryError> {
         for maker in &package.makers {
             let engine = maker.description().id;
             if !package.engines.iter().any(|e| e.id == engine) {
                 return Err(RegistryError::StrayMaker {
-                    package: id,
+                    package: package.id,
                     engine,
                 });
             }
+        }
+        Ok(())
+    }
+
+    /// Every context `package` names is declared, by it or before it
+    /// (where its node types are offered, what its object kinds hold),
+    /// each of its contexts adopts a node type at most once, its icons are well formed ([`Icon::check`](crate::icon::Icon::check)) and named once,
+    /// and every package icon it names (`"acme.trees/leaf"`) is one it or
+    /// a registered package carries.
+    fn check_names(&self, package: &Package) -> Result<(), RegistryError> {
+        let id = package.id;
+        let context = |by: &'static str, context: ContextId| {
+            if package.contexts.iter().any(|c| c.id == context)
+                || self.contexts.contains_key(&context)
+            {
+                Ok(())
+            } else {
+                Err(RegistryError::UnknownContext {
+                    package: id,
+                    by,
+                    context,
+                })
+            }
+        };
+        for c in &package.contexts {
+            let mut adopted = BTreeSet::new();
+            for a in &c.adopts {
+                if !adopted.insert(a.node_type) {
+                    return Err(RegistryError::Adopted {
+                        package: id,
+                        context: c.id,
+                        node: a.node_type,
+                    });
+                }
+            }
+        }
+        let mut names = BTreeSet::new();
+        for icon in &package.icons {
+            icon.check()
+                .map_err(|error| RegistryError::BadIcon { package: id, error })?;
+            if !names.insert(icon.name.as_str()) {
+                return Err(RegistryError::BadIcon {
+                    package: id,
+                    error: IconError::Twice(icon.name.clone()),
+                });
+            }
+        }
+        let icon = |by: &'static str, name: &str| match name.split_once('/') {
+            Some((p, n)) if p == id.as_str() && names.contains(n) => Ok(()),
+            Some((p, n)) if (self.icons.iter()).any(|(q, s)| q.as_str() == p && s.contains(n)) => {
+                Ok(())
+            }
+            Some(_) => Err(RegistryError::UnknownIcon {
+                package: id,
+                by,
+                icon: name.to_owned(),
+            }),
+            None => Ok(()),
+        };
+        for n in &package.node_types {
+            let d = n.description();
+            for &c in &d.contexts {
+                context(n.id().as_str(), c)?;
+            }
+            icon(n.id().as_str(), &d.icon)?;
+        }
+        for k in &package.object_kinds {
+            if let Some(c) = k.context() {
+                context(k.id().as_str(), c)?;
+            }
+            icon(k.id().as_str(), k.icon())?;
         }
         Ok(())
     }
@@ -265,7 +331,7 @@ impl Registry {
             if !declared {
                 return Err(RegistryError::UnknownContext {
                     package: id,
-                    node,
+                    by: node.as_str(),
                     context: inside,
                 });
             }
@@ -319,6 +385,10 @@ impl Registry {
         for n in &package.node_types {
             if let Some(delta) = n.held() {
                 known(n.id().as_str(), delta)?;
+            }
+            let d = n.description();
+            for port in d.inputs.iter().chain(&d.outputs) {
+                known(n.id().as_str(), port.data)?;
             }
         }
         let mut routes = BTreeMap::new();

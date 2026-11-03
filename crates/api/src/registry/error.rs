@@ -1,7 +1,8 @@
 //! [`RegistryError`]: why a package was refused.
+use crate::icon::IconError;
 use crate::id::{ContextId, ConversionId, DataTypeId, NodeTypeId, PackageId};
+use kinogaki_render_api::EngineId;
 use std::fmt;
-use std::sync::Arc;
 
 /// Why a package was refused.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,8 +21,8 @@ pub enum RegistryError {
         /// The package that declared it first.
         first: PackageId,
     },
-    /// `package` declares a creation named `id`, which isn't a well-formed
-    /// id ([`well_formed`](crate::id::well_formed)).
+    /// `package` declares `id` (a creation's name, an engine's id), which
+    /// isn't a well-formed id ([`well_formed`](crate::id::well_formed)).
     MalformedId {
         /// The refused package.
         package: PackageId,
@@ -93,15 +94,42 @@ pub enum RegistryError {
         /// The context.
         context: ContextId,
     },
-    /// `package`'s node type `node` holds a network of `context` inside
-    /// it, which neither it nor a registered package declares.
+    /// `by` (an id `package` declares: a node type offered in `context` or
+    /// holding its network, an object kind holding its network) names
+    /// `context`, which neither it nor a registered package declares.
     UnknownContext {
         /// The refused package.
         package: PackageId,
-        /// The node type.
-        node: NodeTypeId,
+        /// What names the context.
+        by: &'static str,
         /// The context.
         context: ContextId,
+    },
+    /// `package`'s context `context` adopts node type `node` twice.
+    Adopted {
+        /// The refused package.
+        package: PackageId,
+        /// The adopting context.
+        context: ContextId,
+        /// The node type.
+        node: NodeTypeId,
+    },
+    /// One of `package`'s icons is malformed or named twice.
+    BadIcon {
+        /// The refused package.
+        package: PackageId,
+        /// What is wrong with it.
+        error: IconError,
+    },
+    /// `by` (an id `package` declares) shows package icon `icon`, which
+    /// no registered package (nor `package`) carries.
+    UnknownIcon {
+        /// The refused package.
+        package: PackageId,
+        /// What names the icon.
+        by: &'static str,
+        /// The icon's qualified name (`"acme.trees/leaf"`).
+        icon: String,
     },
     /// `package`'s node type `node` closes a loop of contexts holding each
     /// other's networks: `path` runs from the context the node is offered
@@ -134,23 +162,13 @@ pub enum RegistryError {
         /// The package that brought it first.
         first: PackageId,
     },
-    /// `package` describes render engine `engine`, which `first` already
-    /// described (or `package` describes twice).
-    DuplicateEngine {
-        /// The refused package.
-        package: PackageId,
-        /// The engine's id.
-        engine: Arc<str>,
-        /// The package that described it first.
-        first: PackageId,
-    },
     /// `package` brings a maker of render engine `engine`, which it
     /// doesn't describe.
     StrayMaker {
         /// The refused package.
         package: PackageId,
         /// The engine's id.
-        engine: Arc<str>,
+        engine: EngineId,
     },
 }
 
@@ -165,7 +183,7 @@ impl fmt::Display for RegistryError {
                 first,
             } => write!(f, "{package} declares {what} {id}, which {first} declared"),
             Self::MalformedId { package, id } => {
-                write!(f, "{package} names a creation {id:?}, which isn't an id")
+                write!(f, "{package} declares {id:?}, which isn't an id")
             }
             Self::ForeignId { package, id } => {
                 write!(f, "{package} declares {id}, under another vendor's name")
@@ -211,11 +229,21 @@ impl fmt::Display for RegistryError {
             ),
             Self::UnknownContext {
                 package,
-                node,
+                by,
                 context,
             } => write!(
                 f,
-                "{package}'s {node} holds a {context} network, which no package declares"
+                "{package}'s {by} names context {context}, which no package declares"
+            ),
+            Self::Adopted {
+                package,
+                context,
+                node,
+            } => write!(f, "{package}'s {context} adopts {node} twice"),
+            Self::BadIcon { package, error } => write!(f, "{package}'s icon: {error}"),
+            Self::UnknownIcon { package, by, icon } => write!(
+                f,
+                "{package}'s {by} shows icon {icon}, which no package carries"
             ),
             Self::InsideCycle {
                 package,
@@ -244,14 +272,6 @@ impl fmt::Display for RegistryError {
             } => write!(
                 f,
                 "{package} brings a runner for {context}, which {first} already brought"
-            ),
-            Self::DuplicateEngine {
-                package,
-                engine,
-                first,
-            } => write!(
-                f,
-                "{package} describes render engine {engine}, which {first} described"
             ),
             Self::StrayMaker { package, engine } => write!(
                 f,

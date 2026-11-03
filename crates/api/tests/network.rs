@@ -120,7 +120,9 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
 #[test]
 fn a_held_node_type_names_a_registered_delta() {
     let mut registry = Registry::new();
-    let trees = Package::new(PackageId::declared("acme.trees"), "Trees").with_node_type(Grow);
+    let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
+        .with_context(context("acme.trees.network"))
+        .with_node_type(Grow);
     assert!(matches!(
         registry.register(trees),
         Err(RegistryError::UnknownDataType { .. })
@@ -424,28 +426,47 @@ fn engine(id: &str) -> kinogaki_render_api::EngineDescription {
         .description()
         .as_ref()
         .clone();
-    d.id = id.into();
+    d.id = kinogaki_render_api::EngineId::new(id);
     d
 }
 
 #[test]
-fn an_engine_is_described_by_one_package() {
+fn an_engine_id_is_declared_once_under_its_vendor() {
     let package = |id: &'static str, engines: &[&str]| {
         (engines.iter()).fold(Package::new(PackageId::declared(id), id), |p, e| {
             p.with_engine_description(engine(e))
         })
     };
     let mut registry = Registry::new();
-    assert!(registry.register(package("acme.glow", &["glow"])).is_ok());
+    assert!(
+        registry
+            .register(package("acme.glow", &["acme.glow.engine"]))
+            .is_ok()
+    );
+    assert!(matches!(
+        registry.register(package("acme.sparks", &["acme.glow.engine"])),
+        Err(RegistryError::DuplicateId { what: "render engine", first, .. }) if first.as_str() == "acme.glow"
+    ));
+    assert!(matches!(
+        registry.register(package("twice.glow", &["twice.glow.spark", "twice.glow.spark"])),
+        Err(RegistryError::DuplicateId { first, .. }) if first.as_str() == "twice.glow"
+    ));
+    assert!(matches!(
+        registry.register(package("rival.glow", &["acme.glow.spark"])),
+        Err(RegistryError::ForeignId {
+            id: "acme.glow.spark",
+            ..
+        })
+    ));
     assert!(matches!(
         registry.register(package("rival.glow", &["glow"])),
-        Err(RegistryError::DuplicateEngine { first, .. }) if first.as_str() == "acme.glow"
+        Err(RegistryError::MalformedId { .. })
     ));
-    assert!(matches!(
-        registry.register(package("twice.glow", &["spark", "spark"])),
-        Err(RegistryError::DuplicateEngine { first, .. }) if first.as_str() == "twice.glow"
-    ));
-    assert!(registry.register(package("rival.glow", &["spark"])).is_ok());
+    assert!(
+        registry
+            .register(package("rival.glow", &["rival.glow.spark"]))
+            .is_ok()
+    );
 }
 
 #[cfg(feature = "wgpu")]
@@ -454,7 +475,7 @@ struct Glow;
 #[cfg(feature = "wgpu")]
 impl kinogaki_render_api::display::Engine for Glow {
     fn description(&self) -> kinogaki_render_api::EngineDescription {
-        engine("glow")
+        engine("acme.glow.engine")
     }
     fn make(
         &self,
@@ -477,6 +498,6 @@ fn a_package_makes_the_engines_it_describes() {
     stray.engines.clear();
     assert!(matches!(
         Registry::new().register(stray),
-        Err(RegistryError::StrayMaker { engine, .. }) if &*engine == "glow"
+        Err(RegistryError::StrayMaker { engine, .. }) if engine.as_str() == "acme.glow.engine"
     ));
 }

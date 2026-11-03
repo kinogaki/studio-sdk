@@ -17,7 +17,7 @@ use crate::data::Data;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
 use kinogaki_render_api::{
-    Aov, Declared, EngineDescription, Engines, PreviewSurface, SettingValues,
+    Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface, SettingValues,
 };
 use std::any::Any;
 use std::fmt::Debug;
@@ -424,7 +424,7 @@ pub trait RenderSetupKind: Send + Sync {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RenderSetup {
     /// The engine that renders (its id).
-    pub engine: Arc<str>,
+    pub engine: EngineId,
     /// The final image's width and height, pixels.
     pub resolution: [u32; 2],
     /// The Camera object a final render looks through (none: the view's).

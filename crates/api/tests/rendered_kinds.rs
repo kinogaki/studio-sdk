@@ -4,8 +4,8 @@
 //! render setup names its engine, size, camera and settings, and a kind
 //! without either answers neither.
 use kinogaki_render_api::{
-    EngineDescription, RecordingEngine, RenderEngine, SettingValue, SettingValues, settings,
-    standard,
+    EngineDescription, EngineId, RecordingEngine, RenderEngine, SettingValue, SettingValues,
+    settings, standard,
 };
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::*;
@@ -88,7 +88,7 @@ impl RenderSetupKind for Setups {
     fn setup(&self, body: &dyn ObjectBody) -> Option<RenderSetup> {
         let setup = body.downcast_ref::<Setup>()?;
         Some(RenderSetup {
-            engine: setup.engine.into(),
+            engine: EngineId::new(setup.engine),
             resolution: [640, 360],
             camera: setup.camera,
             output: "render.exr".into(),
@@ -102,7 +102,7 @@ impl RenderSetupKind for Setups {
         body.downcast_ref::<Setup>()?;
         let engine = ["toy", "other"]
             .into_iter()
-            .find(|e| *e == &*setup.engine)?;
+            .find(|e| *e == setup.engine.as_str())?;
         Some(Arc::new(Setup {
             engine,
             camera: setup.camera,
@@ -220,10 +220,13 @@ fn a_setup_kind_says_which_engine_renders_and_how() {
         camera: Some(ObjectRef(7)),
     };
     let setup = kind.render_setup().unwrap().setup(&body).unwrap();
-    assert_eq!((&*setup.engine, setup.camera), ("toy", Some(ObjectRef(7))));
+    assert_eq!(
+        (setup.engine.as_str(), setup.camera),
+        ("toy", Some(ObjectRef(7)))
+    );
     // An edit comes back as a new body.
     let edited = RenderSetup {
-        engine: "other".into(),
+        engine: EngineId::new("other"),
         camera: None,
         ..setup.clone()
     };
@@ -233,10 +236,10 @@ fn a_setup_kind_says_which_engine_renders_and_how() {
         .with_setup(&body, edited.clone())
         .unwrap();
     let back = kind.render_setup().unwrap().setup(&*body).unwrap();
-    assert_eq!((&*back.engine, back.camera), ("other", None));
+    assert_eq!((back.engine.as_str(), back.camera), ("other", None));
     // A setup it can't hold, or another kind's body, is refused.
     let unknown = RenderSetup {
-        engine: "missing".into(),
+        engine: EngineId::new("missing"),
         ..edited.clone()
     };
     assert!(

@@ -27,7 +27,8 @@ use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::{SessionSlot, SessionSlots};
-use std::collections::BTreeMap;
+use kinogaki_render_api::EngineId;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -83,7 +84,9 @@ pub struct Registry {
     /// context's mode), and the package giving them.
     ui_contexts: BTreeMap<(ContextId, bool), PackageId>,
     /// The package describing each render engine, by engine id.
-    engines: BTreeMap<Arc<str>, PackageId>,
+    engines: BTreeMap<EngineId, PackageId>,
+    /// Each package's icons' names.
+    icons: BTreeMap<PackageId, BTreeSet<String>>,
 }
 
 impl Registry {
@@ -153,6 +156,8 @@ impl Registry {
         for engine in package.engines {
             self.engines.insert(engine.id.clone(), id);
         }
+        let icons = package.icons.into_iter().map(|i| i.name).collect();
+        self.icons.insert(id, icons);
         self.packages.push((id, package.label));
         Ok(())
     }

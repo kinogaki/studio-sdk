@@ -12,6 +12,7 @@ use std::sync::Arc;
 use crate::aov::{Aov, AovSpec};
 use crate::declared::{AppliedSchema, PrimType};
 use crate::exchange::PreviewSurface;
+use crate::id::EngineId;
 use crate::material::MaterialNetwork;
 use crate::prim::PrimKind;
 use crate::settings::{SettingDescriptor, SettingGroup, SettingValues};
@@ -124,8 +125,8 @@ impl MotionSupport {
 /// An engine, as a host sees it before making one.
 #[derive(Clone)]
 pub struct EngineDescription {
-    /// Its id in files (`pixel`).
-    pub id: Arc<str>,
+    /// Its id in files (`kinogaki.pixel.engine`).
+    pub id: EngineId,
     /// What a UI calls it (`Pixel`).
     pub label: Arc<str>,
     /// The structural prims it renders (hosts send no others).
@@ -281,8 +282,8 @@ impl Engines {
     }
 
     /// Engine `id`.
-    pub fn get(&self, id: &str) -> Option<&Arc<EngineDescription>> {
-        self.0.iter().find(|e| &*e.id == id)
+    pub fn get(&self, id: &EngineId) -> Option<&Arc<EngineDescription>> {
+        self.0.iter().find(|e| e.id == *id)
     }
 
     /// The default engine: the first, when there is one.

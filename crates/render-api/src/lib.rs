@@ -59,7 +59,7 @@ pub use engine::{
     ViewMode, Wake, pending,
 };
 pub use exchange::{Extra, ImportedMaterial, PreviewSurface};
-pub use id::{IdAllocator, MaterialId, PrimId, TextureId};
+pub use id::{EngineId, IdAllocator, MaterialId, PrimId, TextureId};
 /// The standard geometry values, which engines read prims' data as.
 pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.

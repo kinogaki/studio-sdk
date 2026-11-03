@@ -10,7 +10,7 @@ use crate::description::{EngineDescription, MaterialRules, MotionSupport, Previe
 use crate::dirty::Dirty;
 use crate::engine::{Outputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
 use crate::exchange::PreviewSurface;
-use crate::id::PrimId;
+use crate::id::{EngineId, PrimId};
 use crate::material::MaterialNetwork;
 use crate::prim::{Prim, PrimKind};
 use crate::settings::RenderSettings;
@@ -73,15 +73,15 @@ impl RecordingEngine {
     }
 }
 
+/// The recording engine's id.
+const ID: &str = "kinogaki.render.recording";
+
 /// The recording engine's materials: none of its own, so everything is
 /// its empty material.
 struct Rules;
 
 fn empty() -> MaterialNetwork {
-    MaterialNetwork {
-        engine: Arc::from("recording"),
-        ..MaterialNetwork::default()
-    }
+    MaterialNetwork::new(EngineId::new(ID))
 }
 
 impl MaterialRules for Rules {
@@ -111,7 +111,7 @@ fn description() -> EngineDescription {
     let mut types = crate::standard::lights();
     types.push(crate::standard::fog());
     EngineDescription {
-        id: Arc::from("recording"),
+        id: EngineId::new(ID),
         label: Arc::from("Recording"),
         prims: PrimKind::STRUCTURAL.to_vec(),
         types,

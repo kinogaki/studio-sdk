@@ -532,12 +532,12 @@ impl NodeType for ShaderType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PackageId;
     use crate::network::CompileCx;
     use crate::params::SchemaItem;
-    use crate::{Package, PackageId, Registry};
-    use kinogaki_render_api::RenderEngine;
     use kinogaki_render_api::recording::RecordingEngine;
     use kinogaki_render_api::vocabulary::{Choice, SocketKind};
+    use kinogaki_render_api::{EngineId, RenderEngine};
     use std::any::Any;
 
     /// Mix's channels, which follow its mode (as a Convert's follow its
@@ -635,7 +635,7 @@ mod tests {
         });
         let node = |name: &str, category: &str, surface: Option<&str>, layout| {
             Arc::new(vocabulary::NodeType {
-                engine: Arc::from("toy"),
+                engine: EngineId::new("toy"),
                 name: Arc::from(name),
                 label: Arc::from(name),
                 category: Arc::from(category),
@@ -647,7 +647,7 @@ mod tests {
         };
         let recording = RecordingEngine::new(Arc::new(|| {}));
         let mut engine = (**recording.description()).clone();
-        engine.id = Arc::from("toy");
+        engine.id = EngineId::new("toy");
         engine.material_nodes = vec![
             node("mix", "Color", None, mix),
             node("toy_surface", "Surface", Some("Toy"), surface),
@@ -698,7 +698,7 @@ mod tests {
         use kinogaki_render_api::{Constant, Link, ShaderNode};
         let engine = engine();
         let network = MaterialNetwork {
-            engine: Arc::from("toy"),
+            engine: EngineId::new("toy"),
             nodes: vec![
                 ShaderNode::new("mix")
                     .with_param("mode", ParamValue::Choice(Arc::from("mul")))
@@ -917,17 +917,17 @@ mod tests {
 
     #[test]
     fn a_compiler_finds_its_shader_through_the_lookup() {
-        let engine = engine();
-        let mut package = Package::new(toy(), "Toy");
-        for shader in shaders(toy(), &engine) {
-            package = package.with_node_type(shader);
+        struct Lookup(Vec<ShaderType>); // where the compile finds types
+        impl crate::network::NodeTypes for Lookup {
+            fn node_type(&self, id: NodeTypeId) -> Option<&dyn NodeType> {
+                self.0.iter().find(|s| s.id() == id).map(|s| s as _)
+            }
         }
-        let mut registry = Registry::new();
-        registry.register(package).unwrap();
-        let cx = CompileCx::new(&[]).with_types(&registry);
-        let ty = cx
-            .node_type(NodeTypeId::declared("kinogaki.toy.mix"))
-            .expect("registered");
+        let engine = engine();
+        let lookup = Lookup(shaders(toy(), &engine));
+        let cx = CompileCx::new(&[]).with_types(&lookup);
+        let mix = NodeTypeId::declared("kinogaki.toy.mix");
+        let ty = cx.node_type(mix).expect("found");
         // Declared data through the trait, the vocabulary by downcasting.
         assert_eq!(ty.description().label, "mix");
         let any: &dyn Any = ty;

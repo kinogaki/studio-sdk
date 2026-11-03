@@ -293,7 +293,7 @@ fn tiny_layout(_: &str, params: &Params) -> NodeLayout {
 
 fn tiny() -> NodeType {
     NodeType {
-        engine: Arc::from("tiny"),
+        engine: EngineId::new("tiny"),
         name: Arc::from("tiny_surface"),
         label: Arc::from("Tiny Surface"),
         category: Arc::from("Surface"),
@@ -323,7 +323,7 @@ fn node_types_fit_their_settings_and_lay_out_by_them() {
 fn networks_check_their_links_and_name_their_attributes() {
     let node = |kind: &str| ShaderNode::new(kind);
     let mut n = MaterialNetwork {
-        engine: Arc::from("tiny"),
+        engine: EngineId::new("tiny"),
         nodes: vec![
             node("tiny_surface").with("color", Constant::Color([0.2, 0.4, 0.6])),
             node("reader").with_param("attribute", ParamValue::Attribute(Arc::from("Cd"))),
@@ -705,7 +705,7 @@ fn a_later_declared_prim_replaces_the_one_a_batch_sends() {
 /// Material rules giving every material `tint`, flat materials of one
 /// `flat` node in `engine`.
 struct Rules {
-    engine: &'static str,
+    engine: EngineId,
     tint: Option<Tint>,
 }
 
@@ -719,15 +719,12 @@ impl MaterialRules for Rules {
     fn flat(&self, tint: &Tint) -> MaterialNetwork {
         let Tint::Color(c) = tint else { unreachable!() };
         MaterialNetwork::single(
-            self.engine,
+            self.engine.clone(),
             ShaderNode::new("flat").with("color", Constant::Color(*c)),
         )
     }
     fn default_material(&self) -> MaterialNetwork {
-        MaterialNetwork {
-            engine: Arc::from(self.engine),
-            ..MaterialNetwork::default()
-        }
+        MaterialNetwork::new(self.engine.clone())
     }
     fn preview_surface(&self, _: &MaterialNetwork) -> PreviewSurface {
         PreviewSurface::default()
@@ -739,36 +736,33 @@ impl MaterialRules for Rules {
 
 #[test]
 fn another_engines_material_is_adopted_flat_in_its_tint() {
-    let flat_of = |engine: &'static str| MaterialNetwork {
-        engine: Arc::from(engine),
-        ..MaterialNetwork::default()
-    };
+    let flat_of = |engine: &str| MaterialNetwork::new(EngineId::new(engine));
     let mut here: EngineDescription = RecordingEngine::new(Arc::new(|| {}))
         .description()
         .as_ref()
         .clone();
-    here.id = Arc::from("here");
+    here.id = EngineId::new("here");
     here.materials = Arc::new(Rules {
-        engine: "here",
+        engine: EngineId::new("here"),
         tint: None,
     });
     let mut there = here.clone();
-    there.id = Arc::from("there");
+    there.id = EngineId::new("there");
     there.materials = Arc::new(Rules {
-        engine: "there",
+        engine: EngineId::new("there"),
         tint: Some(Tint::Color([0.1, 0.2, 0.3])),
     });
     let own = flat_of("here");
     assert_eq!(here.adopt(own.clone(), &there), own, "its own: as it is");
     let adopted = here.adopt(flat_of("there"), &there);
-    assert_eq!(&*adopted.engine, "here");
+    assert_eq!(adopted.engine.as_str(), "here");
     assert_eq!(
         adopted.nodes[0].value("color"),
         Some(Constant::Color([0.1, 0.2, 0.3]))
     );
     // No one tint: the default material.
     there.materials = Arc::new(Rules {
-        engine: "there",
+        engine: EngineId::new("there"),
         tint: None,
     });
     assert_eq!(
@@ -776,11 +770,16 @@ fn another_engines_material_is_adopted_flat_in_its_tint() {
         here.default_material()
     );
     let engines = Engines::new(vec![here.clone(), there]);
-    assert_eq!(&*engines.default_engine().unwrap().id, "here");
-    assert!(engines.get("there").is_some() && engines.get("nope").is_none());
+    assert_eq!(engines.default_engine().unwrap().id.as_str(), "here");
+    assert!(engines.get(&EngineId::new("there")).is_some());
+    assert!(engines.get(&EngineId::new("nope")).is_none());
     // A host with no engine installed has none to default to.
     let none = Engines::new(Vec::new());
-    assert!(none.is_empty() && none.default_engine().is_none() && none.get("here").is_none());
+    assert!(
+        none.is_empty()
+            && none.default_engine().is_none()
+            && none.get(&EngineId::new("here")).is_none()
+    );
 }
 
 #[test]

@@ -45,7 +45,9 @@ pub struct Description {
     /// selected, each bound to some of its parameters.
     pub handles: Vec<Handle>,
     /// The contexts whose networks offer it (Tab, menus): a Mesh tool's
-    /// `kinogaki.mesh.network`, and CAM's too when CAM cooks it.
+    /// `kinogaki.mesh.network`. Each is its package's or an earlier
+    /// package's (a later package offers it through
+    /// [`NetworkContext::adopts`](crate::NetworkContext::adopts)).
     pub contexts: Vec<ContextId>,
     /// What part it plays in its network beyond what it computes.
     pub role: NodeRole,

@@ -21,12 +21,15 @@
 //! or `currentColor`, ideally as whole-pixel `<rect>`s. Shapes, paths,
 //! transforms and fills are read as a browser reads them.
 //!
-//! **Checks.** Studio checks each icon when the package registers: its
-//! name ([`name_well_formed`]), its size and its text ([`Icon::check`]),
-//! then whether its document reads and its `viewBox` fits. An icon that
-//! fails is left out with one Console error saying why; the package
-//! registers and runs without it, and a name that finds no icon draws a
-//! neutral icon of Studio's (with one Console error per name).
+//! **Checks.** The registry checks each icon when the package registers:
+//! its name ([`name_well_formed`]), its size and its text
+//! ([`Icon::check`]), that no two share a name, and that each package
+//! icon the package shows (a node type's, an object kind's) is one it or
+//! an earlier package carries; a package failing any is refused. Studio
+//! then reads each document and checks its `viewBox`: one that fails is
+//! left out with one Console error saying why, and a name that finds no
+//! icon draws a neutral icon of Studio's (with one Console error per
+//! name).
 //!
 //! ```
 //! use kinogaki_studio_api::icon::{self, Icon};
@@ -107,6 +110,8 @@ pub enum IconError {
     TooLarge(usize),
     /// Its document is not UTF-8 text.
     NotText,
+    /// Its package carries another icon of this name.
+    Twice(String),
 }
 
 impl fmt::Display for IconError {
@@ -121,6 +126,7 @@ impl fmt::Display for IconError {
                 write!(f, "its SVG has {bytes} bytes, more than {MAX_BYTES}")
             }
             IconError::NotText => f.write_str("its SVG is not UTF-8 text"),
+            IconError::Twice(name) => write!(f, "a second icon is named {name:?}"),
         }
     }
 }
