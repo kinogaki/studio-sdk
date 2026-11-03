@@ -7,7 +7,7 @@
 //!
 //! Colors are linear: authored in the working space, ACEScg in a network
 //! an engine receives (the host converts them as it sends the network,
-//! [`MaterialNetwork::map_colors`]; [`crate::color`]).
+//! [`MaterialNetwork::map_colors`]; [`crate::RENDER_SPACE`]).
 
 use std::sync::Arc;
 

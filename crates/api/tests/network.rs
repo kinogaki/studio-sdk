@@ -270,12 +270,12 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
 struct Runs;
 
 #[cfg(feature = "wgpu")]
-impl kinogaki_render_api::display::PlanRunner for Runs {
+impl kinogaki_studio_api::network::run::PlanRunner for Runs {
     fn make(
         &self,
         _: &kinogaki_render_api::display::wgpu::Device,
         _: &kinogaki_render_api::display::wgpu::Queue,
-    ) -> Box<dyn kinogaki_render_api::display::Runner> {
+    ) -> Box<dyn kinogaki_studio_api::network::run::Runner> {
         unreachable!("not made in this test")
     }
 }

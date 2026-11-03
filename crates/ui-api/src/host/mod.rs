@@ -88,7 +88,7 @@ pub trait Cx:
     /// The host's color service: the applied project's, and in a section
     /// of Settings ▸ Project the one of the page's draft (so a config just
     /// chosen lists its own spaces before it is applied).
-    fn colors(&self) -> &dyn kinogaki_studio_api::render::ColorService;
+    fn colors(&self) -> &dyn kinogaki_studio_api::color::ColorService;
     /// The host's current theme: the one a part's [`Ui::theme`](crate::Ui::theme)
     /// draws with, so what a viewport layer colors follows a changed theme.
     fn theme(&self) -> &crate::Theme;

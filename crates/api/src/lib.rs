@@ -65,6 +65,7 @@
 pub mod anim;
 pub mod cancel;
 pub mod codec;
+pub mod color;
 pub mod components;
 pub mod cook;
 pub mod data_type;

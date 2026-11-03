@@ -22,7 +22,7 @@ pub enum SocketKind {
     /// One number.
     Float,
     /// A color (linear: authored in the working space, ACEScg in the
-    /// network an engine receives, [`crate::color`]).
+    /// network an engine receives, [`crate::RENDER_SPACE`]).
     Color,
     /// A vector: a position, direction or normal.
     Vector,

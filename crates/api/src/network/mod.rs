@@ -30,6 +30,8 @@ mod compile;
 mod context;
 mod edit;
 mod read;
+#[cfg(feature = "wgpu")]
+pub mod run;
 
 pub use compile::{CompileCx, CompileError, Compiled, Flat, FlatNode, NetworkCompiler, NodeTypes};
 pub use context::{Adopted, Evaluation, Flag, FlagSet, NetworkContext, NetworkStorage, NodeLayout};

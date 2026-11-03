@@ -1,5 +1,5 @@
 //! [`Unconverted`]: a color service for checks that convert no color.
-use kinogaki_render_api::color::{ColorService, ViewChoice, ViewTransform};
+use kinogaki_studio_api::color::{ColorService, ViewChoice, ViewTransform};
 
 /// A color service taking every space for its working space, `ACEScg`:
 /// conversions leave colors as they are, and it has no view transforms.

@@ -181,7 +181,7 @@ impl<'a> CookCx<'a> {
 
     /// The host's color management, in the project's working space, when
     /// the node reads the project.
-    pub fn colors(&self) -> Option<&'a dyn kinogaki_render_api::ColorService> {
+    pub fn colors(&self) -> Option<&'a dyn crate::color::ColorService> {
         self.project.map(|p| p.colors)
     }
 

@@ -26,7 +26,6 @@
 //! geometry values (`geometry`, which also holds [`Detail`]) alone.
 
 pub mod aov;
-pub mod color;
 pub mod declared;
 pub mod description;
 pub mod dirty;
@@ -47,7 +46,11 @@ pub mod update;
 pub mod vocabulary;
 
 pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
-pub use color::{ColorService, RENDER_SPACE};
+
+/// The space engines take and output: linear ACEScg. Authored colors are
+/// in the project's working space; the host converts them to this as it
+/// sends them, through its color service.
+pub const RENDER_SPACE: &str = "ACEScg";
 pub use declared::{AppliedSchema, Declared, PrimType, Role};
 pub use description::{
     EngineDescription, Engines, MaterialPreset, MaterialRules, MotionSupport, PreviewSetup, Tint,

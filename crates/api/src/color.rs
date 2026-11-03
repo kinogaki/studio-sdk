@@ -1,11 +1,15 @@
-//! Color management, the host's: one [`ColorService`] for every package.
+//! Color management, the host's: one [`ColorService`] lent to formats
+//! ([`Reading`](crate::Reading), [`Writing`](crate::Writing)), cooks
+//! ([`CookCx::colors`](crate::CookCx::colors)), the UI and compiled
+//! contexts' runners.
+//!
 //!
 //! **One rule.** Authored colors (parameters, attributes, lights' and
 //! settings' values, material constants) are linear in the project's
 //! working space, wherever they are held: objects, render setups, a
 //! `Value::Color` in a body. Colors
 //! reaching an engine (prims, materials, render settings) are linear
-//! ACEScg ([`RENDER_SPACE`]), and engines output it: the host converts
+//! ACEScg (`kinogaki_render_api::RENDER_SPACE`), and engines output it: the host converts
 //! each at that one boundary, as it sends it, through this service, and
 //! sends them again when the working space or the configuration changes.
 //! The same types carry both, so an adapter between authored kinds copies
@@ -20,9 +24,6 @@
 
 use std::fmt::Debug;
 use std::sync::Arc;
-
-/// The space engines take and output: linear ACEScg.
-pub const RENDER_SPACE: &str = "ACEScg";
 
 /// The host's color management.
 pub trait ColorService: Send + Sync + Debug {

@@ -408,7 +408,7 @@ pub struct Light {
     /// Where the spectrum comes from.
     pub emission: Emission,
     /// Its color, linear (ACEScg in a prim an engine receives,
-    /// [`crate::color`]): the spectrum's in [`Emission::Color`].
+    /// [`crate::RENDER_SPACE`]): the spectrum's in [`Emission::Color`].
     pub color: [f32; 3],
     /// `inputs:intensity`.
     pub intensity: f32,

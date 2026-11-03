@@ -19,8 +19,8 @@ use std::fmt;
 use std::sync::Arc;
 
 pub use kinogaki_render_api::{
-    AttributeDomain, ColorService, Detail, Extra, ImportedMaterial, Look, MeshAttribute,
-    PlainTriangles, PreviewSurface, Ranges, TriangleSource,
+    AttributeDomain, Detail, Extra, ImportedMaterial, Look, MeshAttribute, PlainTriangles,
+    PreviewSurface, Ranges, TriangleSource,
 };
 
 /// What a value renders as.

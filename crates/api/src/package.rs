@@ -85,7 +85,7 @@ pub struct Package {
     /// The runners of its compiled contexts' plans, by context (the `wgpu`
     /// feature): how the host shows what a compiled network makes.
     #[cfg(feature = "wgpu")]
-    pub runners: Vec<(ContextId, Arc<dyn kinogaki_render_api::display::PlanRunner>)>,
+    pub runners: Vec<(ContextId, Arc<dyn crate::network::run::PlanRunner>)>,
     /// Its UI: its contexts' parts and settings sections, made by the
     /// host UI interface (`kinogaki-studio-ui-api`'s `WithUi::with_ui`).
     /// `None`: a headless package (a kernel's data types, a render
@@ -261,7 +261,7 @@ impl Package {
     pub fn with_runner(
         mut self,
         context: ContextId,
-        runner: impl kinogaki_render_api::display::PlanRunner + 'static,
+        runner: impl crate::network::run::PlanRunner + 'static,
     ) -> Self {
         self.runners.push((context, Arc::new(runner)));
         self

@@ -17,13 +17,13 @@
 pub mod options;
 
 use crate::cancel::CancelToken;
+use crate::color::ColorService;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::error::Error;
 use crate::id::{DataTypeId, FormatId};
 use crate::params::{Parameters, Schema, Value};
 use kinogaki_geometry::{Rate, Units, Xform};
-use kinogaki_render_api::ColorService;
 use std::any::Any;
 use std::path::Path;
 
@@ -331,9 +331,9 @@ pub trait Frames: Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::color::{ColorService, ViewChoice, ViewTransform};
     use crate::element::MemoryElement;
     use kinogaki_geometry::UpAxis;
-    use kinogaki_render_api::color::{ColorService, ViewChoice, ViewTransform};
 
     /// A color service converting nothing (the readings here read no color).
     #[derive(Debug)]
