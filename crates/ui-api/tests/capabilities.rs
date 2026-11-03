@@ -43,12 +43,12 @@ fn host() -> FakeHost {
 }
 
 #[test]
-fn a_restarted_gesture_puts_back_its_changes_and_stays_one_step() {
+fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
     let mut host = host();
-    host.begin_gesture("Adjust");
+    let gesture = host.begin_gesture("Adjust").expect("none was open");
     host.set_slot("step", Count(1));
     host.set_slot("step", Count(2));
-    host.restart_gesture();
+    host.back_to(gesture.start());
     assert_eq!(
         host.slot::<Count>(),
         &Count(0),
@@ -56,14 +56,28 @@ fn a_restarted_gesture_puts_back_its_changes_and_stays_one_step() {
     );
     assert!(host.in_gesture());
     host.set_slot("step", Count(5));
-    host.finish_gesture();
+    let start = gesture.start();
+    host.finish_gesture(gesture).unwrap();
     assert_eq!(host.history(), ["Adjust"]);
     host.undo();
     assert_eq!(host.slot::<Count>(), &Count(0));
-    // With no gesture open, nothing happens.
-    host.restart_gesture();
-    assert_eq!(host.slot::<Count>(), &Count(0));
-    assert!(host.take_calls().contains(&HostCall::RestartGesture));
+    // With its gesture ended, nothing happens.
+    host.set_slot("step", Count(3));
+    host.back_to(start);
+    assert_eq!(host.slot::<Count>(), &Count(3));
+    assert!(host.take_calls().contains(&HostCall::BackTo(start)));
+}
+
+#[test]
+fn a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it() {
+    let mut host = host();
+    let tool = host.begin_gesture("Tool").expect("none was open");
+    host.set_slot("step", Count(1));
+    assert!(host.begin_gesture("Drag").is_none(), "the tool's is open");
+    host.set_slot("step", Count(2));
+    assert!(host.in_gesture(), "the drag's end leaves the tool's open");
+    host.finish_gesture(tool).unwrap();
+    assert_eq!(host.history(), ["Tool"]);
 }
 
 #[test]

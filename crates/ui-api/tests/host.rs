@@ -476,7 +476,7 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
     let mut trees = hosted(&host);
     host.set_slot("Pick", Picked(vec![1, 2]));
     // A level change inside a gesture rides along with it.
-    host.begin_gesture("Change Level");
+    let level = host.begin_gesture("Change Level").unwrap();
     trees.with(|p, s| {
         p.contexts[0]
             .levels
@@ -484,12 +484,12 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
             .unwrap()
             .choose(s, &mut host, 1)
     });
-    host.finish_gesture();
+    host.finish_gesture(level).unwrap();
     assert_eq!(host.history(), ["Pick", "Change Level"]);
     assert_eq!(trees.state::<Forest>().level, 1);
-    host.begin_gesture("Drag");
+    let drag = host.begin_gesture("Drag").unwrap();
     host.slot_mut::<Picked>().0.push(9);
-    host.cancel_gesture();
+    host.cancel_gesture(drag);
     assert_eq!(host.slot::<Picked>(), &Picked::default());
     assert_eq!(host.history(), ["Pick", "Change Level"]);
     // Undo restores the slot, not the package's own state.

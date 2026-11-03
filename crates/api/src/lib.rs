@@ -29,7 +29,8 @@
 //!   which core owns ([`NetworkRead`], [`NetworkEdit`]).
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
-//!   state of an editing session.
+//!   state of an editing session; gestures ([`GestureToken`]), one undo
+//!   step over many edits, held by their opener.
 //! - **Stored values** ([`Stored`], [`StoredValue`]): package-owned values
 //!   the project keeps, one for the project or one per view.
 //! - **Icons** ([`icon`]): the named icons a package adds to Studio's
@@ -135,7 +136,7 @@ pub use params::{Diagnostic, Parameters, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::{Registry, RegistryError};
 pub use render::{PlainTriangles, RenderItem, TriangleSource};
-pub use session::{SessionSlot, SessionSlots, Slot, SlotDoc};
+pub use session::{GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
 pub use time::Time;
 pub use viewport::{ElementKind, ElementSet, Hit, Surface, SurfaceSource};

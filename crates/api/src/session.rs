@@ -1,4 +1,5 @@
-//! Session slots: package-owned state of an editing session.
+//! Session slots, package-owned state of an editing session, and the
+//! gestures its undo steps are made of.
 //!
 //! What the user has selected in a Mesh network, CAD's picks, an open
 //! sketch: state a package keeps per session, outside the project file.
@@ -10,6 +11,12 @@
 //! Values are shared and copy-on-write, as object bodies are: an undo
 //! snapshot is a clone of the table (one pointer a value), and changing a
 //! value copies it only while a snapshot still shares it.
+//!
+//! A gesture (a drag, a live tool's run) makes every edit until it ends
+//! one undo step. Whoever opens one holds its [`GestureToken`] and alone
+//! finishes or cancels it; an edit or a drag begun while another's
+//! gesture is open is part of that one ([`GestureMark`] goes back to
+//! where it joined).
 //!
 //! [`Package::with_slot`]: crate::Package::with_slot
 use crate::id::{ContextId, SlotId};
@@ -295,5 +302,60 @@ impl fmt::Debug for SessionSlots {
         f.debug_map()
             .entries(self.0.iter().map(|(id, e)| (id, Shown(e))))
             .finish()
+    }
+}
+
+/// The open gesture, held by whoever opened it: only its holder finishes
+/// or cancels it. Not `Clone`: a gesture ends once. A host makes these
+/// (its gesture number); a package gets one from the host's
+/// `begin_gesture`, which gives none when another's gesture is open.
+#[must_use = "only the gesture's opener finishes or cancels it"]
+#[derive(Debug, PartialEq, Eq)]
+pub struct GestureToken(u64);
+
+impl GestureToken {
+    /// Gesture number `id`, as its host counts them.
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// The gesture's number.
+    pub fn id(&self) -> u64 {
+        self.0
+    }
+
+    /// The gesture's start: going back there puts back all it changed
+    /// and keeps it open (a live tool recomputing from its start stays
+    /// one step).
+    pub fn start(&self) -> GestureMark {
+        GestureMark::new(self.0, 0)
+    }
+}
+
+/// A point inside an open gesture to go back to: its start
+/// ([`GestureToken::start`]), or where a drag joined it. Going back to a
+/// mark of a gesture that ended, or one a newer mark replaced, does
+/// nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GestureMark {
+    gesture: u64,
+    mark: u64,
+}
+
+impl GestureMark {
+    /// Mark `mark` (0: the start) of gesture number `gesture`, as its
+    /// host counts them.
+    pub fn new(gesture: u64, mark: u64) -> Self {
+        Self { gesture, mark }
+    }
+
+    /// The gesture's number.
+    pub fn gesture(&self) -> u64 {
+        self.gesture
+    }
+
+    /// The mark's number in its gesture (0: its start).
+    pub fn mark(&self) -> u64 {
+        self.mark
     }
 }

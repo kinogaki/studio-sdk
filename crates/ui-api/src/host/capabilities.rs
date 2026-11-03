@@ -16,8 +16,8 @@ use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, NodeTypeId, ObjectBody, ObjectKindId, Parameters, SlotId, Time,
-    Vec3,
+    Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId, ObjectBody,
+    ObjectKindId, Parameters, SlotId, Time, Vec3,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -26,21 +26,30 @@ use std::sync::Arc;
 ///
 /// An edit through the host ([`HostSlotsExt::set_slot`], a selection) is one
 /// undo step of its own, unless a gesture is open: then every change up
-/// to [`finish_gesture`](HostUndo::finish_gesture) is one step, named
-/// when the gesture began (a drag).
+/// to its finish is one step, named when the gesture began (a drag). The
+/// gesture is its opener's: [`begin_gesture`](HostUndo::begin_gesture)
+/// gives the [`GestureToken`] that alone finishes or cancels it.
 pub trait HostUndo {
-    /// Opens a gesture named `label`; a gesture already open is kept.
-    fn begin_gesture(&mut self, label: &str);
-    /// Closes the open gesture as one step (nothing when nothing changed).
-    fn finish_gesture(&mut self);
-    /// Puts back everything the open gesture changed, and records nothing.
-    fn cancel_gesture(&mut self);
-    /// Puts back everything the open gesture changed so far and keeps it
-    /// open: a live tool recomputing from the gesture's start each step
-    /// (an adjustment, a pen stroke) stays one undo step. Nothing happens
-    /// when no gesture is open.
-    fn restart_gesture(&mut self);
-    /// Whether a gesture is open.
+    /// Opens a gesture named `label` and gives its token; `None` when a
+    /// gesture is open already (a live tool's): what follows is part of
+    /// that one, which its opener ends.
+    fn begin_gesture(&mut self, label: &str) -> Option<GestureToken>;
+    /// Closes `gesture` as one step (nothing when nothing changed, or
+    /// when it already ended: an undo cancels it). A result that doesn't
+    /// check is put back, and the error says why.
+    ///
+    /// # Errors
+    /// What the gesture made doesn't check.
+    fn finish_gesture(&mut self, gesture: GestureToken) -> Result<(), Error>;
+    /// Puts back everything `gesture` changed, and records nothing.
+    fn cancel_gesture(&mut self, gesture: GestureToken);
+    /// Puts back everything the open gesture changed since `mark`,
+    /// keeping it open: from [`GestureToken::start`], a live tool
+    /// recomputing from the gesture's start each step (an adjustment, a
+    /// pen stroke) stays one undo step. Nothing happens when `mark`'s
+    /// gesture isn't open.
+    fn back_to(&mut self, mark: GestureMark);
+    /// Whether a gesture is open, anyone's.
     fn in_gesture(&self) -> bool;
     /// Undoes the last step (live tools end first, after this call).
     fn undo(&mut self);
