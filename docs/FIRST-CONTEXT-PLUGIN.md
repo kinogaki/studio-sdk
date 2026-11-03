@@ -220,7 +220,7 @@ fn library() -> Library {
 }
 ```
 
-**The vocabulary** runs the items, and says which apply now. An entry that doesn't apply is hidden, never greyed: Clear shows only once there are pins, labelled with how many it clears. Setting a slot through the context (`set_slot`) is one undo step named by its label.
+**The vocabulary** runs the items, and says which apply now. An entry that doesn't apply is hidden, never greyed: Clear shows only once there are pins, labelled with how many it clears. Changing a slot through the context (`edit_slot`, the one way a slot changes) is one undo step named by its label.
 
 ```rust
 /// Runs Pin and Clear.
@@ -233,8 +233,8 @@ impl Vocabulary<Pinning> for PinVocabulary {
     fn run(&self, _s: &mut Pinning, cx: &mut dyn Cx, item: &str, _how: Invoked) {
         let pins = cx.slot::<Pins>().0;
         match item {
-            PIN => cx.set_slot("Pin", Pins(pins + 1)),
-            CLEAR => cx.set_slot("Clear Pins", Pins(0)),
+            PIN => cx.edit_slot("Pin", |slot| *slot = Pins(pins + 1)),
+            CLEAR => cx.edit_slot("Clear Pins", |slot| *slot = Pins(0)),
             _ => {}
         }
     }

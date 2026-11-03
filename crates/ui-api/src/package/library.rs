@@ -81,6 +81,12 @@ pub struct VocabularyItem {
     pub when: When,
     /// Which surfaces offer it.
     pub places: Places,
+    /// The parameters its tool remembers, by name: a run starts from each
+    /// one's last value (a setting: Bevel's segments); the others (a
+    /// gesture's measure: Extrude's distance, a primitive's placement)
+    /// start at their defaults each run
+    /// ([`HostTools::starting`](crate::host::HostTools::starting)).
+    pub remembered: Vec<String>,
 }
 
 /// The surfaces that offer an item.

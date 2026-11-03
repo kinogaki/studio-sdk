@@ -23,8 +23,8 @@ pub enum HostCall {
     Undo,
     /// [`HostUndo::redo`].
     Redo,
-    /// [`HostSlots::set_slot_any`], by slot and step label.
-    SetSlot(SlotId, String),
+    /// [`HostSlots::edit_slot_any`], by slot and step label.
+    EditSlot(SlotId, String),
     /// [`HostSelection::select_objects`].
     SelectObjects(Vec<ObjectRef>),
     /// [`HostSelection::pick_node`].
@@ -48,7 +48,7 @@ pub enum HostCall {
     Console(Severity, Option<String>, String),
     /// [`HostShell::copy_text`].
     CopyText(String),
-    /// [`Cx::latest`], by key.
+    /// [`Cx::latest_any`] running a job, by its kind.
     Latest(String),
     /// [`HostShell::run_action`].
     RunAction(String, String),

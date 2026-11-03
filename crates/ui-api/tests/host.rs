@@ -10,8 +10,8 @@ use kinogaki_studio_api::{
     ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId, StoredValues,
 };
 use studio_ui_api::host::{
-    Cx, HostDoc, HostSettingsExt, HostSlots, HostSlotsExt, HostUndo, InspectorCx, NodeRef,
-    NodeRows, ObjectRef, Place, View, ViewCx, Waker,
+    Cx, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows,
+    ObjectRef, Place, View, ViewCx, Waker,
 };
 use studio_ui_api::package::hosting::Registered;
 use studio_ui_api::package::{
@@ -170,11 +170,7 @@ impl Levels<Forest> for TreeLevels {
     fn choose(&self, s: &mut Forest, cx: &mut dyn Cx, level: usize) {
         s.level = level;
         // Choosing a level converts the selection, within the open step.
-        cx.slot_any_mut(Picked::id())
-            .and_then(|v| v.downcast_mut::<Picked>())
-            .expect("registered")
-            .0
-            .clear();
+        cx.edit_slot("Change Level", |p: &mut Picked| p.0.clear());
     }
     fn toggle(&self, s: &mut Forest, cx: &mut dyn Cx, level: usize) {
         self.choose(s, cx, level);
@@ -270,7 +266,7 @@ impl Inspector<Forest> for TreeInspector {
             let next = picked.len() as u32;
             let mut more = picked;
             more.push(next);
-            cx.set_slot("Pick Tree", Picked(more));
+            cx.edit_slot("Pick Tree", |slot| *slot = Picked(more));
         }
     }
 }
@@ -446,7 +442,7 @@ fn an_inspector_click_is_one_undo_step_of_its_slot() {
     assert_eq!(host.history(), ["Pick Tree"]);
     assert_eq!(
         host.take_calls(),
-        [HostCall::SetSlot(Picked::id(), "Pick Tree".into())]
+        [HostCall::EditSlot(Picked::id(), "Pick Tree".into())]
     );
     let mut ui = RecordingUi::new(rect());
     show(&mut trees, &mut host, &mut ui);
@@ -463,7 +459,7 @@ fn an_inspector_click_is_one_undo_step_of_its_slot() {
 fn a_gesture_is_one_step_and_a_cancelled_one_none() {
     let mut host = host();
     let mut trees = hosted(&host);
-    host.set_slot("Pick", Picked(vec![1, 2]));
+    host.edit_slot("Pick", |slot| *slot = Picked(vec![1, 2]));
     // A level change inside a gesture rides along with it.
     let level = host.begin_gesture("Change Level").unwrap();
     trees.with(|p, s| {
@@ -477,11 +473,7 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
     assert_eq!(host.history(), ["Pick", "Change Level"]);
     assert_eq!(trees.state::<Forest>().level, 1);
     let drag = host.begin_gesture("Drag").unwrap();
-    host.slot_any_mut(Picked::id())
-        .and_then(|v| v.downcast_mut::<Picked>())
-        .expect("registered")
-        .0
-        .push(9);
+    host.edit_slot("Drag", |p: &mut Picked| p.0.push(9));
     host.cancel_gesture(drag);
     assert_eq!(host.slot::<Picked>(), &Picked::default());
     assert_eq!(host.history(), ["Pick", "Change Level"]);
@@ -553,7 +545,7 @@ fn a_views_calls_answer_its_own_display_options_and_place() {
 #[test]
 fn another_level_starts_place_bound_slots_over() {
     let mut host = host();
-    host.set_slot("Pick", Picked(vec![3]));
+    host.edit_slot("Pick", |slot| *slot = Picked(vec![3]));
     let mut place = host.place;
     place.subnet = Some(NodeRef(2));
     host.go_to(place).unwrap();

@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 /// Undo, redo and gestures.
 ///
-/// An edit through the host ([`HostSlotsExt::set_slot`], a selection) is one
+/// An edit through the host ([`HostSlotsExt::edit_slot`], a selection) is one
 /// undo step of its own, unless a gesture is open: then every change up
 /// to its finish is one step, named when the gesture began (a drag). The
 /// gesture is its opener's: [`begin_gesture`](HostUndo::begin_gesture)
@@ -67,16 +67,16 @@ pub trait HostUndo {
 pub trait HostSlots {
     /// Slot `id`'s value; `None` when no package registered it.
     fn slot_any(&self, id: SlotId) -> Option<&(dyn Any + Send + Sync)>;
-    /// Slot `id`'s value to change in place, as a selection changes: no
-    /// undo step of its own (inside a gesture, part of its step); undo
-    /// restores the value the step it lies in came with. A change undo
-    /// should step through is [`set_slot_any`](Self::set_slot_any). The
-    /// host copies a value a snapshot still shares first.
-    fn slot_any_mut(&mut self, id: SlotId) -> Option<&mut (dyn Any + Send + Sync)>;
-    /// Sets slot `id` to `value` as an undo step named `label` (inside the
-    /// open gesture, if any; nothing is recorded when nothing changed).
-    /// `false`: no such slot, or `value` is not of its type.
-    fn set_slot_any(&mut self, id: SlotId, label: &str, value: Arc<dyn Any + Send + Sync>) -> bool;
+    /// Changes slot `id`'s value in place with `edit`, as an undo step
+    /// named `label` (inside the open gesture, part of its step; nothing
+    /// is recorded when nothing changed). The host copies a value a
+    /// snapshot still shares first. `false`: no such slot.
+    fn edit_slot_any(
+        &mut self,
+        id: SlotId,
+        label: &str,
+        edit: &mut dyn FnMut(&mut (dyn Any + Send + Sync)),
+    ) -> bool;
 }
 
 /// Typed access to the session's slots.
@@ -91,12 +91,20 @@ pub trait HostSlotsExt: HostSlots {
             .and_then(|v| v.downcast_ref())
             .unwrap_or_else(|| unregistered::<T>())
     }
-    /// Sets slot `T` to `value` as an undo step named `label`.
+    /// Changes slot `T` with `edit`, as an undo step named `label` (or
+    /// part of the open gesture's): the one way a slot changes, so every
+    /// change is undone with the document.
     ///
     /// # Panics
     /// When no package registered `T`.
-    fn set_slot<T: Slot>(&mut self, label: &str, value: T) {
-        if !self.set_slot_any(T::id(), label, Arc::new(value)) {
+    fn edit_slot<T: Slot>(&mut self, label: &str, edit: impl FnOnce(&mut T)) {
+        let mut edit = Some(edit);
+        let found = self.edit_slot_any(T::id(), label, &mut |value| {
+            if let (Some(value), Some(edit)) = (value.downcast_mut::<T>(), edit.take()) {
+                edit(value);
+            }
+        });
+        if !found {
             unregistered::<T>()
         }
     }
@@ -305,8 +313,9 @@ pub trait HostTransform {
 /// context's tools (the application's, saved with the user's settings).
 pub trait HostTools {
     /// The parameters node type `ty`'s tool starts from: its declared
-    /// defaults with its [remembered](kinogaki_studio_api::params::Parameter::remembered)
-    /// parameters' last values written in.
+    /// defaults with the last values of the parameters its library item
+    /// remembers ([`VocabularyItem::remembered`](crate::package::VocabularyItem::remembered))
+    /// written in.
     fn starting(&self, ty: NodeTypeId) -> Parameters;
     /// Remembers `parameters`' remembered values for `ty` (the others are
     /// left out).

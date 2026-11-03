@@ -32,7 +32,8 @@
 //! built with [`Cx::wake`]: the service calls the wake once per result,
 //! and the host then calls the package's
 //! [`poll`](crate::package::UiPackage::poll). Work where only the newest
-//! request matters runs on the host's lanes through [`Cx::latest`]. No
+//! request matters runs on the host's lanes through
+//! [`HostLatestExt::latest`], typed by a [`LatestKey`]. No
 //! timers.
 mod capabilities;
 mod data;
@@ -59,12 +60,78 @@ use std::sync::Arc;
 /// callable from any thread.
 pub type Waker = Arc<dyn Fn() + Send + Sync>;
 
-/// A job [`Cx::latest`] runs off the UI thread: it polls its token and
-/// stops early once cancelled (its result is dropped then anyway).
+/// A job [`HostLatestExt::latest`] runs off the UI thread: it polls its
+/// token and stops early once cancelled (its result is dropped then
+/// anyway).
 pub type LatestJob = Box<dyn FnOnce(&CancelToken) -> LatestResult + Send>;
 
-/// What a [`LatestJob`] gives back, downcast by the package that ran it.
+/// What a [`LatestJob`] gives back, its type erased.
 pub type LatestResult = Box<dyn Any + Send>;
+
+/// A kind of latest-wins job a package runs on the host's lanes
+/// ([`HostLatestExt::latest`]): what a job is asked for, and what it
+/// gives. Implemented by a type of the package's own, which names the
+/// kind (a hover's pick, a check of the shown value).
+///
+/// The host runs a job only when what it is asked for changes, cancels
+/// the one still running then, and hands back a result only for the
+/// newest ask: a package asks every frame with what it wants now (an
+/// element and the shown value's revision), and never compares a result
+/// with what it asked itself.
+pub trait LatestKey: 'static {
+    /// What a job is asked for: the host compares it with the last ask.
+    type Asked: Clone + PartialEq + Send + 'static;
+    /// What a job gives.
+    type Out: Send + 'static;
+}
+
+/// What a [`LatestJob`] was asked for, its type erased: compared by the
+/// host with the next ask of its kind.
+pub trait LatestAsked: Any + Send {
+    /// Whether `other` is an ask equal to this one.
+    fn same(&self, other: &dyn LatestAsked) -> bool;
+    /// A copy of the ask (the host keeps one to compare the next with).
+    fn copy(&self) -> Box<dyn LatestAsked>;
+}
+
+impl<T: Clone + PartialEq + Send + 'static> LatestAsked for T {
+    fn same(&self, other: &dyn LatestAsked) -> bool {
+        (other as &dyn Any).downcast_ref::<T>() == Some(self)
+    }
+    fn copy(&self) -> Box<dyn LatestAsked> {
+        Box::new(self.clone())
+    }
+}
+
+/// Typed latest-wins jobs ([`LatestKey`]) over [`Cx`]'s erased ones.
+pub trait HostLatestExt: Cx {
+    /// Runs `job` on the host's worker lanes as the latest job of kind `K`,
+    /// asked for `asked`, unless the last ask of `K` was the same (its job
+    /// stands, running or landed): a job of `K` still running then has its
+    /// token cancelled, and its result is dropped. When `job` lands the
+    /// host wakes the package ([`UiPackage::poll`](crate::package::UiPackage::poll)),
+    /// which takes the result with [`take_latest`](Self::take_latest). For
+    /// work where only the newest request matters (soft-selection weights,
+    /// a check of the shown value), asked as often as wanted.
+    fn latest<K: LatestKey>(
+        &mut self,
+        asked: K::Asked,
+        job: impl FnOnce(&CancelToken) -> K::Out + Send + 'static,
+    ) {
+        let job: LatestJob = Box::new(move |token| Box::new(job(token)));
+        self.latest_any(std::any::type_name::<K>(), Box::new(asked), job);
+    }
+    /// The result of kind `K`'s newest ask, with what it was asked for,
+    /// once it has landed; each result is given once, and a result of an
+    /// older ask never.
+    fn take_latest<K: LatestKey>(&mut self) -> Option<(K::Asked, K::Out)> {
+        let (asked, out) = self.take_latest_any(std::any::type_name::<K>())?;
+        let asked = (asked as Box<dyn Any + Send>).downcast::<K::Asked>().ok()?;
+        Some((*asked, *out.downcast::<K::Out>().ok()?))
+    }
+}
+
+impl<H: Cx + ?Sized> HostLatestExt for H {}
 
 /// One call's context: every capability of the host.
 pub trait Cx:
@@ -93,17 +160,14 @@ pub trait Cx:
     /// The host's current theme: the one a part's [`Ui::theme`](crate::Ui::theme)
     /// draws with, so what a viewport layer colors follows a changed theme.
     fn theme(&self) -> &crate::Theme;
-    /// Runs `job` on the host's worker lanes as the latest job of `key`
-    /// (one of the package's own names): a job of `key` still running has
-    /// its token cancelled, and its result is dropped. When `job` lands the
-    /// host wakes the package ([`UiPackage::poll`](crate::package::UiPackage::poll)),
-    /// which takes the result with [`take_latest`](Self::take_latest). For
-    /// work where only the newest request matters (soft-selection weights,
-    /// a check of the shown value).
-    fn latest(&mut self, key: &str, job: LatestJob);
-    /// The result of `key`'s latest job, once it has landed; each result is
-    /// given once.
-    fn take_latest(&mut self, key: &str) -> Option<LatestResult>;
+    /// [`HostLatestExt::latest`], erased: `key` names the job's kind (its
+    /// [`LatestKey`]'s type), unique among the calling package's.
+    fn latest_any(&mut self, key: &'static str, asked: Box<dyn LatestAsked>, job: LatestJob);
+    /// [`HostLatestExt::take_latest`], erased.
+    fn take_latest_any(
+        &mut self,
+        key: &'static str,
+    ) -> Option<(Box<dyn LatestAsked>, LatestResult)>;
     /// Draws node `node`'s rows into `ui` as its type gives them for
     /// `purpose` (a card's: compact, at `ui`'s width), the node of
     /// `object`'s open network; nothing for another object or node. The

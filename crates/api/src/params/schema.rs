@@ -140,15 +140,6 @@ pub struct Parameter {
     /// Why its value is faulty (a group expression that doesn't parse):
     /// the row shows as an error with this as its tooltip. `None`: it isn't.
     pub problem: Option<String>,
-    /// Shown, not edited: at full contrast (unlike a disabled row), its
-    /// value something the node shows. Hosts show numbers, vectors, text,
-    /// choices, toggles, colors, ramps and paths so; other kinds (code,
-    /// tone curves) show disabled.
-    pub read_only: bool,
-    /// A tool's next run starts from this parameter's last value (a
-    /// setting: Bevel's segments); `false` (a gesture's measure: Extrude's
-    /// distance, a primitive's placement) starts at the default each run.
-    pub remembered: bool,
     /// Whether it can be keyed over time. Its kind gives the default
     /// ([`ValueKind::animatable`]); a type turns it off for a parameter
     /// that shapes its ports or spares, or whose change should be one
@@ -175,8 +166,6 @@ impl Parameter {
             keywords: String::new(),
             enabled: true,
             problem: None,
-            read_only: false,
-            remembered: false,
             animatable,
         }
     }
@@ -202,18 +191,6 @@ impl Parameter {
     /// Animatable or not (see [`animatable`](Self::animatable)).
     pub fn animatable(mut self, on: bool) -> Self {
         self.animatable = on;
-        self
-    }
-
-    /// Remembered by its tool (see [`remembered`](Self::remembered)).
-    pub fn remembered(mut self) -> Self {
-        self.remembered = true;
-        self
-    }
-
-    /// Read-only (or editable again): shown, not edited.
-    pub fn read_only(mut self, read_only: bool) -> Self {
-        self.read_only = read_only;
         self
     }
 

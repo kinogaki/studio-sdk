@@ -22,9 +22,9 @@ use studio_ui_api::Pos;
 use studio_ui_api::gizmo::{TransformSpace, TransformTool};
 use studio_ui_api::host::{
     Cx, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell, HostSlots,
-    HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestJob,
-    LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View, ViewCamera,
-    ViewCx, Waker,
+    HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestAsked,
+    LatestJob, LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View,
+    ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::hosting::{Registered, State};
 
@@ -142,11 +142,13 @@ pub struct FakeHost {
     /// the option's id ([`ViewCx::displayed`]; a fake host knows no
     /// declarations, so every other option is 0).
     pub displayed: BTreeMap<(usize, String), usize>,
-    /// The [`Cx::latest`] jobs not yet run, by key, with their tokens;
+    /// The latest-wins jobs not yet run, by kind, with their tokens;
     /// [`FakeHost::run_latest`] runs them.
-    latest: BTreeMap<String, (CancelToken, LatestJob)>,
-    /// The landed [`Cx::latest`] results not yet taken.
-    landed: BTreeMap<String, LatestResult>,
+    latest: BTreeMap<&'static str, (CancelToken, LatestJob)>,
+    /// Each kind's last ask.
+    asked: BTreeMap<&'static str, Box<dyn LatestAsked>>,
+    /// The landed results not yet taken, by kind.
+    landed: BTreeMap<&'static str, LatestResult>,
     undo: Vec<Step>,
     redo: Vec<Step>,
     /// The open gesture: its number, label and start.
@@ -198,6 +200,7 @@ impl FakeHost {
             snap: None,
             displayed: BTreeMap::new(),
             latest: BTreeMap::new(),
+            asked: BTreeMap::new(),
             landed: BTreeMap::new(),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -211,8 +214,8 @@ impl FakeHost {
         std::mem::take(&mut self.calls)
     }
 
-    /// Runs every pending [`Cx::latest`] job, as the host's lanes would:
-    /// each result lands (replacing an untaken one of its key) and wakes
+    /// Runs every pending latest-wins job, as the host's lanes would:
+    /// each result lands (replacing an untaken one of its kind) and wakes
     /// the package once. Returns how many ran.
     pub fn run_latest(&mut self) -> usize {
         let jobs = std::mem::take(&mut self.latest);
@@ -341,17 +344,20 @@ impl HostSlots for FakeHost {
     fn slot_any(&self, id: SlotId) -> Option<&(dyn Any + Send + Sync)> {
         self.slots.get_any(id)
     }
-    fn slot_any_mut(&mut self, id: SlotId) -> Option<&mut (dyn Any + Send + Sync)> {
-        self.slots.get_any_mut(id)
-    }
-    fn set_slot_any(&mut self, id: SlotId, label: &str, value: Arc<dyn Any + Send + Sync>) -> bool {
-        self.calls.push(HostCall::SetSlot(id, label.into()));
+    fn edit_slot_any(
+        &mut self,
+        id: SlotId,
+        label: &str,
+        edit: &mut dyn FnMut(&mut (dyn Any + Send + Sync)),
+    ) -> bool {
+        self.calls.push(HostCall::EditSlot(id, label.into()));
         let before = self.kept();
-        let set = self.slots.set_any(id, value);
-        if set {
-            self.record(label, before);
-        }
-        set
+        let Some(value) = self.slots.get_any_mut(id) else {
+            return false;
+        };
+        edit(value);
+        self.record(label, before);
+        true
     }
 }
 
@@ -646,17 +652,27 @@ impl Cx for FakeHost {
     fn theme(&self) -> &studio_ui_api::Theme {
         &self.theme
     }
-    /// Queues `job` (cancelling a queued job of `key`, which then never
-    /// runs) until [`FakeHost::run_latest`].
-    fn latest(&mut self, key: &str, job: LatestJob) {
+    /// Queues `job` until [`FakeHost::run_latest`] unless `asked` is the
+    /// kind's last ask (cancelling a queued job of the kind, which then
+    /// never runs, and dropping a landed result of an older ask).
+    fn latest_any(&mut self, key: &'static str, asked: Box<dyn LatestAsked>, job: LatestJob) {
+        if self.asked.get(key).is_some_and(|last| last.same(&*asked)) {
+            return;
+        }
         self.calls.push(HostCall::Latest(key.into()));
+        self.asked.insert(key, asked);
+        self.landed.remove(key);
         let token = CancelToken::default();
-        if let Some((previous, _)) = self.latest.insert(key.into(), (token, job)) {
+        if let Some((previous, _)) = self.latest.insert(key, (token, job)) {
             previous.cancel();
         }
     }
-    fn take_latest(&mut self, key: &str) -> Option<LatestResult> {
-        self.landed.remove(key)
+    fn take_latest_any(
+        &mut self,
+        key: &'static str,
+    ) -> Option<(Box<dyn LatestAsked>, LatestResult)> {
+        let result = self.landed.remove(key)?;
+        Some((self.asked.get(key)?.copy(), result))
     }
     /// Records the call and answers its `node_rows` field.
     fn node_rows(

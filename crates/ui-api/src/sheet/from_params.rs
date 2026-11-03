@@ -63,7 +63,6 @@ fn field(p: &params::Parameter) -> Field<String> {
         field.error = true;
         field.tooltip = Some(problem.clone().into());
     }
-    field.read_only = p.read_only;
     field
 }
 
@@ -378,29 +377,5 @@ mod tests {
         );
         assert!(field("group").error);
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
-    }
-
-    /// Read-only parameters are read-only fields, enabled: the host draws
-    /// them at full contrast, taking no input.
-    #[test]
-    fn read_only_rows_show_without_editing() {
-        let schema = params::Schema::default()
-            .parameter(
-                Parameter::new("tint", "Tint", ValueKind::Color, [0.1, 0.2, 0.3]).read_only(true),
-            )
-            .parameter(
-                Parameter::new(
-                    "amount",
-                    "Amount",
-                    ValueKind::Number(params::Number::plain()),
-                    1.0,
-                )
-                .read_only(true),
-            );
-        let sheet = Schema::<String>::from(&schema);
-        for key in ["tint", "amount"] {
-            let field = sheet.field(&key.to_owned()).unwrap();
-            assert!(field.enabled && field.read_only, "{key}");
-        }
     }
 }

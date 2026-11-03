@@ -13,7 +13,8 @@ use std::sync::atomic::Ordering;
 use studio_ui_api::Ui;
 use studio_ui_api::gizmo::Pivot;
 use studio_ui_api::host::{
-    Cx, HostShell, HostSlotsExt, HostStatus, HostUndo, HostView, InspectorCx, LatestResult,
+    Cx, HostLatestExt, HostShell, HostSlotsExt, HostStatus, HostUndo, HostView, InspectorCx,
+    LatestKey,
 };
 use studio_ui_api::package::{
     ContextPart, Inspector, Invoked, Library, RowAction, UiPackage, ViewportSpec, Vocabulary,
@@ -46,8 +47,8 @@ fn host() -> FakeHost {
 fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
     let mut host = host();
     let gesture = host.begin_gesture("Adjust").expect("none was open");
-    host.set_slot("step", Count(1));
-    host.set_slot("step", Count(2));
+    host.edit_slot("step", |slot| *slot = Count(1));
+    host.edit_slot("step", |slot| *slot = Count(2));
     host.back_to(gesture.start());
     assert_eq!(
         host.slot::<Count>(),
@@ -55,14 +56,14 @@ fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
         "back at the gesture's start"
     );
     assert!(host.in_gesture());
-    host.set_slot("step", Count(5));
+    host.edit_slot("step", |slot| *slot = Count(5));
     let start = gesture.start();
     host.finish_gesture(gesture).unwrap();
     assert_eq!(host.history(), ["Adjust"]);
     host.undo();
     assert_eq!(host.slot::<Count>(), &Count(0));
     // With its gesture ended, nothing happens.
-    host.set_slot("step", Count(3));
+    host.edit_slot("step", |slot| *slot = Count(3));
     host.back_to(start);
     assert_eq!(host.slot::<Count>(), &Count(3));
 }
@@ -71,9 +72,9 @@ fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
 fn a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it() {
     let mut host = host();
     let tool = host.begin_gesture("Tool").expect("none was open");
-    host.set_slot("step", Count(1));
+    host.edit_slot("step", |slot| *slot = Count(1));
     assert!(host.begin_gesture("Drag").is_none(), "the tool's is open");
-    host.set_slot("step", Count(2));
+    host.edit_slot("step", |slot| *slot = Count(2));
     assert!(host.in_gesture(), "the drag's end leaves the tool's open");
     host.finish_gesture(tool).unwrap();
     assert_eq!(host.history(), ["Tool"]);
@@ -103,32 +104,50 @@ fn views_render_consoles_record_and_the_clipboard_holds_text() {
     );
 }
 
+/// Soft-selection weights, asked for a radius.
+struct Weights;
+
+impl LatestKey for Weights {
+    type Asked = u32;
+    type Out = u32;
+}
+
+/// A check of the shown value, asked for its revision.
+struct Check;
+
+impl LatestKey for Check {
+    type Asked = u64;
+    type Out = &'static str;
+}
+
 #[test]
-fn the_latest_job_of_a_key_wins_and_lands_once() {
+fn the_newest_ask_of_a_kind_wins_lands_once_and_an_ask_again_runs_nothing() {
     let mut host = host();
-    let job = |n: u32| -> studio_ui_api::host::LatestJob {
-        Box::new(move |token| {
-            assert!(!token.is_cancelled());
-            Box::new(n) as LatestResult
-        })
-    };
-    host.latest("weights", job(1));
-    host.latest("weights", job(2));
-    host.latest("check", job(3));
-    assert!(host.take_latest("weights").is_none(), "nothing landed yet");
+    host.latest::<Weights>(1, |token| {
+        assert!(token.is_cancelled(), "cancelled by the newer ask");
+        1
+    });
+    host.latest::<Weights>(2, |_| 20);
+    host.latest::<Check>(7, |_| "ok");
+    assert!(
+        host.take_latest::<Weights>().is_none(),
+        "nothing landed yet"
+    );
     assert_eq!(host.run_latest(), 2, "the first weights job was cancelled");
     assert_eq!(host.wakes.load(Ordering::SeqCst), 2);
-    let weights = host.take_latest("weights").unwrap();
-    assert_eq!(weights.downcast_ref::<u32>(), Some(&2));
-    assert!(host.take_latest("weights").is_none(), "given once");
-    assert_eq!(
-        *host
-            .take_latest("check")
-            .unwrap()
-            .downcast::<u32>()
-            .unwrap(),
-        3
-    );
+    assert_eq!(host.take_latest::<Weights>(), Some((2, 20)), "with its ask");
+    assert!(host.take_latest::<Weights>().is_none(), "given once");
+    assert_eq!(host.take_latest::<Check>(), Some((7, "ok")));
+    // The same ask again runs nothing: what it asked for stands.
+    host.take_calls();
+    host.latest::<Check>(7, |_| "again");
+    assert_eq!(host.run_latest(), 0);
+    assert!(host.take_calls().is_empty());
+    // A new ask runs, and a result of the older one is never given.
+    host.latest::<Check>(8, |_| "eight");
+    host.latest::<Check>(9, |_| "nine");
+    host.run_latest();
+    assert_eq!(host.take_latest::<Check>(), Some((9, "nine")));
 }
 
 /// What the inspector heard.

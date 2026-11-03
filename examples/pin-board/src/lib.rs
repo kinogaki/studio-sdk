@@ -237,8 +237,8 @@ impl Vocabulary<Pinning> for PinVocabulary {
     fn run(&self, _s: &mut Pinning, cx: &mut dyn Cx, item: &str, _how: Invoked) {
         let pins = cx.slot::<Pins>().0;
         match item {
-            PIN => cx.set_slot("Pin", Pins(pins + 1)),
-            CLEAR => cx.set_slot("Clear Pins", Pins(0)),
+            PIN => cx.edit_slot("Pin", |slot| *slot = Pins(pins + 1)),
+            CLEAR => cx.edit_slot("Clear Pins", |slot| *slot = Pins(0)),
             _ => {}
         }
     }
