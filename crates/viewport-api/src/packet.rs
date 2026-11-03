@@ -7,7 +7,7 @@
 //! index points. Columns may be paged, so they are read through callbacks at
 //! column granularity rather than per element.
 use crate::{DrawUpdate, UpdateRanges};
-use kinogaki_geometry::{Bounds, Vec3};
+use kinogaki_geometry::{Bounds, Error, Vec3};
 use std::{
     any::Any,
     collections::BTreeSet,
@@ -282,14 +282,14 @@ pub trait SurfaceSource: Any + Send + Sync {
     /// The display range of curvature measure `measure` (98th percentile).
     fn curvature_range(&self, measure: usize) -> f32;
     /// Faces of the object containing `face`, for object hover outlines.
-    fn object_faces(&self, face: u32) -> Result<BTreeSet<u32>, String>;
+    fn object_faces(&self, face: u32) -> Result<BTreeSet<u32>, Error>;
     /// Point-id segments outlining `selection` on this surface (selected
     /// edges, face boundaries; none for points), within `budget` bytes.
     fn selection_segments(
         &self,
         selection: &ElementSet,
         budget: u64,
-    ) -> Result<Vec<OverlayVertex>, String>;
+    ) -> Result<Vec<OverlayVertex>, Error>;
 
     /// Runs of triangle indices drawn in a look other than shaded, in
     /// order (see [`crate::FaceRun`]); none: every face shaded, opaque.
@@ -388,10 +388,10 @@ mod tests {
         fn curvature_range(&self, _: usize) -> f32 {
             0.0
         }
-        fn object_faces(&self, _: u32) -> Result<BTreeSet<u32>, String> {
+        fn object_faces(&self, _: u32) -> Result<BTreeSet<u32>, Error> {
             Ok(BTreeSet::new())
         }
-        fn selection_segments(&self, _: &ElementSet, _: u64) -> Result<Vec<OverlayVertex>, String> {
+        fn selection_segments(&self, _: &ElementSet, _: u64) -> Result<Vec<OverlayVertex>, Error> {
             Ok(Vec::new())
         }
     }

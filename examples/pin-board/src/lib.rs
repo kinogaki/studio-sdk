@@ -109,10 +109,10 @@ impl ObjectKindSpec for BoardKind {
         board.opens = true;
         vec![board]
     }
-    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
         (id.as_str() == board().as_str())
             .then(|| self.new_body())
-            .ok_or_else(|| format!("{id} isn't a Pin Board"))
+            .ok_or_else(|| Error::invalid(format_args!("{id} isn't a Pin Board")))
     }
 }
 

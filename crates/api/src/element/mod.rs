@@ -255,7 +255,7 @@ pub trait ElementReader {
 
     /// The value [`ElementWriter::data`] wrote as child `name`, read
     /// through its type's codec once per load; `None` when there is no
-    /// such child. [`Error::NotInstalled`] when no installed package
+    /// such child. a [`Missing`](crate::ErrorKind::Missing) error when no installed package
     /// registers its type.
     fn data(&self, name: &str) -> Option<Result<Data, Error>>;
 

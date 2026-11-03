@@ -332,10 +332,10 @@ impl ObjectKindSpec for BoxesKind {
         one.start = Some(NodeTypeId::declared(BOX_NODE));
         vec![empty, one]
     }
-    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
         match id {
             _ if id.as_str() == boxes().as_str() || id.as_str() == BOX_NODE => Ok(self.new_body()),
-            _ => Err(format!("Boxes don't make {id}")),
+            _ => Err(Error::invalid(format_args!("Boxes don't make {id}"))),
         }
     }
 }

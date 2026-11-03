@@ -442,7 +442,7 @@ impl SurfaceSource for Surface {
         1.0
     }
 
-    fn object_faces(&self, face: u32) -> Result<BTreeSet<u32>, String> {
+    fn object_faces(&self, face: u32) -> Result<BTreeSet<u32>, Error> {
         Ok(BTreeSet::from([face]))
     }
 
@@ -451,7 +451,7 @@ impl SurfaceSource for Surface {
         &self,
         selection: &ElementSet,
         _budget: u64,
-    ) -> Result<Vec<OverlayVertex>, String> {
+    ) -> Result<Vec<OverlayVertex>, Error> {
         if selection.kind() != ElementKind::Edge {
             return Ok(Vec::new());
         }

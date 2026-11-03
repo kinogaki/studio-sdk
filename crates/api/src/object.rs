@@ -12,12 +12,12 @@
 //! the rest, owned and read by the package. A project that names a kind no
 //! package provides still opens: its objects are kept as they were read,
 //! shown grey, written back unchanged on save, and reported.
-use crate::Diagnostic;
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
 use crate::stored::{Stored, StoredValues};
+use crate::{Diagnostic, Error};
 use kinogaki_render_api::{Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface};
 use std::any::Any;
 use std::fmt::Debug;
@@ -157,9 +157,9 @@ pub trait ObjectKindSpec: Send + Sync {
     /// which Studio adds selected, holding its creation's start and opened
     /// as it says, in one undo step; `Err` with why it can't be made now
     /// (a key or shelf run after the active engine changed).
-    fn create(&self, id: CreationId, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+    fn create(&self, id: CreationId, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
         let _ = cx;
-        Err(format!("{id} isn't made here"))
+        Err(Error::invalid(format_args!("{id} isn't made here")))
     }
 }
 
