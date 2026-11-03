@@ -14,11 +14,11 @@
 //! points that moved.
 use crate::math::Vec3;
 use crate::render::Ranges;
-pub use kinogaki_viewport_api::{
-    BoxRule, ElementKind, ElementSet, OverlayVertex, SurfaceSource, pack_linear, packet_as,
-};
 use kinogaki_viewport_api::{
     BufferRanges, Column, DrawUpdate, LineClass, LineClassId, LineStyle, Vertex,
+};
+pub use kinogaki_viewport_api::{
+    ElementKind, ElementSet, OverlayVertex, SurfaceSource, pack_linear, packet_as,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

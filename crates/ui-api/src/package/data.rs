@@ -37,7 +37,7 @@ pub struct LevelSpec {
 pub enum Pick {
     /// A click at this point on screen: what lies nearest under it.
     Click(Pos),
-    /// A box dragged over the view: what it takes by its rule.
+    /// A box dragged over the view: what it touches.
     Box(Marquee),
 }
 

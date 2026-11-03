@@ -1,19 +1,7 @@
 //! What a surface shows selected: at most one [`ElementSet`] for each
 //! family of drawn elements, so levels that combine (a sketch's curves and
-//! points, CVs beside hull lines) show their elements selected together;
-//! and which elements or objects a box selection takes ([`BoxRule`]).
+//! points, CVs beside hull lines) show their elements selected together.
 use crate::{ElementKind, ElementSet};
-
-/// Which elements or objects a box selection takes: Fusion's and
-/// AutoCAD's left-to-right and right-to-left drags.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BoxRule {
-    /// Those wholly inside the box (a face: every triangle; a line: every
-    /// segment; an object: every point of it).
-    Window,
-    /// Those inside or touching it.
-    Crossing,
-}
 
 /// The selection shown on the edited surface: faces (or whole objects),
 /// lines and markers, each in its own kind's selected look. A present

@@ -5,7 +5,6 @@
 use crate::data::Data;
 use crate::facets::Drawn;
 use crate::math::Bounds;
-use crate::viewport::BoxRule;
 use kinogaki_render_api::Tint;
 use std::sync::Arc;
 
@@ -23,17 +22,14 @@ pub struct WorldRay {
 }
 
 /// A marquee over a view: its box, running 0–1 across the view and down
-/// from its top, and the rule it takes objects by.
+/// from its top. It takes whatever it touches, whichever way it was
+/// dragged (Maya's and Houdini's box).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Marquee {
     /// The box's top left corner.
     pub min: [f64; 2],
     /// Its bottom right corner.
     pub max: [f64; 2],
-    /// Which objects it takes. Core picks it from the drag, the same for
-    /// every kind: dragged left to right a window, right to left a
-    /// crossing.
-    pub rule: BoxRule,
 }
 
 /// How an object holding a value of the type is picked and framed at the
@@ -45,9 +41,8 @@ pub trait ObjectPicking: Send + Sync {
     fn ray(&self, data: &Data, drawn: &Drawn, world: &Matrix, ray: &WorldRay) -> Option<f64>;
 
     /// Whether `marquee`, over the view whose world-to-clip is `view`,
-    /// takes it by its rule: wholly inside its box ([`BoxRule::Window`]),
-    /// or a point of it inside ([`BoxRule::Crossing`]). A value with
-    /// nothing drawn lies in no box.
+    /// touches it: a point of it inside its box. A value with nothing
+    /// drawn lies in no box.
     fn in_box(
         &self,
         data: &Data,
