@@ -1,10 +1,10 @@
 //! [`FakeNetwork`]: one object's network in memory, edited and cooked
 //! the way Studio's core does it, so a package tests its tools' network
 //! edits and its node types in a network without Studio.
-use kinogaki_studio_api::cook::{Description, NewCx, NodeRole, Ports, PortsCx};
+use kinogaki_studio_api::cook::{Arity, Description, NewCx, NodeRole, Ports, PortsCx};
 use kinogaki_studio_api::network::{
-    Flag, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, NodeFlags, NodeInfo, Place,
-    Wire,
+    Flag, Flags, Growth, NetworkContext, NetworkEdit, NetworkKind, NetworkRead, NewNode, NodeInfo,
+    Place, Wire,
 };
 use kinogaki_studio_api::params::Value;
 use kinogaki_studio_api::{
@@ -32,7 +32,8 @@ struct Node {
     node_type: NodeTypeId,
     parameters: Parameters,
     inputs: Vec<Vec<Wire>>,
-    flags: NodeFlags,
+    flags: Flags,
+    held: bool,
     level: Option<NodeRef>,
     position: [f32; 2],
     delta: Option<Data>,
@@ -206,7 +207,7 @@ impl FakeNetwork {
             return Ok(kept.clone());
         }
         let first = at.inputs.first().and_then(|wires| wires.first());
-        if at.flags.bypass {
+        if at.flags.contains(Flag::Bypass) {
             return match first {
                 Some(wire) => self.output(*wire).map(Outputs::one),
                 None => Err(CookError::message(format!(
@@ -365,6 +366,7 @@ impl NetworkRead for FakeNetwork {
             animated: Vec::new(),
             inputs: n.inputs.clone(),
             flags: n.flags,
+            held: n.held,
             level: n.level,
             position: n.position,
             delta: n.delta.as_ref(),
@@ -456,7 +458,8 @@ impl NetworkEdit for FakeNetwork {
                 node_type: node.node_type,
                 parameters,
                 inputs: vec![Vec::new(); ports.inputs.len()],
-                flags: NodeFlags::default(),
+                flags: Flags::NONE,
+                held: false,
                 level: subnet,
                 position,
                 delta: None,
@@ -560,7 +563,8 @@ impl NetworkEdit for FakeNetwork {
             .inputs
             .get(port)
             .ok_or_else(|| Error::invalid(format_args!("{} has no input {port}", target.name)))?
-            .multi;
+            .arity
+            == Arity::Many;
         let wires = &mut self.node_mut(node)?.inputs[port];
         if multi {
             wires.push(from);
@@ -584,23 +588,19 @@ impl NetworkEdit for FakeNetwork {
     }
 
     fn set_flag(&mut self, node: NodeRef, flag: Flag, on: bool) -> Result<(), Error> {
-        if !self.context.flags.offers(flag) {
+        if !self.context.flags.contains(flag) {
             return Err(Error::invalid(format_args!(
                 "{} networks don't offer {flag:?}",
                 self.context.label
             )));
         }
-        if flag == Flag::Freeze && on {
+        if flag == Flag::Frozen && on {
             return Err(Error::invalid("freezing keeps outputs: call `freeze`"));
         }
         let n = self.node_mut(node)?;
-        match flag {
-            Flag::Bypass => n.flags.bypass = on,
-            Flag::Template => n.flags.template = on,
-            Flag::Freeze => {
-                n.flags.frozen = false;
-                n.kept = None;
-            }
+        n.flags = n.flags.with(flag, on);
+        if flag == Flag::Frozen {
+            n.kept = None;
         }
         self.changed();
         Ok(())
@@ -627,9 +627,7 @@ impl NetworkEdit for FakeNetwork {
         }
         self.nodes.remove(&node);
         self.insides.remove(&node);
-        let heal = self
-            .context
-            .heals
+        let heal = (self.context.kind == NetworkKind::Chain)
             .then(|| gone.inputs.first().and_then(|w| w.first()).copied())
             .flatten();
         for n in self.nodes.values_mut() {
@@ -667,7 +665,7 @@ impl NetworkEdit for FakeNetwork {
         }
         let n = self.node_mut(node)?;
         n.delta = Some(delta);
-        n.flags.held = true;
+        n.held = true;
         self.changed();
         Ok(())
     }
@@ -718,7 +716,7 @@ impl NetworkEdit for FakeNetwork {
                 .iter()
                 .zip(&ports.outputs)
                 .all(|(d, p)| d.ty() == p.data);
-        if !self.context.flags.freeze || !fits {
+        if !self.context.flags.contains(Flag::Frozen) || !fits {
             return Err(Error::invalid(format_args!(
                 "{} can't freeze with those outputs",
                 n.name
@@ -726,7 +724,7 @@ impl NetworkEdit for FakeNetwork {
         }
         let n = self.node_mut(node)?;
         n.kept = Some(outputs);
-        n.flags.frozen = true;
+        n.flags = n.flags.with(Flag::Frozen, true);
         self.changed();
         Ok(())
     }

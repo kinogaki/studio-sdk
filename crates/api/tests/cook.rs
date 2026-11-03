@@ -1,6 +1,7 @@
 //! The cook contract through toy nodes over a toy "numbers" data type: a
 //! Scale node (parameters, ports, parallel work, scratch, incremental
 //! updates) and a held edit that adds an authored delta.
+use kinogaki_studio_api::cook::Arity;
 use kinogaki_studio_api::*;
 use std::any::Any;
 use std::sync::{Arc, LazyLock};
@@ -283,7 +284,10 @@ fn the_registry_holds_cooks_and_held_edits() {
     // Its description: what a new node holds.
     let description = scale.description();
     assert_eq!(description.label, "Scale");
-    assert!(description.inputs[0].multi && !description.outputs[0].multi);
+    assert_eq!(
+        (description.inputs[0].arity, description.outputs[0].arity),
+        (Arity::Many, Arity::One)
+    );
     assert_eq!(description.parameters.values(), factor(1.0));
     assert!(
         registry

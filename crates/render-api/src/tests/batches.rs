@@ -143,12 +143,10 @@ fn ids_are_reused_only_with_a_new_generation() {
 fn pending_delivers_once_and_wakes_once() {
     let (wake, wakes) = counter();
     let (deliver, result) = pending::<u32>(wake);
-    assert!(!result.is_resolved());
     assert_eq!(result.take(), None);
     assert_eq!(wakes.load(Ordering::SeqCst), 0);
     let worker = std::thread::spawn(move || deliver.deliver(7));
     worker.join().expect("the producer runs");
-    assert!(result.is_resolved());
     assert_eq!(wakes.load(Ordering::SeqCst), 1);
     assert_eq!(result.take(), Some(Ok(7)));
     assert_eq!(result.take(), None);

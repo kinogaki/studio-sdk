@@ -5,7 +5,8 @@
 //! handles from it.
 use super::handle::Handle;
 use crate::id::{ContextId, DataTypeId};
-use crate::params::{Schema, Value};
+use crate::params::Schema;
+use kinogaki_value::Condition;
 
 /// A node type's label, icon, ports, parameters and handles.
 ///
@@ -246,20 +247,15 @@ pub struct Port {
     pub label: String,
     /// The data type an input takes or an output carries.
     pub data: DataTypeId,
-    /// An input taking any number of wires, read in wire order
-    /// ([`CookCx::port`](crate::CookCx::port)).
-    pub multi: bool,
-    /// An input that may stay unwired.
-    pub optional: bool,
+    /// How many wires an input takes.
+    pub arity: Arity,
+    /// Whether an input needs a wire ([`required`](Self::required)).
+    need: Need,
     /// Why the node can't cook while nothing is wired into a required
     /// input; empty says it plainly.
     pub missing: String,
-    /// An optional input that is required while parameter `.0` holds
-    /// `.1` (a Boolean's Tools while its operation subtracts).
-    pub required_when: Option<(String, Value)>,
-    /// An input that, unwired, reads the parameter of the same name
-    /// instead (a shader socket's constant).
-    pub constant: bool,
+    /// What an unwired input reads.
+    pub unwired: Unwired,
     /// An input taking another branch's whole result: a branch picked in
     /// the viewport while the node's tool is live wires into it.
     pub operand: bool,
@@ -272,24 +268,23 @@ impl Port {
             name: name.into(),
             label: label.into(),
             data,
-            multi: false,
-            optional: false,
+            arity: Arity::One,
+            need: Need::Required,
             missing: String::new(),
-            required_when: None,
-            constant: false,
+            unwired: Unwired::Nothing,
             operand: false,
         }
     }
 
     /// Taking many wires.
     pub fn multi(mut self) -> Self {
-        self.multi = true;
+        self.arity = Arity::Many;
         self
     }
 
     /// May stay unwired.
     pub fn optional(mut self) -> Self {
-        self.optional = true;
+        self.need = Need::Optional;
         self
     }
 
@@ -299,16 +294,15 @@ impl Port {
         self
     }
 
-    /// Optional, but required while parameter `parameter` holds `value`.
-    pub fn required_when(mut self, parameter: impl Into<String>, value: impl Into<Value>) -> Self {
-        self.optional = true;
-        self.required_when = Some((parameter.into(), value.into()));
+    /// Optional, but required while `when` holds.
+    pub fn required_when(mut self, when: Condition) -> Self {
+        self.need = Need::When(when);
         self
     }
 
     /// Reading the parameter of its own name while unwired.
     pub fn constant(mut self) -> Self {
-        self.constant = true;
+        self.unwired = Unwired::Parameter;
         self
     }
 
@@ -321,11 +315,45 @@ impl Port {
 
     /// Whether a node with `parameters` needs a wire here.
     pub fn required(&self, parameters: &crate::Parameters) -> bool {
-        match &self.required_when {
-            Some((name, value)) => parameters.get(name) == Some(value),
-            None => !self.optional,
+        match &self.need {
+            Need::Required => true,
+            Need::Optional => false,
+            Need::When(when) => when.met(parameters),
         }
     }
+}
+
+/// How many wires an input takes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Arity {
+    /// One at most.
+    #[default]
+    One,
+    /// Any number, read in wire order ([`CookCx::port`](crate::CookCx::port)).
+    Many,
+}
+
+/// Whether an input needs a wire for its node to cook.
+#[derive(Clone, Debug, Default, PartialEq)]
+enum Need {
+    /// Always.
+    #[default]
+    Required,
+    /// Never: it may stay unwired.
+    Optional,
+    /// While this holds (a Boolean's Tools while its operation
+    /// subtracts); optional otherwise.
+    When(Condition),
+}
+
+/// What an unwired input reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Unwired {
+    /// Nothing.
+    #[default]
+    Nothing,
+    /// The parameter of its own name (a shader socket's constant).
+    Parameter,
 }
 
 #[cfg(test)]

@@ -50,7 +50,7 @@ Replace `src/lib.rs` with the box and its typed handle. `BOX` wraps a `BoxShape`
 //! context and object kind the node lives in.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
-use kinogaki_studio_api::network::FlagSet;
+use kinogaki_studio_api::network::Flags;
 use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
@@ -348,7 +348,7 @@ A `Package` is everything the plugin registers. `export_package!` writes the ent
 ```rust
 /// The package: what Studio registers when it loads the plugin.
 pub fn package() -> Package {
-    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(FlagSet::all());
+    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(Flags::ALL);
     Package::new(PackageId::declared("acme.boxes"), "Boxes")
         .with_data_type(BoxType)
         .with_context(context)

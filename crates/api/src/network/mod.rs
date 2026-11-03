@@ -7,8 +7,8 @@
 //!
 //! - **Contexts** ([`NetworkContext`]) are declared as data: how the
 //!   context's networks evaluate, which flags their nodes offer, whether
-//!   deleting a node heals the chain, and the element they are stored
-//!   under.
+//!   they are chains (deleting a node heals the chain) or libraries, and
+//!   the element they are stored under.
 //! - **Reading** ([`NetworkRead`]): a network's nodes, their types,
 //!   parameters, wires and flags, by the host's ids.
 //! - **Editing** ([`NetworkEdit`]): the edits a package makes to a network
@@ -34,6 +34,8 @@ mod read;
 pub mod run;
 
 pub use compile::{CompileCx, CompileError, Compiled, Flat, FlatNode, NetworkCompiler, NodeTypes};
-pub use context::{Adopted, Evaluation, Flag, FlagSet, NetworkContext, NetworkStorage, NodeLayout};
+pub use context::{
+    Adopted, Evaluation, Flag, Flags, NetworkContext, NetworkKind, NetworkStorage, NodeLayout,
+};
 pub use edit::{Growth, NetworkEdit, NetworkSeed, NewNode, NodeCreation, Place, SeedWire};
-pub use read::{NetworkRead, NodeFlags, NodeInfo, Wire};
+pub use read::{NetworkRead, NodeInfo, Wire};

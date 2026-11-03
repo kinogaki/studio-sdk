@@ -103,12 +103,11 @@ pub mod standard {
     /// World position at the first hit.
     pub(crate) const POSITION: &str = "position";
     /// The Mesh prim's `id` at the first hit.
-    pub const OBJECT_ID: &str = "objectId";
-    /// The material at the first hit, by its Material prim
-    /// ([`Mesh::material_id`](crate::Mesh::material_id): one id a material
-    /// across every mesh, never a mesh's own slot index; 0 for the
-    /// engine's default material).
-    pub const MATERIAL_ID: &str = "materialId";
+    pub(crate) const OBJECT_ID: &str = "objectId";
+    /// The material at the first hit, by its Material prim: its prim
+    /// slot plus one, one id a material across every mesh, never a mesh's
+    /// own slot index; 0 for the engine's default material.
+    pub(crate) const MATERIAL_ID: &str = "materialId";
     /// Samples each pixel took.
     pub(crate) const SAMPLES: &str = "samples";
     /// Each pixel's estimated variance.

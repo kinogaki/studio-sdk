@@ -3,7 +3,7 @@
 //! cooked as core cooks them.
 use kinogaki_studio_api::cook::{Handle, HandleKind, NodeType, Port, Vector};
 use kinogaki_studio_api::network::{
-    Flag, FlagSet, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, Place, Wire,
+    Flag, Flags, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, Place, Wire,
 };
 use kinogaki_studio_api::params::{Number, Parameter, Value, ValueKind};
 use kinogaki_studio_api::{
@@ -77,11 +77,8 @@ impl NodeType for Add {
 }
 
 fn package() -> Package {
-    let numbers = NetworkContext::new(context(), "Numbers", "numbers").flags(FlagSet {
-        bypass: true,
-        template: false,
-        freeze: true,
-    });
+    let numbers = NetworkContext::new(context(), "Numbers", "numbers")
+        .flags(Flags::of(&[Flag::Bypass, Flag::Frozen]));
     Package::new(PackageId::declared("acme.numbers"), "Numbers")
         .with_context(numbers)
         .with_node_type(Source)
@@ -128,7 +125,7 @@ fn nodes_cook_through_their_types_and_core_flags() {
     net.set_parameter(source, "value", Value::Number(5.0))
         .unwrap();
     assert_eq!(value(&net, a), 10.0);
-    net.set_flag(a, Flag::Freeze, false).unwrap();
+    net.set_flag(a, Flag::Frozen, false).unwrap();
     assert_eq!(value(&net, a), 7.5);
     // What the context doesn't offer, or a type doesn't declare, is
     // refused.

@@ -7,9 +7,10 @@
 //! nodes.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::network::{
-    CompileCx, CompileError, Compiled, Flag, FlagSet, Flat, FlatNode, NetworkCompiler,
-    NetworkContext, NewNode, NodeCreation, Wire,
+    CompileCx, CompileError, Compiled, Flag, Flags, Flat, FlatNode, NetworkCompiler,
+    NetworkContext, NetworkKind, NewNode, NodeCreation, Wire,
 };
+use kinogaki_studio_api::value::Condition;
 use kinogaki_studio_api::{
     ContextId, CookCx, CookError, CreationId, Data, DataTypeId, NodeRef, NodeType, NodeTypeId,
     Outputs, Package, PackageId, Parameters, Registry, RegistryError, Value,
@@ -42,7 +43,7 @@ impl NodeType for Grow {
 fn a_context_registers_once_under_its_vendor() {
     let mut registry = Registry::new();
     let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
-        .with_context(context("acme.trees.network").flags(FlagSet::all()));
+        .with_context(context("acme.trees.network").flags(Flags::ALL));
     registry.register(trees).unwrap();
     let again = Package::new(PackageId::declared("acme.more"), "More")
         .with_context(context("acme.trees.network"));
@@ -69,16 +70,16 @@ fn a_context_registers_once_under_its_vendor() {
             ..
         })
     ));
-    assert!(!FlagSet::default().offers(Flag::Bypass));
+    assert!(!Flags::NONE.contains(Flag::Bypass));
 }
 
 #[test]
 fn a_library_holds_unwired_results_without_flags() {
-    let plain = context("acme.trees.network").flags(FlagSet::all());
-    assert!(!plain.library);
+    let plain = context("acme.trees.network").flags(Flags::ALL);
+    assert_eq!(plain.kind, NetworkKind::Chain);
     let library = plain.clone().library();
-    assert!(library.library && !library.heals);
-    assert_eq!(library.flags, FlagSet::default());
+    assert_eq!(library.kind, NetworkKind::Library);
+    assert_eq!(library.flags, Flags::NONE);
     assert_eq!((library.id, library.storage), (plain.id, plain.storage));
 }
 
@@ -127,9 +128,9 @@ fn a_held_node_type_names_a_registered_delta() {
 
 #[test]
 fn a_port_required_while_a_parameter_holds_a_value() {
-    let tools = Port::new("tools", "Tools", DataTypeId::declared("acme.trees.wood"))
-        .required_when("operation", Value::Choice("subtract".into()));
-    assert!(tools.optional);
+    let tools = Port::new("tools", "Tools", DataTypeId::declared("acme.trees.wood")).required_when(
+        Condition::when("operation", Value::Choice("subtract".into())),
+    );
     let mut parameters =
         Parameters::from([("operation".to_owned(), Value::Choice("union".into()))]);
     assert!(!tools.required(&parameters));

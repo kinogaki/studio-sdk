@@ -219,15 +219,6 @@ impl<T> Drop for Deliver<T> {
 }
 
 impl<T> Pending<T> {
-    /// Whether the result is resolved (delivered, failed or abandoned;
-    /// taken or not).
-    pub fn is_resolved(&self) -> bool {
-        !matches!(
-            *self.slot.lock().unwrap_or_else(|e| e.into_inner()),
-            Slot::Waiting
-        )
-    }
-
     /// The outcome, the first time it is asked for after it was resolved.
     pub fn take(&self) -> Option<Result<T, RenderError>> {
         let mut slot = self.slot.lock().unwrap_or_else(|e| e.into_inner());
@@ -282,7 +273,6 @@ mod tests {
         std::thread::spawn(move || drop(deliver))
             .join()
             .expect("the producer runs");
-        assert!(result.is_resolved());
         assert_eq!(wakes.load(Ordering::SeqCst), 1);
         assert_eq!(result.take(), Some(Err(RenderError::Abandoned)));
         assert_eq!(result.take(), None);

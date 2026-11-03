@@ -62,14 +62,15 @@ pub trait NetworkEdit: NetworkRead {
 
     /// Sets flag `flag` of `node`. Freezing goes through
     /// [`freeze`](Self::freeze), which needs the outputs to keep; turning
-    /// [`Flag::Freeze`] off unfreezes.
+    /// [`Flag::Frozen`] off unfreezes.
     fn set_flag(&mut self, node: NodeRef, flag: Flag, on: bool) -> Result<(), Error>;
 
     /// Moves the display flag of `node`'s level to it (`None`: nothing on
     /// the top level is displayed).
     fn set_display(&mut self, node: Option<NodeRef>) -> Result<(), Error>;
 
-    /// Deletes `node`. When its context heals chains, what it fed takes
+    /// Deletes `node`. When its context's networks are chains
+    /// ([`NetworkKind::Chain`](super::NetworkKind::Chain)), what it fed takes
     /// its first input's wire, and so does the display flag.
     fn remove(&mut self, node: NodeRef) -> Result<(), Error>;
 

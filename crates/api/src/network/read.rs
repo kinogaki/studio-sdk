@@ -60,8 +60,10 @@ pub struct NodeInfo<'a> {
     pub animated: Vec<String>,
     /// Its input wires, one list a port in port order, in wire order.
     pub inputs: Vec<Vec<Wire>>,
-    /// Its core flags.
-    pub flags: NodeFlags,
+    /// The core flags it carries.
+    pub flags: super::Flags,
+    /// It holds a delta over its input ([`NetworkEdit::set_delta`](super::NetworkEdit::set_delta)).
+    pub held: bool,
     /// The subnet holding it, or `None` on the top level.
     pub level: Option<NodeRef>,
     /// Where its tile is.
@@ -95,18 +97,4 @@ pub struct Wire {
     pub node: NodeRef,
     /// The output's index among that node's outputs.
     pub output: usize,
-}
-
-/// A node's core flags.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct NodeFlags {
-    /// It passes input 0 on ([`Flag::Bypass`](super::Flag::Bypass)).
-    pub bypass: bool,
-    /// It shows as a reference ([`Flag::Template`](super::Flag::Template)).
-    pub template: bool,
-    /// It keeps the outputs it was frozen with
-    /// ([`Flag::Freeze`](super::Flag::Freeze)).
-    pub frozen: bool,
-    /// It holds a delta over its input ([`NetworkEdit::set_delta`](super::NetworkEdit::set_delta)).
-    pub held: bool,
 }

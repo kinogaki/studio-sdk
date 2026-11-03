@@ -24,7 +24,9 @@ mod sheet;
 
 pub use binding::{Scalar, Vector};
 pub use context::CookCx;
-pub use description::{Category, Description, Listing, NodeRole, Port, Ports, Reach};
+pub use description::{
+    Arity, Category, Description, Listing, NodeRole, Port, Ports, Reach, Unwired,
+};
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
 pub use placement::Placement;

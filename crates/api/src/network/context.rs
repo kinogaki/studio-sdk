@@ -10,12 +10,12 @@ use crate::id::{ContextId, NodeTypeId};
 ///
 /// ```
 /// use kinogaki_studio_api::{ContextId, NodeTypeId};
-/// use kinogaki_studio_api::network::{FlagSet, NetworkContext};
+/// use kinogaki_studio_api::network::{Flag, Flags, NetworkContext, NetworkKind};
 /// let import = NodeTypeId::declared("acme.mesh.import");
 /// let context = NetworkContext::new(ContextId::declared("acme.trees.network"), "Trees", "trees")
-///     .flags(FlagSet::all())
+///     .flags(Flags::ALL)
 ///     .adopts(import, "Model");
-/// assert!(context.heals && context.flags.freeze);
+/// assert!(context.kind == NetworkKind::Chain && context.flags.contains(Flag::Frozen));
 /// assert_eq!((context.adopts[0].node_type, context.adopts[0].section.as_str()), (import, "Model"));
 /// ```
 #[derive(Clone, Debug, PartialEq)]
@@ -26,11 +26,10 @@ pub struct NetworkContext {
     pub label: String,
     /// How its networks produce their results.
     pub evaluation: Evaluation,
-    /// Whether deleting a node joins its first input's wire to what it
-    /// fed, closing the chain; otherwise what it fed is left unwired.
-    pub heals: bool,
+    /// What its networks are: chains of nodes, or libraries of results.
+    pub kind: NetworkKind,
     /// The core flags its nodes offer.
-    pub flags: FlagSet,
+    pub flags: Flags,
     /// How its networks are stored in a project.
     pub storage: NetworkStorage,
     /// How its nodes are drawn in the network pane.
@@ -38,9 +37,20 @@ pub struct NetworkContext {
     /// Other packages' node types its networks offer too, each listed under
     /// a section of this context's (CAM's networks take Mesh's Import).
     pub adopts: Vec<Adopted>,
-    /// A library ([`library`](Self::library)): its nodes aren't wired,
-    /// each is a result of its network, and none carries the display flag.
-    pub library: bool,
+}
+
+/// What a context's networks are.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NetworkKind {
+    /// Nodes wired into chains: deleting a node joins its first input's
+    /// wire to what it fed, closing the chain.
+    #[default]
+    Chain,
+    /// A library of results (Studio's Material Libraries): its nodes take
+    /// no wires and show no ports, every node is a result of its network
+    /// (a holder's compiled inside, published by path), none carries the
+    /// display flag, and they offer no flags.
+    Library,
 }
 
 /// A node type a context offers though its own package doesn't make it
@@ -63,14 +73,13 @@ impl NetworkContext {
             id,
             label: label.into(),
             evaluation: Evaluation::Cook,
-            heals: true,
-            flags: FlagSet::default(),
+            kind: NetworkKind::Chain,
+            flags: Flags::NONE,
             storage: NetworkStorage {
                 element: element.into(),
             },
             layout: NodeLayout::Vertical,
             adopts: Vec::new(),
-            library: false,
         }
     }
 
@@ -90,7 +99,7 @@ impl NetworkContext {
     }
 
     /// Offering `flags`.
-    pub fn flags(mut self, flags: FlagSet) -> Self {
+    pub fn flags(mut self, flags: Flags) -> Self {
         self.flags = flags;
         self
     }
@@ -102,21 +111,10 @@ impl NetworkContext {
         self
     }
 
-    /// A library of results (Studio's Material Libraries): its nodes
-    /// take no wires and show no ports, every node is a result of its
-    /// network (a holder's compiled inside, published by path), and none
-    /// carries the display flag; they offer no flags and deleting one
-    /// heals nothing.
+    /// A library of results ([`NetworkKind::Library`]), offering no flags.
     pub fn library(mut self) -> Self {
-        self.library = true;
-        self.flags = FlagSet::default();
-        self.heals = false;
-        self
-    }
-
-    /// Healing deleted nodes' chains or not.
-    pub fn heals(mut self, heals: bool) -> Self {
-        self.heals = heals;
+        self.kind = NetworkKind::Library;
+        self.flags = Flags::NONE;
         self
     }
 }
@@ -155,39 +153,52 @@ pub enum Flag {
     /// Its result shows as a faint reference beside the displayed one,
     /// never picked.
     Template,
-    /// Keeps the outputs it has now; nothing upstream cooks for it again
-    /// ([`NetworkEdit::freeze`](super::NetworkEdit::freeze)).
-    Freeze,
+    /// Keeps the outputs it was frozen with; nothing upstream cooks for
+    /// it again ([`NetworkEdit::freeze`](super::NetworkEdit::freeze)).
+    Frozen,
 }
 
-/// The core flags a context's nodes offer.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct FlagSet {
-    /// [`Flag::Bypass`].
-    pub bypass: bool,
-    /// [`Flag::Template`].
-    pub template: bool,
-    /// [`Flag::Freeze`].
-    pub freeze: bool,
+impl Flag {
+    /// Every flag, in the order menus and files list them.
+    pub const ALL: [Flag; 3] = [Flag::Bypass, Flag::Template, Flag::Frozen];
+
+    fn bit(self) -> u8 {
+        1 << self as u8
+    }
 }
 
-impl FlagSet {
+/// A set of [`Flag`]s: what a node carries, or what a context's nodes
+/// offer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Flags(u8);
+
+impl Flags {
+    /// No flag.
+    pub const NONE: Flags = Flags(0);
     /// Every flag.
-    pub fn all() -> Self {
-        Self {
-            bypass: true,
-            template: true,
-            freeze: true,
+    pub const ALL: Flags = Flags(0b111);
+
+    /// `flags`, and nothing else.
+    pub fn of(flags: &[Flag]) -> Self {
+        flags.iter().fold(Self::NONE, |set, f| set.with(*f, true))
+    }
+
+    /// Whether it holds `flag`.
+    pub fn contains(self, flag: Flag) -> bool {
+        self.0 & flag.bit() != 0
+    }
+
+    /// It with `flag` on or off.
+    pub fn with(self, flag: Flag, on: bool) -> Self {
+        match on {
+            true => Flags(self.0 | flag.bit()),
+            false => Flags(self.0 & !flag.bit()),
         }
     }
 
-    /// Whether it offers `flag`.
-    pub fn offers(self, flag: Flag) -> bool {
-        match flag {
-            Flag::Bypass => self.bypass,
-            Flag::Template => self.template,
-            Flag::Freeze => self.freeze,
-        }
+    /// Its flags, in [`Flag::ALL`]'s order.
+    pub fn iter(self) -> impl Iterator<Item = Flag> {
+        Flag::ALL.into_iter().filter(move |f| self.contains(*f))
     }
 }
 

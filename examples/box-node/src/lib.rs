@@ -18,7 +18,7 @@
 //!   and the object kind show by.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
-use kinogaki_studio_api::network::FlagSet;
+use kinogaki_studio_api::network::Flags;
 use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
@@ -356,7 +356,7 @@ impl ObjectCodec for BoxesKind {
 
 /// The package: what Studio registers when it loads the plugin.
 pub fn package() -> Package {
-    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(FlagSet::all());
+    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(Flags::ALL);
     Package::new(PackageId::declared("example.boxes"), "Boxes")
         .with_data_type(BoxType)
         .with_context(context)
