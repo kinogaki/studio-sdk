@@ -10,38 +10,53 @@
 //!
 //! Each kind of id is its own type ([`DataTypeId`], [`ObjectKindId`],
 //! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`], [`StoredId`],
-//! `ConversionId`, [`MesherId`]), so a node type id can't be passed where a data type
-//! is meant. All of them are interned in one table: each distinct text is
-//! kept once for the program's life (packages are never unloaded), so an
-//! id is a `Copy` pointer-sized value and reading its text never allocates.
+//! [`MesherId`], [`CreationId`]), so a node type id can't be passed where a data type
+//! is meant. An id is a `Copy` value over `'static` text: one a package
+//! declares in code is its literal (made in a `const`, with no lock or
+//! allocation), and one parsed from a file is interned in one table (each
+//! distinct text kept once for the program's life: packages are never
+//! unloaded). Ids compare by their text.
 use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Mutex;
 
 /// Whether `text` is a well-formed id: three dot-separated segments, each
 /// a lowercase ASCII letter followed by lowercase letters, digits and `_`.
-pub(crate) fn well_formed(text: &str) -> bool {
+pub(crate) const fn well_formed(text: &str) -> bool {
     segments_well_formed(text, 3)
 }
 
 /// Whether `text` is a well-formed package id: two segments of the form
 /// [`well_formed`] describes (`kinogaki.mesh`).
-pub(crate) fn package_well_formed(text: &str) -> bool {
+pub(crate) const fn package_well_formed(text: &str) -> bool {
     segments_well_formed(text, 2)
 }
 
-fn segments_well_formed(text: &str, segments: usize) -> bool {
-    let mut count = 0;
-    for part in text.split('.') {
-        count += 1;
-        let mut chars = part.chars();
-        if !chars.next().is_some_and(|c| c.is_ascii_lowercase())
-            || !chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-        {
+/// Whether `text` is `segments` dot-separated segments, each a lowercase
+/// ASCII letter followed by lowercase letters, digits and `_` (a `const
+/// fn`, so a declared id is checked where it is made).
+const fn segments_well_formed(text: &str, segments: usize) -> bool {
+    let bytes = text.as_bytes();
+    let (mut count, mut start, mut i) = (1, true, 0);
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'.' {
+            if start {
+                return false;
+            }
+            count += 1;
+            start = true;
+        } else if start {
+            if !b.is_ascii_lowercase() {
+                return false;
+            }
+            start = false;
+        } else if !(b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_') {
             return false;
         }
+        i += 1;
     }
-    count == segments
+    !start && count == segments
 }
 
 /// The one table of every id's text: each distinct text is leaked once and
@@ -73,15 +88,16 @@ macro_rules! declare_id {
                 well_formed(text).then(|| Self(intern(text)))
             }
 
-            #[doc = concat!("A ", $what, " id a package declares in code.")]
+            #[doc = concat!("A ", $what, " id a package declares in code: a `const`")]
+            /// (in a `const` item it is checked as the code compiles).
             ///
             /// # Panics
             ///
             /// On a malformed id: a declaration is code, and a package's
             /// tests construct every id it declares.
-            pub fn declared(text: &str) -> Self {
-                Self::parse(text)
-                    .unwrap_or_else(|| panic!(concat!("malformed ", $what, " id {:?}"), text))
+            pub const fn declared(text: &'static str) -> Self {
+                assert!(well_formed(text), concat!("malformed ", $what, " id"));
+                Self(text)
             }
 
             /// The id's text (`kinogaki.mesh.extrude`).
@@ -166,6 +182,14 @@ declare_id!(
     MesherId,
     "mesher"
 );
+declare_id!(
+    /// A creation: one way menus, keys and shelves make a node
+    /// ([`NodeCreation`](crate::network::NodeCreation)) or an object
+    /// ([`KindCreation`](crate::KindCreation)), under its package's vendor
+    /// (`kinogaki.render.spot_light`).
+    CreationId,
+    "creation"
+);
 
 /// A package: `<vendor>.<package>` (`kinogaki.mesh`, `acme.trees`).
 /// Interned like the other ids.
@@ -179,13 +203,14 @@ impl PackageId {
         package_well_formed(text).then(|| Self(intern(text)))
     }
 
-    /// A package id declared in code.
+    /// A package id declared in code: a `const`.
     ///
     /// # Panics
     ///
     /// On a malformed id.
-    pub fn declared(text: &str) -> Self {
-        Self::parse(text).unwrap_or_else(|| panic!("malformed package id {text:?}"))
+    pub const fn declared(text: &'static str) -> Self {
+        assert!(package_well_formed(text), "malformed package id");
+        Self(text)
     }
 
     /// The id's text (`kinogaki.mesh`).
@@ -254,14 +279,14 @@ mod tests {
     }
 
     #[test]
-    fn equal_texts_share_one_interned_string() {
-        let a = DataTypeId::declared("kinogaki.test.shared");
-        let b = DataTypeId::parse(&String::from("kinogaki.test.shared")).unwrap();
-        assert_eq!(a, b);
-        assert!(std::ptr::eq(a.as_str(), b.as_str()));
-        // Every id kind shares the one table.
-        let node = NodeTypeId::declared("kinogaki.test.shared");
-        assert!(std::ptr::eq(a.as_str(), node.as_str()));
+    fn declared_and_parsed_ids_of_one_text_are_one_id() {
+        const DECLARED: DataTypeId = DataTypeId::declared("kinogaki.test.shared");
+        let parsed = DataTypeId::parse(&String::from("kinogaki.test.shared")).unwrap();
+        assert_eq!(DECLARED, parsed);
+        // Parsed texts are interned once, in one table for every id kind.
+        let node = NodeTypeId::parse("kinogaki.test.shared").unwrap();
+        assert!(std::ptr::eq(parsed.as_str(), node.as_str()));
+        assert!(!well_formed("kinogaki..mesh") && !well_formed("kinogaki.mesh."));
     }
 
     #[test]

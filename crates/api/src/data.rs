@@ -118,7 +118,7 @@ impl<T> fmt::Debug for Typed<T> {
 
 impl<T: Any + Send + Sync> Typed<T> {
     /// The handle for data type `id`, whose values are `T`s.
-    pub fn new(id: DataTypeId) -> Self {
+    pub const fn new(id: DataTypeId) -> Self {
         Self {
             id,
             marker: PhantomData,

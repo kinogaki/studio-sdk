@@ -104,13 +104,13 @@ impl ObjectKindSpec for BoardKind {
     /// The Pin Board in Create, Tab and the A menu: a new board opens,
     /// ready for pinning.
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
-        let mut board = KindCreation::new(board().as_str(), "Pin Board");
+        let mut board = KindCreation::new(CreationId::declared("example.pins.board"), "Pin Board");
         board.aliases = vec!["corkboard".into()];
         board.opens = true;
         vec![board]
     }
-    fn create(&self, id: &str, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
-        (id == board().as_str())
+    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+        (id.as_str() == board().as_str())
             .then(|| self.new_body())
             .ok_or_else(|| format!("{id} isn't a Pin Board"))
     }

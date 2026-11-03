@@ -276,22 +276,33 @@ fn boxes_are_made_empty_or_holding_a_box() {
     let made: Vec<_> = kind
         .creations(&cx)
         .into_iter()
-        .map(|c| (c.id, c.opens, c.start))
+        .map(|c| (c.id.as_str(), c.opens, c.start))
         .collect();
     assert_eq!(
         made,
         [
-            ("example.boxes.boxes".to_owned(), true, None),
+            ("example.boxes.boxes", true, None),
             (
-                "example.boxes.box_node".to_owned(),
+                "example.boxes.box_node",
                 false,
                 Some(NodeTypeId::declared("example.boxes.box_node"))
             ),
         ]
     );
     assert_eq!(
-        kind.create("example.boxes.box_node", &cx).unwrap().kind(),
+        kind.create(
+            kinogaki_studio_api::CreationId::declared("example.boxes.box_node"),
+            &cx
+        )
+        .unwrap()
+        .kind(),
         boxes()
     );
-    assert!(kind.create("example.pins.board", &cx).is_err());
+    assert!(
+        kind.create(
+            kinogaki_studio_api::CreationId::declared("example.pins.board"),
+            &cx
+        )
+        .is_err()
+    );
 }

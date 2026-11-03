@@ -94,10 +94,6 @@ pub struct Reading<'a> {
     /// The host's color management: colors in the file are converted
     /// from the file's space into the project's working space.
     pub colors: &'a dyn ColorService,
-    /// A number naming what the read is for (a File node's id), which a
-    /// format may seed the names of what it reads with, so two nodes
-    /// reading one file give values told apart.
-    pub origin: u64,
     /// Values of the project the host lends formats, found by their Rust
     /// type (`Reading::setting`): a CAD kernel's tolerances.
     pub settings: &'a [&'a (dyn Any + Send + Sync)],
@@ -118,7 +114,6 @@ impl<'a> Reading<'a> {
             purpose,
             units,
             colors,
-            origin: 0,
             settings: &[],
             cancel: CancelToken::default(),
             wants: None,

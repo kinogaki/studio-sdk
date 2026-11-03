@@ -121,8 +121,8 @@ pub use format::{
 pub use held::HeldEdit;
 pub use icon::{Icon, IconError};
 pub use id::{
-    ContextId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId, SlotId,
-    StoredId,
+    ContextId, CreationId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
+    SlotId, StoredId,
 };
 pub use mesher::{Failed, Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};

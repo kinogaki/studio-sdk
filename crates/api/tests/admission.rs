@@ -17,7 +17,7 @@ fn trees() -> PackageId {
     PackageId::declared("acme.trees")
 }
 
-fn context(id: &str) -> NetworkContext {
+fn context(id: &'static str) -> NetworkContext {
     NetworkContext::new(ContextId::declared(id), "Trees", "trees")
 }
 

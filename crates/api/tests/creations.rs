@@ -60,7 +60,7 @@ impl ObjectKindSpec for Kind {
     fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
         let engine = cx.active().map(|_| self.engine_made);
         (self.made.iter().copied().chain(engine))
-            .map(|id| KindCreation::new(id, id))
+            .map(|id| KindCreation::new(CreationId::declared(id), id))
             .collect()
     }
 }
@@ -73,13 +73,13 @@ fn kind(id: &'static str, made: &'static [&'static str]) -> Kind {
     }
 }
 
-fn package(id: &str) -> Package {
+fn package(id: &'static str) -> Package {
     Package::new(PackageId::declared(id), id)
 }
 
-fn node(id: &str) -> NodeCreation {
+fn node(id: &'static str) -> NodeCreation {
     NodeCreation::new(
-        id,
+        CreationId::declared(id),
         id,
         NewNode::new(NodeTypeId::declared("other.trees.grow")),
     )
@@ -104,14 +104,6 @@ fn a_kinds_creations_are_its_vendors_and_new() {
         registry.register(foreign),
         Err(RegistryError::ForeignId { .. })
     ));
-    let malformed = package("acme.bad").with_object_kind(kind("acme.bad.top", &["Top"]));
-    assert_eq!(
-        registry.register(malformed),
-        Err(RegistryError::MalformedId {
-            package: PackageId::declared("acme.bad"),
-            id: "Top".into(),
-        })
-    );
 }
 
 #[test]
@@ -140,11 +132,8 @@ fn node_creations_are_their_vendors_and_new() {
         registry.register(foreign),
         Err(RegistryError::ForeignId { .. })
     ));
-    let malformed = package("acme.bad").with_creation(node("acme.bad"));
-    assert!(matches!(
-        registry.register(malformed),
-        Err(RegistryError::MalformedId { .. })
-    ));
+    // A malformed creation id can't be made: `CreationId` checks it.
+    assert!(CreationId::parse("acme.bad").is_none());
     // A node creation and an object creation may share a name: each kind
     // of id is its own.
     let toys = package("acme.toys").with_object_kind(kind("acme.toys.top", &["acme.toys.oak"]));

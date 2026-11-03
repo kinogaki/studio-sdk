@@ -97,7 +97,7 @@ fn value(network: &FakeNetwork, node: NodeRef) -> f64 {
     *NUMBER.get(&outputs.data[0]).unwrap()
 }
 
-fn add(network: &mut FakeNetwork, kind: &str) -> NodeRef {
+fn add(network: &mut FakeNetwork, kind: &'static str) -> NodeRef {
     let node = NewNode::new(NodeTypeId::declared(kind));
     network.add_node(node, [0.0, 0.0]).unwrap()
 }

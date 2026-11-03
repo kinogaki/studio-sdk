@@ -7,25 +7,18 @@
 //! or a flattened node's parameters change.
 use crate::cook::NodeType;
 use crate::id::{ContextId, NodeTypeId};
+use crate::network::Wire;
 use crate::params::Parameters;
+use crate::refs::NodeRef;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
-/// Where a wire comes from: a flattened node and which of its outputs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Source {
-    /// The node, by the host's id.
-    pub node: u64,
-    /// The output, by index into its outputs.
-    pub output: usize,
-}
-
 /// One node of a [`Flat`] network.
 #[derive(Clone, Debug)]
 pub struct FlatNode<'a> {
-    /// Its id (the host's; a [`Source`] names it).
-    pub id: u64,
+    /// Its id (the host's; a [`Wire`] names it).
+    pub id: NodeRef,
     /// Its name, for what a compiler reports.
     pub name: &'a str,
     /// Its type.
@@ -33,7 +26,7 @@ pub struct FlatNode<'a> {
     /// Its parameters (a subnet's driven values resolved).
     pub parameters: &'a Parameters,
     /// Each input port's wires, in order.
-    pub inputs: Vec<Vec<Source>>,
+    pub inputs: Vec<Vec<Wire>>,
     /// Bypassed: what that means is the compiler's (Comp passes the first
     /// input's image on).
     pub bypass: bool,
@@ -41,7 +34,7 @@ pub struct FlatNode<'a> {
 
 impl FlatNode<'_> {
     /// Input `port`'s first wire.
-    pub fn input(&self, port: usize) -> Option<Source> {
+    pub fn input(&self, port: usize) -> Option<Wire> {
         self.inputs.get(port)?.first().copied()
     }
 }
@@ -57,7 +50,7 @@ pub struct Flat<'a> {
 
 impl<'a> Flat<'a> {
     /// Node `id`.
-    pub fn node(&self, id: u64) -> Option<&FlatNode<'a>> {
+    pub fn node(&self, id: NodeRef) -> Option<&FlatNode<'a>> {
         self.nodes.iter().find(|n| n.id == id)
     }
 }
@@ -127,14 +120,14 @@ impl fmt::Debug for CompileCx<'_> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompileError {
     /// The node it is about, if one.
-    pub node: Option<u64>,
+    pub node: Option<NodeRef>,
     /// What is wrong, for the user.
     pub message: String,
 }
 
 impl CompileError {
     /// `message` about node `node`.
-    pub fn at(node: u64, message: impl Into<String>) -> Self {
+    pub fn at(node: NodeRef, message: impl Into<String>) -> Self {
         Self {
             node: Some(node),
             message: message.into(),
@@ -183,7 +176,7 @@ pub trait NetworkCompiler: Send + Sync {
     fn compile(
         &self,
         flat: &Flat<'_>,
-        target: Source,
+        target: Wire,
         cx: &CompileCx<'_>,
     ) -> Result<Compiled, CompileError>;
 }

@@ -8,15 +8,15 @@
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::network::{
     CompileCx, CompileError, Compiled, Flag, FlagSet, Flat, FlatNode, NetworkCompiler,
-    NetworkContext, NewNode, NodeCreation, Source,
+    NetworkContext, NewNode, NodeCreation, Wire,
 };
 use kinogaki_studio_api::{
-    ContextId, CookCx, CookError, Data, DataTypeId, NodeType, NodeTypeId, Outputs, Package,
-    PackageId, Parameters, Registry, RegistryError, Value,
+    ContextId, CookCx, CookError, CreationId, Data, DataTypeId, NodeRef, NodeType, NodeTypeId,
+    Outputs, Package, PackageId, Parameters, Registry, RegistryError, Value,
 };
 use std::sync::Arc;
 
-fn context(id: &str) -> NetworkContext {
+fn context(id: &'static str) -> NetworkContext {
     NetworkContext::new(ContextId::declared(id), "Trees", "trees")
 }
 
@@ -88,7 +88,7 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
     // Another package's type, which Studio lists the creations with.
     let grow = NodeTypeId::declared("acme.trees.grow");
     let oak = NodeCreation::new(
-        "acme.forest.oak",
+        CreationId::declared("acme.forest.oak"),
         "Oak",
         NewNode::new(grow).named("oak").with("rate", 2.0),
     )
@@ -98,14 +98,14 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
     let forest = Package::new(PackageId::declared("acme.forest"), "Forest")
         .with_creation(oak.clone())
         .with_creation(NodeCreation::new(
-            "acme.forest.pine",
+            CreationId::declared("acme.forest.pine"),
             "Pine",
             NewNode::new(grow),
         ));
     registry.register(forest).unwrap();
     let made: Vec<&NodeCreation> = registry.creations().collect();
     assert_eq!(made[0], &oak);
-    assert_eq!(made[1].id, "acme.forest.pine");
+    assert_eq!(made[1].id.as_str(), "acme.forest.pine");
     assert_eq!(made[1].node.name, None);
     assert!(made[1].family.is_empty() && made[1].inside.is_empty());
     assert_eq!(oak.node.name.as_deref(), Some("oak"));
@@ -151,7 +151,7 @@ impl NetworkCompiler for Chain {
     fn compile(
         &self,
         flat: &Flat<'_>,
-        target: Source,
+        target: Wire,
         cx: &CompileCx<'_>,
     ) -> Result<Compiled, CompileError> {
         let mut names = Vec::new();
@@ -212,13 +212,16 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
     // trunk ← branch (bypassed) ← leaf.
     let none = Parameters::new();
     let node = |id, name, input: Option<u64>, bypass| FlatNode {
-        id,
+        id: NodeRef(id),
         name,
         node_type: NodeTypeId::declared("acme.trees.part"),
         parameters: &none,
         inputs: vec![
             input
-                .map(|n| Source { node: n, output: 0 })
+                .map(|n| Wire {
+                    node: NodeRef(n),
+                    output: 0,
+                })
                 .into_iter()
                 .collect(),
         ],
@@ -235,7 +238,10 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
     let plan = compiler
         .compile(
             &flat,
-            Source { node: 3, output: 0 },
+            Wire {
+                node: NodeRef(3),
+                output: 0,
+            },
             &CompileCx::new(&outputs),
         )
         .unwrap();
@@ -243,11 +249,18 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
     let names = plan.plan.downcast_ref::<Vec<String>>().unwrap();
     assert_eq!(names, &["leaf", "trunk", "beauty"]);
     let missing = compiler
-        .compile(&flat, Source { node: 9, output: 0 }, &CompileCx::default())
+        .compile(
+            &flat,
+            Wire {
+                node: NodeRef(9),
+                output: 0,
+            },
+            &CompileCx::default(),
+        )
         .unwrap_err();
     assert_eq!(
         (missing.node, missing.to_string()),
-        (Some(9), "no such node".into())
+        (Some(NodeRef(9)), "no such node".into())
     );
 }
 
@@ -270,12 +283,12 @@ impl kinogaki_render_api::display::PlanRunner for Runs {
 #[test]
 fn a_runner_runs_a_compiled_context_its_package_declares() {
     let compiled = || context("acme.trees.network").compiled();
-    let trees = |runs: &[&str]| {
+    let trees = |runs: &[&'static str]| {
         runs.iter().fold(
             Package::new(PackageId::declared("acme.trees"), "Trees")
                 .with_context(compiled())
                 .with_compiler(Chain),
-            |p, c| p.with_runner(ContextId::declared(c), Runs),
+            |p, &c| p.with_runner(ContextId::declared(c), Runs),
         )
     };
     assert!(

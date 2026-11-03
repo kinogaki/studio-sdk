@@ -324,17 +324,17 @@ impl ObjectKindSpec for BoxesKind {
     /// for its first node, and a Box: a Boxes object already holding a Box
     /// node.
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
-        let mut empty = KindCreation::new(boxes().as_str(), "Boxes");
+        let mut empty = KindCreation::new(CreationId::declared("example.boxes.boxes"), "Boxes");
         empty.opens = true;
-        let mut one = KindCreation::new(BOX_NODE, "Box");
+        let mut one = KindCreation::new(CreationId::declared(BOX_NODE), "Box");
         one.family = "Boxes".into();
         one.aliases = vec!["cube".into()];
         one.start = Some(NodeTypeId::declared(BOX_NODE));
         vec![empty, one]
     }
-    fn create(&self, id: &str, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
         match id {
-            _ if id == boxes().as_str() || id == BOX_NODE => Ok(self.new_body()),
+            _ if id.as_str() == boxes().as_str() || id.as_str() == BOX_NODE => Ok(self.new_body()),
             _ => Err(format!("Boxes don't make {id}")),
         }
     }

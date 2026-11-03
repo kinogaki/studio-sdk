@@ -97,9 +97,9 @@ impl Registry {
                 owner(self.object_kinds.get(&k.id())),
             )?;
         }
-        // Creations are named by text, under the same rule. A kind's are
-        // those it makes with no engine installed; the rest are named by
-        // the engines' own types.
+        // Creations, under the same rule. A kind's are those it makes with
+        // no engine installed; the rest are named by the engines' own
+        // types.
         let engines = Engines::new(Vec::new());
         let cx = CreateCx::new(&engines, None);
         let made = |k: &dyn ObjectKindSpec| k.creations(&cx).into_iter().map(|c| c.id);
@@ -107,11 +107,11 @@ impl Registry {
             let first = (self.object_kinds.values())
                 .find(|e| made(&*e.item).any(|t| t == text))
                 .map(|e| e.package);
-            declare("object creation", declared_id(id, &text)?, first)?;
+            declare("object creation", text.as_str(), first)?;
         }
         for c in &package.creations {
             let first = self.creations.iter().find(|e| e.item.id == c.id);
-            declare("node creation", declared_id(id, &c.id)?, owner(first))?;
+            declare("node creation", c.id.as_str(), owner(first))?;
         }
         for e in &package.engines {
             let first = self.engines.get(&e.id).copied();

@@ -46,9 +46,20 @@ fn the_package_registers_whole() {
         (creations[0].id.as_str(), creations[0].opens),
         ("example.pins.board", true)
     );
-    let made = kind.create("example.pins.board", &cx).unwrap();
+    let made = kind
+        .create(
+            kinogaki_studio_api::CreationId::declared("example.pins.board"),
+            &cx,
+        )
+        .unwrap();
     assert_eq!(made.kind(), board());
-    assert!(kind.create("example.pins.other", &cx).is_err());
+    assert!(
+        kind.create(
+            kinogaki_studio_api::CreationId::declared("example.pins.other"),
+            &cx
+        )
+        .is_err()
+    );
 }
 
 #[test]

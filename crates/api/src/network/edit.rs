@@ -4,7 +4,7 @@ use crate::Key;
 use crate::cook::Outputs;
 use crate::data::Data;
 use crate::error::Error;
-use crate::id::NodeTypeId;
+use crate::id::{CreationId, NodeTypeId};
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
 use kinogaki_geometry::Time;
@@ -273,7 +273,7 @@ impl NetworkSeed {
 pub struct NodeCreation {
     /// Its item id, which menus, keys and shelves name it by, under its
     /// package's vendor (`kinogaki.spectre.glass`).
-    pub id: String,
+    pub id: CreationId,
     /// What menus call it ("Glass").
     pub label: String,
     /// Its family within its type's section; empty: its type's family.
@@ -290,9 +290,9 @@ pub struct NodeCreation {
 
 impl NodeCreation {
     /// Creation `id` called `label`, making `node` with an empty inside.
-    pub fn new(id: impl Into<String>, label: impl Into<String>, node: NewNode) -> Self {
+    pub fn new(id: CreationId, label: impl Into<String>, node: NewNode) -> Self {
         Self {
-            id: id.into(),
+            id,
             label: label.into(),
             family: String::new(),
             aliases: Vec::new(),

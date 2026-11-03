@@ -5,6 +5,7 @@ use crate::cook::{CookError, Inside, Project, Resolved};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, Value};
+use crate::refs::NodeRef;
 use kinogaki_geometry::{Rate, Time};
 use std::any::Any;
 use std::ops::Range;
@@ -29,7 +30,7 @@ pub struct CookCx<'a> {
     cancel: &'a CancelToken,
     time: Time,
     rate: Rate,
-    node: u64,
+    node: NodeRef,
     resolved: &'a [(String, Resolved)],
     project: Option<&'a Project<'a>>,
     context: Option<ContextId>,
@@ -61,7 +62,7 @@ impl<'a> CookCx<'a> {
             cancel,
             time: Time::ZERO,
             rate: Rate::FILM,
-            node: 0,
+            node: NodeRef(0),
             resolved: &[],
             project: None,
             context: None,
@@ -185,7 +186,7 @@ impl<'a> CookCx<'a> {
     }
 
     /// Cooking the node the host knows as `node`.
-    pub fn with_node(mut self, node: u64) -> Self {
+    pub fn with_node(mut self, node: NodeRef) -> Self {
         self.node = node;
         self
     }
@@ -193,7 +194,7 @@ impl<'a> CookCx<'a> {
     /// The host's id for the node cooking: stable while the node exists
     /// and unique in its network, so what the cook names after it (a CAD
     /// node's faces) keeps its names across cooks. 0 outside a network.
-    pub fn node(&self) -> u64 {
+    pub fn node(&self) -> NodeRef {
         self.node
     }
 

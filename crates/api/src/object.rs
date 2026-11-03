@@ -14,7 +14,7 @@
 //! shown grey, written back unchanged on save, and reported.
 use crate::codec::ObjectCodec;
 use crate::data::Data;
-use crate::id::{ContextId, DataTypeId, NodeTypeId, ObjectKindId};
+use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
 use kinogaki_render_api::{
     Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface, SettingValues,
@@ -157,7 +157,7 @@ pub trait ObjectKindSpec: Send + Sync {
     /// which Studio adds selected, holding its creation's start and opened
     /// as it says, in one undo step; `Err` with why it can't be made now
     /// (a key or shelf run after the active engine changed).
-    fn create(&self, id: &str, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
+    fn create(&self, id: CreationId, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, String> {
         let _ = cx;
         Err(format!("{id} isn't made here"))
     }
@@ -169,7 +169,7 @@ pub trait ObjectKindSpec: Send + Sync {
 pub struct KindCreation {
     /// Its item id, which menus, keys and shelves name it by
     /// (`kinogaki.render.spot_light`, `example.pins.board`).
-    pub id: String,
+    pub id: CreationId,
     /// What menus call it ("Spot Light").
     pub label: String,
     /// The menus' family it is listed in ("Lights", "Primitives"); empty:
@@ -194,9 +194,9 @@ pub struct KindCreation {
 impl KindCreation {
     /// Creation `id` called `label`, with the other kinds, starting empty,
     /// not opening, at order 0.
-    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+    pub fn new(id: CreationId, label: impl Into<String>) -> Self {
         Self {
-            id: id.into(),
+            id,
             label: label.into(),
             family: String::new(),
             aliases: Vec::new(),
