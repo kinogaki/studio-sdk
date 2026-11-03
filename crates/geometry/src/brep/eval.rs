@@ -16,14 +16,23 @@ impl Surface {
     /// The point at `uv`; `None` only for an offset where its base has no
     /// normal (a pole, a collapsed side).
     pub fn point(&self, uv: [f64; 2]) -> Option<[f64; 3]> {
-        Some(self.partials(uv)?[0])
+        match self {
+            Surface::Offset(off) => {
+                let p = off.base().point(uv)?;
+                Some(add(p, scale(off.base().normal(uv)?, off.distance())))
+            }
+            _ => Some(self.partials(uv)?[0]),
+        }
     }
 
     /// The point and first partial derivatives `[S, ∂S/∂u, ∂S/∂v]` at
     /// `uv` (one-sided from above at a NURBS knot); `None` where
-    /// [`point`](Self::point) is. An offset's partials are its base's
-    /// (exact where the offset is no more than a radius of curvature away;
-    /// a kernel needing more evaluates the offset itself).
+    /// [`point`](Self::point) is. An offset's are `S + d·N` and
+    /// `∂S + d·∂N`, exact over a plane, cylinder, cone, sphere or torus,
+    /// whose normals' derivatives have closed forms; over another base
+    /// (NURBS, an extrusion, a revolution) they need its second
+    /// derivatives, which nothing here evaluates: `None`, and a kernel
+    /// evaluates such an offset itself.
     pub fn partials(&self, uv: [f64; 2]) -> Option<[[f64; 3]; 3]> {
         let [u, v] = uv;
         Some(match self {
@@ -101,10 +110,58 @@ impl Surface {
                 [add(o, point), d_theta, d_t]
             }
             Surface::Offset(off) => {
-                let [p, du, dv] = off.base().partials(uv)?;
-                let n = off.base().normal(uv)?;
-                [add(p, scale(n, off.distance())), du, dv]
+                let (base, d) = (off.base(), off.distance());
+                let [p, du, dv] = base.partials(uv)?;
+                let [nu, nv] = base.normal_partials(uv)?;
+                let n = base.normal(uv)?;
+                [
+                    add(p, scale(n, d)),
+                    add(du, scale(nu, d)),
+                    add(dv, scale(nv, d)),
+                ]
             }
+        })
+    }
+
+    /// The derivatives `[∂N/∂u, ∂N/∂v]` of the unit [`normal`](Self::normal)
+    /// at `uv`, for the kinds whose normal has a closed form (plane,
+    /// cylinder, cone, sphere, torus); `None` for the others.
+    fn normal_partials(&self, uv: [f64; 2]) -> Option<[V3; 2]> {
+        let [u, v] = uv;
+        let (s, co) = u.sin_cos();
+        // The ring's derivative in u: the frame's tangent of the turn.
+        let tangent = |x: V3, y: V3| along(x, y, -s, co);
+        Some(match self {
+            Surface::Plane(_) => [[0.0; 3]; 2],
+            Surface::Cylinder(c) => [tangent(c.frame().x(), c.frame().y()), [0.0; 3]],
+            Surface::Cone(c) => {
+                let f = c.frame();
+                [scale(tangent(f.x(), f.y()), c.half_angle().cos()), [0.0; 3]]
+            }
+            Surface::Sphere(sp) => {
+                let f = sp.frame();
+                let (sv, cv) = v.sin_cos();
+                let ring = along(f.x(), f.y(), co, s);
+                [
+                    scale(tangent(f.x(), f.y()), cv),
+                    add(scale(ring, -sv), scale(f.z(), cv)),
+                ]
+            }
+            Surface::Torus(t) => {
+                let f = t.frame();
+                let (sv, cv) = v.sin_cos();
+                let ring = along(f.x(), f.y(), co, s);
+                let side = if t.major() + t.minor() * cv < 0.0 {
+                    -1.0
+                } else {
+                    1.0
+                };
+                [
+                    scale(tangent(f.x(), f.y()), side * cv),
+                    scale(add(scale(ring, -sv), scale(f.z(), cv)), side),
+                ]
+            }
+            _ => return None,
         })
     }
 

@@ -1006,6 +1006,72 @@ fn analytic_charts_follow_the_contract() {
     assert!(Offset::new(Arc::new(offset), 1.0).is_err());
 }
 
+/// An offset's partials are `∂S + d·∂N`: a radius-2 cylinder offset by 1
+/// turns at radius 3, and over every analytic base they agree with finite
+/// differences of the offset's points. Over a base without closed-form
+/// normal derivatives they are refused, its points still given.
+#[test]
+fn offset_partials_follow_the_displaced_surface() {
+    let cylinder = Arc::new(Surface::Cylinder(Cylinder::new(Frame::WORLD, 2.0).unwrap()));
+    let offset = Surface::Offset(Offset::new(cylinder, 1.0).unwrap());
+    let [p, du, dv] = offset.partials([0.0, 0.5]).unwrap();
+    assert!(close(p, [3.0, 0.0, 0.5], 1e-12));
+    assert!(close(du, [0.0, 3.0, 0.0], 1e-12), "radius 3, not 2: {du:?}");
+    assert!(close(dv, [0.0, 0.0, 1.0], 1e-12));
+    let tilted = Frame::new(
+        [1.0, -2.0, 0.5],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0],
+    )
+    .unwrap();
+    let bases = [
+        Surface::Plane(Plane::new(tilted)),
+        Surface::Cylinder(Cylinder::new(tilted, 1.5).unwrap()),
+        Surface::Cone(Cone::new(tilted, 1.0, 0.4).unwrap()),
+        Surface::Sphere(Sphere::new(tilted, 2.0).unwrap()),
+        Surface::Torus(Torus::new(tilted, 3.0, 1.0).unwrap()),
+    ];
+    let h = 1e-6;
+    for base in bases {
+        for distance in [0.5, -0.25] {
+            let offset = Surface::Offset(Offset::new(Arc::new(base.clone()), distance).unwrap());
+            for uv in [[0.3, 0.2], [2.0, -0.7], [4.5, 1.1]] {
+                let [p, du, dv] = offset.partials(uv).unwrap();
+                assert!(close(p, offset.point(uv).unwrap(), 1e-12));
+                let at = |u: f64, v: f64| offset.point([u, v]).unwrap();
+                let central =
+                    |a: [f64; 3], b: [f64; 3]| [0, 1, 2].map(|k| (a[k] - b[k]) / (2.0 * h));
+                let (u, v) = (uv[0], uv[1]);
+                let fu = central(at(u + h, v), at(u - h, v));
+                let fv = central(at(u, v + h), at(u, v - h));
+                assert!(
+                    close(du, fu, 1e-6),
+                    "{base:?} ∂u at {uv:?}: {du:?} vs {fu:?}"
+                );
+                assert!(
+                    close(dv, fv, 1e-6),
+                    "{base:?} ∂v at {uv:?}: {dv:?} vs {fv:?}"
+                );
+            }
+        }
+    }
+    let line = Arc::new(Curve::Line(Line::new([0.0; 3], [1.0, 0.0, 0.0]).unwrap()));
+    let extruded = Arc::new(Surface::Extrusion(
+        Extrusion::new(line, [0.0, 1.0, 0.0]).unwrap(),
+    ));
+    let offset = Surface::Offset(Offset::new(extruded, 1.0).unwrap());
+    assert!(
+        offset.partials([0.5, 0.5]).is_none(),
+        "no closed form: refused"
+    );
+    assert!(close(
+        offset.point([0.5, 0.5]).unwrap(),
+        [0.5, 0.5, 1.0],
+        1e-12
+    ));
+}
+
 #[test]
 fn provenance_surfaces_sweep_their_profiles() {
     let circle = Arc::new(Curve::Circle(
