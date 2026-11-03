@@ -1,6 +1,7 @@
 //! [`ShadingNormals`]: the one rule polygons are shaded by, everywhere.
 use crate::attributes::{Attribute, Domain};
 use crate::column::Column;
+use crate::elements::Elements;
 use crate::kept::Kept;
 use crate::names;
 use crate::parallel;
@@ -59,8 +60,8 @@ impl ShadingNormals {
 struct Inputs {
     topology: Arc<Topology>,
     authored: Option<(Domain, Arc<Attribute>)>,
-    sharp: Option<Column<u64>>,
-    smooth: Option<Column<u64>>,
+    sharp: Option<Arc<Elements>>,
+    smooth: Option<Arc<Elements>>,
 }
 
 impl Inputs {
@@ -69,11 +70,7 @@ impl Inputs {
         let authored = [Domain::Vertex, Domain::Point, Domain::Primitive]
             .into_iter()
             .find_map(|d| Some((d, attributes.get_shared(d, names::N)?.clone())));
-        let group = |name| {
-            attributes
-                .group(Domain::Edge, name)
-                .map(|g| g.words().clone())
-        };
+        let group = |name| attributes.group_shared(Domain::Edge, name).cloned();
         Self {
             topology: value.topology().clone(),
             authored,
@@ -89,14 +86,14 @@ impl Inputs {
                 (None, None) => true,
                 _ => false,
             }
-            && same_words(&self.sharp, &other.sharp)
-            && same_words(&self.smooth, &other.smooth)
+            && same_group(&self.sharp, &other.sharp)
+            && same_group(&self.smooth, &other.smooth)
     }
 }
 
-fn same_words(a: &Option<Column<u64>>, b: &Option<Column<u64>>) -> bool {
+fn same_group(a: &Option<Arc<Elements>>, b: &Option<Arc<Elements>>) -> bool {
     match (a, b) {
-        (Some(x), Some(y)) => x.ptr_eq(y),
+        (Some(x), Some(y)) => Arc::ptr_eq(x, y),
         (None, None) => true,
         _ => false,
     }
@@ -288,8 +285,9 @@ impl Fan {
             };
             local.push((f, at, faces[f as usize], angle));
         }
-        let set =
-            |words: &Option<Column<u64>>, e: usize| words.as_deref().is_some_and(|w| is_set(w, e));
+        let set = |group: &Option<Arc<Elements>>, e: usize| {
+            group.as_ref().is_some_and(|g| g.contains(e as u32))
+        };
         links.clear();
         let flooded = inputs.authored.is_none().then_some(local.iter());
         links.extend(flooded.into_iter().flatten().map(|&(f, at, _, _)| {
@@ -348,9 +346,4 @@ impl Fan {
         }
         out
     }
-}
-
-/// Whether bit `i` of a group's words is set.
-fn is_set(words: &[u64], i: usize) -> bool {
-    words.get(i / 64).is_some_and(|w| w >> (i % 64) & 1 == 1)
 }

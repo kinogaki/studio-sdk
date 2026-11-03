@@ -112,11 +112,11 @@ pub const fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
     Typed::new(DataTypeId::declared(PREVIEW_MATERIALS))
 }
 
-/// `selection` of a value of data type `ty` with `count` elements of its
-/// domain, as the [`Components`] the host keeps, shows and counts.
-pub fn components(ty: DataTypeId, selection: Selection, count: usize) -> Components {
+/// `selection` of a value of data type `ty`, as the [`Components`] the
+/// host keeps, shows and counts.
+pub fn components(ty: DataTypeId, selection: Selection) -> Components {
     let level = level(selection.domain());
-    Components::new(ty, level, selection.len(count), selection)
+    Components::new(ty, level, selection.len(), selection)
 }
 
 /// The viewport's element kind that shows elements of `domain`: Primitive

@@ -2,8 +2,8 @@
 //! zero-copy view of a polygons value's polylines.
 use kinogaki_geometry::limits::MAX_DEGREE;
 use kinogaki_geometry::{
-    Attribute, Attributes, Basis, Column, Curves, CurvesBuilder, Domain, ErrorKind, Group, Meaning,
-    Polygons, Text, Topology, names,
+    Attribute, Attributes, Basis, Column, Curves, CurvesBuilder, Domain, Elements, ErrorKind,
+    Meaning, Polygons, Text, Topology, names,
 };
 use std::sync::Arc;
 
@@ -52,7 +52,7 @@ fn bezier_counts_are_whole_segments() {
     let closed = |count| {
         one(Basis::Bezier, count)
             .degree(3)
-            .periodic(Group::from_indices(1, [0]).unwrap())
+            .periodic(Elements::from_indices(1, [0]).unwrap())
     };
     assert!(closed(6).build().is_ok());
     assert_eq!(
@@ -169,7 +169,7 @@ fn offsets_points_degrees_and_periodic_cover_the_curves() {
         "2 degrees for 1 curves"
     );
     assert_eq!(
-        refused(build(vec![0, 3]).periodic(Group::none(2))),
+        refused(build(vec![0, 3]).periodic(Elements::none(2))),
         "the periodic group is over 2 curves, not 1"
     );
     let far = Curves::builder(
@@ -269,7 +269,7 @@ fn from_polylines_shares_the_buffers() {
         .with_group(
             Domain::Primitive,
             names::HIDDEN,
-            Group::from_indices(3, [2]).unwrap(),
+            Elements::from_indices(3, [2]).unwrap(),
         )
         .unwrap();
     let polygons = Polygons::new(positions.into(), t, attributes).unwrap();
@@ -318,7 +318,7 @@ fn bases_name_themselves() {
 }
 
 mod display {
-    use kinogaki_geometry::{Basis, Curves, Group};
+    use kinogaki_geometry::{Basis, Curves, Elements};
     use std::sync::Arc;
 
     /// The points a display samples each span with.
@@ -328,7 +328,7 @@ mod display {
         let n = points.len() as u32;
         let mut builder = Curves::builder(basis, points.into(), vec![0, n].into()).degree(degree);
         if periodic {
-            builder = builder.periodic(Group::from_indices(1, [0]).unwrap());
+            builder = builder.periodic(Elements::from_indices(1, [0]).unwrap());
         }
         builder.build().unwrap()
     }

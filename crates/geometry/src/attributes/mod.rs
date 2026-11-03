@@ -1,6 +1,6 @@
 //! The attribute model every standard value shares: named, typed columns
 //! per element domain ([`Attribute`] of an [`AttributeType`]), named sets
-//! of elements ([`Group`]), and the table of both a value holds
+//! of elements ([`Elements`]), and the table of both a value holds
 //! ([`Attributes`]).
 //!
 //! An [`Attribute`] checks its own values once, when it is made. An
@@ -11,18 +11,18 @@
 //! its domain ([`Polygons`](crate::Polygons), [`Curves`](crate::Curves)).
 mod attribute;
 mod domain;
-mod group;
+mod ids;
 pub mod names;
 mod text;
 mod types;
 
 pub use attribute::{Attribute, Tuple, Values};
 pub use domain::Domain;
-pub use group::Group;
 pub use names::check_name;
 pub use text::Text;
 pub use types::{AttributeType, Meaning, Storage};
 
+use crate::elements::Elements;
 use crate::error::{ErrorKind, GeometryError};
 use names::Standard;
 use std::collections::BTreeMap;
@@ -40,7 +40,8 @@ type Named<T> = BTreeMap<Domain, BTreeMap<Arc<str>, Arc<T>>>;
 /// **Rules** (checked as entries are added): every name passes
 /// [`check_name`]; a [standard name](names) has its standard type and
 /// lives only on its domains; `P` is never an attribute (positions are the
-/// value's own column).
+/// value's own column); the stable `id` names each element of its domain
+/// once (checked in parallel, only when the column is added).
 ///
 /// ```
 /// use kinogaki_geometry::{Attribute, Attributes, Domain, Meaning, names};
@@ -55,7 +56,7 @@ type Named<T> = BTreeMap<Domain, BTreeMap<Arc<str>, Arc<T>>>;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Attributes {
     values: Named<Attribute>,
-    groups: Named<Group>,
+    groups: Named<Elements>,
 }
 
 impl Attributes {
@@ -75,8 +76,14 @@ impl Attributes {
     }
 
     /// Group `name` of `domain`.
-    pub fn group(&self, domain: Domain, name: &str) -> Option<&Group> {
+    pub fn group(&self, domain: Domain, name: &str) -> Option<&Elements> {
         self.groups.get(&domain)?.get(name).map(|g| &**g)
+    }
+
+    /// Group `name` of `domain`, shared: what a cache compares by
+    /// identity.
+    pub(crate) fn group_shared(&self, domain: Domain, name: &str) -> Option<&Arc<Elements>> {
+        self.groups.get(&domain)?.get(name)
     }
 
     /// Every attribute, by domain then name.
@@ -87,7 +94,7 @@ impl Attributes {
     }
 
     /// Every group, by domain then name.
-    pub fn groups(&self) -> impl Iterator<Item = (Domain, &str, &Group)> {
+    pub fn groups(&self) -> impl Iterator<Item = (Domain, &str, &Elements)> {
         self.groups
             .iter()
             .flat_map(|(&d, m)| m.iter().map(move |(n, g)| (d, &**n, &**g)))
@@ -156,7 +163,7 @@ impl Attributes {
         &self,
         domain: Domain,
         name: &str,
-        group: Group,
+        group: Elements,
     ) -> Result<Attributes, GeometryError> {
         check_name(name)?;
         match names::standard(name) {
@@ -228,8 +235,8 @@ impl Attributes {
                     continue;
                 }
                 checked += 1;
-                if g.elements() != expected {
-                    return Err(missized(*domain, name, "group", g.elements(), expected));
+                if g.count() != expected {
+                    return Err(missized(*domain, name, "group", g.count(), expected));
                 }
             }
         }
@@ -286,6 +293,19 @@ fn check_standard_attribute(
             ty.describe(),
             attribute.ty().describe()
         ))),
+        Some(Standard::Attribute(..)) if name == names::ID => {
+            let repeated = match attribute.values() {
+                Values::I64(ids) => ids::repeated(ids),
+                _ => None,
+            };
+            match repeated {
+                Some(id) => Err(refused(format!(
+                    "{} id {id} names two elements",
+                    domain.name()
+                ))),
+                None => Ok(()),
+            }
+        }
         _ => Ok(()),
     }
 }

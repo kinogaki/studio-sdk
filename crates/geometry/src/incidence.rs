@@ -1,13 +1,15 @@
 //! [`Incidence`]: which elements of a value touch which, the one structure
 //! selection rules read (`kinogaki-edit`'s conversions), implemented by
 //! every standard value with elements: [`Polygons`] and [`Brep`].
-use crate::attributes::Domain;
+use crate::attributes::{Domain, Values, names};
 use crate::brep::Brep;
+use crate::column::Column;
 use crate::polygons::Polygons;
 
 /// A value's elements per domain and how they touch: a polygon its
 /// points, vertices and edges; an edge its points; a B-rep body its faces,
-/// edges and vertices. Pure structure: no positions, no attributes.
+/// edges and vertices; and the elements' stable ids where the value keeps
+/// them. Structure and identity: no positions, no other attributes.
 pub trait Incidence {
     /// How many elements `domain` has; `None` for a domain the value has
     /// none of.
@@ -22,6 +24,10 @@ pub trait Incidence {
     /// The fingerprint a selection made on it keeps: equal fingerprints
     /// number the same elements alike ([`Selection::validate`](crate::Selection::validate)).
     fn fingerprint(&self) -> [u8; 32];
+
+    /// The stable ids of `domain`'s elements (the standard `id`
+    /// attribute, unique within the domain), when the value has them.
+    fn ids(&self, domain: Domain) -> Option<&Column<i64>>;
 }
 
 impl Incidence for Polygons {
@@ -85,6 +91,13 @@ impl Incidence for Polygons {
 
     fn fingerprint(&self) -> [u8; 32] {
         self.topology().fingerprint()
+    }
+
+    fn ids(&self, domain: Domain) -> Option<&Column<i64>> {
+        match self.attributes().get(domain, names::ID)?.values() {
+            Values::I64(ids) => Some(ids),
+            _ => None,
+        }
     }
 }
 
@@ -164,5 +177,10 @@ impl Incidence for Brep {
 
     fn fingerprint(&self) -> [u8; 32] {
         Brep::fingerprint(self)
+    }
+
+    /// A B-rep keeps its elements by persistent name, not by id.
+    fn ids(&self, _: Domain) -> Option<&Column<i64>> {
+        None
     }
 }

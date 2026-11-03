@@ -3,7 +3,7 @@
 //! registered meshers.
 use kinogaki_studio_api::element::{Field, MemoryElement};
 use kinogaki_studio_api::geometry::brep::{Body, Brep, Element, FaceId};
-use kinogaki_studio_api::geometry::{Detail, Domain, Polygons, Selection, Tolerances};
+use kinogaki_studio_api::geometry::{Detail, Domain, Elements, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, BrepCodec};
 use kinogaki_studio_api::{
     CancelToken, Data, DataCodec, DisplayRequest, Error, Meshed, Mesher, MesherId, Package,
@@ -113,8 +113,9 @@ fn counts_and_selections_span_the_bodies() {
     // The numbering's fingerprint is the value's.
     assert_eq!(value.clone().fingerprint(), value.fingerprint());
     let data = standard::brep().wrap(value);
-    let s = Selection::new(Domain::Primitive, vec![6, 0], Some(6), None).unwrap();
-    let components = standard::components(data.ty(), s.clone(), 8);
+    let members = Elements::from_indices(8, [6, 0]).unwrap();
+    let s = Selection::new(Domain::Primitive, members, Some(6)).unwrap();
+    let components = standard::components(data.ty(), s.clone());
     let mut saved = MemoryElement::new("components");
     saved
         .write(|w| {

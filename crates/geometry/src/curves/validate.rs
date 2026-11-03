@@ -36,10 +36,10 @@ pub(super) fn curves(c: &Curves) -> Result<(), GeometryError> {
     if c.degrees.len() != curves {
         return whole(format!("{} degrees for {curves} curves", c.degrees.len()));
     }
-    if c.periodic.elements() != curves {
+    if c.periodic.count() != curves {
         return whole(format!(
             "the periodic group is over {} curves, not {curves}",
-            c.periodic.elements()
+            c.periodic.count()
         ));
     }
     let nurbs = c.basis == Basis::Nurbs;
@@ -79,7 +79,7 @@ pub(super) fn curves(c: &Curves) -> Result<(), GeometryError> {
         }
         let count = (end - start) as usize;
         let degree = c.degrees[i];
-        let periodic = c.periodic.contains(i);
+        let periodic = c.periodic.contains(i as u32);
         if let Some(problem) = degree_rule(c.basis, degree) {
             return at(i, format!("curve {i} {problem}"));
         }

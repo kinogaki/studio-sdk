@@ -11,7 +11,7 @@
 //! | [`Polygons`] | polygons and polylines over shared points ([`Topology`]), with [`Attributes`] |
 //! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves ([`Basis`]) |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
-//! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and [`Group`]s per [`Domain`]; [`Text`] is indexed; [standard names](names) |
+//! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and groups ([`Elements`]) per [`Domain`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`], [`Incidence`] | selected elements of one domain, with the active one; which elements of a value touch which (selection rules live in `kinogaki-edit`) |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
 //! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
@@ -101,6 +101,7 @@ mod column;
 mod curves;
 mod derived;
 mod detail;
+mod elements;
 mod error;
 mod frame;
 mod incidence;
@@ -124,13 +125,13 @@ mod xform;
 
 pub use attributes::names;
 pub use attributes::{
-    Attribute, AttributeType, Attributes, Domain, Group, Meaning, Storage, Text, Tuple, Values,
-    check_name,
+    Attribute, AttributeType, Attributes, Domain, Meaning, Storage, Text, Tuple, Values, check_name,
 };
 pub use bounds::Bounds;
 pub use column::Column;
 pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
 pub use detail::{Detail, DisplayQuality};
+pub use elements::Elements;
 pub use error::{ErrorKind, GeometryError};
 pub use frame::Frame;
 pub use incidence::Incidence;

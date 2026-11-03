@@ -5,7 +5,7 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
-use kinogaki_geometry::{Basis, Column, Curves, Group};
+use kinogaki_geometry::{Basis, Column, Curves, Elements};
 
 /// Saves [`Curves`]: `basis` (its [name](Basis::name)), `positions` (rows
 /// of 3 reals), `offsets`, `indexed` and the point index `points` (empty
@@ -107,7 +107,7 @@ pub(super) fn read_curves(element: &dyn ElementReader) -> Result<Curves, Error> 
         .iter()
         .map(|&w| w as u64)
         .collect();
-    let periodic = Group::new(curves_count, words.into()).map_err(|e| invalid(&at, e))?;
+    let periodic = Elements::from_bits(curves_count, words.into()).map_err(|e| invalid(&at, e))?;
     let mut builder = Curves::builder(
         basis,
         attributes::rows(element, "positions")?.into(),

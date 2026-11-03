@@ -1,7 +1,9 @@
 //! Shading normals: the cusp angle, sharp edges, authored normals first,
 //! the cache following N and sharp, and the refresh after a drag matching
 //! a whole build.
-use kinogaki_geometry::{Attribute, Attributes, Domain, Group, Meaning, Polygons, Topology, names};
+use kinogaki_geometry::{
+    Attribute, Attributes, Domain, Elements, Meaning, Polygons, Topology, names,
+};
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_6, PI};
 use std::sync::Arc;
 
@@ -39,9 +41,9 @@ fn folded(angle: f64) -> Polygons {
 fn edges(v: &Polygons, name: &str, all: bool) -> Polygons {
     let count = v.count(Domain::Edge).unwrap();
     let group = if all {
-        Group::from_indices(count, 0..count as u32).unwrap()
+        Elements::from_indices(count, 0..count as u32).unwrap()
     } else {
-        Group::none(count)
+        Elements::none(count)
     };
     let attributes = v
         .attributes()
@@ -216,6 +218,13 @@ fn normals_are_kept_and_follow_n_and_sharp_without_new_positions() {
     assert!(marked.positions().ptr_eq(v.positions()));
     assert_ne!(marked.shading_normals().vertices(), n.vertices());
     assert!(Arc::ptr_eq(&n, &v.shading_normals()), "both kept");
+    // A group of a few edges of many (held as a list) is kept by identity
+    // too.
+    let g = grid(10);
+    let one = Elements::from_indices(g.count(Domain::Edge).unwrap(), [0]).unwrap();
+    let attributes = g.attributes().with_group(Domain::Edge, names::SHARP, one);
+    let few = g.with_attributes(attributes.unwrap()).unwrap();
+    assert!(Arc::ptr_eq(&few.shading_normals(), &few.shading_normals()));
 }
 
 /// A bumpy grid of `n` × `n` quads.
@@ -251,8 +260,8 @@ fn the_refresh_after_a_drag_matches_a_whole_build() {
         let mut before = grid(100);
         if with_sharp {
             let edges = before.count(Domain::Edge).unwrap();
-            let group = Group::from_indices(edges, (0..edges as u32).step_by(7)).unwrap();
-            let smooth = Group::from_indices(edges, (3..edges as u32).step_by(5)).unwrap();
+            let group = Elements::from_indices(edges, (0..edges as u32).step_by(7)).unwrap();
+            let smooth = Elements::from_indices(edges, (3..edges as u32).step_by(5)).unwrap();
             let attributes = before.attributes();
             let attributes = attributes
                 .with_group(Domain::Edge, names::SHARP, group)

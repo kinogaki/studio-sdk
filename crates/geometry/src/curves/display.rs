@@ -74,7 +74,7 @@ struct Layout {
     offsets: Column<u32>,
     points: Option<Column<u32>>,
     degrees: Column<u8>,
-    periodic: Column<u64>,
+    periodic: crate::Elements,
     knots: Option<Knots>,
     weights: Option<Column<f64>>,
 }
@@ -86,7 +86,7 @@ impl Layout {
             offsets: curves.offsets.clone(),
             points: curves.points.clone(),
             degrees: curves.degrees.clone(),
-            periodic: curves.periodic.words().clone(),
+            periodic: curves.periodic.clone(),
             knots: curves.knots.clone(),
             weights: curves.weights.clone(),
         }
@@ -104,7 +104,7 @@ impl Layout {
             && self.offsets.ptr_eq(&other.offsets)
             && same(self.points.as_ref(), other.points.as_ref())
             && self.degrees.ptr_eq(&other.degrees)
-            && self.periodic.ptr_eq(&other.periodic)
+            && self.periodic == other.periodic
             && same(
                 self.knots.as_ref().map(|k| &k.offsets),
                 other.knots.as_ref().map(|k| &k.offsets),
@@ -155,7 +155,7 @@ impl Curves {
     fn on_span(&self, curve: usize, span: usize, u: f64) -> [f64; 3] {
         let n = self.vertices(curve).len();
         let d = self.degree(curve) as usize;
-        let closed = self.periodic.contains(curve);
+        let closed = self.periodic.contains(curve as u32);
         let cv =
             |k: usize| self.positions[self.point_of(self.offsets[curve] as usize + k % n) as usize];
         match self.basis {
@@ -287,7 +287,7 @@ impl Curves {
         let mut closed = Vec::with_capacity(self.curves());
         offsets.push(0);
         for i in 0..self.curves() {
-            let periodic = self.periodic.contains(i);
+            let periodic = self.periodic.contains(i as u32);
             match previous {
                 Some((previous, touched)) if !touched[i] => {
                     let range = previous.offsets[i] as usize..previous.offsets[i + 1] as usize;
@@ -357,7 +357,7 @@ impl Curves {
     fn spans(&self, i: usize) -> usize {
         let n = self.vertices(i).len();
         let d = self.degree(i) as usize;
-        let closed = self.periodic.contains(i);
+        let closed = self.periodic.contains(i as u32);
         match self.basis {
             Basis::Linear | Basis::CatmullRom => {
                 if closed {

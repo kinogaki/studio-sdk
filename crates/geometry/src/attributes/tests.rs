@@ -1,6 +1,7 @@
 //! The table's checks: a value re-checks only the entries it doesn't
 //! already hold.
-use super::{Attribute, Attributes, Domain, Group, Meaning};
+use super::{Attribute, Attributes, Domain, Meaning};
+use crate::Elements;
 
 #[test]
 fn only_replaced_entries_are_checked() {
@@ -10,7 +11,7 @@ fn only_replaced_entries_are_checked() {
         table = table.with(Domain::Point, name, floats(4)).unwrap();
     }
     table = table
-        .with_group(Domain::Point, "g", Group::none(4))
+        .with_group(Domain::Point, "g", Elements::none(4))
         .unwrap();
     let count = |d: Domain| (d == Domain::Point).then_some(4);
     assert_eq!(table.check("polygons", None, count), Ok(5));

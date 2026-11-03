@@ -1,7 +1,7 @@
 //! The standard data types: handles, codecs, the tolerances and display
 //! quality values and the conformance suite.
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::{Domain, Polygons, Selection, Tolerances};
+use kinogaki_studio_api::geometry::{Domain, Elements, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, PolygonsCodec};
 use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue, Units, UpAxis};
 use kinogaki_studio_api_testing as conformance;
@@ -114,11 +114,12 @@ fn a_saved_value_breaking_a_rule_does_not_read() {
 #[test]
 fn components_hold_a_standard_selection() {
     let data = standard::polygons().wrap(grid());
-    let s = Selection::new(Domain::Primitive, vec![3, 1], Some(3), None).unwrap();
-    let c = standard::components(data.ty(), s.clone(), 16);
+    let members = Elements::from_indices(16, [3, 1]).unwrap();
+    let s = Selection::new(Domain::Primitive, members, Some(3)).unwrap();
+    let c = standard::components(data.ty(), s.clone());
     assert_eq!((c.len(), c.selection()), (2, Some(&s)));
-    let all = standard::components(data.ty(), Selection::all(Domain::Point, None), 25);
-    assert_eq!(all.len(), 25);
+    let every = Selection::new(Domain::Point, Elements::all(25), None).unwrap();
+    assert_eq!(standard::components(data.ty(), every).len(), 25);
 }
 
 #[test]

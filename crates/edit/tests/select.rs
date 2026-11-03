@@ -2,7 +2,8 @@
 //! the same selection as another domain, and connected pieces.
 use kinogaki_edit::select::{self, Coverage, Expand, Mode};
 use kinogaki_geometry::{
-    Attribute, Attributes, Domain, ErrorKind, Polygons, Selection, Text, Topology, names,
+    Attribute, Attributes, Domain, Elements, ErrorKind, Meaning, Polygons, Selection, Text,
+    Topology, names,
 };
 
 /// A unit quad (0 1 2 3) and a triangle (1 4 2) sharing the edge 1–2, and
@@ -35,11 +36,24 @@ fn value() -> Polygons {
 }
 
 fn on(p: &Polygons, domain: Domain, ids: &[u32]) -> Selection {
-    Selection::new(domain, ids.to_vec(), None, Some(p.topology().fingerprint())).unwrap()
+    let count = p.count(domain).unwrap();
+    let members = Elements::from_indices(count, ids.iter().copied()).unwrap();
+    Selection::on(p, domain, members, None).unwrap()
+}
+
+/// A selection of `ids` of `count` points made on another value.
+fn stale(count: usize, ids: &[u32]) -> Selection {
+    let members = Elements::from_indices(count, ids.iter().copied()).unwrap();
+    let s = Selection::new(Domain::Point, members, None).unwrap();
+    s.restored(Some([7; 32]), None).unwrap()
+}
+
+fn all(p: &Polygons, domain: Domain) -> Selection {
+    Selection::on(p, domain, Elements::all(p.count(domain).unwrap()), None).unwrap()
 }
 
 fn ids(s: &Selection) -> Vec<u32> {
-    s.indices().to_vec()
+    s.members().iter().collect()
 }
 
 /// The edge between points `a` and `b`.
@@ -51,31 +65,36 @@ fn edge(p: &Polygons, a: u32, b: u32) -> u32 {
 fn a_selection_is_valid_on_its_own_topology_and_within_its_elements() {
     let p = value();
     on(&p, Domain::Point, &[0, 6]).validate(&p).unwrap();
-    // Made on no particular topology: valid while its indices are.
-    Selection::new(Domain::Edge, vec![1], None, None)
+    // Made on no particular topology: valid while it is a set of the
+    // domain's elements.
+    let edges = p.count(Domain::Edge).unwrap();
+    let one = Elements::from_indices(edges, [1]).unwrap();
+    Selection::new(Domain::Edge, one, None)
         .unwrap()
         .validate(&p)
         .unwrap();
-    let stale = Selection::new(Domain::Point, vec![0], None, Some([7; 32])).unwrap();
-    let e = stale.validate(&p).unwrap_err();
+    let e = stale(7, &[0]).validate(&p).unwrap_err();
     assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, None));
-    // The first index past the end is the one named.
-    let past = on(&p, Domain::Primitive, &[1, 3, 9]);
-    let e = past.validate(&p).unwrap_err();
-    assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, Some(3)));
-    let e = Selection::none(Domain::Object).validate(&p).unwrap_err();
+    // A set of another count is refused.
+    let wide = Selection::none(Domain::Primitive, 9);
+    let e = wide.validate(&p).unwrap_err();
+    assert_eq!(
+        e.message(),
+        "a selection of 9 primitive elements on a value of 3"
+    );
+    let e = Selection::none(Domain::Object, 1).validate(&p).unwrap_err();
     assert_eq!(e.message(), "the value has no object domain");
 }
 
 #[test]
-fn resolved_shares_the_indices_and_spells_out_all() {
+fn resolved_lists_the_members_and_spells_out_all() {
     let p = value();
     let some = on(&p, Domain::Point, &[2, 5]);
-    assert!(select::resolve(&some, &p).unwrap().ptr_eq(some.indices()));
-    let all = Selection::all(Domain::Primitive, None);
-    assert_eq!(&*select::resolve(&all, &p).unwrap(), &[0, 1, 2]);
+    assert_eq!(&*select::resolve(&some, &p).unwrap(), &[2, 5]);
+    let every = all(&p, Domain::Primitive);
+    assert_eq!(&*select::resolve(&every, &p).unwrap(), &[0, 1, 2]);
     assert_eq!(
-        &*select::resolve(&Selection::all(Domain::Detail, None), &p).unwrap(),
+        &*select::resolve(&all(&p, Domain::Detail), &p).unwrap(),
         &[0]
     );
 }
@@ -143,21 +162,16 @@ fn points_become_whole_polygons_and_edges_by_the_standard_rule() {
         [0, 1, 2, 3]
     );
     // Every result is made on the value's topology.
-    assert_eq!(faces.topology(), Some(p.topology().fingerprint()));
+    assert_eq!(faces.made_on(), Some(p.topology().fingerprint()));
 }
 
 #[test]
 fn all_stays_all_and_the_same_domain_is_the_selection_itself() {
     let p = value();
-    let all = select::convert(&Selection::all(Domain::Point, None), &p, Domain::Edge).unwrap();
-    assert!(all.is_all() && all.domain() == Domain::Edge);
+    let every = select::convert(&all(&p, Domain::Point), &p, Domain::Edge).unwrap();
+    assert!(every.members().is_all() && every.domain() == Domain::Edge);
     let s = on(&p, Domain::Edge, &[0]);
-    assert!(
-        select::convert(&s, &p, Domain::Edge)
-            .unwrap()
-            .indices()
-            .ptr_eq(s.indices())
-    );
+    assert_eq!(select::convert(&s, &p, Domain::Edge).unwrap(), s);
     let e = select::convert(&s, &p, Domain::Instance).unwrap_err();
     assert_eq!(e.kind(), ErrorKind::Selection);
 }
@@ -173,8 +187,7 @@ fn coverage_chooses_between_any_and_whole() {
     let whole = select::convert_by(&points, &p, Domain::Primitive, Coverage::Whole).unwrap();
     assert!(whole.is_empty());
     // A stale selection converts to nothing.
-    let stale = Selection::new(Domain::Point, vec![0], None, Some([7; 32])).unwrap();
-    assert!(select::convert(&stale, &p, Domain::Edge).is_err());
+    assert!(select::convert(&stale(7, &[0]), &p, Domain::Edge).is_err());
 }
 
 /// Two quads apart (0 1 2 3, 4 5 6 7) and a lone triangle (8 9 10), the
@@ -211,7 +224,7 @@ fn connected_grows_a_pick_to_its_pieces_and_a_name_keeps_one_together() {
     let point = on(&p, Domain::Point, &[2]);
     let grown = select::expand(&point, &p, &Expand::Connected);
     assert_eq!(ids(&grown), [0, 1, 2, 3]);
-    assert_eq!(grown.topology(), Some(p.topology().fingerprint()));
+    assert_eq!(grown.made_on(), Some(p.topology().fingerprint()));
     // Named alike, the first quad and the triangle are one piece; a blank
     // name joins nothing.
     let named = islands(true);
@@ -224,13 +237,61 @@ fn connected_grows_a_pick_to_its_pieces_and_a_name_keeps_one_together() {
         select::convert(&on(&named, Domain::Primitive, &[2]), &named, Domain::Edge).unwrap();
     let grown = select::expand(&edges, &named, &Expand::Connected);
     assert_eq!(
-        grown.len(0),
+        grown.len(),
         7,
         "the quad's four edges and the triangle's three"
     );
     // As picked, and a selection of another value, stay as they are.
     assert_eq!(select::expand(&first, &named, &Expand::None), first);
-    let stale = Selection::new(Domain::Primitive, vec![0], None, Some([7; 32])).unwrap();
+    let stale = stale(11, &[0]);
     assert_eq!(select::expand(&stale, &named, &Expand::Connected), stale);
     assert_eq!(Mode::from(Domain::Edge).expand, Expand::None);
+}
+
+/// `value()` with point ids `ids` and, when `insert`, a new point and a
+/// triangle on it placed before everything else (an insert upstream).
+fn with_ids(insert: bool) -> Polygons {
+    let base = value();
+    let ids: Vec<i64> = (0..7).map(|i| 100 + i).collect();
+    let column = |ids: Vec<i64>| Attribute::tuples(ids, Meaning::None).unwrap();
+    if !insert {
+        let attributes = Attributes::new()
+            .with(Domain::Point, names::ID, column(ids))
+            .unwrap();
+        return base.with_attributes(attributes).unwrap();
+    }
+    // Point 0 is new (id 7); the old points move up by one.
+    let mut positions = vec![[5.0, 5.0, 0.0]];
+    positions.extend(base.positions().iter().copied());
+    let t = base.topology();
+    let mut offsets = vec![0u32, 3];
+    offsets.extend(t.offsets()[1..].iter().map(|o| o + 3));
+    let mut vertices = vec![0u32, 1, 2];
+    vertices.extend(t.vertices().iter().map(|v| v + 1));
+    let topology = Topology::new(8, offsets.into(), vertices.into(), 3).unwrap();
+    let mut shifted = vec![7];
+    shifted.extend(ids);
+    let attributes = Attributes::new()
+        .with(Domain::Point, names::ID, column(shifted))
+        .unwrap();
+    Polygons::new(positions.into(), topology, attributes).unwrap()
+}
+
+#[test]
+fn a_selection_with_ids_is_found_again_after_an_insert_upstream() {
+    let before = with_ids(false);
+    let members = Elements::from_indices(7, [2, 5]).unwrap();
+    let s = Selection::on(&before, Domain::Point, members, Some(5)).unwrap();
+    assert_eq!(s.ids().map(|ids| ids.to_vec()), Some(vec![102, 105]));
+    // On its own value it is itself.
+    assert_eq!(select::reresolve(&s, &before), Some(s.clone()));
+    let after = with_ids(true);
+    assert!(s.validate(&after).is_err());
+    let found = select::reresolve(&s, &after).unwrap();
+    assert_eq!((ids(&found), found.active()), (vec![3, 6], Some(6)));
+    assert_eq!(found.made_on(), Some(after.topology().fingerprint()));
+    // Without ids it can't be found again.
+    let plain = on(&value(), Domain::Point, &[2]);
+    let moved = after.with_attributes(Attributes::new()).unwrap();
+    assert_eq!(select::reresolve(&plain, &moved), None);
 }

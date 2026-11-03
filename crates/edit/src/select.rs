@@ -1,5 +1,6 @@
 //! Selection rules: a [`Selection`] as another domain, the elements it
-//! holds, and how a pick grows before it becomes a selection.
+//! holds, how it is found again after its value changed
+//! ([`reresolve`]), and how a pick grows before it becomes a selection.
 //!
 //! One rule for every value: conversions read the value's
 //! [`Incidence`] (polygons and B-rep alike), so the levels row, the
@@ -8,20 +9,22 @@
 //!
 //! ```
 //! use kinogaki_edit::select;
-//! use kinogaki_geometry::{Attributes, Domain, Polygons, Selection, Topology};
+//! use kinogaki_geometry::{Attributes, Domain, Elements, Polygons, Selection, Topology};
 //!
 //! // Two triangles sharing the edge 1–2.
 //! let t = Topology::new(4, vec![0, 3, 6].into(), vec![0, 1, 2, 1, 3, 2].into(), 2).unwrap();
 //! let p = Polygons::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
-//! let on = Some(p.topology().fingerprint());
-//! let first = Selection::new(Domain::Primitive, vec![0], None, on).unwrap();
+//! let first = Elements::from_indices(2, [0]).unwrap();
+//! let first = Selection::on(&p, Domain::Primitive, first, None).unwrap();
 //! let points = select::convert(&first, &p, Domain::Point).unwrap();
-//! assert_eq!(&**points.indices(), &[0, 1, 2]);
+//! assert_eq!(points.members().iter().collect::<Vec<_>>(), [0, 1, 2]);
 //! // Back up, wholly: those points hold the first triangle alone.
 //! let faces = select::convert(&points, &p, Domain::Primitive).unwrap();
-//! assert_eq!(&**faces.indices(), &[0]);
+//! assert_eq!(faces.members().iter().collect::<Vec<_>>(), [0]);
 //! ```
-use kinogaki_geometry::{Column, Domain, GeometryError, Incidence, Polygons, Selection, names};
+use kinogaki_geometry::{
+    Column, Domain, Elements, GeometryError, Incidence, Polygons, Selection, names,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -39,8 +42,9 @@ pub enum Coverage {
 
 /// The selection as `to` by the standard rule: [`Coverage::Whole`] into
 /// Primitive and Object, and from Point into Edge; [`Coverage::Any`]
-/// otherwise. An all-selection stays all; the same domain is the
-/// selection itself.
+/// otherwise. The same domain is the selection itself; every element of
+/// one domain is, in another, what touches them (a loose point is no
+/// polygon's).
 ///
 /// # Errors
 /// As [`Selection::validate`], or a domain `on` has none of.
@@ -48,10 +52,6 @@ pub fn convert(s: &Selection, on: &dyn Incidence, to: Domain) -> Result<Selectio
     s.validate(on)?;
     if to == s.domain() {
         return Ok(s.clone());
-    }
-    if s.is_all() {
-        target(on, to)?;
-        return Ok(Selection::all(to, Some(on.fingerprint())));
     }
     let whole = matches!(to, Domain::Primitive | Domain::Object)
         || (to == Domain::Edge && s.domain() == Domain::Point);
@@ -81,8 +81,8 @@ pub fn convert_by(
         return Ok(s.clone());
     }
     let targets = target(on, to)?;
-    let mut chosen = vec![s.is_all(); on.count(s.domain()).unwrap_or(0)];
-    for &i in s.indices().iter() {
+    let mut chosen = vec![false; on.count(s.domain()).unwrap_or(0)];
+    for i in s.members().iter() {
         chosen[i as usize] = true;
     }
     let whole = coverage == Coverage::Whole;
@@ -96,33 +96,79 @@ pub fn convert_by(
             missing[target] = true;
         }
     });
-    let ids = (0..targets)
-        .filter(|&i| touched[i] && (!whole || !missing[i]))
-        .map(|i| i as u32)
-        .collect();
-    Selection::new(to, ids, None, Some(on.fingerprint()))
+    let members = Elements::from_fn(targets, |i| {
+        touched[i as usize] && (!whole || !missing[i as usize])
+    });
+    Selection::on(on, to, members, None)
 }
 
-/// The selected elements, ascending: every one of `on`'s for an
-/// all-selection, else the indices themselves (shared, no copy).
+/// The selected elements of `on`, ascending (shared when the selection
+/// holds them as a list).
 ///
 /// # Errors
 /// As [`Selection::validate`].
 pub fn resolve(s: &Selection, on: &dyn Incidence) -> Result<Column<u32>, GeometryError> {
     s.validate(on)?;
-    Ok(if s.is_all() {
-        let count = on.count(s.domain()).unwrap_or(0) as u32;
-        Column::new((0..count).collect())
-    } else {
-        s.indices().clone()
-    })
+    Ok(s.members().indices())
+}
+
+/// `s` on `on`, a later value of the one it was made on: itself while
+/// `on` numbers the elements as that value did; after a change of
+/// topology upstream, the elements of `on` whose stable ids it holds
+/// (those still there; the active one too, when it is). `None` when it
+/// can't be found again: it holds no ids, or `on` has none on its domain.
+///
+/// ```
+/// use kinogaki_edit::select;
+/// use kinogaki_geometry::{Attribute, Attributes, Domain, Elements, Polygons, Selection, Topology, names};
+///
+/// let with_ids = |points: usize, ids: Vec<i64>| {
+///     let t = Topology::new(points, vec![0, 3].into(), vec![0, 1, 2].into(), 1).unwrap();
+///     let ids = Attributes::new().with(Domain::Point, names::ID, Attribute::tuples(ids, kinogaki_geometry::Meaning::None).unwrap()).unwrap();
+///     Polygons::new(vec![[0.0; 3]; points].into(), t, ids).unwrap()
+/// };
+/// let before = with_ids(3, vec![10, 11, 12]);
+/// let s = Selection::on(&before, Domain::Point, Elements::from_indices(3, [1, 2]).unwrap(), Some(2)).unwrap();
+/// // A point inserted upstream, before the others.
+/// let after = with_ids(4, vec![99, 10, 11, 12]);
+/// let found = select::reresolve(&s, &after).unwrap();
+/// assert_eq!(found.members().iter().collect::<Vec<_>>(), [2, 3]);
+/// assert_eq!(found.active(), Some(3));
+/// ```
+pub fn reresolve(s: &Selection, on: &dyn Incidence) -> Option<Selection> {
+    if s.validate(on).is_ok() {
+        return Some(s.clone());
+    }
+    let (Some(kept), Some(now)) = (s.ids(), on.ids(s.domain())) else {
+        return None;
+    };
+    let wanted: HashMap<i64, u32> = kept
+        .iter()
+        .zip(s.members().iter())
+        .map(|(&id, member)| (id, member))
+        .collect();
+    let mut active = None;
+    let mut found = Vec::with_capacity(kept.len());
+    for (element, id) in now.iter().enumerate() {
+        if let Some(&was) = wanted.get(id) {
+            found.push(element as u32);
+            if s.active() == Some(was) {
+                active = Some(element as u32);
+            }
+        }
+    }
+    let members = Elements::from_indices(now.len(), found).ok()?;
+    Selection::on(on, s.domain(), members, active).ok()
 }
 
 /// How many elements of `domain` `on` has, refusing a domain it has none
 /// of as [`Selection::validate`] does.
 fn target(on: &dyn Incidence, domain: Domain) -> Result<usize, GeometryError> {
-    Selection::none(domain).validate(on)?;
-    Ok(on.count(domain).unwrap_or(0))
+    on.count(domain).ok_or_else(|| {
+        Selection::none(domain, 0)
+            .validate(on)
+            .expect_err("a domain the value has none of")
+    })
 }
 
 /// How a pick grows before it becomes a selection.
@@ -174,22 +220,22 @@ pub fn expand(s: &Selection, on: &Polygons, how: &Expand) -> Selection {
             _ => return None,
         })
     };
-    let (Expand::Connected, false, Ok(()), Some(point)) =
-        (how, s.is_all(), s.validate(on), point_of(s.domain()))
-    else {
+    let (Expand::Connected, false, Ok(()), Some(point)) = (
+        how,
+        s.members().is_all(),
+        s.validate(on),
+        point_of(s.domain()),
+    ) else {
         return s.clone();
     };
     let pieces = &pieces(on).0;
     let mut held = vec![false; pieces.len()];
-    for &i in s.indices().iter() {
+    for i in s.members().iter() {
         held[pieces[point(i) as usize] as usize] = true;
     }
-    let count = on.count(s.domain()).unwrap_or(0) as u32;
-    let ids = (0..count)
-        .filter(|&i| held[pieces[point(i) as usize] as usize])
-        .collect();
-    Selection::new(s.domain(), ids, None, Some(on.topology().fingerprint()))
-        .expect("no active element")
+    let count = on.count(s.domain()).unwrap_or(0);
+    let members = Elements::from_fn(count, |i| held[pieces[point(i) as usize] as usize]);
+    Selection::on(on, s.domain(), members, None).expect("a set of the domain's elements")
 }
 
 /// Each point's piece, by the smallest point in it.

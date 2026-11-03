@@ -1,7 +1,7 @@
 //! The attribute model: types, standard names, adoption without copies,
 //! arrays, indexed text, groups, and sharing between tables.
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Column, Domain, ErrorKind, Group, Meaning, Polygons,
+    Attribute, AttributeType, Attributes, Column, Domain, Elements, ErrorKind, Meaning, Polygons,
     Storage, Text, Topology, Tuple, Values, check_name, limits::MAX_NAME, names,
 };
 use std::sync::Arc;
@@ -341,24 +341,24 @@ fn replacing_one_column_shares_the_rest_and_checks_it_alone() {
 fn standard_groups_are_on_their_domain() {
     let t = Attributes::new();
     assert!(
-        t.with_group(Domain::Edge, names::SHARP, Group::none(3))
+        t.with_group(Domain::Edge, names::SHARP, Elements::none(3))
             .is_ok()
     );
     assert!(
-        t.with_group(Domain::Primitive, names::HIDDEN, Group::none(3))
+        t.with_group(Domain::Primitive, names::HIDDEN, Elements::none(3))
             .is_ok()
     );
-    let wrong = t.with_group(Domain::Point, names::SHARP, Group::none(3));
+    let wrong = t.with_group(Domain::Point, names::SHARP, Elements::none(3));
     assert_eq!(
         wrong.unwrap_err().message(),
         "sharp is a group of the edge domain, not of the point domain"
     );
     assert!(
-        t.with_group(Domain::Point, names::CD, Group::none(3))
+        t.with_group(Domain::Point, names::CD, Elements::none(3))
             .is_err()
     );
     assert!(
-        t.with_group(Domain::Point, "set:top", Group::none(3))
+        t.with_group(Domain::Point, "set:top", Elements::none(3))
             .is_ok()
     );
 }
@@ -380,67 +380,6 @@ fn text_rules_are_checked() {
     );
     let repeated = Text::new(vec![0].into(), table(&["a", "a"])).unwrap_err();
     assert_eq!(repeated.message(), "text table entry 1 repeats \"a\"");
-}
-
-#[test]
-fn group_rules_are_checked() {
-    let g = Group::from_indices(130, [0, 64, 129]).unwrap();
-    assert_eq!((g.elements(), g.members(), g.words().len()), (130, 3, 3));
-    assert_eq!(g.iter().collect::<Vec<_>>(), [0, 64, 129]);
-    assert!(g.contains(129) && !g.contains(130) && !g.contains(1000));
-    assert!(Group::new(130, g.words().clone()).is_ok());
-    let few = Group::new(130, vec![0, 0].into()).unwrap_err();
-    assert_eq!(few.message(), "a group of 130 elements has 2 words, not 3");
-    let past = Group::new(130, vec![0, 0, 1 << 2].into()).unwrap_err();
-    assert_eq!(
-        past.message(),
-        "a group of 130 elements holds bits past its last element"
-    );
-    assert!(Group::new(128, vec![u64::MAX, u64::MAX].into()).is_ok());
-    let out = Group::from_indices(4, [4]).unwrap_err();
-    assert_eq!(
-        (out.element(), out.message()),
-        (Some(4), "group member 4 is past its 4 elements")
-    );
-    assert_eq!(Group::none(0).words().len(), 0);
-}
-
-#[test]
-fn group_set_algebra_matches_the_per_index_definitions() {
-    // Sizes on, below and past word boundaries; members spread across words.
-    for elements in [0usize, 1, 63, 64, 65, 130, 200] {
-        let a = Group::from_fn(elements, |i| i % 3 == 0 || i == 64);
-        let b = Group::from_fn(elements, |i| i % 5 == 1 || i + 1 == elements);
-        let per_index = |f: &dyn Fn(bool, bool) -> bool| -> Vec<u32> {
-            (0..elements)
-                .filter(|&i| f(a.contains(i), b.contains(i)))
-                .map(|i| i as u32)
-                .collect()
-        };
-        let members = |g: Group| {
-            assert_eq!(g.elements(), elements);
-            // The rule `Group::new` checks: no bit past the last element.
-            assert!(Group::new(elements, g.words().clone()).is_ok());
-            g.iter().collect::<Vec<_>>()
-        };
-        assert_eq!(members(a.union(&b).unwrap()), per_index(&|x, y| x || y));
-        assert_eq!(
-            members(a.intersection(&b).unwrap()),
-            per_index(&|x, y| x && y)
-        );
-        assert_eq!(
-            members(a.difference(&b).unwrap()),
-            per_index(&|x, y| x && !y)
-        );
-        assert_eq!(
-            members(a.symmetric_difference(&b).unwrap()),
-            per_index(&|x, y| x != y)
-        );
-        assert_eq!(members(Group::all(elements)), per_index(&|_, _| true));
-        assert_eq!(Group::all(elements).members(), elements);
-    }
-    let refused = Group::none(3).union(&Group::none(4)).unwrap_err();
-    assert_eq!(refused.kind(), ErrorKind::Attribute);
 }
 
 #[test]

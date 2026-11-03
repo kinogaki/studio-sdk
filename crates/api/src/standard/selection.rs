@@ -1,6 +1,7 @@
-//! Saving a standard [`Selection`]: the fields `domain`, `all`, `indices`,
-//! `active` (−1 for none) and `topology` (the 32-byte fingerprint it was
-//! made on, or no bytes).
+//! Saving a standard [`Selection`]: the fields `domain`, its members as
+//! `elements` and `words` (as a group saves them), `active` when one is,
+//! `on` (the 32-byte fingerprint of the value it was made on, or no
+//! bytes) and `ids` (the members' stable ids) when it holds them.
 use super::{attributes, components, invalid};
 use crate::components::Components;
 use crate::element::{ElementReader, ElementWriter, Field};
@@ -15,11 +16,15 @@ pub(super) fn write(components: &Components, out: &mut dyn ElementWriter) -> Res
         ));
     };
     out.set("domain", Field::Text(s.domain().name().into()))?;
-    out.set("all", Field::Bool(s.is_all()))?;
-    out.set("indices", Field::U32s(s.indices().to_vec()))?;
-    out.set("active", Field::Int(s.active().map_or(-1, i64::from)))?;
-    let topology = s.topology().map_or(Vec::new(), |t| t.to_vec());
-    out.set("topology", Field::U8s(topology))?;
+    attributes::write_elements(s.members(), out)?;
+    if let Some(active) = s.active() {
+        out.set("active", Field::Int(i64::from(active)))?;
+    }
+    let on = s.made_on().map_or(Vec::new(), |t| t.to_vec());
+    out.set("on", Field::U8s(on))?;
+    if let Some(ids) = s.ids() {
+        out.set("ids", Field::I64s(ids.to_vec()))?;
+    }
     Ok(true)
 }
 
@@ -34,30 +39,36 @@ pub(super) fn read(
         .ok_or_else(|| Error::invalid(format_args!("{at}: no domain {name:?}")))?;
     let elements = count(domain)
         .ok_or_else(|| Error::invalid(format_args!("{at}: the value has no {name} domain")))?;
-    let topology = match attributes::u8s(from, "topology")? {
+    let members = attributes::elements(from)?;
+    if members.count() != elements {
+        return Err(Error::invalid(format_args!(
+            "{at}: a selection of {} {name} elements on a value of {elements}",
+            members.count()
+        )));
+    }
+    let on = match attributes::u8s(from, "on")? {
         [] => None,
         bytes => Some(
             <[u8; 32]>::try_from(bytes)
                 .map_err(|_| Error::invalid(format_args!("{at}: a fingerprint is 32 bytes")))?,
         ),
     };
-    let selection = if from.bool("all")? {
-        Selection::all(domain, topology)
-    } else {
-        let active =
-            match from.int("active")? {
-                -1 => None,
-                a => Some(u32::try_from(a).map_err(|_| {
+    let active =
+        match from.field("active") {
+            None => None,
+            Some(_) => {
+                let a = from.int("active")?;
+                Some(u32::try_from(a).map_err(|_| {
                     Error::invalid(format_args!("{at}: active {a} is not an element"))
-                })?),
-            };
-        let indices = from.u32s("indices")?.to_vec();
-        if let Some(&past) = indices.iter().find(|&&i| i as usize >= elements) {
-            return Err(Error::invalid(format_args!(
-                "{at}: selected {name} {past} is past the {elements} elements"
-            )));
-        }
-        Selection::new(domain, indices, active, topology).map_err(|e| invalid(&at, e))?
+                })?)
+            }
+        };
+    let ids = match from.field("ids") {
+        None => None,
+        Some(_) => Some(attributes::i64s(from, "ids")?.to_vec().into()),
     };
-    Ok(components(ty, selection, elements))
+    let selection = Selection::new(domain, members, active)
+        .and_then(|s| s.restored(on, ids))
+        .map_err(|e| invalid(&at, e))?;
+    Ok(components(ty, selection))
 }

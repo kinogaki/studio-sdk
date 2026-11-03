@@ -16,7 +16,7 @@ use super::invalid;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::error::Error;
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Column, Domain, Group, Meaning, Storage, Text, Values,
+    Attribute, AttributeType, Attributes, Column, Domain, Elements, Meaning, Storage, Text, Values,
 };
 use std::sync::Arc;
 
@@ -59,9 +59,7 @@ pub(super) fn write(attributes: &Attributes, out: &mut dyn ElementWriter) -> Res
         let mut child = out.child(&format!("g{k}"), "group")?;
         child.set("name", Field::Text(name.into()))?;
         child.set("domain", Field::Text(domain.name().into()))?;
-        child.set("elements", Field::Int(group.elements() as i64))?;
-        let words = group.words().iter().map(|&w| w as i64).collect();
-        child.set("words", Field::I64s(words))?;
+        write_elements(group, &mut *child)?;
     }
     Ok(())
 }
@@ -83,10 +81,7 @@ pub(super) fn read(from: &dyn ElementReader) -> Result<Attributes, Error> {
             }
             "group" => {
                 let (domain, name) = (domain(&*child)?, child.text("name")?);
-                let elements = count(&*child, "elements")?;
-                let words: Vec<u64> = i64s(&*child, "words")?.iter().map(|&w| w as u64).collect();
-                let group =
-                    Group::new(elements, Column::new(words)).map_err(|e| invalid(&at, e))?;
+                let group = elements(&*child)?;
                 attributes = attributes
                     .with_group(domain, name, group)
                     .map_err(|e| invalid(&at, e))?;
@@ -95,6 +90,20 @@ pub(super) fn read(from: &dyn ElementReader) -> Result<Attributes, Error> {
         }
     }
     Ok(attributes)
+}
+
+/// The set `elements` and `words` say (a group's or a selection's).
+pub(super) fn elements(from: &dyn ElementReader) -> Result<Elements, Error> {
+    let count = count(from, "elements")?;
+    let words: Vec<u64> = i64s(from, "words")?.iter().map(|&w| w as u64).collect();
+    Elements::from_bits(count, Column::new(words)).map_err(|e| invalid(&from.location(), e))
+}
+
+/// Writes `set` as `elements` (its count) and its bit `words`.
+pub(super) fn write_elements(set: &Elements, out: &mut dyn ElementWriter) -> Result<(), Error> {
+    out.set("elements", Field::Int(set.count() as i64))?;
+    let words = set.words().iter().map(|&w| w as i64).collect();
+    out.set("words", Field::I64s(words))
 }
 
 fn read_attribute(child: &dyn ElementReader) -> Result<Attribute, Error> {

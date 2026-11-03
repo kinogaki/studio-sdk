@@ -2,7 +2,7 @@
 //! edit keeps.
 use kinogaki_geometry::limits::MAX_POINTS;
 use kinogaki_geometry::{
-    Attribute, Attributes, Bounds, Domain, ErrorKind, Group, Meaning, Polygons, Text, Topology,
+    Attribute, Attributes, Bounds, Domain, Elements, ErrorKind, Meaning, Polygons, Text, Topology,
     Vec3, names,
 };
 use std::sync::Arc;
@@ -166,10 +166,10 @@ fn attributes_are_sized_to_their_domain() {
         .with_group(
             Domain::Edge,
             names::SHARP,
-            Group::from_indices(6, [1]).unwrap(),
+            Elements::from_indices(6, [1]).unwrap(),
         )
         .unwrap()
-        .with_group(Domain::Primitive, names::HIDDEN, Group::none(3))
+        .with_group(Domain::Primitive, names::HIDDEN, Elements::none(3))
         .unwrap();
     let ok = p.with_attributes(sized).unwrap();
     assert!(Arc::ptr_eq(ok.topology(), p.topology()) && ok.positions().ptr_eq(p.positions()));
@@ -185,7 +185,7 @@ fn attributes_are_sized_to_their_domain() {
         "vertex attribute w has 7 values for 8 elements"
     );
     let group = Attributes::new()
-        .with_group(Domain::Edge, names::SHARP, Group::none(5))
+        .with_group(Domain::Edge, names::SHARP, Elements::none(5))
         .unwrap();
     assert_eq!(
         p.with_attributes(group).unwrap_err().message(),

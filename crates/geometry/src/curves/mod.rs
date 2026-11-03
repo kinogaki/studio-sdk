@@ -8,8 +8,9 @@ mod validate;
 pub use build::CurvesBuilder;
 pub use display::CurveDisplay;
 
-use crate::attributes::{Attributes, Domain, Group};
+use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
+use crate::elements::Elements;
 use crate::error::GeometryError;
 use crate::positions;
 use std::ops::Range;
@@ -141,7 +142,7 @@ pub struct Curves {
     points: Option<Column<u32>>,
     basis: Basis,
     degrees: Column<u8>,
-    periodic: Group,
+    periodic: Elements,
     knots: Option<Knots>,
     weights: Option<Column<f64>>,
     attributes: Arc<Attributes>,
@@ -197,7 +198,7 @@ impl Curves {
     }
 
     /// The closed curves.
-    pub fn periodic(&self) -> &Group {
+    pub fn periodic(&self) -> &Elements {
         &self.periodic
     }
 

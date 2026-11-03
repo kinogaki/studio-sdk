@@ -2,8 +2,8 @@
 //! types allow and every attribute type on every domain.
 use super::Producer;
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Group, Meaning, Polygons,
-    Storage, Text, Topology, Values, names,
+    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Elements, Meaning,
+    Polygons, Storage, Text, Topology, Values, names,
 };
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::standard;
@@ -67,7 +67,7 @@ impl Fixtures {
                 "linear curves".into(),
                 build(
                     Curves::builder(Basis::Linear, points(7), vec![0, 3, 7].into())
-                        .periodic(Group::from_indices(2, [1]).expect("periodic"))
+                        .periodic(Elements::from_indices(2, [1]).expect("periodic"))
                         .attributes(widths),
                 ),
             ),
@@ -354,20 +354,20 @@ fn groups() -> Polygons {
         .with_group(
             Domain::Primitive,
             names::HIDDEN,
-            Group::from_indices(9, [4]).expect("hidden"),
+            Elements::from_indices(9, [4]).expect("hidden"),
         )
         .and_then(|a| {
             a.with_group(
                 Domain::Edge,
                 names::SHARP,
-                Group::from_indices(edges, [0, 1, 2]).expect("sharp"),
+                Elements::from_indices(edges, [0, 1, 2]).expect("sharp"),
             )
         })
         .and_then(|a| {
             a.with_group(
                 Domain::Point,
                 "corners",
-                Group::from_indices(16, [0, 3, 12, 15]).expect("corners"),
+                Elements::from_indices(16, [0, 3, 12, 15]).expect("corners"),
             )
         })
         .expect("groups");

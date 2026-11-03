@@ -1,7 +1,8 @@
 //! [`CurvesBuilder`]: the one way to make [`Curves`].
 use super::{Basis, Curves, Knots, validate};
-use crate::attributes::{Attributes, Group};
+use crate::attributes::Attributes;
 use crate::column::Column;
+use crate::elements::Elements;
 use crate::error::GeometryError;
 use std::sync::Arc;
 
@@ -19,7 +20,7 @@ pub struct CurvesBuilder {
     points: Option<Column<u32>>,
     basis: Basis,
     degrees: Option<Column<u8>>,
-    periodic: Option<Group>,
+    periodic: Option<Elements>,
     knots: Option<(Column<u32>, Column<f64>)>,
     weights: Option<Column<f64>>,
     attributes: Arc<Attributes>,
@@ -60,7 +61,7 @@ impl CurvesBuilder {
     }
 
     /// The closed curves.
-    pub fn periodic(mut self, periodic: Group) -> Self {
+    pub fn periodic(mut self, periodic: Elements) -> Self {
         self.periodic = Some(periodic);
         self
     }
@@ -98,7 +99,7 @@ impl CurvesBuilder {
             let degree = if self.basis == Basis::Linear { 1 } else { 3 };
             Column::new(vec![degree; curves])
         });
-        let periodic = self.periodic.unwrap_or_else(|| Group::none(curves));
+        let periodic = self.periodic.unwrap_or_else(|| Elements::none(curves));
         let value = Curves {
             positions: self.positions,
             offsets: self.offsets,

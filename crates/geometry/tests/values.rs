@@ -1,22 +1,28 @@
 //! Selection, Detail, DisplayQuality and Tolerances: their rules.
 use kinogaki_geometry::{
-    Detail, DisplayQuality, Domain, ErrorKind, Selection, Tolerances, Units, UpAxis,
+    Detail, DisplayQuality, Domain, Elements, ErrorKind, Selection, Tolerances, Units, UpAxis,
 };
 
 #[test]
 fn selections_are_sorted_distinct_and_hold_their_active_element() {
-    let s = Selection::new(Domain::Primitive, vec![5, 1, 5, 3], Some(5), None).unwrap();
-    assert_eq!(&**s.indices(), &[1, 3, 5]);
+    let members = Elements::from_indices(10, [5, 1, 5, 3]).unwrap();
+    let s = Selection::new(Domain::Primitive, members, Some(5)).unwrap();
+    assert_eq!(s.members().iter().collect::<Vec<_>>(), [1, 3, 5]);
     assert_eq!(
-        (s.domain(), s.active(), s.len(10), s.is_all()),
+        (s.domain(), s.active(), s.len(), s.members().is_all()),
         (Domain::Primitive, Some(5), 3, false)
     );
-    let e = Selection::new(Domain::Point, vec![1, 2], Some(4), None).unwrap_err();
+    let two = Elements::from_indices(10, [1, 2]).unwrap();
+    let e = Selection::new(Domain::Point, two.clone(), Some(4)).unwrap_err();
     assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, Some(4)));
     assert_eq!(e.message(), "the active point 4 is not selected");
-    let all = Selection::all(Domain::Edge, None);
-    assert!(all.contains(1_000) && all.len(7) == 7 && !all.is_empty());
-    assert!(Selection::none(Domain::Point).is_empty());
+    let all = Selection::new(Domain::Edge, Elements::all(7), None).unwrap();
+    assert!(all.contains(6) && !all.contains(7) && all.len() == 7 && !all.is_empty());
+    assert!(Selection::none(Domain::Point, 3).is_empty());
+    // Ids are one per member.
+    let s = Selection::new(Domain::Point, two, None).unwrap();
+    assert!(s.clone().restored(None, Some(vec![4, 5].into())).is_ok());
+    assert!(s.restored(None, Some(vec![4].into())).is_err());
 }
 
 #[test]

@@ -1,6 +1,6 @@
 //! The SDK's consumers: [`Codecs`] and [`Invariants`].
 use super::Consumer;
-use kinogaki_geometry::{Curves, Domain, Polygons, Selection, Topology};
+use kinogaki_geometry::{Curves, Domain, Elements, Polygons, Selection, Topology};
 use kinogaki_studio_api::codec::DataCodec;
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::element::MemoryElement;
@@ -37,11 +37,10 @@ impl Consumer for Codecs {
             return Err("the value read back differs".into());
         }
         let points = count.unwrap_or(0);
-        let picked: Vec<u32> = (0..points as u32).step_by(2).collect();
-        let active = picked.last().copied();
-        let selection =
-            Selection::new(Domain::Point, picked, active, None).map_err(|e| e.to_string())?;
-        let components = standard::components(data.ty(), selection, points);
+        let picked = Elements::from_fn(points, |i| i % 2 == 0);
+        let active = picked.iter().last();
+        let selection = Selection::new(Domain::Point, picked, active).map_err(|e| e.to_string())?;
+        let components = standard::components(data.ty(), selection);
         let mut saved = MemoryElement::new("components");
         saved
             .write(|w| codec.write_components(&components, data, w))
