@@ -8,8 +8,7 @@
 //!
 //! | Value | What |
 //! |---|---|
-//! | [`Geometry`] | polygons, polylines and curves over shared points: one [`Primitives`] table, each primitive of a [`Kind`] ([`Basis`] and closed), in any order, with [`Attributes`] |
-//! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves of one [`Basis`] |
+//! | [`Geometry`] | polygons, polylines and curves over shared points: one [`Primitives`] table, each primitive of a [`Kind`] ([`Basis`] and closed), in any order, with [`Attributes`]; a primitive evaluates as a [`Curve`] |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
 //! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and groups ([`Elements`]) per [`Domain`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`], [`Incidence`] | selected elements of one domain, with the active one; which elements of a value touch which (selection rules live in `kinogaki-edit`) |
@@ -98,7 +97,7 @@ mod attributes;
 mod bounds;
 pub mod brep;
 mod column;
-mod curves;
+mod curve;
 mod derived;
 mod detail;
 mod elements;
@@ -129,7 +128,7 @@ pub use attributes::{
 };
 pub use bounds::Bounds;
 pub use column::Column;
-pub use curves::{CurveDisplay, Curves, CurvesBuilder};
+pub use curve::{Curve, Span};
 pub use detail::{Detail, DisplayQuality};
 pub use elements::Elements;
 pub use error::{ErrorKind, GeometryError};

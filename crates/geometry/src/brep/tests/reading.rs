@@ -185,7 +185,7 @@ fn fingerprints_follow_structure_and_names_never_geometry() {
         let body = b.build(Attributes::new()).unwrap();
         let value = Brep::new(
             vec![body.clone()],
-            Curves::empty(),
+            crate::Geometry::empty(),
             Vec::new(),
             Attributes::new(),
         )
@@ -259,12 +259,17 @@ fn fingerprints_name_datums_and_free_curves_in_order() {
                 Attribute::text(crate::Text::from_strs(names)),
             )
             .unwrap();
-        Curves::builder(crate::Basis::Linear, points.into(), vec![0, 2, 4].into())
-            .attributes(named)
-            .build()
-            .unwrap()
+        let lines = vec![crate::Kind::POLYLINE; 2].into();
+        let t = crate::Primitives::new(
+            4,
+            vec![0, 2, 4].into(),
+            vec![0, 1, 2, 3].into(),
+            lines,
+            None,
+        );
+        crate::Geometry::new(points.into(), t.unwrap(), named).unwrap()
     };
-    let value = |datums: Vec<Datum>, curves: Curves| {
+    let value = |datums: Vec<Datum>, curves: crate::Geometry| {
         Brep::new(Vec::new(), curves, datums, Attributes::new())
             .unwrap()
             .fingerprint()
@@ -376,7 +381,7 @@ fn a_value_holds_bodies_curves_and_datums() {
     };
     let value = Brep::new(
         vec![body.clone()],
-        Curves::empty(),
+        crate::Geometry::empty(),
         vec![datum.clone()],
         Attributes::new(),
     )
@@ -389,7 +394,13 @@ fn a_value_holds_bodies_curves_and_datums() {
         },
         ..datum
     };
-    let e = Brep::new(Vec::new(), Curves::empty(), vec![skew], Attributes::new()).unwrap_err();
+    let e = Brep::new(
+        Vec::new(),
+        crate::Geometry::empty(),
+        vec![skew],
+        Attributes::new(),
+    )
+    .unwrap_err();
     assert_eq!(e.element(), Some(0));
     let detail = Attributes::new()
         .with(
@@ -399,5 +410,13 @@ fn a_value_holds_bodies_curves_and_datums() {
         )
         .unwrap();
     assert!(value.with_detail(detail).is_err());
+    // Free curves are curves and polylines: a polygon among them refuses.
+    let tri = crate::Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+    let polygon = crate::Geometry::new(vec![[0.0; 3]; 3].into(), tri, Attributes::new()).unwrap();
+    let e = value.with_curves(polygon).unwrap_err();
+    assert_eq!(
+        (e.element(), e.message()),
+        (Some(0), "free curve 0 is a polygon")
+    );
     assert_eq!(Brep::empty(), Brep::default());
 }

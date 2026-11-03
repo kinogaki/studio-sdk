@@ -4,7 +4,6 @@
 ///
 /// Which domains a value has, and how many elements each holds, is the
 /// value's own: [`Geometry::count`](crate::Geometry::count),
-/// [`Curves::count`](crate::Curves::count),
 /// [`Body::count`](crate::brep::Body::count). A value refuses an attribute
 /// on a domain it doesn't have. New domains may be added; a reader that
 /// doesn't know one leaves its attributes as they are (they pass through

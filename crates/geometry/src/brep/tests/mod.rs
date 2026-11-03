@@ -4,7 +4,7 @@
 //! them by the documented conventions alone, and edits make new bodies
 //! from old ones. Then each rule the builder checks is broken once.
 use crate::brep::*;
-use crate::{Attributes, Column, Curves, Frame};
+use crate::{Attributes, Column, Frame};
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 use std::sync::Arc;
 use vectors::{close, cross, dot, unit};

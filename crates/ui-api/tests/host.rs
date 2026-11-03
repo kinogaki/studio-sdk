@@ -658,7 +658,7 @@ fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
 fn shown_polygons_are_the_ones_the_object_draws() {
     use kinogaki_studio_api::geometry::{Attribute, Domain, Meaning};
     let mut host = host();
-    let (_, grid) = (kinogaki_studio_api_testing::Fixtures::default().polygons())
+    let (_, grid) = (kinogaki_studio_api_testing::Fixtures::default().geometry())
         .into_iter()
         .next()
         .unwrap();

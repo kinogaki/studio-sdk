@@ -1,6 +1,6 @@
 //! The one B-spline evaluator every value shares: span search, de Boor's
 //! algorithm with the first derivative, and rational (homogeneous)
-//! points. [`Curves`](crate::Curves) and the B-rep's NURBS
+//! points. [`Curve`](crate::Curve)s and the B-rep's NURBS
 //! ([`crate::brep`]) both evaluate through it.
 //!
 //! Control values are homogeneous `[x·w, y·w, z·w, w]` (a chart point

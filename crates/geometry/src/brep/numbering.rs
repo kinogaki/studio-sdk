@@ -60,7 +60,7 @@ impl Brep {
             .map(|b| b.count(domain))
             .sum::<Option<usize>>()?;
         let curves = if domain == Domain::Edge {
-            self.curves.curves()
+            self.curves.primitives().len()
         } else {
             0
         };
@@ -82,10 +82,10 @@ impl Brep {
             id -= n;
         }
         if domain == Domain::Edge {
-            if id < self.curves.curves() {
+            if id < self.curves.primitives().len() {
                 return Some(Element::Curve(id));
             }
-            id -= self.curves.curves();
+            id -= self.curves.primitives().len();
         }
         self.datums_of(domain).nth(id).map(Element::Datum)
     }
@@ -102,7 +102,7 @@ impl Brep {
             return None;
         }
         let all = bodies(self.bodies.len())?;
-        let curves = self.curves.curves();
+        let curves = self.curves.primitives().len();
         let id = match element {
             Element::Body { body, index } if index < self.bodies.get(body)?.count(domain)? => {
                 bodies(body)? + index
@@ -145,7 +145,7 @@ impl Brep {
             h.update(&body.topology().fingerprint());
             h.update(&body.names().fingerprint());
         }
-        h.update(&(self.curves.curves() as u64).to_le_bytes());
+        h.update(&(self.curves.primitives().len() as u64).to_le_bytes());
         let names = (self.curves.attributes()).text(Domain::Primitive, crate::names::NAME);
         h.update(&names.map_or([0; 32], text_hash));
         h.update(

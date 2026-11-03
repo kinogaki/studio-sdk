@@ -2,16 +2,17 @@
 //! types allow and every attribute type on every domain.
 use super::Producer;
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Elements, Geometry, Kind,
-    Meaning, Primitives, Storage, Text, Values, names,
+    Attribute, AttributeType, Attributes, Basis, Column, CurveData, Domain, Elements, Geometry,
+    Kind, Knots, Meaning, Primitives, Storage, Text, Values, names,
 };
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::standard;
 
-/// The SDK's fixtures: polygons (a quad grid; mixed triangles, quads and
+/// The SDK's fixtures: geometry (a quad grid; mixed triangles, quads and
 /// n-gons; concave polygons; polylines only; polygons and polylines
-/// sharing points; points only; every attribute type on every domain;
-/// groups with `.hidden` and `sharp`), curves of every basis, and B-reps
+/// sharing points; curves of every basis, open and closed; a quad, a
+/// polyline and a NURBS curve sharing points; points only; every attribute
+/// type on every domain; groups with `.hidden` and `sharp`), and B-reps
 /// (a box, a cylinder, a cone, a sphere, a trimmed NURBS patch, and a
 /// value with every part the type has). With
 /// `large`, a 1000 × 1000 quad grid too (1M faces).
@@ -27,14 +28,16 @@ impl Fixtures {
         super::brep::breps()
     }
 
-    /// The polygons fixtures, by name.
-    pub fn polygons(&self) -> Vec<(String, Geometry)> {
+    /// The geometry fixtures, by name.
+    pub fn geometry(&self) -> Vec<(String, Geometry)> {
         let mut out = vec![
             ("quad grid".to_owned(), grid(4)),
             ("mixed polygons".to_owned(), mixed()),
             ("concave polygons".to_owned(), concave()),
             ("polylines only".to_owned(), polylines_only()),
             ("polygons and polylines".to_owned(), shared_points()),
+            ("curves of every basis".to_owned(), every_basis()),
+            ("polygon, polyline and curve".to_owned(), mixed_primitives()),
             ("points only".to_owned(), points_only()),
             ("every attribute".to_owned(), every_attribute()),
             ("groups".to_owned(), groups()),
@@ -45,73 +48,6 @@ impl Fixtures {
         }
         out
     }
-
-    /// The curves fixtures, by name: one value of each basis.
-    pub fn curves(&self) -> Vec<(String, Curves)> {
-        let points = |n: usize| -> Column<[f64; 3]> {
-            (0..n)
-                .map(|i| [i as f64, (i % 2) as f64, 0.0])
-                .collect::<Vec<_>>()
-                .into()
-        };
-        let build = |b: kinogaki_geometry::CurvesBuilder| b.build().expect("a valid fixture");
-        let widths = Attributes::new()
-            .with(
-                Domain::Point,
-                names::WIDTH,
-                Attribute::tuples(vec![0.1f32; 7], Meaning::None).unwrap(),
-            )
-            .expect("width");
-        vec![
-            (
-                "linear curves".into(),
-                build(
-                    Curves::builder(Basis::Linear, points(7), vec![0, 3, 7].into())
-                        .periodic(Elements::from_indices(2, [1]).expect("periodic"))
-                        .attributes(widths),
-                ),
-            ),
-            (
-                "bezier curve".into(),
-                build(Curves::builder(Basis::Bezier, points(7), vec![0, 7].into()).degree(3)),
-            ),
-            (
-                "bspline curves".into(),
-                build(Curves::builder(
-                    Basis::BSpline,
-                    points(9),
-                    vec![0, 4, 9].into(),
-                )),
-            ),
-            (
-                "catmull-rom curve".into(),
-                build(Curves::builder(
-                    Basis::CatmullRom,
-                    points(5),
-                    vec![0, 5].into(),
-                )),
-            ),
-            (
-                "nurbs curve".into(),
-                build(
-                    Curves::builder(Basis::Nurbs, points(4), vec![0, 4].into())
-                        .degree(2)
-                        .knots(
-                            vec![0, 7].into(),
-                            vec![0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0].into(),
-                        )
-                        .weights(vec![1.0, 0.7, 0.7, 1.0].into()),
-                ),
-            ),
-            (
-                "indexed curves".into(),
-                build(
-                    Curves::builder(Basis::Linear, points(4), vec![0, 3, 5].into())
-                        .points(vec![0, 1, 2, 2, 3].into()),
-                ),
-            ),
-        ]
-    }
 }
 
 impl Producer for Fixtures {
@@ -119,19 +55,15 @@ impl Producer for Fixtures {
         "SDK fixtures"
     }
     fn fixtures(&self) -> Vec<(String, Data)> {
-        let polygons = self
-            .polygons()
+        let geometry = self
+            .geometry()
             .into_iter()
             .map(|(n, p)| (n, standard::geometry().wrap(p)));
-        let curves = self
-            .curves()
-            .into_iter()
-            .map(|(n, c)| (n, standard::curves().wrap(c)));
         let breps = self
             .breps()
             .into_iter()
             .map(|(n, b)| (n, standard::brep().wrap(b)));
-        polygons.chain(curves).chain(breps).collect()
+        geometry.chain(breps).collect()
     }
 }
 
@@ -246,6 +178,104 @@ fn shared_points() -> Geometry {
     value(p, &[vec![2, 4], vec![0, 1, 2, 3], vec![3, 2, 1]], |p| {
         p == 1
     })
+}
+
+/// Primitives over `positions`' points, a row each (its kind, degree,
+/// points and, for NURBS, knots), with a weight a vertex when `weights`.
+pub(super) fn curves(
+    positions: Vec<[f64; 3]>,
+    rows: &[(Kind, u8, Vec<u32>, Vec<f64>)],
+    weights: Option<Vec<f64>>,
+) -> Primitives {
+    let (mut offsets, mut vertices) = (vec![0], Vec::new());
+    let (mut knot_offsets, mut knots) = (vec![0], Vec::new());
+    for (_, _, ids, k) in rows {
+        vertices.extend_from_slice(ids);
+        offsets.push(vertices.len() as u32);
+        knots.extend_from_slice(k);
+        knot_offsets.push(knots.len() as u32);
+    }
+    let degrees: Vec<u8> = rows.iter().map(|r| r.1).collect();
+    let data = CurveData::new(
+        degrees.into(),
+        Knots::new(knot_offsets.into(), knots.into()),
+        weights.map(Into::into),
+    );
+    let kinds: Vec<Kind> = rows.iter().map(|r| r.0).collect();
+    Primitives::new(
+        positions.len(),
+        offsets.into(),
+        vertices.into(),
+        kinds.into(),
+        Some(data),
+    )
+    .expect("a valid fixture")
+}
+
+/// Points along x, alternating in y.
+fn zigzag(n: usize) -> Vec<[f64; 3]> {
+    (0..n).map(|i| [i as f64, (i % 2) as f64, 0.0]).collect()
+}
+
+/// One curve of every basis, open and closed, with a Point `width`: a
+/// polyline, a cubic Bézier, an open and a closed B-spline, a
+/// Catmull-Rom and a rational NURBS curve.
+fn every_basis() -> Geometry {
+    let run = |from: u32, n: u32| (from..from + n).collect::<Vec<u32>>();
+    let curve = |b, closed| Kind::curve(b, closed);
+    let rows = [
+        (Kind::POLYLINE, 1, run(0, 3), vec![]),
+        (curve(Basis::Bezier, false), 3, run(3, 7), vec![]),
+        (curve(Basis::BSpline, false), 3, run(10, 4), vec![]),
+        (curve(Basis::BSpline, true), 2, run(14, 5), vec![]),
+        (curve(Basis::CatmullRom, false), 3, run(19, 5), vec![]),
+        (
+            curve(Basis::Nurbs, false),
+            2,
+            run(24, 4),
+            vec![0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0],
+        ),
+    ];
+    let mut weights = vec![1.0; 28];
+    weights[25..27].fill(0.7);
+    let t = curves(zigzag(28), &rows, Some(weights));
+    let widths = Attributes::new()
+        .with(
+            Domain::Point,
+            names::WIDTH,
+            tuples(vec![0.1f32; 28], Meaning::None),
+        )
+        .expect("width");
+    Geometry::new(zigzag(28).into(), t, widths).expect("a valid fixture")
+}
+
+/// A quad, a polyline from its corner and a NURBS curve from another,
+/// sharing those points; the curve first (any order).
+fn mixed_primitives() -> Geometry {
+    let mut p = vec![
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+    ];
+    p.extend([
+        [2.0, 2.0, 0.0],
+        [2.0, 3.0, 1.0],
+        [3.0, 3.0, 0.0],
+        [-1.0, 2.0, 0.0],
+    ]);
+    let rows = [
+        (
+            Kind::curve(Basis::Nurbs, false),
+            3,
+            vec![2, 4, 5, 6],
+            vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+        ),
+        (Kind::POLYGON, 1, vec![0, 1, 2, 3], vec![]),
+        (Kind::POLYLINE, 1, vec![3, 7], vec![]),
+    ];
+    Geometry::new(p.clone().into(), curves(p, &rows, None), Attributes::new())
+        .expect("a valid fixture")
 }
 
 fn points_only() -> Geometry {

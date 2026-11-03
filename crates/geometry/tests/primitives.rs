@@ -378,6 +378,23 @@ fn curves_follow_their_basis_rules() {
         "curve 0 has 5 control points, not k·degree + 1 for degree 3"
     );
     assert_eq!(
+        message(curve(Basis::Bezier, true, 7, 3, vec![], None)),
+        "curve 0 has 7 control points, not k·degree for degree 3"
+    );
+    assert!(curve(Basis::Bezier, true, 6, 3, vec![], None).is_ok());
+    assert_eq!(
+        message(curve(Basis::BSpline, false, 3, 3, vec![], None)),
+        "curve 0 has 3 control points, fewer than 4"
+    );
+    assert_eq!(
+        message(curve(Basis::BSpline, false, 30, 26, vec![], None)),
+        "curve 0 has degree 26, not 1 to 25"
+    );
+    assert_eq!(
+        message(curve(Basis::CatmullRom, false, 4, 2, vec![], None)),
+        "curve 0 is Catmull-Rom but of degree 2, not 3"
+    );
+    assert_eq!(
         message(curve(Basis::Nurbs, false, 4, 3, open[1..].to_vec(), None)),
         "curve 0 has 7 knots, not 8 (count + degree + 1)"
     );

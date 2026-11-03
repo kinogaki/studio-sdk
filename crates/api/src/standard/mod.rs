@@ -12,11 +12,11 @@
 //! let data = standard::geometry().wrap(Geometry::empty());
 //! assert_eq!(data.ty().as_str(), "kinogaki.core.geometry");
 //! assert!(standard::geometry().get(&data).is_some());
-//! assert!(standard::curves().get(&data).is_none());
+//! assert!(standard::brep().get(&data).is_none());
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`GeometryCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`],
+//! here ([`GeometryCodec`], [`BrepCodec`], [`CameraCodec`],
 //! [`LightCodec`], [`PreviewMaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
@@ -32,7 +32,6 @@ mod attributes;
 mod brep;
 mod camera;
 mod color;
-mod curves;
 mod geometry;
 mod light;
 mod materials;
@@ -43,7 +42,6 @@ mod tolerances;
 pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use color::ColorConfiguration;
-pub use curves::CurvesCodec;
 pub use geometry::GeometryCodec;
 pub use light::LightCodec;
 pub use materials::PreviewMaterialsCodec;
@@ -54,13 +52,11 @@ use crate::error::Error;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
-use kinogaki_geometry::{Curves, Domain, Geometry, GeometryError, Selection};
+use kinogaki_geometry::{Domain, Geometry, GeometryError, Selection};
 use kinogaki_render_api::ImportedMaterial;
 
 /// The id of [`Geometry`] values: polygons, polylines and curves.
 pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
-/// The id of [`Curves`] values.
-pub const CURVES: &str = "kinogaki.core.curves";
 
 /// The id of [`Brep`] values.
 pub const BREP: &str = "kinogaki.core.brep";
@@ -72,11 +68,6 @@ pub(crate) const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
 /// The handle on [`Geometry`] values (`GEOMETRY`).
 pub const fn geometry() -> Typed<Geometry> {
     Typed::new(DataTypeId::declared(GEOMETRY))
-}
-
-/// The handle on [`Curves`] values ([`CURVES`]).
-pub const fn curves() -> Typed<Curves> {
-    Typed::new(DataTypeId::declared(CURVES))
 }
 
 /// The id of camera values: an unplaced lens ([`lens`], [`CameraCodec`]).

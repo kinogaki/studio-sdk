@@ -7,7 +7,9 @@ use kinogaki_geometry::brep::{
     DatumHint, DatumKind, EdgeId, EdgeSpec, FaceSpec, Line, Line2, Name, NurbsCurve, NurbsSurface,
     OperationId, PCurve, PCurveId, Plane, Sense, Sphere, Surface, SurfaceId, VertexId,
 };
-use kinogaki_geometry::{Attribute, Attributes, Basis, Column, Curves, Domain, Meaning, Text};
+use kinogaki_geometry::{
+    Attribute, Attributes, Basis, Column, Domain, Geometry, Kind, Meaning, Text,
+};
 use kinogaki_geometry::{Frame, Vec3, Xform};
 use std::f64::consts::TAU;
 use std::sync::Arc;
@@ -19,7 +21,7 @@ const P: f64 = 0.01;
 pub(super) fn breps() -> Vec<(String, Brep)> {
     let one = |b: BrepBuilder| {
         let body = b.build(Attributes::new()).expect("a fixture body is valid");
-        Brep::new(vec![body], Curves::empty(), Vec::new(), Attributes::new())
+        Brep::new(vec![body], Geometry::empty(), Vec::new(), Attributes::new())
             .expect("a fixture value is valid")
     };
     vec![
@@ -76,13 +78,15 @@ fn every_part() -> Brep {
     let patch = patch(0.5, [0.25, 0.75])
         .build(Attributes::new())
         .expect("valid");
-    let curves = Curves::builder(
-        Basis::BSpline,
-        vec![[0.0; 3], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 1.0]].into(),
-        vec![0, 4].into(),
-    )
-    .build()
-    .expect("a free curve");
+    let corners = vec![[0.0; 3], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 1.0]];
+    let spline = [(
+        Kind::curve(Basis::BSpline, false),
+        3,
+        vec![0, 1, 2, 3],
+        vec![],
+    )];
+    let table = super::fixtures::curves(corners.clone(), &spline, None);
+    let curves = Geometry::new(corners.into(), table, Attributes::new()).expect("a free curve");
     let hint = DatumHint {
         center: [0.0; 3].into(),
         size: 1.0,

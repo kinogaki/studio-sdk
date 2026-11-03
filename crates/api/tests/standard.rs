@@ -12,7 +12,7 @@ use std::sync::Arc;
 fn every_fixture_passes_the_sdk_consumers() {
     let report = conformance::run(&[&Fixtures::default()], &[&Codecs, &Invariants]);
     assert!(report.failures().is_empty(), "{report}");
-    assert_eq!(report.outcomes.len(), 2 * (9 + 6 + 6));
+    assert_eq!(report.outcomes.len(), 2 * (11 + 6));
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn a_failing_consumer_is_reported() {
 
 fn grid() -> Geometry {
     Fixtures::default()
-        .polygons()
+        .geometry()
         .into_iter()
         .find(|(n, _)| n == "quad grid")
         .unwrap()
@@ -312,4 +312,59 @@ fn attributes_read_by_storage_width_and_meaning_strictly() {
     }
     let path = read_quad_with(&element("w", "f16", 1, "none", Field::F32s(vec![0.0; 4])));
     assert!(path.unwrap_err().contains("a0"), "the element is named");
+}
+
+/// A two-point primitive table saved by hand with `kinds` and, when
+/// given, a `curves` child of `degrees`, read back.
+fn read_line_with(kinds: Vec<u8>, degrees: Option<Vec<u8>>) -> Result<Geometry, String> {
+    let mut saved = MemoryElement::new("result");
+    saved
+        .write(|w| {
+            w.set_rows(
+                "positions",
+                3,
+                Field::F64s(vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0]),
+            )?;
+            let mut t = w.child("primitives", "primitives")?;
+            t.set("points", Field::Int(2))?;
+            t.set("offsets", Field::U32s(vec![0, 2]))?;
+            t.set("vertices", Field::U32s(vec![0, 1]))?;
+            t.set("kinds", Field::U8s(kinds.clone()))?;
+            if let Some(degrees) = &degrees {
+                let mut c = t.child("curves", "curves")?;
+                c.set("degrees", Field::U8s(degrees.clone()))?;
+                c.set("knotOffsets", Field::U32s(vec![0, 0]))?;
+                c.set("knots", Field::F64s(Vec::new()))?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let read = saved.read(|r| GeometryCodec.read(r, None));
+    let read = read.map_err(|e| e.to_string())?;
+    Ok(standard::geometry().get(&read).unwrap().clone())
+}
+
+/// Kinds a file can't hold refuse it: a byte naming no kind, a curve kind
+/// without curve data, curve data without a curve, and a curve breaking
+/// its basis's rule. The same table with its curve data reads.
+#[test]
+fn saved_kinds_and_curve_data_read_strictly() {
+    use kinogaki_studio_api::geometry::{Basis, Kind};
+    let bezier = Kind::curve(Basis::Bezier, false).byte();
+    let line = read_line_with(vec![bezier], Some(vec![1])).unwrap();
+    assert_eq!(line.curve(0).point(0.5).to_array(), [0.5, 0.0, 0.0]);
+    let refused = [
+        (vec![0x17], None, "no primitive kind 23"),
+        (vec![bezier], None, "curve primitives need curve data"),
+        (
+            vec![Kind::POLYLINE.byte()],
+            Some(vec![1]),
+            "curve data without a curve primitive",
+        ),
+        (vec![bezier], Some(vec![3]), "curve 0 has 2 control points"),
+    ];
+    for (kinds, degrees, message) in refused {
+        let error = read_line_with(kinds, degrees).unwrap_err();
+        assert!(error.contains(message), "{error}");
+    }
 }

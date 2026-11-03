@@ -208,7 +208,6 @@ use crate::Frame;
 use crate::Tolerances;
 use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
-use crate::curves::Curves;
 use crate::error::GeometryError;
 use crate::limits::MAX_COORDINATE;
 use crate::vec3::Vec3;
@@ -266,19 +265,21 @@ pub struct Datum {
 /// Detail attributes and the record of the operation that made it.
 ///
 /// **Classes:** Detail (one element) on the value; each body has its own
-/// ([`Body`]). Free curves are [`Curves`] (exact by definition: rational
-/// NURBS hold arcs exactly), each named by its Primitive `name`.
+/// ([`Body`]). Free curves are a [`Geometry`](crate::Geometry) of curves and polylines, no
+/// polygons (exact by definition: rational NURBS hold arcs exactly), each
+/// named by its Primitive `name`.
 /// **Numbering:** the value's faces, edges and vertices are numbered as
 /// one, across its bodies, free curves and datums ([`Brep::count`],
 /// [`Brep::element`]); a selection keeps [`Brep::fingerprint`].
 ///
 /// **Rules** ([`Brep::new`]): at most `MAX_ENTITIES` bodies and datums;
 /// Detail attributes only, one element each; each datum finite, an axis's
-/// direction unit and a hint's size not negative.
+/// direction unit and a hint's size not negative; no polygon among the
+/// free curves.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Brep {
     bodies: Column<Body>,
-    curves: Curves,
+    curves: crate::Geometry,
     datums: Column<Datum>,
     detail: Arc<Attributes>,
 }
@@ -291,7 +292,7 @@ impl Brep {
     /// The first rule broken.
     pub fn new(
         bodies: Vec<Body>,
-        curves: Curves,
+        curves: crate::Geometry,
         datums: Vec<Datum>,
         detail: Attributes,
     ) -> Result<Self, GeometryError> {
@@ -307,8 +308,13 @@ impl Brep {
 
     /// Nothing: no bodies, curves or datums.
     pub fn empty() -> Self {
-        Self::new(Vec::new(), Curves::empty(), Vec::new(), Attributes::new())
-            .expect("an empty value is valid")
+        Self::new(
+            Vec::new(),
+            crate::Geometry::empty(),
+            Vec::new(),
+            Attributes::new(),
+        )
+        .expect("an empty value is valid")
     }
 
     fn check(&self) -> Result<(), GeometryError> {
@@ -342,6 +348,13 @@ impl Brep {
         }
         let detail = |domain| (domain == Domain::Detail).then_some(1);
         self.detail.check("B-rep values", None, detail)?;
+        if let Some(p) = self.curves.primitives().polygons().iter().next() {
+            return Err(GeometryError::at(
+                crate::ErrorKind::Brep,
+                p as usize,
+                format!("free curve {p} is a polygon"),
+            ));
+        }
         Ok(())
     }
 
@@ -350,8 +363,8 @@ impl Brep {
         &self.bodies
     }
 
-    /// The free curves.
-    pub fn curves(&self) -> &Curves {
+    /// The free curves, a primitive each.
+    pub fn curves(&self) -> &crate::Geometry {
         &self.curves
     }
 
@@ -379,11 +392,16 @@ impl Brep {
     }
 
     /// This value with `curves`, sharing the rest.
-    pub fn with_curves(&self, curves: Curves) -> Self {
-        Self {
+    ///
+    /// # Errors
+    /// A polygon among them.
+    pub fn with_curves(&self, curves: crate::Geometry) -> Result<Self, GeometryError> {
+        let value = Self {
             curves,
             ..self.clone()
-        }
+        };
+        value.check()?;
+        Ok(value)
     }
 
     /// This value with `detail` attributes, sharing the rest.

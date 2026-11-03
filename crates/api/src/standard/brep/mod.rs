@@ -2,7 +2,8 @@
 mod carriers;
 mod names;
 
-use super::{attributes, brep, curves, invalid, selection};
+use super::geometry::{read_geometry, write_geometry};
+use super::{attributes, brep, invalid, selection};
 use crate::codec::DataCodec;
 use crate::components::Components;
 use crate::data::Data;
@@ -18,7 +19,8 @@ use kinogaki_geometry::{Frame, Vec3, Xform};
 /// (`name_tags`, `name_words`, `name_texts`), which everything else names
 /// by index; the datums (`datum_names`,
 /// `datum_kinds`, `datum_reals`, `datum_hints`); the free curves as the
-/// child `curves` (as [`CurvesCodec`](super::CurvesCodec) saves them); one
+/// child `curves` (a geometry value, as
+/// [`GeometryCodec`](super::GeometryCodec) saves one); one
 /// child `body-<i>` (kind `body`) per body; and the Detail attributes.
 ///
 /// A body holds its `name`, `tolerance`, `placement` and `instances`
@@ -69,7 +71,7 @@ impl DataCodec for BrepCodec {
             write_body(body, &mut names, &mut *child)?;
         }
         write_datums(value.datums(), &mut names, out)?;
-        curves::write_curves(value.curves(), &mut *out.child("curves", "curves")?)?;
+        write_geometry(value.curves(), &mut *out.child("curves", "curves")?)?;
         attributes::write(value.detail(), out)?;
         names.finish(out)
     }
@@ -82,7 +84,7 @@ impl DataCodec for BrepCodec {
             bodies.push(read_body(&*child, &names)?);
         }
         let datums = read_datums(element, &names)?;
-        let curves = curves::read_curves(&*element.required_child("curves")?)?;
+        let curves = read_geometry(&*element.required_child("curves")?)?;
         let detail = attributes::read(element)?;
         let value = Brep::new(bodies, curves, datums, detail);
         Ok(brep().wrap(value.map_err(|e| invalid(&at, e))?))

@@ -8,7 +8,7 @@
 //! types and domains as entries are added. The value that holds it checks
 //! the rest against its own counts, for the entries it doesn't already
 //! hold: each attribute and group has exactly one entry per element of
-//! its domain ([`Geometry`](crate::Geometry), [`Curves`](crate::Curves)).
+//! its domain ([`Geometry`](crate::Geometry), [`Body`](crate::brep::Body)).
 mod attribute;
 mod domain;
 mod ids;

@@ -1,10 +1,10 @@
 //! The SDK's consumers: [`Codecs`] and [`Invariants`].
 use super::Consumer;
-use kinogaki_geometry::{Curves, Domain, Elements, Geometry, Primitives, Selection};
+use kinogaki_geometry::{Domain, Elements, Geometry, Primitives, Selection};
 use kinogaki_studio_api::codec::DataCodec;
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::element::MemoryElement;
-use kinogaki_studio_api::standard::{self, BrepCodec, CurvesCodec, GeometryCodec};
+use kinogaki_studio_api::standard::{self, BrepCodec, GeometryCodec};
 
 /// Saves each standard value with its codec and reads it back: the read
 /// value equals it bit for bit, and a selection of it round-trips too.
@@ -19,8 +19,6 @@ impl Consumer for Codecs {
         let (codec, count): (&dyn DataCodec, Option<usize>) =
             if let Some(p) = standard::geometry().get(data) {
                 (&GeometryCodec, p.count(Domain::Point))
-            } else if let Some(c) = standard::curves().get(data) {
-                (&CurvesCodec, c.count(Domain::Point))
             } else if let Some(b) = standard::brep().get(data) {
                 (&BrepCodec, b.count(Domain::Point))
             } else {
@@ -61,13 +59,10 @@ fn same_bits(a: &Data, b: &Data) -> bool {
     let bits = |p: &[[f64; 3]]| p.iter().flatten().map(|v| v.to_bits()).collect::<Vec<_>>();
     match (standard::geometry().get(a), standard::geometry().get(b)) {
         (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
-        _ => match (standard::curves().get(a), standard::curves().get(b)) {
-            (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
-            _ => match (standard::brep().get(a), standard::brep().get(b)) {
-                // Equal values whose saves are equal: the same bits.
-                (Some(x), Some(y)) => x == y && saved(a) == saved(b),
-                _ => false,
-            },
+        _ => match (standard::brep().get(a), standard::brep().get(b)) {
+            // Equal values whose saves are equal: the same bits.
+            (Some(x), Some(y)) => x == y && saved(a) == saved(b),
+            _ => false,
         },
     }
 }
@@ -90,17 +85,14 @@ impl Consumer for Invariants {
         "invariants"
     }
     fn check(&self, _fixture: &str, data: &Data) -> Result<(), String> {
-        if let Some(p) = standard::geometry().get(data) {
-            return polygons(p);
+        match standard::geometry().get(data) {
+            Some(g) => geometry(g),
+            None => Ok(()),
         }
-        if let Some(c) = standard::curves().get(data) {
-            return curves(c);
-        }
-        Ok(())
     }
 }
 
-fn polygons(p: &Geometry) -> Result<(), String> {
+fn geometry(p: &Geometry) -> Result<(), String> {
     let t = p.primitives();
     let curves = t.curves().map(|c| (**c).clone());
     let (offsets, vertices) = (t.offsets().clone(), t.vertices().clone());
@@ -127,27 +119,6 @@ fn polygons(p: &Geometry) -> Result<(), String> {
                 return Err(format!("primitive {prim}'s edge {i} is misnumbered"));
             }
         }
-    }
-    Ok(())
-}
-
-fn curves(c: &Curves) -> Result<(), String> {
-    let mut builder = Curves::builder(c.basis(), c.positions().clone(), c.offsets().clone())
-        .degrees(c.degrees().clone())
-        .periodic(c.periodic().clone())
-        .shared_attributes(c.attributes().clone());
-    if let Some(points) = c.points() {
-        builder = builder.points(points.clone());
-    }
-    if let Some(knots) = c.knots() {
-        builder = builder.knots(knots.offsets().clone(), knots.values().clone());
-    }
-    if let Some(weights) = c.weights() {
-        builder = builder.weights(weights.clone());
-    }
-    let again = builder.build().map_err(|e| e.to_string())?;
-    if &again != c {
-        return Err("rebuilt from its parts, the value differs".into());
     }
     Ok(())
 }

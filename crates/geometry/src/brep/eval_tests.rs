@@ -1,8 +1,8 @@
 //! `kinogaki.brep` evaluation against closed forms: the analytic charts,
-//! offsets, swept surfaces and NURBS, and the one evaluator Curves and the
-//! B-rep share.
+//! offsets, swept surfaces and NURBS, and the one evaluator geometry
+//! curves and the B-rep share.
 use super::*;
-use crate::{Column, Curves, Frame, Vec3};
+use crate::{Column, CurveData, Frame, Kind, Knots, Primitives, Vec3};
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};
 use std::sync::Arc;
 
@@ -290,7 +290,7 @@ fn a_closed_nurbs_direction_wraps() {
 }
 
 #[test]
-fn curves_and_brep_nurbs_evaluate_alike() {
+fn geometry_curves_and_brep_nurbs_evaluate_alike() {
     use crate::Basis;
     // A rational cubic with a double interior knot, and its polynomial
     // twin: one evaluator behind both values.
@@ -305,13 +305,23 @@ fn curves_and_brep_nurbs_evaluate_alike() {
         [6.0, 1.0, 0.0],
     ];
     for weights in [None, Some(vec![1.0, 0.5, 2.0, 1.0, 0.7, 1.3, 1.0])] {
-        let mut b = Curves::builder(Basis::Nurbs, points.clone().into(), vec![0, 7].into())
-            .degree(3)
-            .knots(vec![0, 11].into(), knots.clone().into());
-        if let Some(w) = &weights {
-            b = b.weights(w.clone().into());
-        }
-        let curves = b.build().unwrap();
+        let data = CurveData::new(
+            vec![3].into(),
+            Knots::new(vec![0, 11].into(), knots.clone().into()),
+            weights.clone().map(Column::from),
+        );
+        let kinds = vec![Kind::curve(Basis::Nurbs, false)];
+        let vertices: Vec<u32> = (0..7).collect();
+        let table = Primitives::new(
+            7,
+            vec![0, 7].into(),
+            vertices.into(),
+            kinds.into(),
+            Some(data),
+        );
+        let value =
+            crate::Geometry::new(points.clone().into(), table.unwrap(), Attributes::new()).unwrap();
+        let curve = value.curve(0);
         let nurbs = NurbsCurve::new(
             3,
             knots.clone(),
@@ -319,10 +329,10 @@ fn curves_and_brep_nurbs_evaluate_alike() {
             weights.clone().map(Column::from),
         )
         .unwrap();
-        assert_eq!(curves.domain(0), nurbs.domain());
+        assert_eq!(curve.domain(), nurbs.domain());
         for k in 0..=150 {
             let t = 1.5 * k as f64 / 150.0;
-            assert!(close(curves.point(0, t), nurbs.point(t), 1e-12), "at {t}");
+            assert!(close(curve.point(t), nurbs.point(t), 1e-12), "at {t}");
         }
     }
 }
