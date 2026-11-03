@@ -16,7 +16,7 @@
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`GeometryCodec`], [`BrepCodec`], [`CameraCodec`],
+//! here ([`GeometryCodec`], [`InstancesCodec`], [`BrepCodec`], [`CameraCodec`],
 //! [`LightCodec`], [`PreviewMaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
@@ -33,6 +33,7 @@ mod brep;
 mod camera;
 mod color;
 mod geometry;
+mod instances;
 mod light;
 mod materials;
 mod quality;
@@ -43,6 +44,7 @@ pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use color::ColorConfiguration;
 pub use geometry::GeometryCodec;
+pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
 pub use light::LightCodec;
 pub use materials::PreviewMaterialsCodec;
 
@@ -68,6 +70,14 @@ pub(crate) const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
 /// The handle on [`Geometry`] values (`GEOMETRY`).
 pub const fn geometry() -> Typed<Geometry> {
     Typed::new(DataTypeId::declared(GEOMETRY))
+}
+
+/// The id of [`Instances`] values: placements of prototypes of any type.
+pub(crate) const INSTANCES: &str = "kinogaki.core.instances";
+
+/// The handle on [`Instances`] values (`INSTANCES`).
+pub const fn instances() -> Typed<Instances> {
+    Typed::new(DataTypeId::declared(INSTANCES))
 }
 
 /// The id of camera values: an unplaced lens ([`lens`], [`CameraCodec`]).

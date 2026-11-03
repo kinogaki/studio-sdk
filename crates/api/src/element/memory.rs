@@ -2,6 +2,7 @@
 //! package tests (a codec's round trip without Studio). Its reads are as
 //! strict as Studio's: what a read leaves unread is refused.
 use super::{ElementReader, ElementWriter, Field, FieldRef, ReadShared, SharedValue, check_name};
+use crate::data::Data;
 use crate::error::Error;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,6 +22,9 @@ const SHARED: &str = "shared:";
 /// ```
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MemoryElement {
+    /// Values written with [`ElementWriter::data`], kept as the values
+    /// they are (memory needs no codec to hold them).
+    values: Vec<(String, Value)>,
     kind: String,
     fields: BTreeMap<String, Field>,
     metadata: BTreeMap<String, String>,
@@ -98,6 +102,22 @@ impl MemoryElement {
 }
 
 /// Writes one [`MemoryElement`].
+/// A value held by a memory element: equal when it is the same value.
+#[derive(Clone)]
+struct Value(Data);
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.ptr_eq(&other.0)
+    }
+}
+
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.ty())
+    }
+}
+
 struct Writer<'a> {
     element: &'a mut MemoryElement,
     /// From the root, `/`-separated.
@@ -169,6 +189,18 @@ impl ElementWriter for Writer<'_> {
         self.shared.insert(key, at);
         Ok(())
     }
+
+    fn data(&mut self, name: &str, data: &Data) -> Result<(), Error> {
+        check_name(name)?;
+        if self.element.values.iter().any(|(n, _)| n == name) {
+            return Err(Error::invalid(format_args!(
+                "{}: {name} is written twice",
+                self.path
+            )));
+        }
+        (self.element.values).push((name.to_owned(), Value(data.clone())));
+        Ok(())
+    }
 }
 
 /// What a read took of one element: its fields and metadata keys.
@@ -176,6 +208,7 @@ impl ElementWriter for Writer<'_> {
 struct Taken {
     fields: BTreeSet<String>,
     metadata: BTreeSet<String>,
+    values: BTreeSet<String>,
 }
 
 /// Reads one [`MemoryElement`].
@@ -238,6 +271,9 @@ fn leftover(
         if let Some(key) = e.metadata.keys().find(|k| !marks.metadata.contains(*k)) {
             return Some(format!("{at}: unknown metadata {key:?}"));
         }
+        if let Some((name, _)) = e.values.iter().find(|(n, _)| !marks.values.contains(n)) {
+            return Some(format!("{at}: unknown value {name:?}"));
+        }
         for (name, child) in &e.children {
             let below = format!("{path}/{name}");
             if !taken.contains_key(&below) && !shared.contains_key(&below) {
@@ -297,6 +333,12 @@ impl ElementReader for Reader<'_> {
         let value = read(&self.at(element, path.clone()))?;
         self.cache.borrow_mut().insert(path, value.clone());
         Ok(value)
+    }
+
+    fn data(&self, name: &str) -> Option<Result<Data, Error>> {
+        let (_, value) = self.element.values.iter().find(|(n, _)| n == name)?;
+        self.take(|t| _ = t.values.insert(name.to_owned()));
+        Some(Ok(value.0.clone()))
     }
 
     fn location(&self) -> String {

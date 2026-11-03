@@ -29,6 +29,7 @@ mod memory;
 
 pub use memory::MemoryElement;
 
+use crate::data::Data;
 use crate::error::Error;
 use std::any::Any;
 use std::sync::Arc;
@@ -212,6 +213,13 @@ pub trait ElementWriter {
         key: u64,
         write: &mut dyn FnMut(&mut dyn ElementWriter) -> Result<(), Error>,
     ) -> Result<(), Error>;
+
+    /// Writes `data`, a value of any installed type, as child `name` of
+    /// its type's id, through that type's own codec: once per save for
+    /// every place holding the same value (by its identity), as
+    /// [`share`](Self::share) writes. What a value holds of other values
+    /// (instances' prototypes) saves this way.
+    fn data(&mut self, name: &str, data: &Data) -> Result<(), Error>;
 }
 
 /// Reads one element: what a codec reads through.
@@ -244,6 +252,12 @@ pub trait ElementReader {
     /// same element returns the same `Arc`. Codecs call the typed
     /// [`read_shared`](trait.ElementReader.html#method.read_shared).
     fn shared_any(&self, name: &str, read: &mut ReadShared<'_>) -> Result<SharedValue, Error>;
+
+    /// The value [`ElementWriter::data`] wrote as child `name`, read
+    /// through its type's codec once per load; `None` when there is no
+    /// such child. [`Error::NotInstalled`] when no installed package
+    /// registers its type.
+    fn data(&self, name: &str) -> Option<Result<Data, Error>>;
 
     /// Where the element is, for messages (`/objects/box/result`).
     fn location(&self) -> String;

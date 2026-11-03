@@ -20,6 +20,7 @@
 //! | [`SCALE`] | Point, Instance | f32 × 3 |
 //! | [`ORIENT`] | Point, Instance | f32 × 4 rotation |
 //! | [`UP`] | Point | f32 × 3 vector |
+//! | [`TRANSFORM`] | Point, Instance | f64 × 16 transform (row-major, affine) |
 //! | [`REST`] | Point | f64 × 3 point (positions' precision) |
 //! | [`WIDTH`] | Point, Primitive | f32 |
 //! | [`MATERIAL`], [`NAME`], [`PART`] | any | text |
@@ -55,6 +56,9 @@ pub const SCALE: &str = "scale";
 pub const ORIENT: &str = "orient";
 /// The up direction a copy aims its y axis along.
 pub const UP: &str = "up";
+/// A whole placement (copies, instances): a row-major affine 4 × 4, as
+/// precise as positions; it stands in for the orientation and scales.
+pub const TRANSFORM: &str = "transform";
 /// Rest positions, as precise as positions.
 pub const REST: &str = "rest";
 /// A curve's or point's width, in scene units.
@@ -112,6 +116,10 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
         SCALE => attribute(f32s(3, Meaning::None), &[Point, Instance]),
         ORIENT => attribute(f32s(4, Meaning::Rotation), &[Point, Instance]),
         UP => attribute(f32s(3, Meaning::Vector), &[Point]),
+        TRANSFORM => attribute(
+            AttributeType::new(Storage::F64, 16, Meaning::Transform),
+            &[Point, Instance],
+        ),
         REST => attribute(
             AttributeType::new(Storage::F64, 3, Meaning::Point),
             &[Point],

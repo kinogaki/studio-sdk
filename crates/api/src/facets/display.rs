@@ -6,7 +6,7 @@ use crate::error::Error;
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
 use crate::viewport::{ElementKind, ElementSet, SurfaceSource};
-use kinogaki_geometry::{Bounds, Units, Xform};
+use kinogaki_geometry::{Bounds, Column, Units, Xform};
 use kinogaki_geometry::{DisplayQuality, Tolerances};
 use std::any::Any;
 use std::fmt;
@@ -129,8 +129,9 @@ pub struct Piece {
     /// What draws. Its maker reads it back as its own type with
     /// [`packet_as`](crate::viewport::packet_as).
     pub packet: Arc<dyn SurfaceSource>,
-    /// Where it sits in its object; `None`: once, where the object is.
-    pub placements: Option<Arc<[Xform]>>,
+    /// Where it sits in its object, once a placement (instances' pieces
+    /// share their placements column); `None`: once, where the object is.
+    pub placements: Option<Column<Xform>>,
     /// What it is to its object.
     pub role: Role,
 }
