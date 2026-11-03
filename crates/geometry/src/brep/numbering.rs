@@ -120,23 +120,45 @@ impl Brep {
 
     /// What its numbering stands on, as one 32-byte hash: BLAKE3 of the
     /// body count, each body's [topology fingerprint](super::BrepTopology::fingerprint)
-    /// and the fingerprint of its persistent names in body order, then
-    /// the free curves' count and the datums' counts of each class
-    /// (planes, axes, points), each count a little-endian `u64`. It hashes
+    /// and the fingerprint of its persistent names in body order; then the
+    /// free curves' count and each curve's Primitive `name` in order (its
+    /// byte length and bytes, `u64::MAX` for none); then, for planes, axes
+    /// and points in turn, their datums' count and each one's persistent
+    /// name in datum order. Counts are little-endian `u64`. It hashes
     /// structure and names alone, never geometry: equal fingerprints, the
     /// same elements under the same ids, so a selection made on one value
-    /// still means the same on the other (a resize keeps it), and a stale
-    /// one is seen when they differ (a face added or split).
+    /// still means the same on the other (a resize or a datum moved keeps
+    /// it), and a stale one is seen when they differ (a face added or
+    /// split, two datums or free curves swapped).
     pub fn fingerprint(&self) -> [u8; 32] {
         let mut h = blake3::Hasher::new();
-        h.update(&(self.bodies.len() as u64).to_le_bytes());
+        let count = |h: &mut blake3::Hasher, n: usize| {
+            h.update(&(n as u64).to_le_bytes());
+        };
+        count(&mut h, self.bodies.len());
         for body in self.bodies.iter() {
             h.update(&body.topology().fingerprint());
             h.update(&body.names().fingerprint());
         }
-        h.update(&(self.curves.curves() as u64).to_le_bytes());
+        let curves = self.curves.curves();
+        count(&mut h, curves);
+        let names = (self.curves.attributes()).text(Class::Primitive, crate::names::NAME);
+        for curve in 0..curves {
+            match names.and_then(|n| n.get(curve)) {
+                Some(name) => {
+                    count(&mut h, name.len());
+                    h.update(name.as_bytes());
+                }
+                None => {
+                    h.update(&u64::MAX.to_le_bytes());
+                }
+            }
+        }
         for class in [Class::Primitive, Class::Edge, Class::Point] {
-            h.update(&(self.datums_of(class).count() as u64).to_le_bytes());
+            count(&mut h, self.datums_of(class).count());
+            for datum in self.datums_of(class) {
+                super::fingerprint::hash_name(&mut h, &self.datums[datum].name);
+            }
         }
         *h.finalize().as_bytes()
     }

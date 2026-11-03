@@ -757,6 +757,73 @@ fn fingerprints_follow_structure_and_names_never_geometry() {
     assert_ne!(unit_value.fingerprint(), renamed_value.fingerprint());
 }
 
+/// Datums and free curves are numbered too, so the fingerprint names
+/// them in order: swapping two point datums or two free curves changes
+/// what an id selects and the fingerprint; moving them changes neither.
+#[test]
+fn fingerprints_name_datums_and_free_curves_in_order() {
+    let point = |index: u32, at: [f64; 3]| Datum {
+        name: name(index),
+        kind: DatumKind::Point(at),
+        hint: DatumHint {
+            center: at,
+            size: 1.0,
+        },
+    };
+    let curves = |names: [&str; 2], lift: f64| {
+        let points = vec![
+            [0.0, 0.0, lift],
+            [1.0, 0.0, lift],
+            [0.0, 1.0, lift],
+            [1.0, 1.0, lift],
+        ];
+        let named = Attributes::new()
+            .with(
+                Class::Primitive,
+                kinogaki_geometry::names::NAME,
+                Attribute::text(kinogaki_geometry::Text::from_strs(names)),
+            )
+            .unwrap();
+        Curves::builder(
+            kinogaki_geometry::Basis::Linear,
+            points.into(),
+            vec![0, 2, 4].into(),
+        )
+        .attributes(named)
+        .build()
+        .unwrap()
+    };
+    let value = |datums: Vec<Datum>, curves: Curves| {
+        Brep::new(
+            Vec::new(),
+            curves,
+            datums,
+            Attributes::new(),
+            History::default(),
+        )
+        .unwrap()
+        .fingerprint()
+    };
+    let (a, b) = (point(1, [0.0; 3]), point(2, [1.0, 0.0, 0.0]));
+    let first = value(vec![a.clone(), b.clone()], curves(["left", "right"], 0.0));
+    assert_ne!(
+        first,
+        value(vec![b.clone(), a.clone()], curves(["left", "right"], 0.0)),
+        "two point datums swapped"
+    );
+    assert_ne!(
+        first,
+        value(vec![a.clone(), b.clone()], curves(["right", "left"], 0.0)),
+        "two free curves swapped"
+    );
+    let moved = vec![point(1, [5.0, 5.0, 5.0]), point(2, [-1.0, 2.0, 0.0])];
+    assert_eq!(
+        first,
+        value(moved, curves(["left", "right"], 3.0)),
+        "datums and curves moved"
+    );
+}
+
 #[test]
 fn attributes_follow_the_body_classes() {
     let b = cuboid([0.0; 3], [1.0; 3]);

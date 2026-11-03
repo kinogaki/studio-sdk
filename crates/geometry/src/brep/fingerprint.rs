@@ -98,7 +98,9 @@ fn text(h: &mut blake3::Hasher, t: &str) {
     h.update(t.as_bytes());
 }
 
-fn hash_name(h: &mut blake3::Hasher, name: &Name) {
+/// `name` into `h`: its node's tag byte and fields (texts as their `u64`
+/// byte length and bytes, names within names in place).
+pub(super) fn hash_name(h: &mut blake3::Hasher, name: &Name) {
     match name.node() {
         NameNode::Created { by, role } => {
             h.update(&[0]);
