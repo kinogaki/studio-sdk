@@ -5,6 +5,7 @@
 //!
 //! Control values are homogeneous `[x·w, y·w, z·w, w]` (a chart point
 //! leaves `z` zero; a polynomial spline has `w = 1`).
+use crate::limits::MAX_DEGREE;
 
 /// A homogeneous control value: a point of `D ≤ 3` dimensions and its
 /// weight.
@@ -40,29 +41,52 @@ pub(crate) fn span(knots: &[f64], degree: usize, count: usize, t: f64) -> usize 
     k
 }
 
-/// De Boor's recursion over the `degree + 1` homogeneous control values of
-/// span `k`, at `t`: the point and the first derivative (from the last two
-/// values one level short, NURBS Book eq. 3.4; zero on a span of no
-/// length). Outside the span it continues the span's polynomial.
+/// The most control values a span has: every degree is at most
+/// [`MAX_DEGREE`].
+const MOST: usize = MAX_DEGREE as usize + 1;
+
+#[cfg(test)]
+thread_local! {
+    /// How many knot values this thread's evaluations have built: the
+    /// work a test can bound without timing it.
+    pub(crate) static KNOTS_BUILT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// De Boor's recursion at `t` over one span of `degree`, on the stack: its
+/// `degree + 1` homogeneous control values `value(0..=degree)` and the
+/// knots around it, `knot(i)` the span's knot `i` of `0..=2·degree`, the
+/// span itself running from `knot(degree)` to `knot(degree + 1)`. The point
+/// and the first derivative (from the last two values one level short,
+/// NURBS Book eq. 3.4; zero on a span of no length). Outside the span it
+/// continues the span's polynomial.
 pub(crate) fn de_boor(
-    knots: &[f64],
-    mut points: Vec<Homogeneous>,
     degree: usize,
     t: f64,
-    k: usize,
+    knot: impl Fn(usize) -> f64,
+    value: impl Fn(usize) -> Homogeneous,
 ) -> [Homogeneous; 2] {
     let d = degree;
+    #[cfg(test)]
+    KNOTS_BUILT.with(|built| built.set(built.get() + 2 * d + 1));
+    let mut knots = [0.0; 2 * MOST - 1];
+    for (i, k) in knots[..=2 * d].iter_mut().enumerate() {
+        *k = knot(i);
+    }
+    let mut points = [[0.0; 4]; MOST];
+    for (j, p) in points[..=d].iter_mut().enumerate() {
+        *p = value(j);
+    }
     let mut derivative = [0.0; 4];
     for r in 1..=d {
         if r == d {
-            let gap = knots[k + 1] - knots[k];
+            let gap = knots[d + 1] - knots[d];
             if gap > 0.0 {
                 let (a, b) = (points[d - 1], points[d]);
                 derivative = std::array::from_fn(|c| (b[c] - a[c]) * d as f64 / gap);
             }
         }
         for j in (r..=d).rev() {
-            let (lo, hi) = (knots[j + k - d], knots[j + 1 + k - r]);
+            let (lo, hi) = (knots[j], knots[j + 1 + d - r]);
             let alpha = if hi > lo { (t - lo) / (hi - lo) } else { 0.0 };
             let (before, here) = (points[j - 1], points[j]);
             points[j] = std::array::from_fn(|c| (1.0 - alpha) * before[c] + alpha * here[c]);
@@ -81,7 +105,6 @@ pub(crate) fn evaluate(
     t: f64,
     value: impl Fn(usize) -> Homogeneous,
 ) -> [Homogeneous; 2] {
-    let k = span(knots, degree, count, t);
-    let points = (k - degree..=k).map(value).collect();
-    de_boor(knots, points, degree, t, k)
+    let first = span(knots, degree, count, t) - degree;
+    de_boor(degree, t, |i| knots[first + i], |j| value(first + j))
 }

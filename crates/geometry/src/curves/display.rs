@@ -6,6 +6,7 @@
 use super::{Basis, Curves, Knots};
 use crate::column::Column;
 use crate::kept::Kept;
+use crate::limits::MAX_DEGREE;
 use crate::spline::{self, homogeneous, rational};
 use std::sync::Arc;
 
@@ -150,22 +151,30 @@ impl Curves {
     pub fn point(&self, curve: usize, t: f64) -> [f64; 3] {
         let [lo, hi] = self.domain(curve);
         let t = t.clamp(lo, hi);
+        if self.basis == Basis::Nurbs {
+            let (d, n) = (self.degree(curve) as usize, self.vertices(curve).len());
+            let first = spline::span(self.knots_of(curve), d, n, t) - d;
+            return self.nurbs_at(curve, first, t);
+        }
+        let span = (t.floor() as usize).min(self.spans(curve).saturating_sub(1));
+        self.on_span(curve, span, t - span as f64)
+    }
+
+    /// The point of span `span` of curve `curve` (not NURBS) at `u`, `0`
+    /// to `1` over the span: only the span's control points are read.
+    fn on_span(&self, curve: usize, span: usize, u: f64) -> [f64; 3] {
         let n = self.vertices(curve).len();
         let d = self.degree(curve) as usize;
         let closed = self.periodic.contains(curve);
         let cv =
             |k: usize| self.positions[self.point_of(self.offsets[curve] as usize + k % n) as usize];
-        let spans = self.spans(curve);
-        let (span, u) = if self.basis == Basis::Nurbs {
-            (0, t)
-        } else {
-            let span = (t.floor() as usize).min(spans.saturating_sub(1));
-            (span, t - span as f64)
-        };
         match self.basis {
             Basis::Linear => lerp(cv(span), cv(span + 1), u),
             Basis::Bezier => {
-                let mut points: Vec<[f64; 3]> = (0..=d).map(|k| cv(span * d + k)).collect();
+                let mut points = [[0.0; 3]; MAX_DEGREE as usize + 1];
+                for (k, p) in points[..=d].iter_mut().enumerate() {
+                    *p = cv(span * d + k);
+                }
                 for level in 1..=d {
                     for k in 0..=d - level {
                         points[k] = lerp(points[k], points[k + 1], u);
@@ -189,32 +198,37 @@ impl Curves {
                 catmull_rom([at(s - 1), at(s), at(s + 1), at(s + 2)], u)
             }
             Basis::BSpline => {
+                let value = |j: usize| homogeneous(cv(span + j), 1.0);
                 if closed {
                     // Uniform knots, the vertices wrapping: span s uses
                     // vertices s..=s + d.
-                    let knots: Vec<f64> = (0..=2 * d + 1).map(|k| k as f64).collect();
-                    let points: Vec<[f64; 4]> =
-                        (0..=d).map(|k| homogeneous(cv(span + k), 1.0)).collect();
-                    rational(spline::de_boor(&knots, points, d, d as f64 + u, d))[0]
+                    rational(spline::de_boor(d, d as f64 + u, |i| i as f64, value))[0]
                 } else {
-                    let knots = clamped(n, d);
-                    rational(spline::evaluate(&knots, d, n, t, |k| {
-                        homogeneous(cv(k), 1.0)
-                    }))[0]
+                    // Clamped uniform knots, global knot g being
+                    // g − d within 0..=n − d; span s starts at knot s + d.
+                    let knot = |i: usize| (span + i).saturating_sub(d).min(n - d) as f64;
+                    rational(spline::de_boor(d, span as f64 + u, knot, value))[0]
                 }
             }
-            Basis::Nurbs => {
-                let knots = self.knots_of(curve);
-                let weight = |k: usize| {
-                    self.weights
-                        .as_ref()
-                        .map_or(1.0, |w| w[self.offsets[curve] as usize + k])
-                };
-                rational(spline::evaluate(knots, d, n, t, |k| {
-                    homogeneous(cv(k), weight(k))
-                }))[0]
-            }
+            Basis::Nurbs => unreachable!("NURBS curves evaluate by knot"),
         }
+    }
+
+    /// The point of NURBS curve `curve` at `t` on the span whose control
+    /// vertices start at `first`.
+    fn nurbs_at(&self, curve: usize, first: usize, t: f64) -> [f64; 3] {
+        let (knots, offset) = (self.knots_of(curve), self.offsets[curve] as usize);
+        let value = |j: usize| {
+            let v = offset + first + j;
+            let weight = self.weights.as_ref().map_or(1.0, |w| w[v]);
+            homogeneous(self.positions[self.point_of(v) as usize], weight)
+        };
+        rational(spline::de_boor(
+            self.degree(curve) as usize,
+            t,
+            |i| knots[first + i],
+            value,
+        ))[0]
     }
 
     /// Every curve as the polyline the viewport draws (see
@@ -286,7 +300,9 @@ impl Curves {
         }
     }
 
-    /// Curve `i`'s display points and their spans.
+    /// Curve `i`'s display points and their spans: each span evaluated
+    /// on its own control points and knots, so a curve shows in time
+    /// linear in its points.
     fn sample(
         &self,
         i: usize,
@@ -294,22 +310,38 @@ impl Curves {
         positions: &mut Vec<[f64; 3]>,
         spans: &mut Vec<u32>,
     ) {
-        let count = self.spans(i);
-        let starts = self.span_starts(i);
         let per = if self.basis == Basis::Linear {
             1
         } else {
             CurveDisplay::SAMPLES
         };
-        for (s, pair) in starts.windows(2).enumerate() {
+        let fraction = |k: usize| k as f64 / per as f64;
+        if self.basis == Basis::Nurbs {
+            let (knots, d) = (self.knots_of(i), self.degree(i) as usize);
+            let mut last = None;
+            for (s, k) in self.nurbs_spans(i).enumerate() {
+                let (lo, hi) = (knots[k], knots[k + 1]);
+                for j in 0..per {
+                    positions.push(self.nurbs_at(i, k - d, lo + (hi - lo) * fraction(j)));
+                    spans.push(s as u32);
+                }
+                last = Some((s, k, hi));
+            }
+            if let Some((s, k, end)) = last.filter(|_| !periodic) {
+                positions.push(self.nurbs_at(i, k - d, end));
+                spans.push(s as u32);
+            }
+            return;
+        }
+        let count = self.spans(i);
+        for s in 0..count {
             for k in 0..per {
-                let t = pair[0] + (pair[1] - pair[0]) * k as f64 / per as f64;
-                positions.push(self.point(i, t));
+                positions.push(self.on_span(i, s, fraction(k)));
                 spans.push(s as u32);
             }
         }
         if !periodic && count > 0 {
-            positions.push(self.point(i, *starts.last().expect("spans")));
+            positions.push(self.on_span(i, count - 1, 1.0));
             spans.push(count as u32 - 1);
         }
     }
@@ -341,43 +373,24 @@ impl Curves {
                     n - d
                 }
             }
-            Basis::Nurbs => self.span_starts(i).len() - 1,
+            Basis::Nurbs => self.nurbs_spans(i).count(),
         }
     }
 
-    /// The parameters where curve `i`'s spans start, and its end.
-    fn span_starts(&self, i: usize) -> Vec<f64> {
-        match self.basis {
-            Basis::Nurbs => {
-                let (knots, d, n) = (
-                    self.knots_of(i),
-                    self.degree(i) as usize,
-                    self.vertices(i).len(),
-                );
-                let mut starts: Vec<f64> = vec![knots[d]];
-                for &k in &knots[d + 1..=n] {
-                    if k > *starts.last().expect("a start") {
-                        starts.push(k);
-                    }
-                }
-                starts
-            }
-            _ => (0..=self.spans(i)).map(|s| s as f64).collect(),
-        }
+    /// NURBS curve `i`'s spans, each as the knot `k` it starts at: the
+    /// intervals `knots[k]..knots[k + 1]` of non-zero length in its domain.
+    fn nurbs_spans(&self, i: usize) -> impl Iterator<Item = usize> + '_ {
+        let (knots, d, n) = (
+            self.knots_of(i),
+            self.degree(i) as usize,
+            self.vertices(i).len(),
+        );
+        (d..n).filter(move |&k| knots[k + 1] > knots[k])
     }
 
     fn knots_of(&self, i: usize) -> &[f64] {
         self.knots.as_ref().expect("NURBS curves have knots").of(i)
     }
-}
-
-/// An open, clamped, uniform knot vector for `n` vertices of degree `d`:
-/// the parameter runs from 0 to `n − d`.
-fn clamped(n: usize, d: usize) -> Vec<f64> {
-    let interior = n - d;
-    (0..n + d + 1)
-        .map(|k| k.saturating_sub(d).min(interior) as f64)
-        .collect()
 }
 
 fn lerp(a: [f64; 3], b: [f64; 3], u: f64) -> [f64; 3] {
@@ -399,4 +412,46 @@ fn catmull_rom(p: [[f64; 3]; 4], u: f64) -> [f64; 3] {
             + (2.0 * a - 5.0 * b + 4.0 * e - f) * u2
             + (3.0 * b - a - 3.0 * e + f) * u3)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Basis, Curves};
+    use crate::spline::KNOTS_BUILT;
+
+    /// One open cubic curve of `n` points of `basis` (NURBS clamped
+    /// uniform).
+    fn curve(basis: Basis, n: usize) -> Curves {
+        let points: Vec<[f64; 3]> = (0..n).map(|k| [k as f64, (k % 3) as f64, 0.0]).collect();
+        let mut builder = Curves::builder(basis, points.into(), vec![0, n as u32].into()).degree(3);
+        if basis == Basis::Nurbs {
+            let knots: Vec<f64> = (0..n + 4)
+                .map(|k| k.saturating_sub(3).min(n - 3) as f64)
+                .collect();
+            builder = builder.knots(vec![0, n as u32 + 4].into(), knots.into());
+        }
+        builder.build().unwrap()
+    }
+
+    /// The knot values showing `curves` builds, and the points it shows.
+    fn work(curves: &Curves) -> (usize, usize) {
+        let before = KNOTS_BUILT.with(|built| built.get());
+        let shown = curves.displayed(None).positions.len();
+        (KNOTS_BUILT.with(|built| built.get()) - before, shown)
+    }
+
+    #[test]
+    fn a_shown_point_builds_only_its_spans_knots() {
+        for basis in [Basis::BSpline, Basis::Nurbs] {
+            for n in [1000, 4000] {
+                let (knots, points) = work(&curve(basis, n));
+                // A cubic span reads 2·3 + 1 knots a point, however long
+                // the curve.
+                assert!(
+                    knots <= 7 * points,
+                    "{basis:?} of {n} points: {knots} knots for {points} shown points"
+                );
+            }
+        }
+    }
 }
