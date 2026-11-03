@@ -134,7 +134,7 @@ pub use mesher::{Failed, Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     Adoption, CreateCx, KindCreation, MOTION_SAMPLES, ObjectBody, ObjectKindSpec, Processing,
-    PublishedMaterial, RenderSetup, RenderSetupKind, RenderedKind, UserSettings, Valued,
+    PublishedMaterial, RenderSetup, RenderSetupKind, RenderedKind, Valued,
 };
 pub use package::{Package, PackageUi};
 pub use params::{Diagnostic, Parameters, Schema, Value};

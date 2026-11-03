@@ -1,11 +1,11 @@
 //! [`HostCall`]: what a package asked of a [`FakeHost`](super::FakeHost).
 use kinogaki_studio_api::params::Severity;
-use kinogaki_studio_api::{Bounds, ContextId, RowsFor, SlotId, Time};
+use kinogaki_studio_api::{Bounds, RowsFor, SlotId, Time};
 use studio_ui_api::gizmo::{TransformSpace, TransformTool};
 #[cfg(doc)]
 use studio_ui_api::host::{
-    Cx, HostDoc, HostNetwork, HostSelection, HostSettings, HostShell, HostSlots, HostStatus,
-    HostTransform, HostUndo, HostView,
+    Cx, HostDoc, HostNetwork, HostSelection, HostShell, HostSlots, HostStatus, HostTransform,
+    HostUndo, HostView,
 };
 use studio_ui_api::host::{NodeRef, ObjectRef, Place};
 
@@ -58,8 +58,6 @@ pub enum HostCall {
     SetSnapping(bool),
     /// [`HostTransform::set_transform_space`].
     SetTransformSpace(TransformSpace),
-    /// [`HostSettings::set_section_any`].
-    SetSection(ContextId),
     /// [`HostNetwork::edit_network`], by object and step label, whether or
     /// not the edit held.
     EditNetwork(ObjectRef, String),

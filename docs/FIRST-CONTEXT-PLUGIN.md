@@ -437,4 +437,4 @@ The context parts this plugin leaves out, all in `studio_ui_api::package` with t
 
 - the viewport parts, each a capability of its own: `LiveTools` (its tools' input, keys and gestures, what they `Takes` of a view, `cancel` with why they `Ended`), `Panels` (floating panels such as a tool's card showing its node's rows with `Cx::node_rows`), `Transforms` (the host's gizmo over its selection, `GizmoUse`, and the Gear's rows), `Display` (what it adds over the edited surface core draws, `settle` once a frame, overlays through the `Painter`), `Timeline` (its own time) and `NumericBar`; `studio_ui_api_testing::view` is a view to call them about in a test;
 - `ObjectRows`: rows for the context's objects in the inspector;
-- a `KeyStore`, marking menus and shelves (`MenuDefaults`) in the library, and settings pages (`SettingsSection`).
+- a `KeyStore`, marking menus and shelves (`MenuDefaults`) in the library, and settings pages over its stored values (`SettingsPage`).

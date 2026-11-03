@@ -16,8 +16,8 @@ use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId, ObjectBody,
-    ObjectKindId, Parameters, SlotId, Time, Vec3,
+    Bounds, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId, ObjectBody, ObjectKindId,
+    Parameters, SlotId, Time, Vec3,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -326,25 +326,3 @@ pub trait HostTools {
     /// A tool just ran on `node`: it becomes the adjustable one.
     fn ran(&mut self, node: NodeRef);
 }
-
-/// The user's settings sections of the installed packages (a package's
-/// own [`SettingsSection`](crate::package::SettingsSection)s), as applied.
-/// Untyped here; packages use [`HostSettingsExt`].
-pub trait HostSettings {
-    /// The applied value of the section of context `context`.
-    fn section_any(&self, context: ContextId) -> Option<&(dyn Any + Send + Sync)>;
-    /// Applies `value` to that section and saves the settings (a toggle a
-    /// package offers outside the Settings window). `false`: no such
-    /// section, or `value` is not of its type.
-    fn set_section_any(&mut self, context: ContextId, value: Arc<dyn Any + Send + Sync>) -> bool;
-}
-
-/// Typed access to the settings sections.
-pub trait HostSettingsExt: HostSettings {
-    /// The applied value of `context`'s section, as a `T`.
-    fn section<T: Any>(&self, context: ContextId) -> Option<&T> {
-        self.section_any(context)?.downcast_ref()
-    }
-}
-
-impl<H: HostSettings + ?Sized> HostSettingsExt for H {}

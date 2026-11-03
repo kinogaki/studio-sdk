@@ -16,7 +16,6 @@
 //! | [`HostStatus`] | the error line and the Console |
 //! | [`HostShell`] | actions and the keyboard |
 //! | [`HostTransform`] | the transform tool and snapping |
-//! | [`HostSettings`] ([`HostSettingsExt`]) | packages' settings sections |
 //!
 //! plus plain data ([`HostPrefs`]) and two services over the host's own
 //! drawing ([`UnitsService`]).
@@ -40,8 +39,8 @@ mod data;
 mod network;
 
 pub use capabilities::{
-    HostDoc, HostDocExt, HostSelection, HostSettings, HostSettingsExt, HostShell, HostSlots,
-    HostSlotsExt, HostStatus, HostTools, HostTransform, HostUndo, HostView,
+    HostDoc, HostDocExt, HostSelection, HostShell, HostSlots, HostSlotsExt, HostStatus, HostTools,
+    HostTransform, HostUndo, HostView,
 };
 pub use data::{
     Ground, HostPrefs, Inspected, NodeRef, NodeRows, ObjectRef, Place, PointerOver, View,
@@ -144,7 +143,6 @@ pub trait Cx:
     + HostStatus
     + HostShell
     + HostTransform
-    + HostSettings
     + HostTools
 {
     /// The user's preferences now.

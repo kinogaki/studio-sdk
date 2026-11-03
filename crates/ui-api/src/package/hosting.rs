@@ -3,7 +3,7 @@
 //! the state the host keeps ([`State`]) as `dyn Any` and downcast it back.
 //! A package's author never meets these: they are the host's (Studio's,
 //! and the testing crate's `Hosting`).
-use super::{ContextPart, ProjectSettingsSection, SettingsSection, UiPackage};
+use super::{ContextPart, PageRows, SettingsPage, UiPackage};
 use super::{Display, Inspector, Levels, LiveTools, NumericBar, ObjectRows, Panels};
 use super::{Timeline, Transforms, Vocabulary};
 use crate::host::{Cx, Waker};
@@ -64,15 +64,24 @@ impl<S: 'static> ContextPart<S> {
     }
 }
 
+impl<S: 'static> SettingsPage<S> {
+    /// The same page over the host's erased state.
+    fn erase(self) -> SettingsPage<dyn Any> {
+        SettingsPage {
+            scope: self.scope,
+            label: self.label,
+            rows: Box::new(Erased::<S, dyn PageRows<S>>::new(self.rows)),
+        }
+    }
+}
+
 /// A package's UI, its state's type erased: what the host reads from the
 /// package ([`Registered::of`]).
 pub struct Registered {
     /// Its contexts, over the erased state.
     pub contexts: Vec<ContextPart<dyn Any>>,
-    /// Its settings sections.
-    pub settings: Vec<SettingsSection>,
-    /// Its sections of Settings ▸ Project.
-    pub project_sections: Vec<ProjectSettingsSection>,
+    /// Its pages of the Settings window, over the erased state.
+    pub settings: Vec<SettingsPage<dyn Any>>,
     package: Arc<dyn Calls>,
 }
 
@@ -106,14 +115,7 @@ impl Registered {
     pub(super) fn new(ui: impl UiPackage) -> Self {
         Registered {
             contexts: ui.contexts().into_iter().map(ContextPart::erase).collect(),
-            settings: ui
-                .settings()
-                .into_iter()
-                .map(SettingsSection::erase)
-                .collect(),
-            project_sections: (ui.project_sections().into_iter())
-                .map(ProjectSettingsSection::erase)
-                .collect(),
+            settings: ui.settings().into_iter().map(SettingsPage::erase).collect(),
             package: Arc::new(ui),
         }
     }
@@ -149,7 +151,6 @@ impl fmt::Debug for Registered {
         f.debug_struct("Registered")
             .field("contexts", &self.contexts)
             .field("settings", &self.settings)
-            .field("project_sections", &self.project_sections)
             .finish()
     }
 }

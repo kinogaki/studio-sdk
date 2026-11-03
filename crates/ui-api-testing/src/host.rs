@@ -21,10 +21,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use studio_ui_api::Pos;
 use studio_ui_api::gizmo::{TransformSpace, TransformTool};
 use studio_ui_api::host::{
-    Cx, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell, HostSlots,
-    HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestAsked,
-    LatestJob, LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View,
-    ViewCamera, ViewCx, Waker,
+    Cx, HostDoc, HostNetwork, HostPrefs, HostSelection, HostShell, HostSlots, HostStatus,
+    HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestAsked, LatestJob,
+    LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View, ViewCamera,
+    ViewCx, Waker,
 };
 use studio_ui_api::package::hosting::{Registered, State};
 
@@ -71,7 +71,7 @@ struct Step {
 }
 
 /// The host interface without Studio: slots and objects' networks with a
-/// real undo history, selections, a place, views and settings sections,
+/// real undo history, selections, a place, views and stored values,
 /// all plain fields a test sets and reads; every request is recorded
 /// ([`FakeHost::calls`]).
 pub struct FakeHost {
@@ -106,8 +106,6 @@ pub struct FakeHost {
     pub prefs: HostPrefs,
     /// The host's theme.
     pub theme: studio_ui_api::Theme,
-    /// Settings sections' applied values, by context.
-    pub sections: BTreeMap<ContextId, Arc<dyn Any + Send + Sync>>,
     /// The project's stored values.
     pub stored: kinogaki_studio_api::StoredValues,
     /// The user's stored values.
@@ -183,7 +181,6 @@ impl FakeHost {
             inspected: Inspected::default(),
             prefs: HostPrefs::default(),
             theme: studio_ui_api::Theme::default(),
-            sections: BTreeMap::new(),
             stored: Default::default(),
             user_stored: Default::default(),
             view_stored: Vec::new(),
@@ -593,22 +590,6 @@ impl HostTools for FakeHost {
     }
     fn ran(&mut self, node: NodeRef) {
         self.adjustable = Some(node);
-    }
-}
-
-impl HostSettings for FakeHost {
-    fn section_any(&self, context: ContextId) -> Option<&(dyn Any + Send + Sync)> {
-        self.sections.get(&context).map(|v| &**v)
-    }
-    fn set_section_any(&mut self, context: ContextId, value: Arc<dyn Any + Send + Sync>) -> bool {
-        self.calls.push(HostCall::SetSection(context));
-        match self.sections.get_mut(&context) {
-            Some(kept) if (**kept).type_id() == (*value).type_id() => {
-                *kept = value;
-                true
-            }
-            _ => false,
-        }
     }
 }
 

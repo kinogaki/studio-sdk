@@ -11,7 +11,7 @@ use kinogaki_geometry::DisplayQuality;
 /// display is tessellated shows unless the object overrides it. Core
 /// registers it and gives each object's quality to its display and render
 /// views ([`Detail::Viewport`](kinogaki_geometry::Detail::Viewport)); a
-/// package's settings section may show it.
+/// package's settings page may show it.
 ///
 /// ```
 /// use kinogaki_studio_api::Stored;

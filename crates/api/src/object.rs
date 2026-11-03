@@ -16,6 +16,7 @@ use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
+use crate::stored::{Stored, StoredValues};
 use kinogaki_render_api::{Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface};
 use std::any::Any;
 use std::fmt::Debug;
@@ -334,42 +335,37 @@ pub(crate) fn is_path_step(text: &str) -> bool {
 }
 
 /// What a kind's creations may depend on: the installed render engines,
-/// the active Render Settings' engine, if any, and the user's settings.
+/// the active Render Settings' engine, if any, and the user's stored
+/// values.
 #[derive(Clone, Copy)]
 pub struct CreateCx<'a> {
     engines: &'a Engines,
     active: Option<&'a EngineDescription>,
-    settings: Option<&'a dyn UserSettings>,
-}
-
-/// The user's settings sections, by context, as the host keeps them
-/// ([`CreateCx::settings`]).
-pub trait UserSettings {
-    /// Context `context`'s section value, when it has one.
-    fn section(&self, context: ContextId) -> Option<&(dyn Any + Send + Sync)>;
+    user: Option<&'a StoredValues>,
 }
 
 impl<'a> CreateCx<'a> {
     /// Creating with `engines` installed, `active` rendering, no user
-    /// settings.
+    /// values.
     pub fn new(engines: &'a Engines, active: Option<&'a EngineDescription>) -> Self {
         Self {
             engines,
             active,
-            settings: None,
+            user: None,
         }
     }
 
-    /// Reading the user's settings sections from `settings`.
-    pub fn with_settings(mut self, settings: &'a dyn UserSettings) -> Self {
-        self.settings = Some(settings);
+    /// Reading the user's stored values ([`Scope::User`](crate::Scope::User))
+    /// from `user`.
+    pub fn with_user(mut self, user: &'a StoredValues) -> Self {
+        self.user = Some(user);
         self
     }
 
-    /// Context `context`'s user settings section (the package's section
-    /// value; read it with `downcast_ref`), when it has one.
-    pub fn settings(&self, context: ContextId) -> Option<&'a (dyn Any + Send + Sync)> {
-        self.settings?.section(context)
+    /// The user's value `T`, when the host lent the user's values and a
+    /// package registered `T` for the user.
+    pub fn user<T: Stored>(&self) -> Option<&'a T> {
+        self.user?.get::<T>()
     }
     /// The installed engines.
     pub fn engines(&self) -> &'a Engines {

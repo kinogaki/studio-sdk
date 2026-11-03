@@ -86,7 +86,7 @@ pub struct Package {
     /// feature): how the host shows what a compiled network makes.
     #[cfg(feature = "wgpu")]
     pub runners: Vec<(ContextId, Arc<dyn crate::network::run::PlanRunner>)>,
-    /// Its UI: its contexts' parts and settings sections, made by the
+    /// Its UI: its contexts' parts and settings pages, made by the
     /// host UI interface (`kinogaki-studio-ui-api`'s `WithUi::with_ui`).
     /// `None`: a headless package (a kernel's data types, a render
     /// engine), shown through Studio's own UI alone.

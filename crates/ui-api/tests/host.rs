@@ -1,24 +1,25 @@
 //! A toy package's UI on the fake host: registering erases its state's
 //! type; its inspector, viewport layer and levels run through
 //! the host interface; its slot is undone with the document; its
-//! settings section round-trips; a tool's card shows its node's rows
+//! settings pages edit the stored values they are lent; a tool's card shows its node's rows
 //! through the host, with More while they are fewer than the inspector's;
 //! and a nested call is refused.
 use kinogaki_studio_api::RowsFor;
-use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field, MemoryElement};
+use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field};
 use kinogaki_studio_api::{
-    ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId, StoredValues,
+    ContextId, Error, ObjectKindId, Package, PackageId, Scope, Slot, SlotId, Stored, StoredId,
+    StoredValue, StoredValues,
 };
 use studio_ui_api::host::{
-    Cx, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows,
-    ObjectRef, Place, View, ViewCx, Waker,
+    Cx, HostDoc, HostDocExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows, ObjectRef,
+    Place, View, ViewCx, Waker,
 };
 use studio_ui_api::package::hosting::Registered;
 use studio_ui_api::package::{
     ContextPart, Display, DisplayKind, DisplayOption, DisplayScope, Edited, Ended, Held, Inspector,
     KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library, LiveTools, MarkingDefault,
-    MenuDefaults, Panel, PanelScope, Panels, Places, ProjectSection, ProjectSettingsSection,
-    Section, SettingsSection, Shared, Situation, Takes, UiPackage, VocabularyItem, When, WithUi,
+    MenuDefaults, PageRows, PageScope, Panel, PanelScope, Panels, Places, SettingsPage, Shared,
+    Situation, Takes, UiPackage, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::{ButtonSpec, Color, Modifiers, Painter, Pos, Rect, Stroke, Ui, Vec2};
@@ -84,11 +85,11 @@ impl UiPackage for Trees {
                 .with_inspector(TreeInspector),
         ]
     }
-    fn settings(&self) -> Vec<SettingsSection<Forest>> {
-        vec![SettingsSection::of::<Density>()]
-    }
-    fn project_sections(&self) -> Vec<ProjectSettingsSection<Forest>> {
-        vec![ProjectSettingsSection::of::<SpacingPage>()]
+    fn settings(&self) -> Vec<SettingsPage<Forest>> {
+        vec![
+            SettingsPage::new(PageScope::User, "Forest", DensityPage),
+            SettingsPage::new(PageScope::Project, "Trees", SpacingPage),
+        ]
     }
     fn poll(&self, s: &mut Forest, _cx: &mut dyn Cx) {
         s.polls += 1;
@@ -271,45 +272,53 @@ impl Inspector<Forest> for TreeInspector {
     }
 }
 
-/// The forest's user settings: how dense new forests grow.
+/// The forest's user setting: how dense new forests grow.
 #[derive(Clone, Debug, PartialEq)]
 struct Density(f64);
 
-impl Section for Density {
-    type State = Forest;
-    fn context() -> ContextId {
-        forest()
+impl Stored for Density {
+    fn id() -> StoredId {
+        StoredId::declared("toy.trees.density")
     }
-    fn pages() -> Vec<String> {
-        vec!["Forest".into()]
+    fn scope() -> Scope {
+        Scope::User
     }
     fn defaults() -> Self {
         Density(0.5)
-    }
-    fn page(&self, _page: &str, s: &mut Forest, _cx: &mut dyn Cx) -> Schema<u32> {
-        s.pages += 1;
-        let mut rows = Schema::new();
-        rows.push(Row::number(0, "Density", self.0, Number::length()));
-        rows
-    }
-    fn apply(
-        &mut self,
-        _page: &str,
-        rows: &Schema<u32>,
-        edits: &Edits<u32>,
-        _s: &mut Forest,
-        cx: &mut dyn Cx,
-    ) {
-        if edits.changed.contains(&0) {
-            self.0 = rows.number(&0).unwrap_or(self.0);
-            cx.info("Density set");
-        }
     }
     fn write(&self, to: &mut dyn ElementWriter) -> Result<(), Error> {
         to.set("density", Field::Float(self.0))
     }
     fn read(from: &dyn ElementReader) -> Result<Self, Error> {
         Ok(Density(from.float("density")?))
+    }
+}
+
+/// The Forest page of the user's settings: the density.
+struct DensityPage;
+
+impl PageRows<Forest> for DensityPage {
+    fn rows(&self, s: &mut Forest, user: &StoredValues, _cx: &mut dyn Cx) -> Schema<u32> {
+        s.pages += 1;
+        let density = user.get::<Density>().map_or(0.0, |d| d.0);
+        let mut rows = Schema::new();
+        rows.push(Row::number(0, "Density", density, Number::length()));
+        rows
+    }
+    fn apply(
+        &self,
+        _s: &mut Forest,
+        user: &mut StoredValues,
+        rows: &Schema<u32>,
+        edits: &Edits<u32>,
+        cx: &mut dyn Cx,
+    ) {
+        if edits.changed.contains(&0)
+            && let Some(v) = rows.number(&0)
+        {
+            user.set(Density(v));
+            cx.info("Density set");
+        }
     }
 }
 
@@ -338,12 +347,8 @@ impl kinogaki_studio_api::Stored for Spacing {
 /// Settings ▸ Project's Trees section: the spacing.
 struct SpacingPage;
 
-impl ProjectSection for SpacingPage {
-    type State = Forest;
-    fn label() -> String {
-        "Trees".into()
-    }
-    fn rows(project: &StoredValues, s: &mut Forest, _cx: &mut dyn Cx) -> Schema<u32> {
+impl PageRows<Forest> for SpacingPage {
+    fn rows(&self, s: &mut Forest, project: &StoredValues, _cx: &mut dyn Cx) -> Schema<u32> {
         s.pages += 1;
         let spacing = project.get::<Spacing>().map_or(0.0, |s| s.0);
         let mut rows = Schema::new();
@@ -351,10 +356,11 @@ impl ProjectSection for SpacingPage {
         rows
     }
     fn apply(
+        &self,
+        _s: &mut Forest,
         project: &mut StoredValues,
         rows: &Schema<u32>,
         edits: &Edits<u32>,
-        _s: &mut Forest,
         _cx: &mut dyn Cx,
     ) {
         if edits.changed.contains(&0)
@@ -381,6 +387,8 @@ fn host() -> FakeHost {
 fn package() -> Package {
     Package::new(PackageId::declared("toy.trees"), "Trees")
         .with_slot::<Picked>()
+        .with_stored::<Density>()
+        .with_stored::<Spacing>()
         .with_ui(Trees)
 }
 
@@ -409,7 +417,13 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     let context = package.context(forest()).unwrap();
     assert!(context.levels.is_some() && context.tools.is_some() && context.display.is_some());
     assert!(context.vocabulary.is_none());
-    assert_eq!(package.settings[0].context(), forest());
+    let pages: Vec<_> = (package.settings.iter())
+        .map(|p| (p.scope, p.label.as_str()))
+        .collect();
+    assert_eq!(
+        pages,
+        [(PageScope::User, "Forest"), (PageScope::Project, "Trees")]
+    );
     let levels = context.levels.as_ref().unwrap().levels();
     assert_eq!(levels.len(), 2);
     // The library is data, kept as given.
@@ -565,63 +579,50 @@ fn polls_reach_the_state_and_workers_wake_the_host() {
     assert_eq!(trees.state::<Forest>().polls, 1);
 }
 
+/// Each page draws its rows over the draft of its scope's values, lent
+/// the package's state, and writes the edits it is told of into the draft;
+/// the host then gives the values back typed.
 #[test]
-fn a_settings_section_edits_its_draft_and_round_trips() {
+fn settings_pages_edit_the_stored_values_they_are_lent() {
     let mut host = host();
     let mut trees = hosted(&host);
-    let section = trees.registered().settings[0];
-    let mut draft = section.defaults();
-    let value = std::sync::Arc::get_mut(&mut draft).unwrap();
-    // The page is drawn lent the package's state; the host's sheet reports
-    // the edited row with its new value in place.
-    let rows = Density(0.8).page("Forest", &mut Forest::default(), &mut host);
-    let drawn = trees.with(|_, s| section.page(value, "Forest", s, &mut host));
-    assert_eq!(
-        drawn,
-        Density(0.5).page("Forest", &mut Forest::default(), &mut host)
-    );
-    assert_eq!(trees.state::<Forest>().pages, 1);
     let edits = Edits {
         changed: vec![0],
         ..Edits::default()
     };
-    trees.with(|_, s| section.apply(value, ("Forest", &rows, &edits), s, &mut host));
+    let edited = |value| {
+        let mut rows = Schema::new();
+        rows.push(Row::number(0, "", value, Number::length()));
+        rows
+    };
+    let mut user = StoredValues::new([StoredValue::of::<Density>()]).unwrap();
+    let mut project = StoredValues::new([StoredValue::of::<Spacing>()]).unwrap();
+    let drawn = trees.with(|ui, s| ui.settings[0].rows.rows(s, &user, &mut host));
+    assert_eq!(drawn.number(&0), Some(0.5));
+    let drawn = trees.with(|ui, s| ui.settings[1].rows.rows(s, &project, &mut host));
+    assert_eq!(drawn.number(&0), Some(2.0));
+    assert_eq!(trees.state::<Forest>().pages, 2);
+    let rows = edited(0.8);
+    trees.with(|ui, s| {
+        ui.settings[0]
+            .rows
+            .apply(s, &mut user, &rows, &edits, &mut host)
+    });
     assert!(
         host.take_calls()
             .contains(&HostCall::Info("Density set".into()))
     );
-    assert!(!section.eq(&*draft, &*section.defaults()));
-    let mut element = MemoryElement::new("forest");
-    element.write(|w| section.write(&*draft, w)).unwrap();
-    let back = element.read(|r| section.read(r)).unwrap();
-    assert!(section.eq(&*back, &*draft));
-    assert_eq!(back.downcast_ref::<Density>(), Some(&Density(0.8)));
-    // The host gives the applied section back typed.
-    host.sections.insert(forest(), back);
-    assert_eq!(host.section::<Density>(forest()), Some(&Density(0.8)));
-    let empty = MemoryElement::new("forest");
-    assert!(empty.read(|r| section.read(r)).is_err());
-}
-
-#[test]
-fn a_project_section_edits_the_project_values_it_is_lent() {
-    let mut host = host();
-    let mut trees = hosted(&host);
-    let section = trees.registered().project_sections[0];
-    assert_eq!(section.label(), "Trees");
-    let mut project =
-        StoredValues::new([kinogaki_studio_api::StoredValue::of::<Spacing>()]).unwrap();
-    let drawn = trees.with(|_, s| section.rows(&project, s, &mut host));
-    assert_eq!(drawn.number(&0), Some(2.0));
-    assert_eq!(trees.state::<Forest>().pages, 1);
-    let mut edited = Schema::new();
-    edited.push(Row::number(0, "Spacing", 3.5, Number::length()));
-    let edits = Edits {
-        changed: vec![0],
-        ..Edits::default()
-    };
-    trees.with(|_, s| section.apply(&mut project, (&edited, &edits), s, &mut host));
+    let rows = edited(3.5);
+    trees.with(|ui, s| {
+        ui.settings[1]
+            .rows
+            .apply(s, &mut project, &rows, &edits, &mut host)
+    });
+    assert_eq!(user.get::<Density>(), Some(&Density(0.8)));
     assert_eq!(project.get::<Spacing>(), Some(&Spacing(3.5)));
+    (host.user_stored, host.stored) = (user, project);
+    assert_eq!(host.stored::<Density>(), &Density(0.8));
+    assert_eq!(host.stored::<Spacing>(), &Spacing(3.5));
 }
 
 /// The registry checks a UI's contexts like every id a package declares:

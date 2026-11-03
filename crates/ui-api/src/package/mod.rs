@@ -1,4 +1,4 @@
-//! A package's UI: its contexts and settings sections, and how the host
+//! A package's UI: its contexts and settings pages, and how the host
 //! keeps its state ([`UiPackage`], added to a package with
 //! [`WithUi::with_ui`]).
 //!
@@ -73,7 +73,6 @@ mod edited;
 pub mod hosting;
 mod library;
 mod parts;
-mod project;
 mod settings;
 mod view;
 
@@ -92,8 +91,7 @@ pub use parts::{
     Display, Inspector, Invoked, Levels, LiveTools, NumericBar, ObjectRows, Panels, RowAction,
     Timeline, Transforms, Vocabulary,
 };
-pub use project::{ProjectSection, ProjectSettingsSection};
-pub use settings::{Section, SettingsSection};
+pub use settings::{PageRows, PageScope, SettingsPage};
 pub use view::{Holds, KeyPress};
 
 use crate::host::{Cx, Waker};
@@ -119,14 +117,8 @@ pub trait UiPackage: Send + Sync + 'static {
     /// Its contexts.
     fn contexts(&self) -> Vec<ContextPart<Self::State>>;
 
-    /// Its settings sections (one per context that has user settings).
-    fn settings(&self) -> Vec<SettingsSection<Self::State>> {
-        Vec::new()
-    }
-
-    /// Its sections of Settings ▸ Project, over the project's stored
-    /// values.
-    fn project_sections(&self) -> Vec<ProjectSettingsSection<Self::State>> {
+    /// Its pages of the Settings window, over its stored values.
+    fn settings(&self) -> Vec<SettingsPage<Self::State>> {
         Vec::new()
     }
 
