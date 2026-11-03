@@ -59,6 +59,30 @@ pub struct Description {
     /// context's levels). A new node gets it empty; core keeps, saves,
     /// copies and navigates it, and the type's own cook doesn't read it.
     pub inside: Option<ContextId>,
+    /// Which networks offer and keep its nodes beyond its
+    /// [`contexts`](Self::contexts).
+    pub reach: Reach,
+}
+
+/// Which networks offer a node type's nodes (Tab, menus, adds, pastes) and
+/// keep them (a file read, a paste), beyond the contexts it lists and
+/// those adopting it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Reach {
+    /// Its contexts' networks alone: offered and kept there.
+    #[default]
+    Contexts,
+    /// Every network, offered and kept: a node that holds any value (a
+    /// stash of what an import made).
+    Everywhere,
+    /// Offered where an installed format reads into what the network
+    /// carries, kept in every network (it stays when its formats go): a
+    /// node reading files.
+    Files,
+    /// Kept in every network but the one it holds
+    /// ([`inside`](Description::inside)), offered in its contexts: a
+    /// holder carried with what it is used in (a Material).
+    Kept,
 }
 
 impl Description {
@@ -76,7 +100,14 @@ impl Description {
             role: NodeRole::Plain,
             listing: None,
             inside: None,
+            reach: Reach::Contexts,
         }
+    }
+
+    /// Offered and kept as `reach` says.
+    pub fn reach(mut self, reach: Reach) -> Self {
+        self.reach = reach;
+        self
     }
 
     /// With icon `name`.
