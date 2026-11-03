@@ -61,7 +61,7 @@ impl Displayable for CloudDisplay {
             })
             .collect();
         let surface =
-            Surface::new(points, Arc::from([]), Arc::from([]), 0, 0).with_markers(markers);
+            Surface::new(points, Arc::from([]), Arc::from([]), 0, 0).with_markers(markers, 0);
         Ok(Drawn::one(Arc::new(surface)).with_detail(cloud.0.len()))
     }
     fn highlight(&self, _data: &Data, _drawn: &Drawn, components: &Components) -> ElementSet {

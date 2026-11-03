@@ -173,14 +173,14 @@ impl Surface {
             faces += 1;
         }
         Self::new(points, corners.into(), triangles.into(), faces, topology)
-            .with_lines(lines.into())
+            .with_lines(lines.into(), topology)
     }
 
     /// With `lines`: line vertices, two a segment, drawn and picked as
-    /// edges. A new surface: an identity of its own and no update, so it
-    /// never passes for the one it was made from (`topology` covers the
-    /// lines, as [`new`](Self::new) says).
-    pub fn with_lines(mut self, lines: Arc<[OverlayVertex]>) -> Self {
+    /// edges, `topology` the key of the connectivity with them (as in
+    /// [`new`](Self::new)). A new surface: an identity of its own and no
+    /// update, so it never passes for the one it was made from.
+    pub fn with_lines(mut self, lines: Arc<[OverlayVertex]>, topology: u64) -> Self {
         debug_assert!(lines.len().is_multiple_of(2), "two line vertices a segment");
         let segments = lines.len() / 2;
         self.classes = if segments == 0 {
@@ -197,18 +197,20 @@ impl Surface {
             }])
         };
         self.lines = lines;
-        self.renewed()
+        self.renewed(topology)
     }
 
-    /// With point `markers`. A new surface, as with
-    /// [`with_lines`](Self::with_lines).
-    pub fn with_markers(mut self, markers: Arc<[OverlayVertex]>) -> Self {
+    /// With point `markers`, `topology` the key of the connectivity with
+    /// them. A new surface, as with [`with_lines`](Self::with_lines).
+    pub fn with_markers(mut self, markers: Arc<[OverlayVertex]>, topology: u64) -> Self {
         self.markers = markers;
-        self.renewed()
+        self.renewed(topology)
     }
 
-    /// This surface as a new one: its own identity, derived from nothing.
-    fn renewed(mut self) -> Self {
+    /// This surface as a new one of connectivity `topology`: its own
+    /// identity, derived from nothing.
+    fn renewed(mut self, topology: u64) -> Self {
+        self.topology = topology;
         self.identity = Arc::new(());
         self.update = None;
         self
@@ -536,8 +538,9 @@ mod tests {
             ]
             .map(|(p, e)| vertex(p, e))
             .into(),
+            42,
         )
-        .with_markers((0..4).map(|i| vertex(i, i)).collect())
+        .with_markers((0..4).map(|i| vertex(i, i)).collect(), 42)
     }
 
     #[test]
@@ -588,16 +591,18 @@ mod tests {
         };
         let relined = surface
             .clone()
-            .with_lines(Arc::from([vertex(0), vertex(2)]));
+            .with_lines(Arc::from([vertex(0), vertex(2)]), 43);
         assert!(!relined.same(&surface), "other lines, another surface");
-        let marked = surface.clone().with_markers(Arc::from([vertex(1)]));
+        assert_eq!(relined.topology_key()[0], 43, "of another connectivity");
+        let marked = surface.clone().with_markers(Arc::from([vertex(1)]), 44);
         assert!(!marked.same(&surface), "other markers, another surface");
+        assert_eq!(marked.topology_key()[0], 44);
         // A drag's frame, given new lines, derives from nothing.
         let mut points = surface.points().to_vec();
         points[1][2] += 1.0;
         let dragged = surface.derived(points.into(), Ranges::of(1..2));
         assert!(dragged.update().is_some());
-        let relined = dragged.with_lines(Arc::from([vertex(0), vertex(2)]));
+        let relined = dragged.with_lines(Arc::from([vertex(0), vertex(2)]), 43);
         assert!(relined.update().is_none() && relined.update_from(&surface).is_none());
     }
 
