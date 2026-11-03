@@ -161,6 +161,27 @@ impl Polygons {
     pub fn bounds(&self) -> Option<[[f64; 3]; 2]> {
         positions::cached_bounds(&self.positions)
     }
+
+    /// Whether `self` and `other` are one value: the same positions,
+    /// topology and attribute allocations (one is a clone of the other),
+    /// known without comparing them.
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        self.positions.ptr_eq(&other.positions)
+            && Arc::ptr_eq(&self.topology, &other.topology)
+            && Arc::ptr_eq(&self.attributes, &other.attributes)
+    }
+
+    /// The points whose position differs from `before`'s bit for bit,
+    /// ascending: what moved between two values of one topology (a drag's
+    /// steps), and what a display patches. Bitwise, so a point moved from
+    /// `0.0` to `-0.0` moved (its bytes changed). Points past `before`'s
+    /// count are all among them.
+    pub fn moved_points(&self, before: &Polygons) -> Vec<u32> {
+        if self.positions.ptr_eq(&before.positions) {
+            return Vec::new();
+        }
+        positions::moved(&before.positions, &self.positions)
+    }
 }
 
 impl Default for Polygons {

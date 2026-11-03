@@ -273,3 +273,25 @@ fn with_topology_reuses_a_checked_topology() {
     );
     assert!(Polygons::with_topology(positions().into(), a.topology().clone(), wrong).is_err());
 }
+
+#[test]
+fn moved_points_are_those_whose_bits_changed() {
+    let p = value();
+    assert!(p.moved_points(&p).is_empty(), "one column moved nothing");
+    assert!(p.ptr_eq(&p.clone()));
+    let mut at = positions();
+    at[1][2] = 0.5;
+    // -0.0 is another position's bytes; the same bits anew are not a move.
+    at[3][0] = -0.0;
+    let moved = p.with_positions(at.clone().into()).unwrap();
+    assert_eq!(moved.moved_points(&p), [1, 3]);
+    assert!(!moved.ptr_eq(&p), "other positions");
+    let again = p.with_positions(positions().into()).unwrap();
+    assert!(
+        again.moved_points(&p).is_empty(),
+        "equal bits, another column"
+    );
+    assert!(!again.ptr_eq(&p));
+    // Back from -0.0 to 0.0 is a move too, either way round.
+    assert_eq!(p.moved_points(&moved), [1, 3]);
+}

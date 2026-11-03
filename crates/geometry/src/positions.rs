@@ -52,3 +52,17 @@ pub(crate) fn cached_bounds(positions: &Column<[f64; 3]>) -> Option<[[f64; 3]; 2
     struct Bounds(Option<[[f64; 3]; 2]>);
     positions.derived(|p| Bounds(bounds(p))).0
 }
+
+/// The points whose position differs bit for bit between `before` and
+/// `after`, ascending (every point past `before`'s count among them): what
+/// a display patches when a value's points moved. Bitwise, so `-0.0` and
+/// `0.0` differ (their bytes do) and equal bits never do.
+pub(crate) fn moved(before: &[[f64; 3]], after: &[[f64; 3]]) -> Vec<u32> {
+    let bits = |p: &[f64; 3]| p.map(f64::to_bits);
+    let blocks = parallel::map_blocks(after.len(), BLOCK, |range| {
+        (range.filter(|&p| before.get(p).is_none_or(|b| bits(b) != bits(&after[p]))))
+            .map(|p| p as u32)
+            .collect::<Vec<_>>()
+    });
+    blocks.into_iter().flatten().collect()
+}
