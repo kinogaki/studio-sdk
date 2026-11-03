@@ -48,6 +48,11 @@ pub enum ValueKind {
     /// [`Value::Text`]: a path to what the filter says fits; the host
     /// offers what fits and resolves the path from the node holding it.
     Reference(RefFilter),
+    /// [`Value::Object`]: one object the filter says fits, or none, held
+    /// by the host's id; the host shows and takes it by the object's path.
+    /// A row of an object's kind (a render setup's Camera): a node names
+    /// what it reads by a [`Reference`](Self::Reference) path.
+    Object(RefFilter),
     /// [`Value::Text`]: attribute names (a name or a pattern), the
     /// attributes of an input offered as a menu.
     Attribute {
@@ -172,6 +177,7 @@ impl ValueKind {
             | Self::Attribute { .. }
             | Self::Group
             | Self::Texts
+            | Self::Object(_)
             | Self::Data(_) => false,
         }
     }
@@ -203,6 +209,7 @@ impl ValueKind {
             (Self::Ramp { color, .. }, Value::Ramp(r)) => r.color == *color,
             (Self::ToneCurves { channels }, Value::ToneCurves(c)) => c.len() == channels.len(),
             (Self::Texts, Value::Texts(_)) => true,
+            (Self::Object(_), Value::Object(_)) => true,
             (Self::Data(ty), Value::Data(data)) => data.ty() == *ty,
             _ => false,
         }

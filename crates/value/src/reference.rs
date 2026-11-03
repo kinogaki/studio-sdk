@@ -5,6 +5,12 @@
 //! from the node holding the parameter, when the node cooks.
 use crate::id::{DataTypeId, ObjectKindId};
 
+/// A scene object, by the host's id for it: it names the object whatever
+/// the object is called or wherever it moves. Valid while the object
+/// exists; the host answers `None` for one that is gone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ObjectRef(pub u64);
+
 /// What a reference may name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RefFilter {

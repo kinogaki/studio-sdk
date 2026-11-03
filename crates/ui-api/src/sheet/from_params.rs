@@ -125,7 +125,9 @@ impl From<&ValueKind> for Kind {
             ValueKind::File => Kind::Path(FileDialog::open()),
             // The host fills the pickers and menus from the scene and the
             // node's input.
-            ValueKind::Reference(filter) => Kind::Reference(filter.clone()),
+            ValueKind::Reference(filter) | ValueKind::Object(filter) => {
+                Kind::Reference(filter.clone())
+            }
             ValueKind::Path => Kind::TreePath {
                 choices: Vec::new(),
                 relative: false,

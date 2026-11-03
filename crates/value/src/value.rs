@@ -33,6 +33,10 @@ pub enum Value {
     Text(String),
     /// Several texts: a list of names (the outputs a node writes).
     Texts(Vec<String>),
+    /// A scene object, by the host's id (none: no object): it names the
+    /// object through renames and moves, where a path would have to be
+    /// rewritten.
+    Object(Option<crate::ObjectRef>),
     /// A float or color ramp.
     Ramp(Ramp),
     /// Tone curves, one a channel.
@@ -48,6 +52,14 @@ impl Value {
     pub fn number(&self) -> Option<f64> {
         match self {
             Self::Number(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// The object named, when it is an object value naming one.
+    pub fn object(&self) -> Option<crate::ObjectRef> {
+        match self {
+            Self::Object(o) => *o,
             _ => None,
         }
     }

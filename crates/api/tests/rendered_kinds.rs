@@ -80,15 +80,13 @@ struct Setups;
 impl RenderSetupKind for Setups {
     fn setup(&self, body: &dyn ObjectBody) -> Option<RenderSetup> {
         let setup = body.downcast_ref::<Setup>()?;
+        let mut values = Parameters::new();
+        values.insert(RenderSetup::CAMERA.into(), Value::Object(setup.camera));
         Some(RenderSetup {
             engine: EngineId::new(setup.engine),
-            resolution: [640, 360],
-            camera: setup.camera,
-            output: "render.exr".into(),
+            values,
             outputs: Vec::new(),
-            values: Parameters::new(),
             processing: Processing::Network { source: None },
-            motion_samples: kinogaki_studio_api::MOTION_SAMPLES.1,
         })
     }
     fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>> {
@@ -98,7 +96,7 @@ impl RenderSetupKind for Setups {
             .find(|e| *e == setup.engine.as_str())?;
         Some(Arc::new(Setup {
             engine,
-            camera: setup.camera,
+            camera: setup.camera(),
         }))
     }
 }
@@ -195,22 +193,25 @@ fn a_setup_kind_says_which_engine_renders_and_how() {
     };
     let setup = kind.render_setup().unwrap().setup(&body).unwrap();
     assert_eq!(
-        (setup.engine.as_str(), setup.camera),
-        ("toy", Some(ObjectRef(7)))
+        (setup.engine.as_str(), setup.camera(), setup.resolution()),
+        ("toy", Some(ObjectRef(7)), [1920, 1080]),
+        "an own setting it doesn't hold takes its default"
     );
     // An edit comes back as a new body.
-    let edited = RenderSetup {
+    let mut edited = RenderSetup {
         engine: EngineId::new("other"),
-        camera: None,
         ..setup.clone()
     };
+    edited
+        .values
+        .insert(RenderSetup::CAMERA.into(), Value::Text(String::new()));
     let body = kind
         .render_setup()
         .unwrap()
         .with_setup(&body, edited.clone())
         .unwrap();
     let back = kind.render_setup().unwrap().setup(&*body).unwrap();
-    assert_eq!((back.engine.as_str(), back.camera), ("other", None));
+    assert_eq!((back.engine.as_str(), back.camera()), ("other", None));
     // A setup it can't hold, or another kind's body, is refused.
     let unknown = RenderSetup {
         engine: EngineId::new("missing"),

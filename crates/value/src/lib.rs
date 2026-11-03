@@ -9,7 +9,7 @@
 //! | [`kind`] | [`ValueKind`]: what a value holds, its limits and the options its kind takes ([`Number`], [`Unit`], [`Choice`]) |
 //! | [`condition`] | [`Condition`]: when something applies, as values holding values |
 //! | [`ramp`], [`tone_curve`] | the structured values: [`Ramp`] and [`ToneCurve`] |
-//! | [`reference`](mod@reference) | [`RefFilter`]: what a reference may name |
+//! | [`reference`](mod@reference) | [`RefFilter`]: what a reference may name; [`ObjectRef`]: an object, by the host's id |
 //!
 //! Integers are exact (`i64`), numbers `f64` wherever they are held; a
 //! choice is held and saved by its key; a unit's suffix is owned text; an
@@ -33,6 +33,6 @@ pub use id::{
 };
 pub use kind::{Choice, CurveChannel, Number, Unit, ValueKind};
 pub use ramp::Ramp;
-pub use reference::{Fits, RefFilter};
+pub use reference::{Fits, ObjectRef, RefFilter};
 pub use tone_curve::ToneCurve;
 pub use value::{Parameters, Value};

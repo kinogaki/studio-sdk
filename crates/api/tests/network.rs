@@ -409,6 +409,18 @@ fn engine(id: &str) -> kinogaki_render_api::EngineDescription {
 }
 
 #[test]
+fn an_engine_setting_is_never_named_as_a_setups_own() {
+    use kinogaki_render_api::SettingDescriptor;
+    use kinogaki_studio_api::params::ValueKind;
+    let mut d = engine("acme.lights.engine");
+    let own = SettingDescriptor::new("output", "Output", "main", ValueKind::File, "a.exr");
+    d.settings.push(own);
+    let package =
+        Package::new(PackageId::declared("acme.lights"), "Lights").with_engine_description(d);
+    assert_refused(Registry::new().register(package), &["a render setup's own"]);
+}
+
+#[test]
 fn an_engine_id_is_declared_once_under_its_vendor() {
     let package = |id: &'static str, engines: &[&str]| {
         (engines.iter()).fold(Package::new(PackageId::declared(id), id), |p, e| {

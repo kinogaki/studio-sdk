@@ -18,10 +18,14 @@ use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
 use crate::stored::{Stored, StoredValues};
 use crate::{Diagnostic, Error};
-use kinogaki_render_api::{Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface};
+use kinogaki_render_api::{
+    Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface, SettingDescriptor,
+    SettingGroup,
+};
+use kinogaki_value::{Number, RefFilter, Unit, Value, ValueKind};
 use std::any::Any;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// One object's package-owned state. Bodies are immutable and shared: an
 /// edit makes a new body, so undo keeps the old one.
@@ -416,28 +420,122 @@ pub trait RenderSetupKind: Send + Sync {
 pub struct RenderSetup {
     /// The engine that renders (its id).
     pub engine: EngineId,
-    /// The final image's width and height, pixels.
-    pub resolution: [u32; 2],
-    /// The Camera object a final render looks through (none: the view's).
-    pub camera: Option<ObjectRef>,
-    /// Where a final render writes its image, relative to the project's
-    /// folder unless absolute.
-    pub output: String,
+    /// Its own settings ([`RenderSetup::settings`]) and the engine's, by
+    /// their descriptors' names; one missing takes its descriptor's
+    /// default.
+    pub values: crate::Parameters,
     /// The outputs a final render writes beside the beauty, by the
     /// engine's ids (`EngineDescription::aovs`).
     pub outputs: Vec<Aov>,
-    /// The engine's own settings, by its descriptors' names.
-    pub values: crate::Parameters,
     /// What its render shows: a Comp network's result, or the raw render.
     pub processing: Processing,
-    /// How many placements across the shutter a moving prim sends an
-    /// engine that blurs motion ([`MOTION_SAMPLES`]): core samples them.
-    pub motion_samples: u32,
 }
 
-/// The motion samples a render setup takes, and their default
-/// ([`RenderSetup::motion_samples`]).
-pub const MOTION_SAMPLES: (std::ops::RangeInclusive<u32>, u32) = (2..=16, 3);
+impl RenderSetup {
+    /// The final image's width and height, pixels.
+    pub const RESOLUTION: &str = "resolution";
+    /// The Camera object a final render looks through (none: the view's
+    /// camera).
+    pub const CAMERA: &str = "camera";
+    /// Where a final render writes its image, relative to the project's
+    /// folder unless absolute.
+    pub const OUTPUT: &str = "output";
+    /// How many placements across the shutter a moving prim sends an
+    /// engine that blurs motion: core samples them. The host offers it
+    /// only while the engine blurs motion and the camera's shutter is open.
+    pub const MOTION_SAMPLES: &str = "motionSamples";
+
+    /// A setup's own settings, every engine's alike, in the Image group
+    /// before the engine's: Resolution, Camera, Output and Motion Samples.
+    /// They are the setup's structure, so none animates.
+    pub fn settings() -> &'static [SettingDescriptor] {
+        static SETTINGS: LazyLock<[SettingDescriptor; 4]> = LazyLock::new(|| {
+            let pixels = Number::new(Unit::Suffix(" px".into()))
+                .range(1.0, 16_384.0)
+                .decimals(0)
+                .speed(1.0);
+            let size = ValueKind::Vector {
+                components: 2,
+                number: pixels,
+            };
+            let cameras = RefFilter::objects([ObjectKindId::declared(crate::standard::CAMERA)]);
+            let own = |name, label, kind, default: Value| {
+                SettingDescriptor::new(name, label, IMAGE, kind, default).animatable(false)
+            };
+            [
+                own(
+                    RenderSetup::RESOLUTION,
+                    "Resolution",
+                    size,
+                    vec![1920.0, 1080.0].into(),
+                ),
+                own(
+                    RenderSetup::CAMERA,
+                    "Camera",
+                    ValueKind::Object(cameras),
+                    Value::Object(None),
+                ),
+                own(
+                    RenderSetup::OUTPUT,
+                    "Output",
+                    ValueKind::File,
+                    "render.exr".into(),
+                ),
+                own(
+                    RenderSetup::MOTION_SAMPLES,
+                    "Motion Samples",
+                    ValueKind::integer(2, 16),
+                    Value::Integer(3),
+                ),
+            ]
+        });
+        &*SETTINGS
+    }
+
+    /// The group a setup's own settings sit in.
+    pub fn group() -> SettingGroup {
+        SettingGroup::new(IMAGE, "Image", true)
+    }
+
+    /// The final image's width and height, pixels.
+    pub fn resolution(&self) -> [u32; 2] {
+        match self.own(Self::RESOLUTION).numbers() {
+            Some(&[w, h]) => [w, h].map(|side| side.round() as u32),
+            _ => unreachable!("its kind takes two numbers"),
+        }
+    }
+
+    /// The Camera object a final render looks through (none: the view's).
+    pub fn camera(&self) -> Option<ObjectRef> {
+        self.own(Self::CAMERA).object()
+    }
+
+    /// Where a final render writes its image.
+    pub fn output(&self) -> &str {
+        self.own(Self::OUTPUT).text().unwrap_or_default()
+    }
+
+    /// The placements across the shutter a moving prim sends.
+    pub fn motion_samples(&self) -> u32 {
+        match self.own(Self::MOTION_SAMPLES) {
+            &Value::Integer(n) => n as u32,
+            _ => unreachable!("its kind takes an integer"),
+        }
+    }
+
+    /// Own setting `name`'s value: the one held when its kind takes it,
+    /// else its default.
+    fn own(&self, name: &str) -> &Value {
+        let d = (Self::settings().iter()).find(|d| &*d.name == name);
+        let d = d.expect("a setup's own setting");
+        (self.values.get(name))
+            .filter(|v| d.accepts(v))
+            .unwrap_or(&d.default)
+    }
+}
+
+/// The name of the group a setup's own settings sit in.
+const IMAGE: &str = "image";
 
 /// What a render shows: the raw render, or a Comp network's result (the
 /// host resolves the nodes against the network and compiles them).

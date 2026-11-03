@@ -337,6 +337,29 @@ fn held_edits_need_their_types_registered() {
     );
 }
 
+/// A node names what it reads by a Reference path: an object row is an
+/// object kind's.
+#[test]
+fn a_node_parameter_holding_an_object_is_refused() {
+    struct Holding;
+    impl NodeType for Holding {
+        fn id(&self) -> NodeTypeId {
+            NodeTypeId::declared("toy.holding.node")
+        }
+        fn description(&self) -> Description {
+            let kind = params::ValueKind::Object(params::RefFilter::objects([]));
+            let row = params::Parameter::new("target", "Target", kind, Value::Object(None));
+            Description::new("Holding").parameters(Schema::default().parameter(row))
+        }
+        fn cook(&self, _cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, Error> {
+            Ok(Outputs::default())
+        }
+    }
+    let package =
+        Package::new(PackageId::declared("toy.holding"), "Holding").with_node_type(Holding);
+    assert_refused(Registry::new().register(package), &["an object row"]);
+}
+
 /// A node type declaring a parameter named as spares are is refused.
 #[test]
 fn a_parameter_named_as_spares_are_is_refused() {

@@ -166,7 +166,7 @@ pub trait FileFormat: Send + Sync {
     /// option is a field named as it: a number a real, an integer an
     /// integer, a toggle a boolean, a choice its key, text as text, a
     /// color, numbers and texts arrays (an option holds no ramp, tone
-    /// curves or data).
+    /// curves, object or data).
     fn write_options(
         &self,
         options: &FormatOptions,
@@ -182,9 +182,9 @@ pub trait FileFormat: Send + Sync {
                 Value::Choice(v) => Field::Text(v.to_string()),
                 Value::Text(v) => Field::Text(v.clone()),
                 Value::Texts(v) => Field::Texts(v.clone()),
-                Value::Ramp(_) | Value::ToneCurves(_) | Value::Data(_) => {
+                Value::Ramp(_) | Value::ToneCurves(_) | Value::Object(_) | Value::Data(_) => {
                     return Err(Error::invalid(format_args!(
-                        "option {name}: a format's options hold no ramps, curves or data"
+                        "option {name}: a format's options hold no ramps, curves, objects or data"
                     )));
                 }
             };

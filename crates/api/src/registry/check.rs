@@ -6,6 +6,7 @@ use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
+use crate::params::ValueKind;
 use kinogaki_render_api::Engines;
 use std::collections::BTreeSet;
 
@@ -26,7 +27,8 @@ impl Registry {
     /// (its UI's contexts too, and its creations' names: its kinds' with
     /// no engine installed, and its node creations', each well formed)
     /// are new and under its vendor, no node type
-    /// declares a parameter named as spares are ([`SPARE`]), each compiler
+    /// declares a parameter named as spares are ([`SPARE`]) or holding an
+    /// object ([`ValueKind::Object`]), each compiler
     /// and runner it brings serves a compiled context (its own or a
     /// registered package's) that has no other, and every data type
     /// it names is registered (by it or an earlier package). Changes
@@ -120,6 +122,13 @@ impl Registry {
         for e in &package.engines {
             let first = self.engines.get(&e.id).copied();
             declare("render engine", declared_id(id, e.id.as_str())?, first)?;
+            let own = crate::RenderSetup::settings();
+            if let Some(d) = (e.settings.iter()).find(|d| own.iter().any(|o| o.name == d.name)) {
+                return Err(Error::refused(format_args!(
+                    "{id}: render engine {} has a setting named {}, as a render setup's own",
+                    e.id, d.name
+                )));
+            }
         }
         for f in &package.formats {
             declare("format", f.id().as_str(), owner(self.formats.get(&f.id())))?;
@@ -157,6 +166,14 @@ impl Registry {
                     package = id,
                     node = n.id(),
                     parameter = p.name.clone()
+                )));
+            }
+            let object = |p: &&crate::params::Parameter| matches!(p.kind, ValueKind::Object(_));
+            if let Some(p) = description.parameters.parameters().find(object) {
+                return Err(Error::refused(format!(
+                    "{id}'s node type {} declares parameter {}, an object row: a node names what it reads by a Reference path",
+                    n.id(),
+                    p.name
                 )));
             }
         }
