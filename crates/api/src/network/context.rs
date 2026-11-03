@@ -191,9 +191,9 @@ impl FlagSet {
     }
 }
 
-/// How a context's networks are stored. Core writes each network as one
-/// child element of its object's element, spelt `element` (`def trees
-/// "trees" {…}`), with a `def node "n<id>"` element per node: its `type`,
+/// How a context's networks are stored. Core writes each network as the
+/// `network` child of its object's element, typed `element` (`def trees
+/// "network" {…}`), with a `def node "n<id>"` element per node: its `type`,
 /// name and position, its flags, its wires (`in_<port>` slots connected
 /// to `out_<port>` slots), its parameters in one layout every node type
 /// shares, and its held delta and kept outputs through their data types'

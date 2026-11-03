@@ -13,10 +13,10 @@
 //!
 //! **In the project.** A [`Scope::Project`] value is the element of its
 //! [`Stored::id`] among the project's settings; a [`Scope::View`]
-//! value is that element in each view's. Each element names its package
-//! (the `package` metadata), so a project holding a value of a package
-//! that isn't installed skips it. Reading is strict: a project without an
-//! installed package's value does not read.
+//! value is that element in each view's. The element is typed with the id,
+//! which names its package, so a project holding a value of a package that
+//! isn't installed keeps it as read. Reading is strict: a field the value's
+//! codec doesn't read refuses the project, as one missing does.
 //!
 //! **For the user.** A [`Scope::User`] value is that element in the
 //! user's settings folder, kept beside the user's settings, never in a

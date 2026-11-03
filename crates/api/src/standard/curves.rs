@@ -78,8 +78,9 @@ pub(super) fn write_curves(c: &Curves, out: &mut dyn ElementWriter) -> Result<()
     out.set_rows("positions", 3, Field::F64s(attributes::flat(c.positions())))?;
     out.set("offsets", Field::U32s(c.offsets().to_vec()))?;
     out.set("indexed", Field::Bool(c.points().is_some()))?;
-    let points = c.points().map_or(Vec::new(), |p| p.to_vec());
-    out.set("points", Field::U32s(points))?;
+    if let Some(points) = c.points() {
+        out.set("points", Field::U32s(points.to_vec()))?;
+    }
     out.set("degrees", Field::U8s(c.degrees().to_vec()))?;
     let periodic = c.periodic().words().iter().map(|&w| w as i64).collect();
     out.set("periodic", Field::I64s(periodic))?;
@@ -88,8 +89,9 @@ pub(super) fn write_curves(c: &Curves, out: &mut dyn ElementWriter) -> Result<()
         out.set("knots", Field::F64s(knots.values().to_vec()))?;
     }
     out.set("rational", Field::Bool(c.weights().is_some()))?;
-    let weights = c.weights().map_or(Vec::new(), |w| w.to_vec());
-    out.set("weights", Field::F64s(weights))?;
+    if let Some(weights) = c.weights() {
+        out.set("weights", Field::F64s(weights.to_vec()))?;
+    }
     attributes::write(c.attributes(), out)
 }
 
