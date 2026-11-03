@@ -105,7 +105,7 @@ pub struct ParamSpec {
 impl ParamSpec {
     /// Whether `value` fits it (a choice it offers, a count in range).
     pub fn accepts(&self, value: &Value) -> bool {
-        self.kind.check(value).is_ok()
+        self.kind.check(value, &self.label).is_ok()
     }
 }
 

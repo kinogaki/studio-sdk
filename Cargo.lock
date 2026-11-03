@@ -464,6 +464,9 @@ dependencies = [
 [[package]]
 name = "kinogaki-value"
 version = "0.1.0"
+dependencies = [
+ "kinogaki-geometry",
+]
 
 [[package]]
 name = "kinogaki-viewport-api"

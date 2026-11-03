@@ -5,6 +5,7 @@
 use crate::id::DataTypeId;
 use crate::reference::RefFilter;
 use crate::value::Value;
+use kinogaki_geometry::Diagnostic;
 use std::sync::Arc;
 
 /// What a value holds and the options its kind takes.
@@ -210,10 +211,14 @@ impl ValueKind {
     /// Whether `value` is one this kind takes: of its variant
     /// ([`accepts`](Self::accepts)), every number finite and within the
     /// kind's limits, a ramp's keys ascending in 0–1 and at most `most`, a
-    /// tone curve's keys ascending.
-    /// The error says why, as a phrase after the value's label ("must be a
-    /// number from 0 to 10").
-    pub fn check(&self, value: &Value) -> Result<(), String> {
+    /// tone curve's keys ascending. The error names the value by `label`
+    /// and says why ("Length must be a number from 0 to 10").
+    pub fn check(&self, value: &Value, label: &str) -> Result<(), Diagnostic> {
+        (self.refusal(value)).map_err(|why| Diagnostic::error(format!("{label} {why}")))
+    }
+
+    /// Why `value` isn't one this kind takes, as a phrase after its label.
+    fn refusal(&self, value: &Value) -> Result<(), String> {
         if !self.accepts(value) {
             return Err("doesn't take that value".to_owned());
         }
@@ -404,36 +409,45 @@ mod tests {
     #[test]
     fn numbers_take_finite_values_within_their_limits() {
         let length = ValueKind::Number(Number::length().range(0.0, 10.0));
-        assert!(length.check(&Value::Number(10.0)).is_ok());
-        let refused = |k: &ValueKind, v: Value| k.check(&v).unwrap_err();
+        assert!(length.check(&Value::Number(10.0), "Value").is_ok());
+        let refused = |k: &ValueKind, v: Value| k.check(&v, "Length").unwrap_err().message;
         assert_eq!(
             refused(&length, Value::Number(-1.0)),
-            "must be a number from 0 to 10"
+            "Length must be a number from 0 to 10"
         );
         assert_eq!(
             refused(&length, Value::Number(f64::NAN)),
-            "must be a finite number"
+            "Length must be a finite number"
         );
         assert_eq!(
             refused(&length, Value::Bool(true)),
-            "doesn't take that value"
+            "Length doesn't take that value"
         );
         let size = ValueKind::Vector {
             components: 3,
             number: Number::length().range(0.0, f64::INFINITY),
         };
-        assert!(size.check(&Value::Numbers(vec![1.0, 0.0, 2.0])).is_ok());
-        assert!(size.check(&Value::Numbers(vec![1.0, -0.5, 2.0])).is_err());
-        assert!(size.check(&Value::Numbers(vec![1.0; 2])).is_err());
+        assert!(
+            size.check(&Value::Numbers(vec![1.0, 0.0, 2.0]), "Value")
+                .is_ok()
+        );
+        assert!(
+            size.check(&Value::Numbers(vec![1.0, -0.5, 2.0]), "Value")
+                .is_err()
+        );
+        assert!(size.check(&Value::Numbers(vec![1.0; 2]), "Value").is_err());
     }
 
     #[test]
     fn integers_are_exact_and_within_their_limits() {
         let count = ValueKind::integer(1, i64::MAX);
-        assert!(count.check(&Value::Integer(i64::MAX)).is_ok());
+        assert!(count.check(&Value::Integer(i64::MAX), "Value").is_ok());
         assert_eq!(
-            count.check(&Value::Integer(0)).unwrap_err(),
-            "must be a whole number of at least 1"
+            count
+                .check(&Value::Integer(0), "Count")
+                .unwrap_err()
+                .message,
+            "Count must be a whole number of at least 1"
         );
         assert!(!count.accepts(&Value::Number(2.0)), "a float is no integer");
     }
@@ -453,12 +467,12 @@ mod tests {
     fn colors_ramps_and_curves_check_their_structure() {
         assert!(
             ValueKind::Color
-                .check(&Value::Color([4.0, -0.5, 1.0]))
+                .check(&Value::Color([4.0, -0.5, 1.0]), "Value")
                 .is_ok()
         );
         assert!(
             ValueKind::Color
-                .check(&Value::Color([f64::NAN, 0.0, 0.0]))
+                .check(&Value::Color([f64::NAN, 0.0, 0.0]), "Value")
                 .is_err()
         );
         let ramp = ValueKind::Ramp {
@@ -466,20 +480,22 @@ mod tests {
             most: Some(2),
         };
         let mut r = Ramp::default_of(true);
-        assert!(ramp.check(&Value::Ramp(r.clone())).is_ok());
+        assert!(ramp.check(&Value::Ramp(r.clone()), "Value").is_ok());
         assert!(!ramp.accepts(&Value::Ramp(Ramp::default_of(false))));
         r.insert(0.5);
         assert_eq!(
-            ramp.check(&Value::Ramp(r.clone())).unwrap_err(),
-            "takes at most 2 keys"
+            ramp.check(&Value::Ramp(r.clone()), "Ramp")
+                .unwrap_err()
+                .message,
+            "Ramp takes at most 2 keys"
         );
         let any = ValueKind::Ramp {
             color: true,
             most: None,
         };
-        assert!(any.check(&Value::Ramp(r.clone())).is_ok());
+        assert!(any.check(&Value::Ramp(r.clone()), "Value").is_ok());
         r.keys[1] = Key::color(2.0, [0.0; 3], Interpolation::Linear);
-        assert!(any.check(&Value::Ramp(r)).is_err());
+        assert!(any.check(&Value::Ramp(r), "Value").is_err());
         let curves = ValueKind::ToneCurves {
             channels: vec![CurveChannel {
                 label: "Master".into(),
@@ -488,14 +504,18 @@ mod tests {
         };
         assert!(
             curves
-                .check(&Value::ToneCurves(vec![ToneCurve::identity()]))
+                .check(&Value::ToneCurves(vec![ToneCurve::identity()]), "Value")
                 .is_ok()
         );
         let one_key = ToneCurve {
             keys: vec![[0.0, 0.0]],
             ..ToneCurve::identity()
         };
-        assert!(curves.check(&Value::ToneCurves(vec![one_key])).is_err());
+        assert!(
+            curves
+                .check(&Value::ToneCurves(vec![one_key]), "Value")
+                .is_err()
+        );
         assert!(!curves.accepts(&Value::ToneCurves(Vec::new())));
     }
 
@@ -514,7 +534,7 @@ mod tests {
         let kind = ValueKind::Data(sketch.id());
         assert!(!kind.animatable());
         let value: Data = sketch.wrap(Vec::new());
-        assert!(kind.check(&Value::Data(value)).is_ok());
+        assert!(kind.check(&Value::Data(value), "Value").is_ok());
         let other = Typed::<Vec<f64>>::new(DataTypeId::declared("acme.cad.other"));
         assert!(!kind.accepts(&Value::Data(other.wrap(Vec::new()))));
     }

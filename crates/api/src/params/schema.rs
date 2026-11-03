@@ -224,7 +224,7 @@ impl Parameter {
     /// kind's [`check`](ValueKind::check). The error says why, naming the
     /// parameter by its label.
     pub fn check(&self, value: &Value) -> Result<(), Error> {
-        (self.kind.check(value)).map_err(|why| Error::invalid(format_args!("{} {why}", self.label)))
+        Ok(self.kind.check(value, &self.label)?)
     }
 }
 

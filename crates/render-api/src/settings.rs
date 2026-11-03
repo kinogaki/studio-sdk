@@ -186,7 +186,7 @@ impl SettingDescriptor {
 
     /// Whether `value` is of its kind and within its limits.
     pub fn accepts(&self, value: &Value) -> bool {
-        self.kind.check(value).is_ok()
+        self.kind.check(value, &self.label).is_ok()
     }
 }
 

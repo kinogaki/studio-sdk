@@ -10,3 +10,4 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+kinogaki-geometry.workspace = true
