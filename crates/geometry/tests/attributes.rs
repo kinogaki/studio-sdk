@@ -420,3 +420,27 @@ fn domains_storages_and_meanings_name_themselves() {
     assert_eq!(Domain::from_name("face"), None);
     assert_eq!(Domain::from_name("piece"), None);
 }
+
+#[test]
+fn replacing_ids_with_some_of_them_and_higher_ones_is_checked_as_well() {
+    let ids = |v: Vec<i64>| Attribute::tuples(v, Meaning::None).unwrap();
+    let table = |v: Vec<i64>| {
+        Attributes::new()
+            .with(Domain::Point, names::ID, ids(v))
+            .unwrap()
+    };
+    let base = table(vec![5, 3, 9, 1]);
+    // Kept in order, then fresh above them: taken in one pass.
+    let replaced = |v: Vec<i64>| base.with(Domain::Point, names::ID, ids(v));
+    assert!(replaced(vec![5, 9, 10, 11]).is_ok());
+    assert!(replaced(vec![3, 1]).is_ok());
+    // Anything else goes through the whole check, and passes or fails on it.
+    assert!(replaced(vec![1, 3, 5]).is_ok(), "reordered");
+    assert!(replaced(vec![5, 3, 2]).is_ok(), "new but not above");
+    assert!(
+        replaced(vec![5, 3, 10, 10]).is_err(),
+        "fresh ones repeating"
+    );
+    assert!(replaced(vec![5, 5, 3]).is_err(), "a kept one repeating");
+    assert!(replaced(vec![5, 10, 3, 3]).is_err());
+}

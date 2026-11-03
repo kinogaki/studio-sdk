@@ -290,3 +290,45 @@ fn moved_points_are_those_whose_bits_changed() {
     // Back from -0.0 to 0.0 is a move too, either way round.
     assert_eq!(p.moved_points(&moved), [1, 3]);
 }
+
+#[test]
+fn with_moved_copies_the_positions_once_and_knows_what_moved() {
+    let table = Primitives::of_polygons(4, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+    let value = Geometry::new(vec![[0.0; 3]; 4].into(), table, Attributes::new()).unwrap();
+    let up = [0.0, 0.0, 1.0];
+    // Unsorted, with a point that stays where it is.
+    let one = value.with_moved(&[3, 1, 0], &[up, up, [0.0; 3]]).unwrap();
+    assert_eq!(one.moved_points(&value), [1, 3]);
+    assert_eq!(value.moved_points(&one), [1, 3], "and back");
+    assert!(std::sync::Arc::ptr_eq(one.primitives(), value.primitives()));
+    assert!(std::sync::Arc::ptr_eq(one.attributes(), value.attributes()));
+    // Two steps on: compared, with the same answer.
+    let two = one.with_moved(&[0], &[up]).unwrap();
+    assert_eq!(two.moved_points(&one), [0]);
+    assert_eq!(two.moved_points(&value), [0, 1, 3]);
+    // The last write of a point wins.
+    let twice = value.with_moved(&[2, 2], &[up, [0.0, 0.0, 2.0]]).unwrap();
+    assert_eq!(twice.positions()[2], [0.0, 0.0, 2.0]);
+    assert_eq!(twice.moved_points(&value), [2]);
+    // A column that merely has the same values records nothing about it.
+    let same = value
+        .with_positions(value.positions().to_vec().into())
+        .unwrap();
+    assert!(same.moved_points(&value).is_empty());
+    // Refusals.
+    assert!(value.with_moved(&[4], &[up]).is_err());
+    assert!(value.with_moved(&[0], &[]).is_err());
+    assert!(value.with_moved(&[0], &[[f64::NAN; 3]]).is_err());
+    assert!(value.with_moved(&[0], &[[1e101, 0.0, 0.0]]).is_err());
+}
+
+#[test]
+fn with_points_keeps_the_rows_and_their_columns() {
+    let table = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+    let more = table.with_points(5).unwrap();
+    assert_eq!(more.points(), 5);
+    assert_eq!(more.offsets().key(), table.offsets().key());
+    assert_eq!(more.vertices().key(), table.vertices().key());
+    assert_ne!(more.fingerprint(), table.fingerprint());
+    assert!(table.with_points(2).is_err(), "rows would name past them");
+}

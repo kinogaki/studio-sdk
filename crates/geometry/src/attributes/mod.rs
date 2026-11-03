@@ -137,7 +137,7 @@ impl Attributes {
         attribute: Arc<Attribute>,
     ) -> Result<Attributes, Error> {
         check_name(name)?;
-        check_standard_attribute(domain, name, &attribute)?;
+        check_standard_attribute(domain, name, &attribute, self.get(domain, name))?;
         let mut out = self.clone();
         out.values
             .entry(domain)
@@ -268,6 +268,7 @@ fn check_standard_attribute(
     domain: Domain,
     name: &str,
     attribute: &Attribute,
+    replacing: Option<&Attribute>,
 ) -> Result<(), Error> {
     match names::standard(name) {
         Some(Standard::Group(on)) => Err(refused(format!(
@@ -294,8 +295,9 @@ fn check_standard_attribute(
             attribute.ty().describe()
         ))),
         Some(Standard::Attribute(..)) if name == names::ID => {
-            let repeated = match attribute.values() {
-                Values::I64(ids) => ids::repeated(ids),
+            let repeated = match (attribute.values(), replacing.map(Attribute::values)) {
+                (Values::I64(new), Some(Values::I64(old))) if ids::kept_or_above(new, old) => None,
+                (Values::I64(ids), _) => ids::repeated(ids),
                 _ => None,
             };
             match repeated {

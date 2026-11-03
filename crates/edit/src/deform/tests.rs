@@ -116,35 +116,6 @@ fn scale_acts_along_the_axes() {
 }
 
 #[test]
-fn apply_places_the_moved_points_by_their_weights_and_leaves_the_rest() {
-    let positions = [[0.0; 3], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0]];
-    let lift = Move::new(v(0.0, 0.0, 2.0), STILL, ONES, Vec3::ZERO).unwrap();
-    let d = Deform {
-        step: lift,
-        weights: Some(Arc::from([1.0, 0.5])),
-        symmetry: None,
-    };
-    let mut out = positions;
-    d.apply(&positions, &[1, 3], &mut out);
-    assert_eq!(
-        out,
-        [[0.0; 3], [1.0, 0.0, 2.0], [2.0, 0.0, 0.0], [3.0, 0.0, 1.0]]
-    );
-    // Each point where `place` puts it: the preview's function.
-    for (i, &p) in [1u32, 3].iter().enumerate() {
-        let w = d.weights.as_ref().unwrap()[i];
-        assert_eq!(
-            out[p as usize],
-            d.place(positions[p as usize].into(), w).to_array()
-        );
-    }
-    // Without weights every point moves fully.
-    let mut rigid = positions;
-    Deform::rigid(lift).apply(&positions, &[0], &mut rigid);
-    assert_eq!(rigid[0], [0.0, 0.0, 2.0]);
-}
-
-#[test]
 fn axes_index_coordinates() {
     assert_eq!([Axis::X, Axis::Y, Axis::Z].map(Axis::index), [0, 1, 2]);
 }

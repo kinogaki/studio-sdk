@@ -1,6 +1,6 @@
 [package]
 name = "kinogaki-edit"
-description = "Kinogaki Studio's core-kernel edit contracts over the standard geometry values: selection rules and modes, deformations and the drag preview's moving points"
+description = "Kinogaki Studio's core-kernel edit contracts over the standard geometry values: selection rules and modes, the editor every stored value changes through, deformations and the drag preview's moving points"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

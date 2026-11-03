@@ -187,6 +187,30 @@ impl Primitives {
         }
     }
 
+    /// These primitives over `points` points: the same rows, sharing their
+    /// columns, so only the count is checked. What adding points no
+    /// primitive names yet makes of a table. Its index, fingerprint and
+    /// caches are its own (they speak of the points).
+    ///
+    /// # Errors
+    /// Fewer points than now, or past the limit.
+    pub fn with_points(&self, points: usize) -> Result<Self, Error> {
+        crate::limits::check(points, crate::limits::MAX_POINTS, "points")?;
+        if points < self.points {
+            return Err(Error::invalid(format!(
+                "{points} points for a table of {}",
+                self.points
+            )));
+        }
+        Ok(Self::unchecked(
+            points,
+            self.offsets.clone(),
+            self.vertices.clone(),
+            self.kinds.clone(),
+            self.curves.clone(),
+        ))
+    }
+
     /// No primitives over no points.
     pub fn empty() -> Self {
         let kinds = Kinds::All(Kind::POLYGON);

@@ -1,7 +1,7 @@
 //! The rule every value's positions follow: finite, each component at
 //! most [`MAX_COORDINATE`] in magnitude, at most [`MAX_POINTS`] of them.
 use crate::Error;
-use crate::column::Column;
+use crate::column::{Column, Origin};
 use crate::limits::{self, MAX_COORDINATE, MAX_POINTS};
 use crate::parallel;
 use crate::{Bounds, Vec3};
@@ -40,6 +40,69 @@ pub(crate) fn cached_bounds(positions: &Column<[f64; 3]>) -> Option<Bounds> {
     /// The bounds of one positions column: this crate's cache.
     struct Cached(Option<Bounds>);
     positions.derived(|p| Cached(bounds(p))).0
+}
+
+/// What a positions column records of the column it was edited from: the
+/// points that differ. This crate's cache; a column made any other way
+/// records nothing.
+struct Lineage(Option<(Origin<[f64; 3]>, Column<u32>)>);
+
+/// `positions` with `points` at `at`: one copy of the column, only the
+/// points given checked, the ones that differ recorded on the new column
+/// for [`moved_between`]. Returns those points, ascending.
+///
+/// # Errors
+/// A point past the column or a bad position, by the rule of [`check`].
+pub(crate) fn with_moved(
+    positions: &Column<[f64; 3]>,
+    points: &[u32],
+    at: &[[f64; 3]],
+) -> Result<(Column<[f64; 3]>, Column<u32>), Error> {
+    if points.len() != at.len() {
+        return Err(Error::invalid(format!(
+            "{} positions for {} points",
+            at.len(),
+            points.len()
+        )));
+    }
+    let mut after = positions.to_vec();
+    let mut moved = Vec::with_capacity(points.len());
+    for (&p, &to) in points.iter().zip(at) {
+        let Some(slot) = after.get_mut(p as usize) else {
+            let last = positions.len();
+            return Err(
+                Error::invalid(format!("point {p} is past the last of {last}")).element(p as usize),
+            );
+        };
+        if !to.iter().all(|c| c.abs() <= MAX_COORDINATE) {
+            return Err(
+                Error::invalid(format!("point {p} is not finite or is beyond 1e100"))
+                    .element(p as usize),
+            );
+        }
+        if slot.map(f64::to_bits) != to.map(f64::to_bits) {
+            *slot = to;
+            moved.push(p);
+        }
+    }
+    moved.sort_unstable();
+    moved.dedup();
+    let after = Column::new(after);
+    let moved = Column::new(moved);
+    let record = (Origin::of(positions), moved.clone());
+    after.derived(|_| Lineage(Some(record)));
+    Ok((after, moved))
+}
+
+/// What [`moved`] would find between these two columns, when one was made
+/// from the other by [`with_moved`]: known without comparing them.
+pub(crate) fn moved_between(a: &Column<[f64; 3]>, b: &Column<[f64; 3]>) -> Option<Column<u32>> {
+    let recorded = |after: &Column<[f64; 3]>, before: &Column<[f64; 3]>| {
+        let lineage = after.derived(|_| Lineage(None));
+        let (origin, points) = lineage.0.as_ref()?;
+        origin.is(before).then(|| points.clone())
+    };
+    recorded(a, b).or_else(|| recorded(b, a))
 }
 
 /// The points whose position differs bit for bit between `before` and

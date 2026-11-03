@@ -3,7 +3,7 @@
 use crate::derived::Derived;
 use std::fmt;
 use std::ops::{Deref, Range};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 /// A shared, immutable array of `T`, with its own cache slots.
 ///
@@ -114,6 +114,23 @@ impl<T> Column<T> {
         T: Clone,
     {
         self.as_slice().to_vec()
+    }
+}
+
+/// A note of which column another came from, which keeps none of its
+/// values alive and can't be mistaken for a later column: the allocation
+/// stays reserved while the note lives.
+pub(crate) struct Origin<T>(Weak<Inner<T>>);
+
+impl<T> Origin<T> {
+    /// A note of `column`.
+    pub(crate) fn of(column: &Column<T>) -> Self {
+        Origin(Arc::downgrade(&column.0))
+    }
+
+    /// Whether it notes `column`.
+    pub(crate) fn is(&self, column: &Column<T>) -> bool {
+        std::ptr::eq(self.0.as_ptr(), Arc::as_ptr(&column.0))
     }
 }
 

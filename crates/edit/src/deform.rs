@@ -1,7 +1,7 @@
 //! A move as data: [`Deform`], a [`Move`] applied to each point by its
 //! weight, mirrored by an optional [`Symmetry`]. It is the one definition
 //! the viewport's preview and the edit that commits the move both place
-//! points with ([`Deform::place`], [`Deform::apply`]), so the preview is
+//! points with ([`Deform::place`], [`Editor::deform`](crate::editor::Editor::deform)), so the preview is
 //! the commit.
 //!
 //! A point of weight `w` gets the move scaled by `w`: `w` of the
@@ -256,7 +256,7 @@ pub struct Deform {
     /// The move at full weight.
     pub step: Move,
     /// Each moved point's weight (0 fixed, 1 moving fully), in the order
-    /// of the points it moves ([`apply`](Self::apply)'s, or
+    /// of the points it moves ([`Editor::deform`](crate::editor::Editor::deform)'s, or
     /// [`Moving::points`](crate::preview::Moving::points)): a soft move.
     /// `None`: every point moves fully.
     pub weights: Option<Arc<[f32]>>,
@@ -286,21 +286,6 @@ impl Deform {
             Some(s) if s.side(p) == Side::On => s.axis.set(self.step.weighted(p, w), s.offset),
             Some(s) if s.mirrored(p) => s.reflect(self.step.weighted(s.reflect(p), w)),
             _ => self.step.weighted(p, w),
-        }
-    }
-
-    /// `points` of `positions` placed into `out` (the same length as
-    /// `positions`), each by its weight; the other points of `out` are
-    /// left as they are.
-    ///
-    /// # Panics
-    /// When a point is past `positions` or `out`, or the weights are
-    /// fewer than the points.
-    pub fn apply(&self, positions: &[[f64; 3]], points: &[u32], out: &mut [[f64; 3]]) {
-        for (i, &p) in points.iter().enumerate() {
-            let weight = self.weights.as_ref().map_or(1.0, |w| w[i]);
-            let at = Vec3::from(positions[p as usize]);
-            out[p as usize] = self.place(at, weight).to_array();
         }
     }
 

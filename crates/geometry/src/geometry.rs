@@ -98,6 +98,33 @@ impl Geometry {
         })
     }
 
+    /// This value with `points` at `at`, sharing the table and the
+    /// attributes: the one copy of the positions immutability asks, only
+    /// the points given checked, and [`moved_points`](Self::moved_points)
+    /// between the two known without comparing them. So a display patches
+    /// what moved at the cost of what moved.
+    ///
+    /// ```
+    /// use kinogaki_geometry::{Attributes, Geometry, Primitives};
+    ///
+    /// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+    /// let flat = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
+    /// let lifted = flat.with_moved(&[2], &[[0.0, 0.0, 1.0]]).unwrap();
+    /// assert_eq!(lifted.moved_points(&flat), [2]);
+    /// assert!(flat.with_moved(&[3], &[[0.0; 3]]).is_err());
+    /// ```
+    ///
+    /// # Errors
+    /// A point past the last, a bad position, or not one position a point.
+    pub fn with_moved(&self, points: &[u32], at: &[[f64; 3]]) -> Result<Self, Error> {
+        let (positions, _) = positions::with_moved(&self.positions, points, at)?;
+        Ok(Self {
+            positions,
+            primitives: self.primitives.clone(),
+            attributes: self.attributes.clone(),
+        })
+    }
+
     /// This value with `attributes`, sharing the positions and the
     /// primitives. Only the entries this value doesn't already hold (the
     /// same shared attribute or group under the same name) are checked, so
@@ -176,12 +203,17 @@ impl Geometry {
     /// ascending: what moved between two values of one table (a drag's
     /// steps), and what a display patches. Bitwise, so a point moved from
     /// `0.0` to `-0.0` moved (its bytes changed). Points past `before`'s
-    /// count are all among them.
+    /// count are all among them. Known at once between a value and one
+    /// [`with_moved`](Self::with_moved) made of it; found by comparing
+    /// the columns otherwise.
     pub fn moved_points(&self, before: &Geometry) -> Vec<u32> {
         if self.positions.ptr_eq(&before.positions) {
             return Vec::new();
         }
-        positions::moved(&before.positions, &self.positions)
+        match positions::moved_between(&self.positions, &before.positions) {
+            Some(points) => points.to_vec(),
+            None => positions::moved(&before.positions, &self.positions),
+        }
     }
 }
 
