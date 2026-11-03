@@ -172,17 +172,6 @@ impl<K> Field<K> {
         )
     }
 
-    /// A palette of `colors` (display code values), holding at most
-    /// `capacity`.
-    pub fn palette(key: K, label: impl Into<Text>, colors: &[[f64; 3]], capacity: usize) -> Self {
-        Self::new(
-            key,
-            label,
-            Kind::Palette { capacity },
-            Some(Value::Numbers(colors.iter().flatten().copied().collect())),
-        )
-    }
-
     /// A toggle.
     pub fn toggle(key: K, label: impl Into<Text>, on: bool) -> Self {
         Self::new(key, label, Kind::Toggle, Some(Value::Bool(on)))

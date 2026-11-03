@@ -156,9 +156,9 @@ pub struct Parameter {
     /// the host's code editor names it; `None`: plain text.
     pub language: Option<String>,
     /// Shown, not edited: at full contrast (unlike a disabled row), its
-    /// value something the node shows (a palette it read back). Hosts
-    /// show numbers, vectors, text, choices, toggles, colors, ramps, paths
-    /// and palettes so; other kinds (code, tone curves) show disabled.
+    /// value something the node shows. Hosts show numbers, vectors, text,
+    /// choices, toggles, colors, ramps and paths so; other kinds (code,
+    /// tone curves) show disabled.
     pub read_only: bool,
     /// A tool's next run starts from this parameter's last value (a
     /// setting: Bevel's segments); `false` (a gesture's measure: Extrude's
@@ -393,12 +393,6 @@ pub enum ParameterKind {
         /// The most keys a curve holds.
         capacity: usize,
     },
-    /// [`Value::Numbers`]: a palette, r, g, b a color (display code values,
-    /// 0–1), at most `capacity` colors.
-    Palette {
-        /// The most colors it holds.
-        capacity: usize,
-    },
     /// [`Value::Numbers`] (4): R, G, B and A, each shown and moved as
     /// `number`. The host may show them as one value while they are
     /// linked (sheet state it keeps, not a value).
@@ -430,7 +424,7 @@ pub struct CurveChannel {
 impl ParameterKind {
     /// Whether a parameter of this kind can be keyed over time unless its
     /// type says otherwise: numbers, integers, vectors, colors, channels,
-    /// toggles, choices, ramps, tone curves and palettes can; text of every
+    /// toggles, choices, ramps and tone curves can; text of every
     /// kind (text, code, files, paths, references, attributes, groups,
     /// texts) and data can't.
     pub fn animatable(&self) -> bool {
@@ -443,8 +437,7 @@ impl ParameterKind {
             | Self::Toggle
             | Self::Choice(_)
             | Self::Ramp { .. }
-            | Self::ToneCurves { .. }
-            | Self::Palette { .. } => true,
+            | Self::ToneCurves { .. } => true,
             Self::Text
             | Self::Code
             | Self::File
@@ -482,9 +475,6 @@ impl ParameterKind {
             }
             (Self::ToneCurves { channels, capacity }, Value::Numbers(v)) => {
                 v.len() == channels.len() * super::tone_curve::stride(*capacity)
-            }
-            (Self::Palette { capacity }, Value::Numbers(v)) => {
-                v.len().is_multiple_of(3) && v.len() / 3 <= *capacity
             }
             (Self::Channels(_), Value::Numbers(v)) => v.len() == 4,
             (Self::Texts, Value::Texts(_)) => true,

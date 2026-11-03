@@ -3,8 +3,8 @@
 //! A [`Brep`](kinogaki_geometry::brep::Brep) holds exact geometry and no
 //! triangles. What the viewport, an engine or an exporter draws of a body
 //! is a registered mesher's output: a kernel operation, never part of the
-//! value and never saved. Core asks the installed mesher (first-party
-//! first, [`Registry::meshers`](crate::Registry::meshers)) and caches the
+//! value and never saved. Core asks an installed mesher
+//! ([`Registry::meshers`](crate::Registry::meshers)) and caches the
 //! answer per body and [`Detail`]; with no mesher installed a body shows
 //! grey, without faces.
 use crate::cancel::CancelToken;

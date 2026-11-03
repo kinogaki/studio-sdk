@@ -9,10 +9,10 @@
 //! (`kinogaki-render-api`), the crate engines build on; they are re-exported
 //! here, so a source a data type makes is what engines' hosts consume.
 //!
-//! [`ShaderType`]s ([`shaders`]) are an engine's material vocabulary as
-//! node types of Studio's Shading context, which the engine's package
-//! registers. An engine's settings and its declared prims' values are
-//! parameters to a host keying them over time ([`setting_parameter`]).
+//! An engine's settings and its declared prims' values are parameters to
+//! a host keying them over time ([`setting_parameter`]). Shader node types
+//! (an engine's material vocabulary as nodes of a Material's network) are
+//! the render package's, not the SDK's.
 use crate::math::Mat4;
 use std::fmt;
 use std::sync::Arc;
@@ -22,12 +22,8 @@ pub use kinogaki_render_api::{
     PlainTriangles, PreviewSurface, Ranges, TriangleSource,
 };
 pub use setting::{setting_from_value, setting_parameter, setting_to_value};
-pub use shader::{
-    MATERIAL, SHADER_VALUE, SHADING, ShaderType, presets, seed_of, shader_value, shaders,
-};
 
 mod setting;
-mod shader;
 
 /// What a value renders as.
 #[derive(Clone)]

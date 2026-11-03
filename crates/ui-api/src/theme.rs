@@ -48,27 +48,12 @@ pub struct Theme {
     pub label_halo: Color,
     /// The X, Y and Z axes.
     pub axes: [Color; 3],
-    /// Edge marks in the viewport.
-    pub marks: Marks,
     /// Corner radii.
     pub radius: Radii,
     /// Spacing, rows and control sizes.
     pub metrics: Metrics,
     /// The interface text size, in points: [`Font::ui`](crate::Font::ui)'s.
     pub text_size: f32,
-}
-
-/// The colors of edge marks in the viewport.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Marks {
-    /// Crease weight.
-    pub crease: Color,
-    /// UV seams.
-    pub seam: Color,
-    /// Hard (sharp) edges.
-    pub hard: Color,
-    /// Bevel weight.
-    pub bevel: Color,
 }
 
 /// Corner radii, in points.
@@ -153,12 +138,6 @@ impl Default for Theme {
                 Color::rgb(137, 176, 105),
                 Color::rgb(101, 151, 194),
             ],
-            marks: Marks {
-                crease: Color::rgb(214, 72, 168),
-                seam: Color::rgb(226, 64, 40),
-                hard: Color::rgb(64, 200, 220),
-                bevel: Color::rgb(70, 140, 240),
-            },
             radius: Radii {
                 row: 2.0,
                 chip: 3.0,

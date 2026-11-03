@@ -5,9 +5,8 @@
 use kinogaki_geometry::Frame;
 use kinogaki_geometry::brep::{
     Brep, BrepBuilder, Circle, Circle2, CoedgeSpec, Cone, Curve, CurveId, Cylinder, Datum,
-    DatumHint, DatumKind, EdgeId, EdgeSpec, End, FaceSpec, History, Line, Line2, Name, NurbsCurve,
-    NurbsSurface, OperationId, PCurve, PCurveId, Placement, Plane, Role, Sense, Sphere, Surface,
-    SurfaceId, VertexId,
+    DatumHint, DatumKind, EdgeId, EdgeSpec, FaceSpec, Line, Line2, Name, NurbsCurve, NurbsSurface,
+    OperationId, PCurve, PCurveId, Placement, Plane, Sense, Sphere, Surface, SurfaceId, VertexId,
 };
 use kinogaki_geometry::{Attribute, Attributes, Basis, Class, Column, Curves, Text, TypeInfo};
 use std::f64::consts::TAU;
@@ -20,14 +19,8 @@ const P: f64 = 0.01;
 pub(super) fn breps() -> Vec<(String, Brep)> {
     let one = |b: BrepBuilder| {
         let body = b.build(Attributes::new()).expect("a fixture body is valid");
-        Brep::new(
-            vec![body],
-            Curves::empty(),
-            Vec::new(),
-            Attributes::new(),
-            History::default(),
-        )
-        .expect("a fixture value is valid")
+        Brep::new(vec![body], Curves::empty(), Vec::new(), Attributes::new())
+            .expect("a fixture value is valid")
     };
     vec![
         ("box".to_owned(), one(cuboid([0.0; 3], [1.0, 2.0, 3.0]))),
@@ -41,8 +34,8 @@ pub(super) fn breps() -> Vec<(String, Brep)> {
 
 /// A value with every part: two bodies (one placed twice, with
 /// precisions and attributes on every class), free curves, a datum of
-/// each kind, Detail attributes and a history over names of every node
-/// and role.
+/// each kind (named by names of every node: made, a part, merged) and
+/// Detail attributes.
 fn every_part() -> Brep {
     let mut b = cuboid([0.0; 3], [1.0; 3]);
     let up = Placement::new([
@@ -77,14 +70,17 @@ fn every_part() -> Brep {
         center: [0.0; 3],
         size: 1.0,
     };
+    let by = OperationId(42);
+    let face = Name::created(by, "local 0");
+    let piece = Name::part(&face, 1);
     let datums = vec![
         Datum {
-            name: name(900),
+            name: Name::created(by, "between local 0, part 1 · 0"),
             kind: DatumKind::Plane(Frame::WORLD),
             hint,
         },
         Datum {
-            name: name(901),
+            name: piece.clone(),
             kind: DatumKind::Axis {
                 origin: [0.0; 3],
                 direction: [0.0, 0.0, 1.0],
@@ -92,7 +88,7 @@ fn every_part() -> Brep {
             hint,
         },
         Datum {
-            name: name(902),
+            name: Name::merged(&[piece, face]),
             kind: DatumKind::Point([1.0, 2.0, 3.0]),
             hint: DatumHint {
                 center: [1.0, 2.0, 3.0],
@@ -100,44 +96,6 @@ fn every_part() -> Brep {
             },
         },
     ];
-    let by = OperationId(42);
-    let face = Name::created(by, Role::Local { index: 0 });
-    let piece = Name::part(&face, 1);
-    let roles = [
-        Role::Imported { body: 0, index: 3 },
-        Role::ImportedBody { body: 1 },
-        Role::Cap {
-            profile: "12+,15-".into(),
-            end: End::End,
-        },
-        Role::Side {
-            profile: "12+".into(),
-            curve: 2,
-            segment: 1,
-        },
-        Role::Along(face.clone()),
-        Role::At(piece.clone()),
-        Role::Offset(face.clone()),
-        Role::Copy {
-            of: piece.clone(),
-            index: 3,
-        },
-        Role::Between {
-            faces: vec![face.clone(), piece.clone()].into(),
-            index: 0,
-        },
-    ];
-    let generated: Vec<Name> = roles.into_iter().map(|r| Name::created(by, r)).collect();
-    let history = History {
-        generated,
-        modified: vec![face.clone()],
-        split: vec![(face.clone(), vec![piece.clone(), Name::part(&face, 2)])],
-        merged: vec![(
-            vec![piece.clone(), face.clone()],
-            Name::merged(&[piece, face]),
-        )],
-        deleted: vec![name(77)],
-    };
     let detail = Attributes::new()
         .with(
             Class::Detail,
@@ -145,11 +103,11 @@ fn every_part() -> Brep {
             Attribute::text(Text::from_strs(["parts"])),
         )
         .expect("a Detail attribute");
-    Brep::new(vec![boxed, patch], curves, datums, detail, history).expect("a fixture value")
+    Brep::new(vec![boxed, patch], curves, datums, detail).expect("a fixture value")
 }
 
 fn name(index: u32) -> Name {
-    Name::created(OperationId::NONE, Role::Primitive { index })
+    Name::created(OperationId::NONE, format!("primitive {index}"))
 }
 
 fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {

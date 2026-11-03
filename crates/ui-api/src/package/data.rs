@@ -23,14 +23,13 @@ pub struct LevelSpec {
 }
 
 /// A button after a context's levels that turns several of them on at
-/// once (Mesh's Smart: faces, edges and points), on the number key after
-/// the last level's. Which levels it turns on is the context's own
+/// once, on the number key after the last level's. Which levels it turns on is the context's own
 /// [`active`](super::Levels::active) while it is on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LevelPreset {
-    /// Its stable name for settings keys ("Smart").
+    /// Its stable name for settings keys.
     pub id: String,
-    /// Its tooltip ("Smart selection").
+    /// Its tooltip.
     pub label: String,
     /// Its icon, by name.
     pub icon: String,

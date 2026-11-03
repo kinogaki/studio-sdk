@@ -142,12 +142,6 @@ fn another_engines_material_is_adopted_flat_in_its_tint() {
 #[test]
 fn tints_say_their_color_and_attribute() {
     let cd: Arc<str> = Arc::from("Cd");
-    let modulated = Tint::Modulated {
-        color: [0.2, 0.4, 0.1],
-        attribute: cd.clone(),
-    };
-    assert_eq!(modulated.color(), Some([0.2, 0.4, 0.1]));
-    assert_eq!(modulated.attribute(), Some(&cd));
     assert_eq!(Tint::Attribute(cd.clone()).color(), None);
     assert_eq!(Tint::Attribute(cd.clone()).attribute(), Some(&cd));
     assert_eq!(Tint::Color([1.0; 3]).color(), Some([1.0; 3]));
@@ -168,7 +162,7 @@ fn outputs_have_one_id_each_and_engines_list_theirs() {
     assert_eq!(get(standard::OCCLUSION).channels(), 1);
     assert!(get(standard::INDIRECT).is_color() && get(standard::INDIRECT).channels() == 3);
     assert!(get(standard::VOLUME).is_color() && get(standard::VOLUME).channels() == 4);
-    assert!(get(standard::AMBIENT).is_color() && !get(standard::OCCLUSION).is_color());
+    assert!(!get(standard::OCCLUSION).is_color());
     assert!(get(standard::OBJECT_ID).is_id() && get(standard::BEAUTY).is_beauty());
     let (wake, _) = counter();
     let engine = RecordingEngine::new(wake);

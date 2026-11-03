@@ -87,9 +87,6 @@ pub mod standard {
     pub const ALBEDO: &str = "albedo";
     /// Light arriving straight from the lights, off a white diffuse surface.
     pub(crate) const DIRECT: &str = "direct";
-    /// Ambient light (a dome's, an ambient color's), off a white diffuse
-    /// surface.
-    pub(crate) const AMBIENT: &str = "ambient";
     /// Indirect light (global illumination), off a white diffuse surface.
     pub(crate) const INDIRECT: &str = "indirect";
     /// Light scattered toward the camera by volumes and lit fog (R G B) and
@@ -128,7 +125,6 @@ pub mod standard {
             (BEAUTY, "Beauty", AovClass::Rgba),
             (ALBEDO, "Albedo", AovClass::Color),
             (DIRECT, "Direct Light", AovClass::Color),
-            (AMBIENT, "Ambient Light", AovClass::Color),
             (INDIRECT, "Indirect Light", AovClass::Color),
             (VOLUME, "Volume", AovClass::Rgba),
             (OCCLUSION, "Ambient Occlusion", AovClass::Scalar),

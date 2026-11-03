@@ -185,7 +185,6 @@ fn fingerprints_follow_structure_and_names_never_geometry() {
             Curves::empty(),
             Vec::new(),
             Attributes::new(),
-            History::default(),
         )
         .unwrap();
         (body, value)
@@ -263,15 +262,9 @@ fn fingerprints_name_datums_and_free_curves_in_order() {
             .unwrap()
     };
     let value = |datums: Vec<Datum>, curves: Curves| {
-        Brep::new(
-            Vec::new(),
-            curves,
-            datums,
-            Attributes::new(),
-            History::default(),
-        )
-        .unwrap()
-        .fingerprint()
+        Brep::new(Vec::new(), curves, datums, Attributes::new())
+            .unwrap()
+            .fingerprint()
     };
     let (a, b) = (point(1, [0.0; 3]), point(2, [1.0, 0.0, 0.0]));
     let first = value(vec![a.clone(), b.clone()], curves(["left", "right"], 0.0));
@@ -363,20 +356,14 @@ fn a_value_holds_bodies_curves_and_datums() {
             size: 2.0,
         },
     };
-    let history = History {
-        generated: vec![body.name().clone()],
-        ..History::default()
-    };
     let value = Brep::new(
         vec![body.clone()],
         Curves::empty(),
         vec![datum.clone()],
         Attributes::new(),
-        history,
     )
     .unwrap();
     assert_eq!((value.bodies().len(), value.datums().len()), (1, 1));
-    assert_eq!(value.history().generated, vec![body.name().clone()]);
     let skew = Datum {
         kind: DatumKind::Axis {
             origin: [0.0; 3],
@@ -384,14 +371,7 @@ fn a_value_holds_bodies_curves_and_datums() {
         },
         ..datum
     };
-    let e = Brep::new(
-        Vec::new(),
-        Curves::empty(),
-        vec![skew],
-        Attributes::new(),
-        History::default(),
-    )
-    .unwrap_err();
+    let e = Brep::new(Vec::new(), Curves::empty(), vec![skew], Attributes::new()).unwrap_err();
     assert_eq!(e.element(), Some(0));
     let detail = Attributes::new()
         .with(Class::Primitive, "w", Attribute::float(vec![0.0]))

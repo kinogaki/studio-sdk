@@ -212,7 +212,6 @@ impl RenderEngine for RecordingEngine {
         deliver.deliver(Outputs {
             width,
             height,
-            block: 1,
             planes,
             names: Vec::new(),
         });

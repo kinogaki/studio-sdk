@@ -30,7 +30,6 @@ pub struct SchemaCx<'a> {
     inputs: &'a [Option<Data>],
     outputs: &'a [Data],
     names: &'a [Vec<String>],
-    kept: Option<&'a [f64]>,
     purpose: RowsFor,
 }
 
@@ -44,7 +43,6 @@ impl<'a> SchemaCx<'a> {
             inputs,
             outputs: &[],
             names: &[],
-            kept: None,
             purpose: RowsFor::Inspector,
         }
     }
@@ -72,18 +70,6 @@ impl<'a> SchemaCx<'a> {
     pub fn with_outputs(mut self, outputs: &'a [Data]) -> Self {
         self.outputs = outputs;
         self
-    }
-
-    /// With what the node's compiled context's runner keeps for it
-    /// (`display::Runner::kept`: a palette it read back).
-    pub fn with_kept(mut self, kept: Option<&'a [f64]>) -> Self {
-        self.kept = kept;
-        self
-    }
-
-    /// What the node's runner keeps for it, if anything.
-    pub fn kept(&self) -> Option<&'a [f64]> {
-        self.kept
     }
 
     /// Whether input `port` has a wire.
@@ -175,7 +161,6 @@ mod tests {
         let cooked = cx.with_outputs(&made);
         assert!(cooked.output(0).is_some() && cooked.output(1).is_none());
         assert!(!SchemaCx::default().wired(0));
-        assert_eq!(cx.kept(), None);
         assert!(cx.input_names(0).is_empty());
         let names = [vec!["a".to_owned(), "b".to_owned()]];
         let named = SchemaCx::new(&[true], &[None]).with_input_names(&names);
@@ -184,8 +169,6 @@ mod tests {
         assert_eq!(cx.purpose(), RowsFor::Inspector);
         let card = RowsFor::Card { more: false };
         assert_eq!(cx.with_purpose(card).purpose(), card);
-        let palette = [0.1, 0.2, 0.3];
-        assert_eq!(cx.with_kept(Some(&palette)).kept(), Some(&palette[..]));
     }
 
     #[test]

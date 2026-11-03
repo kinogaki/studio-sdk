@@ -381,18 +381,6 @@ pub trait ObjectRows<S: ?Sized>: Send + Sync {
         rows: &Schema<u32>,
         edits: &Edits<u32>,
     );
-    /// Whether object `object` is cooking (its outliner row and tile show
-    /// it busy).
-    fn cooking(&self, s: &S, cx: &dyn Cx, object: ObjectRef) -> bool {
-        let _ = (s, cx, object);
-        false
-    }
-    /// Object `object` is inspected for the first time since the document
-    /// opened (a printer reads its trays when it has none yet). Nothing by
-    /// default.
-    fn opened(&self, s: &mut S, cx: &mut dyn Cx, object: ObjectRef) {
-        let _ = (s, cx, object);
-    }
 }
 
 /// A part over `S` as the same part over `dyn Any`: the host's state,
@@ -622,11 +610,5 @@ impl<S: 'static> ObjectRows<dyn Any> for Erased<S, dyn ObjectRows<S>> {
         edits: &Edits<u32>,
     ) {
         self.part.apply(own_mut(s), cx, object, rows, edits)
-    }
-    fn cooking(&self, s: &dyn Any, cx: &dyn Cx, object: ObjectRef) -> bool {
-        self.part.cooking(own(s), cx, object)
-    }
-    fn opened(&self, s: &mut dyn Any, cx: &mut dyn Cx, object: ObjectRef) {
-        self.part.opened(own_mut(s), cx, object)
     }
 }

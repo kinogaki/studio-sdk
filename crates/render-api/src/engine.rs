@@ -86,11 +86,6 @@ pub struct Frame {
     pub width: u32,
     /// Display height, in pixels.
     pub height: u32,
-    /// Display pixels a film pixel covers along each axis: the engine
-    /// renders a film of `ceil(width / block)` × `ceil(height / block)`
-    /// pixels and repeats each over a `block` × `block` square from the
-    /// top-left (Pixel's pixel size; 1 when the film is the image).
-    pub block: u32,
     /// RGBA half floats (their bits), linear ACEScg, rows from the top;
     /// empty when the image reaches the display another way (a shared GPU
     /// texture).
@@ -110,10 +105,6 @@ pub struct Outputs {
     pub width: u32,
     /// Height, in pixels.
     pub height: u32,
-    /// Pixels a film pixel covers along each axis, as [`Frame::block`]:
-    /// every plane repeats each film pixel over its block, so taking one
-    /// pixel a block from the top-left gives the film back.
-    pub block: u32,
     /// Each requested output: its values, interleaved per pixel
     /// ([`crate::Aov::channels`] a pixel), f32 or u32 bits as its
     /// format says (f16 widened).
@@ -128,7 +119,6 @@ impl Default for Outputs {
         Outputs {
             width: 0,
             height: 0,
-            block: 1,
             planes: Vec::new(),
             names: Vec::new(),
         }

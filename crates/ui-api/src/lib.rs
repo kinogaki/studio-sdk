@@ -81,7 +81,7 @@ pub use projection::{ClipMatrix, Projection, Ray};
 pub use response::{InnerResponse, Response, Sense};
 pub use sheet::{Edits, FieldKey, SheetStyle};
 pub use text::{Font, FontRole, TextStyle};
-pub use theme::{Marks, Metrics, Radii, Theme};
+pub use theme::{Metrics, Radii, Theme};
 pub use ui::{Body, RowMenu, Ui, UiExt};
 pub use value_fields::{ValueField, ValueFields};
 pub use widgets::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};

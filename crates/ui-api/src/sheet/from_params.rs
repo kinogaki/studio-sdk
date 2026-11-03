@@ -179,9 +179,6 @@ impl From<&ParameterKind> for Kind {
                     .collect(),
                 capacity: *capacity,
             },
-            ParameterKind::Palette { capacity } => Kind::Palette {
-                capacity: *capacity,
-            },
             // Apart until the host says the node keeps them linked (its
             // view, not the value).
             ParameterKind::Channels(number) => Kind::Channels {
@@ -289,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn curves_palettes_channels_and_texts_become_their_fields() {
+    fn curves_channels_and_texts_become_their_fields() {
         use kinogaki_studio_api::params::{CurveChannel as Channel, tone_curve};
         let curves = tone_curve::encode(&vec![tone_curve::ToneCurve::identity(); 2], 8);
         let channels = vec![
@@ -311,12 +308,6 @@ mod tests {
                     capacity: 8,
                 },
                 curves.clone(),
-            ))
-            .parameter(Parameter::new(
-                "palette",
-                "Palette",
-                ParameterKind::Palette { capacity: 16 },
-                vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
             ))
             .parameter(Parameter::new(
                 "gain",
@@ -346,18 +337,13 @@ mod tests {
         assert_eq!((channels.len(), *capacity), (2, 8));
         assert_eq!(channels[1].tint, Some([1.0, 0.0, 0.0]));
         assert!(matches!(
-            field("palette").kind,
-            Kind::Palette { capacity: 16 }
-        ));
-        assert!(matches!(
             field("gain").kind,
             Kind::Channels { linked: false, .. }
         ));
         let outputs = field("outputs");
         assert!(matches!(outputs.kind, Kind::Info));
         assert_eq!(outputs.value, Some(Value::Text("beauty, depth".into())));
-        // A palette past its capacity, or three channels, isn't accepted.
-        assert!(!ParameterKind::Palette { capacity: 1 }.accepts(&Value::Numbers(vec![0.0; 6])));
+        // Three channels aren't accepted.
         assert!(
             !ParameterKind::Channels(params::Number::plain())
                 .accepts(&Value::Numbers(vec![0.0; 3]))
@@ -417,13 +403,8 @@ mod tests {
     fn read_only_rows_show_without_editing() {
         let schema = params::Schema::default()
             .parameter(
-                Parameter::new(
-                    "palette",
-                    "Palette",
-                    ParameterKind::Palette { capacity: 4 },
-                    vec![0.1, 0.2, 0.3],
-                )
-                .read_only(true),
+                Parameter::new("tint", "Tint", ParameterKind::Color, vec![0.1, 0.2, 0.3])
+                    .read_only(true),
             )
             .parameter(
                 Parameter::new(
@@ -435,7 +416,7 @@ mod tests {
                 .read_only(true),
             );
         let sheet = Schema::<String>::from(&schema);
-        for key in ["palette", "amount"] {
+        for key in ["tint", "amount"] {
             let field = sheet.field(&key.to_owned()).unwrap();
             assert!(field.enabled && field.read_only, "{key}");
         }

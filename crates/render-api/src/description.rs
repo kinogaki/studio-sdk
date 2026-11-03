@@ -19,30 +19,20 @@ use crate::settings::{SettingDescriptor, SettingGroup, SettingValues};
 use crate::vocabulary::{NodeType, Params};
 
 /// The one look a raster view and other engines give a material: a color
-/// (linear ACEScg), the mesh attribute its base color reads, or a color
-/// times an attribute.
+/// (linear ACEScg) or the mesh attribute its base color reads.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Tint {
     /// One color.
     Color([f32; 3]),
     /// A mesh attribute, read as a color (0, black, on a mesh without it).
     Attribute(Arc<str>),
-    /// `color` times a mesh attribute read as a color; `color` alone on a
-    /// mesh without it (a Pixel Surface's Color and Color Attribute).
-    Modulated {
-        /// The material's own color.
-        color: [f32; 3],
-        /// The attribute that scales it.
-        attribute: Arc<str>,
-    },
 }
 
 impl Tint {
-    /// Its color where no attribute is read: the one color, a modulated
-    /// tint's own color; none for a bare attribute.
+    /// Its color where no attribute is read; none for an attribute.
     pub fn color(&self) -> Option<[f32; 3]> {
         match self {
-            Tint::Color(c) | Tint::Modulated { color: c, .. } => Some(*c),
+            Tint::Color(c) => Some(*c),
             Tint::Attribute(_) => None,
         }
     }
@@ -51,10 +41,7 @@ impl Tint {
     pub fn attribute(&self) -> Option<&Arc<str>> {
         match self {
             Tint::Color(_) => None,
-            Tint::Attribute(name)
-            | Tint::Modulated {
-                attribute: name, ..
-            } => Some(name),
+            Tint::Attribute(name) => Some(name),
         }
     }
 }

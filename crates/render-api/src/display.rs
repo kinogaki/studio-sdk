@@ -21,9 +21,7 @@
 //! [`Runner`] its package makes on the host's device ([`PlanRunner`]): the
 //! host gives it the film ([`RunFilm`]) and its color service, whose view
 //! transforms come as WGSL ([`ColorService`]: the host keeps the color
-//! maths), and shows the
-//! [`RunImage`] it returns; what the runner reads back (a palette) the host
-//! asks for with [`Runner::kept`].
+//! maths), and shows the [`RunImage`] it returns.
 //!
 //! This module is the crate's `wgpu` feature (wgpu 30.0.1).
 
@@ -61,13 +59,12 @@ pub struct Shown {
     frame: Arc<Frame>,
     key: (u64, u32),
     view: wgpu::TextureView,
-    filter: wgpu::FilterMode,
     _retire: Box<dyn Send>,
 }
 
 impl Shown {
     /// `frame`'s image `view`, known by `key`, held until `retire` drops
-    /// (the engine's pin on it), sampled with linear filtering.
+    /// (the engine's pin on it).
     pub fn new(
         frame: Arc<Frame>,
         key: (u64, u32),
@@ -78,16 +75,8 @@ impl Shown {
             frame,
             key,
             view,
-            filter: wgpu::FilterMode::Linear,
             _retire: Box::new(retire),
         }
-    }
-
-    /// The image sampled with `filter` instead: nearest for images whose
-    /// texels must stay crisp (pixel art) when the host scales them.
-    pub fn filtered(mut self, filter: wgpu::FilterMode) -> Shown {
-        self.filter = filter;
-        self
     }
 
     /// The frame it shows.
@@ -104,11 +93,6 @@ impl Shown {
     /// A view of the whole texture (RGBA, linear ACEScg, sampled only).
     pub fn view(&self) -> &wgpu::TextureView {
         &self.view
-    }
-
-    /// How a host samples it.
-    pub fn filter(&self) -> wgpu::FilterMode {
-        self.filter
     }
 }
 
@@ -179,11 +163,6 @@ impl ShownFilm {
         self.size
     }
 
-    /// Display pixels a film pixel covers ([`Frame::block`]).
-    pub fn block(&self) -> u32 {
-        self.frame.block.max(1)
-    }
-
     /// Its images, the beauty first.
     pub fn images(&self) -> &[FilmImage] {
         &self.images
@@ -239,8 +218,6 @@ pub enum Referred {
 pub struct RunFilm<'a> {
     /// The film's size, in film pixels.
     pub size: [u32; 2],
-    /// Display pixels a film pixel covers.
-    pub block: u32,
     /// Changes whenever the film's contents do (a new frame).
     pub stamp: u64,
     /// Its images, the beauty first.
@@ -272,13 +249,9 @@ pub trait Runner: Send {
         colors: &dyn ColorService,
         encoder: &mut wgpu::CommandEncoder,
     ) -> Result<RunImage, String>;
-    /// The host submitted the last run as `index`: what it reads back (a
-    /// palette it made) is read once that work is done, waking `wake` once.
+    /// The host submitted the last run as `index`: what it reads back is
+    /// read once that work is done, waking `wake` once.
     fn submitted(&mut self, index: wgpu::SubmissionIndex, wake: Wake);
-    /// What node `node` made that the runner keeps for the host to read
-    /// (its last read-back palette, r, g, b a color); none when it keeps
-    /// nothing for it.
-    fn kept(&self, node: u64) -> Option<Arc<[f64]>>;
     /// Drops what it keeps (the network was closed).
     fn clear(&mut self);
 }

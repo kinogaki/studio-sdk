@@ -141,7 +141,7 @@
 //!
 //! # Unknown kinds
 //!
-//! [`Surface`], [`Curve`], [`PCurve`], [`SeamContinuity`], [`Role`] and
+//! [`Surface`], [`Curve`], [`PCurve`], [`SeamContinuity`] and
 //! [`DatumKind`] are `#[non_exhaustive]`. A value holding a kind a reader
 //! doesn't know stays valid and passes through unchanged; to that reader
 //! the body is read-only, and a mesher that can't evaluate a face reports
@@ -150,13 +150,13 @@
 //! ```
 //! use kinogaki_geometry::brep::{
 //!     BodyKind, BrepBuilder, Circle, Circle2, CoedgeSpec, Curve, EdgeSpec, FaceSpec, Name,
-//!     OperationId, PCurve, Plane, Role, Sense, Surface,
+//!     OperationId, PCurve, Plane, Sense, Surface,
 //! };
 //! use kinogaki_geometry::{Attributes, Frame};
 //! use std::f64::consts::TAU;
 //!
 //! // A unit disc: one plane face bounded by one circular edge.
-//! let name = |index| Name::created(OperationId(1), Role::Primitive { index });
+//! let name = |index: u32| Name::created(OperationId(1), format!("disc.{index}"));
 //! let mut b = BrepBuilder::new(name(0), 0.01);
 //! let plane = b.surface(Surface::Plane(Plane::new(Frame::WORLD)));
 //! let circle = b.curve(Curve::Circle(Circle::new(Frame::WORLD, 1.0).unwrap()));
@@ -196,7 +196,7 @@ pub(crate) use ids::Entity;
 pub use ids::{
     CoedgeId, CurveId, EdgeId, FaceId, LoopId, LumpId, PCurveId, ShellId, SurfaceId, VertexId,
 };
-pub use names::{End, History, Name, NameNode, OperationId, Role};
+pub use names::{Name, NameNode, OperationId};
 pub use numbering::Element;
 pub use nurbs::{NurbsCurve, NurbsSurface, SeamContinuity};
 pub use topology::{
@@ -280,12 +280,11 @@ pub struct Brep {
     curves: Curves,
     datums: Column<Datum>,
     detail: Arc<Attributes>,
-    history: Arc<History>,
 }
 
 impl Brep {
     /// The value of `bodies`, `curves` and `datums`, with `detail`
-    /// attributes and `history`, checked.
+    /// attributes, checked.
     ///
     /// # Errors
     /// The first rule broken.
@@ -294,14 +293,12 @@ impl Brep {
         curves: Curves,
         datums: Vec<Datum>,
         detail: Attributes,
-        history: History,
     ) -> Result<Self, GeometryError> {
         let value = Self {
             bodies: bodies.into(),
             curves,
             datums: datums.into(),
             detail: Arc::new(detail),
-            history: Arc::new(history),
         };
         value.check()?;
         Ok(value)
@@ -309,14 +306,8 @@ impl Brep {
 
     /// Nothing: no bodies, curves or datums.
     pub fn empty() -> Self {
-        Self::new(
-            Vec::new(),
-            Curves::empty(),
-            Vec::new(),
-            Attributes::new(),
-            History::default(),
-        )
-        .expect("an empty value is valid")
+        Self::new(Vec::new(), Curves::empty(), Vec::new(), Attributes::new())
+            .expect("an empty value is valid")
     }
 
     fn check(&self) -> Result<(), GeometryError> {
@@ -375,11 +366,6 @@ impl Brep {
     /// The value's Detail attributes.
     pub fn detail(&self) -> &Arc<Attributes> {
         &self.detail
-    }
-
-    /// What the operation that made it did to its input's names.
-    pub fn history(&self) -> &Arc<History> {
-        &self.history
     }
 
     /// This value with `bodies`, sharing the rest.

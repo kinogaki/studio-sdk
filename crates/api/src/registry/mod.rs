@@ -192,13 +192,10 @@ impl Registry {
         self.creations.iter().map(|e| &*e.item)
     }
 
-    /// The B-rep meshers, the preferred first: first-party (`kinogaki.*`)
-    /// packages' before others', each in registration order.
+    /// The B-rep meshers, in registration order (the host's choice among
+    /// them is the user's: no vendor is preferred).
     pub fn meshers(&self) -> impl Iterator<Item = &dyn Mesher> {
-        let first_party = |e: &&Entry<dyn Mesher>| e.package.vendor() == "kinogaki";
-        let ours = self.meshers.iter().filter(first_party);
-        let theirs = self.meshers.iter().filter(move |e| !first_party(e));
-        ours.chain(theirs).map(|e| &*e.item)
+        self.meshers.iter().map(|e| &*e.item)
     }
 
     /// Object kind `id`.

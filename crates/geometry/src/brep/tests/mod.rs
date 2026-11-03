@@ -16,7 +16,7 @@ mod vectors;
 const P: f64 = 0.01;
 
 fn name(index: u32) -> Name {
-    Name::created(OperationId(1), Role::Local { index })
+    Name::created(OperationId(1), format!("local.{index}"))
 }
 
 fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {

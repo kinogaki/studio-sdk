@@ -20,7 +20,7 @@
 //! widget for it: numbers, vectors, colors, linked channels, choices, text,
 //! code, secrets, file paths (with the host's file dialog), paths in the
 //! scene's tree, references the host fills, float and color ramps
-//! ([`ramp`]), tone curves, palettes and material inputs' connection
+//! ([`ramp`]), tone curves and material inputs' connection
 //! buttons ([`Socket`]).
 mod code;
 mod edits;

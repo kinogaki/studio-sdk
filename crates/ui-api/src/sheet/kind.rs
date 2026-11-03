@@ -150,14 +150,6 @@ pub enum Kind {
         /// The most keys a curve holds.
         capacity: usize,
     },
-    /// `Value::Numbers`: a palette, r, g, b a color (display code values,
-    /// 0–1, drawn as they are), at most `capacity` colors; drawn as a
-    /// swatch grid. A click on a swatch edits its color, and colors can
-    /// be added and removed; read-only, the swatches only.
-    Palette {
-        /// The most colors it holds.
-        capacity: usize,
-    },
 }
 
 /// One channel of [`Kind::ToneCurves`]: its tab's text and its curve's

@@ -11,14 +11,13 @@ use crate::error::Error;
 use kinogaki_geometry::Frame;
 use kinogaki_geometry::GeometryError;
 use kinogaki_geometry::brep::{
-    Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, History,
+    Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec,
     Placement, Sense,
 };
 
 /// Saves [`Brep`]: one table of every persistent name the value holds
 /// (`name_tags`, `name_words`, `name_texts`), which everything else names
-/// by index; the history (`generated`, `modified`, `deleted`, and
-/// `split_*` and `merged_*` as runs); the datums (`datum_names`,
+/// by index; the datums (`datum_names`,
 /// `datum_kinds`, `datum_reals`, `datum_hints`); the free curves as the
 /// child `curves` (as [`CurvesCodec`](super::CurvesCodec) saves them); one
 /// child `body-<i>` (kind `body`) per body; and the Detail attributes.
@@ -70,7 +69,6 @@ impl DataCodec for BrepCodec {
             let mut child = out.child(&format!("body-{i}"), "body")?;
             write_body(body, &mut names, &mut *child)?;
         }
-        write_history(value.history(), &mut names, out)?;
         write_datums(value.datums(), &mut names, out)?;
         curves::write_curves(value.curves(), &mut *out.child("curves", "curves")?)?;
         attributes::write(value.detail(), out)?;
@@ -84,11 +82,10 @@ impl DataCodec for BrepCodec {
         while let Some(child) = element.child(&format!("body-{}", bodies.len())) {
             bodies.push(read_body(&*child, &names)?);
         }
-        let history = read_history(element, &names)?;
         let datums = read_datums(element, &names)?;
         let curves = curves::read_curves(&*element.required_child("curves")?)?;
         let detail = attributes::read(element)?;
-        let value = Brep::new(bodies, curves, datums, detail, history);
+        let value = Brep::new(bodies, curves, datums, detail);
         Ok(brep().wrap(value.map_err(|e| invalid(&at, e))?))
     }
 
@@ -483,70 +480,6 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
     }
     let body: Result<Body, GeometryError> = b.build(attributes::read(element)?);
     body.map_err(|e| invalid(&at, e))
-}
-
-fn write_history(
-    h: &History,
-    names: &mut names::Writer,
-    out: &mut dyn ElementWriter,
-) -> Result<(), Error> {
-    out.set("generated", Field::U32s(names.names(&h.generated)?))?;
-    out.set("modified", Field::U32s(names.names(&h.modified)?))?;
-    out.set("deleted", Field::U32s(names.names(&h.deleted)?))?;
-    out.set(
-        "split_from",
-        Field::U32s(names.names(h.split.iter().map(|(n, _)| n))?),
-    )?;
-    out.set(
-        "split_offsets",
-        Field::U32s(offsets(h.split.iter().map(|(_, i)| i.len()))),
-    )?;
-    out.set(
-        "split_into",
-        Field::U32s(names.names(h.split.iter().flat_map(|(_, i)| i))?),
-    )?;
-    out.set(
-        "merged_offsets",
-        Field::U32s(offsets(h.merged.iter().map(|(f, _)| f.len()))),
-    )?;
-    out.set(
-        "merged_from",
-        Field::U32s(names.names(h.merged.iter().flat_map(|(f, _)| f))?),
-    )?;
-    out.set(
-        "merged_into",
-        Field::U32s(names.names(h.merged.iter().map(|(_, n)| n))?),
-    )
-}
-
-fn read_history(element: &dyn ElementReader, names: &names::Table) -> Result<History, Error> {
-    let at = element.location();
-    let from = names.all(element.u32s("split_from")?)?;
-    let into = runs(
-        &at,
-        element.u32s("split_offsets")?,
-        element.u32s("split_into")?,
-    )?;
-    let merged_into = names.all(element.u32s("merged_into")?)?;
-    let merged_from = runs(
-        &at,
-        element.u32s("merged_offsets")?,
-        element.u32s("merged_from")?,
-    )?;
-    if into.len() != from.len() || merged_from.len() != merged_into.len() {
-        return Err(Error::invalid(format_args!("{at}: history runs missized")));
-    }
-    Ok(History {
-        generated: names.all(element.u32s("generated")?)?,
-        modified: names.all(element.u32s("modified")?)?,
-        deleted: names.all(element.u32s("deleted")?)?,
-        split: (from.into_iter().zip(into))
-            .map(|(n, run)| Ok((n, names.all(run)?)))
-            .collect::<Result<_, Error>>()?,
-        merged: (merged_from.into_iter().zip(merged_into))
-            .map(|(run, n)| Ok((names.all(run)?, n)))
-            .collect::<Result<_, Error>>()?,
-    })
 }
 
 fn write_datums(

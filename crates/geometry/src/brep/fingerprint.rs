@@ -17,7 +17,7 @@
 //!   persistent names in that order, each table's length as a `u64` first,
 //!   each name as its node's tag byte and fields (texts as their `u64`
 //!   byte length and bytes, names within names in place).
-use super::names::{End, Name, NameNode, Role};
+use super::names::{Name, NameNode};
 use super::topology::{BrepTopology, Names, Sense};
 
 pub(super) fn of(t: &BrepTopology) -> [u8; 32] {
@@ -102,10 +102,10 @@ fn text(h: &mut blake3::Hasher, t: &str) {
 /// byte length and bytes, names within names in place).
 pub(super) fn hash_name(h: &mut blake3::Hasher, name: &Name) {
     match name.node() {
-        NameNode::Created { by, role } => {
+        NameNode::Created { by, tag } => {
             h.update(&[0]);
             h.update(&by.0.to_le_bytes());
-            hash_role(h, role);
+            text(h, tag);
         }
         NameNode::Part { of, index } => {
             h.update(&[1]);
@@ -118,68 +118,6 @@ pub(super) fn hash_name(h: &mut blake3::Hasher, name: &Name) {
             for n in of {
                 hash_name(h, n);
             }
-        }
-    }
-}
-
-fn hash_role(h: &mut blake3::Hasher, role: &Role) {
-    match role {
-        Role::Local { index } => {
-            h.update(&[0]);
-            int(h, *index);
-        }
-        Role::Primitive { index } => {
-            h.update(&[1]);
-            int(h, *index);
-        }
-        Role::Imported { body, index } => {
-            h.update(&[2]);
-            int(h, *body);
-            int(h, *index);
-        }
-        Role::ImportedBody { body } => {
-            h.update(&[3]);
-            int(h, *body);
-        }
-        Role::Cap { profile, end } => {
-            h.update(&[4]);
-            text(h, profile);
-            h.update(&[u8::from(*end == End::End)]);
-        }
-        Role::Side {
-            profile,
-            curve,
-            segment,
-        } => {
-            h.update(&[5]);
-            text(h, profile);
-            int(h, *curve);
-            int(h, *segment);
-        }
-        Role::Along(n) => {
-            h.update(&[6]);
-            hash_name(h, n);
-        }
-        Role::At(n) => {
-            h.update(&[7]);
-            hash_name(h, n);
-        }
-        Role::Offset(n) => {
-            h.update(&[8]);
-            hash_name(h, n);
-        }
-        Role::Copy { of, index } => {
-            h.update(&[9]);
-            hash_name(h, of);
-            int(h, *index);
-        }
-        Role::Between { faces, index } => {
-            h.update(&[10]);
-            h.update(&(faces.len() as u64).to_le_bytes());
-            for n in faces.iter() {
-                hash_name(h, n);
-            }
-            int(h, *index);
         }
     }
 }
