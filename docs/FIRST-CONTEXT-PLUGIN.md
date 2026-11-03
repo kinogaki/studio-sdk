@@ -20,6 +20,10 @@ crate-type = ["dylib"]
 [dependencies]
 kinogaki-studio-api = { git = "https://github.com/kinogaki/studio-sdk" }
 kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk" }
+
+[dev-dependencies]
+# The fake host the tests run the UI on (the `testing` feature).
+kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk", features = ["testing"] }
 ```
 
 The UI layer, `kinogaki-studio-ui-api` (library `studio_ui_api`), is how a plugin's UI asks Studio to draw. Plugins never see Studio's UI library: they declare data (menus, rows, levels) and make immediate-mode calls, and Studio draws. Every call runs on the UI thread and returns at once; long work goes to workers, which wake the host. No timers.

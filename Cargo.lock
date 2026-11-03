@@ -415,6 +415,7 @@ version = "0.1.0"
 dependencies = [
  "kinogaki-geometry",
  "kinogaki-render-api",
+ "kinogaki-studio-api",
  "kinogaki-viewport-api",
 ]
 
@@ -423,6 +424,7 @@ name = "kinogaki-studio-ui-api"
 version = "0.1.0"
 dependencies = [
  "kinogaki-studio-api",
+ "kinogaki-studio-ui-api",
  "kinogaki-viewport-api",
 ]
 

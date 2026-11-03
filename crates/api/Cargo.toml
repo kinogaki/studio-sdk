@@ -22,3 +22,11 @@ kinogaki-viewport-api.workspace = true
 # display contract, which needs wgpu. Off by default: the API stays
 # headless for a host that renders nothing.
 wgpu = ["kinogaki-render-api/wgpu"]
+# The conformance suite (`conformance`): fixtures and invariants a package's
+# tests check its data types and engines against. Off by default: tests
+# only.
+testing = []
+
+[dev-dependencies]
+# The crate's own tests use its conformance fixtures.
+kinogaki-studio-api = { path = ".", features = ["testing"] }

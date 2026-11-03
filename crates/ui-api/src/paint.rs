@@ -330,7 +330,7 @@ impl Shape {
 /// to the next. Coordinates are screen points.
 ///
 /// Implementations: Studio's (over its UI toolkit) and
-/// [`RecordingPainter`](crate::testing::RecordingPainter), which records
+/// `testing::RecordingPainter`, which records
 /// for tests.
 pub trait Painter {
     /// The rectangle drawing is clipped to.

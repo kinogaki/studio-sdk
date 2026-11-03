@@ -37,7 +37,7 @@ pub type RowMenu<'a, K> = &'a mut dyn FnMut(&mut dyn Ui, &K);
 /// value.
 ///
 /// Implementations: Studio's, and
-/// [`RecordingUi`](crate::testing::RecordingUi), which records for tests.
+/// `testing::RecordingUi`, which records for tests.
 pub trait Ui {
     /// This frame's input.
     fn input(&self) -> &Input;

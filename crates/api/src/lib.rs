@@ -63,6 +63,7 @@ pub mod anim;
 pub mod cancel;
 pub mod codec;
 pub mod components;
+#[cfg(feature = "testing")]
 pub mod conformance;
 pub mod cook;
 pub mod data;

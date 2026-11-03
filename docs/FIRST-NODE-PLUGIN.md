@@ -32,8 +32,9 @@ crate-type = ["dylib"]
 kinogaki-studio-api = { git = "https://github.com/kinogaki/studio-sdk" }
 
 [dev-dependencies]
-# The fake host and its in-memory networks, for the tests.
-kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk" }
+# The fake host and its in-memory networks, for the tests (the `testing`
+# feature).
+kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk", features = ["testing"] }
 ```
 
 Pin the dependency (`rev = "…"`) to the SDK your Studio release's kit was built from once you ship. During development, cargo and these crates are all you need; step 7 builds the shipping library against the kit.

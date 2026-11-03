@@ -102,7 +102,7 @@ The topology's `Index` (edges in canonical order, polygons and polylines per edg
 
 **Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec`, `standard::BrepCodec`, `standard::CameraCodec` and `standard::LightCodec` are the codecs core registers (core's Camera and Light objects save their lens and light through them too; a light value is unplaced and names a dome's image by its file: the Texture prim a host decodes it to is one scene's, as an Image Texture node's is), writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
 
-**Conformance.** `conformance` runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
+**Conformance.** `conformance` (the api crate's `testing` feature, as the UI layer's `testing` fakes are: test support, which a plugin enables in its dev-dependencies) runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
 
 ## Data types and facets
 
