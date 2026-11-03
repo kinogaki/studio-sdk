@@ -100,10 +100,10 @@ fn write_material(m: &ImportedMaterial, out: &mut dyn ElementWriter) -> Result<(
         }
     }
     let names = p.kinogaki.iter().map(|(n, _)| n.clone()).collect();
-    out.set("extra_names", Field::Texts(names))?;
-    out.set("extra_kinds", Field::U8s(kinds))?;
-    out.set("extra_numbers", Field::F64s(numbers))?;
-    out.set("extra_tokens", Field::Texts(tokens))
+    out.set("extraNames", Field::Texts(names))?;
+    out.set("extraKinds", Field::U8s(kinds))?;
+    out.set("extraNumbers", Field::F64s(numbers))?;
+    out.set("extraTokens", Field::Texts(tokens))
 }
 
 fn read_material(element: &dyn ElementReader) -> Result<ImportedMaterial, Error> {
@@ -128,31 +128,31 @@ fn read_material(element: &dyn ElementReader) -> Result<ImportedMaterial, Error>
         [t] => Some(t.clone()),
         _ => return Err(wrong("texture")),
     };
-    let names = element.texts("extra_names")?;
-    let kinds = super::attributes::u8s(element, "extra_kinds")?;
+    let names = element.texts("extraNames")?;
+    let kinds = super::attributes::u8s(element, "extraKinds")?;
     if kinds.len() != names.len() {
-        return Err(wrong("extra_kinds"));
+        return Err(wrong("extraKinds"));
     }
     let (mut numbers, mut tokens) = (
-        element.f64s("extra_numbers")?.iter().copied(),
-        element.texts("extra_tokens")?.iter().cloned(),
+        element.f64s("extraNumbers")?.iter().copied(),
+        element.texts("extraTokens")?.iter().cloned(),
     );
-    let mut next = || numbers.next().ok_or_else(|| wrong("extra_numbers"));
+    let mut next = || numbers.next().ok_or_else(|| wrong("extraNumbers"));
     let mut kinogaki = Vec::with_capacity(names.len());
     for (name, kind) in names.iter().zip(kinds) {
         let extra = match kind {
             0 => Extra::Number(next()?),
             1 => Extra::Triple([next()?, next()?, next()?]),
-            2 => Extra::Token(tokens.next().ok_or_else(|| wrong("extra_tokens"))?),
+            2 => Extra::Token(tokens.next().ok_or_else(|| wrong("extraTokens"))?),
             k => return Err(Error::invalid(format_args!("{at}: no attribute kind {k}"))),
         };
         kinogaki.push((name.clone(), extra));
     }
     if next().is_ok() {
-        return Err(wrong("extra_numbers"));
+        return Err(wrong("extraNumbers"));
     }
     if tokens.next().is_some() {
-        return Err(wrong("extra_tokens"));
+        return Err(wrong("extraTokens"));
     }
     Ok(ImportedMaterial {
         key: element.text("key")?.to_owned(),

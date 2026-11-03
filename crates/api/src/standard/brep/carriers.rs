@@ -200,9 +200,9 @@ impl Writer {
     }
 
     pub(super) fn finish(self, out: &mut dyn ElementWriter) -> Result<(), Error> {
-        out.set("carrier_tags", Field::U8s(self.tags))?;
-        out.set("carrier_reals", Field::F64s(self.reals))?;
-        out.set("carrier_counts", Field::U32s(self.counts))
+        out.set("carrierTags", Field::U8s(self.tags))?;
+        out.set("carrierReals", Field::F64s(self.reals))?;
+        out.set("carrierCounts", Field::U32s(self.counts))
     }
 }
 
@@ -218,9 +218,9 @@ impl<'a> Reader<'a> {
     pub(super) fn new(element: &'a dyn ElementReader) -> Result<Self, Error> {
         Ok(Self {
             at: element.location(),
-            tags: super::super::attributes::u8s(element, "carrier_tags")?,
-            reals: element.f64s("carrier_reals")?,
-            counts: element.u32s("carrier_counts")?,
+            tags: super::super::attributes::u8s(element, "carrierTags")?,
+            reals: element.f64s("carrierReals")?,
+            counts: element.u32s("carrierCounts")?,
         })
     }
 

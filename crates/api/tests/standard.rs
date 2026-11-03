@@ -135,7 +135,7 @@ fn the_tolerances_save_as_a_project_value() {
     wrong
         .write(|w| {
             value.write(&inches, w)?;
-            w.set("positional_mm", Field::Float(5.0))
+            w.set("positionalMm", Field::Float(5.0))
         })
         .unwrap();
     assert!(wrong.read(|r| value.read(r)).is_err());

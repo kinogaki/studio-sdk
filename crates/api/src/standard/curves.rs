@@ -85,7 +85,7 @@ pub(super) fn write_curves(c: &Curves, out: &mut dyn ElementWriter) -> Result<()
     let periodic = c.periodic().words().iter().map(|&w| w as i64).collect();
     out.set("periodic", Field::I64s(periodic))?;
     if let Some(knots) = c.knots() {
-        out.set("knot_offsets", Field::U32s(knots.offsets().to_vec()))?;
+        out.set("knotOffsets", Field::U32s(knots.offsets().to_vec()))?;
         out.set("knots", Field::F64s(knots.values().to_vec()))?;
     }
     out.set("rational", Field::Bool(c.weights().is_some()))?;
@@ -121,7 +121,7 @@ pub(super) fn read_curves(element: &dyn ElementReader) -> Result<Curves, Error> 
     }
     if basis == Basis::Nurbs {
         builder = builder.knots(
-            element.u32s("knot_offsets")?.to_vec().into(),
+            element.u32s("knotOffsets")?.to_vec().into(),
             element.f64s("knots")?.to_vec().into(),
         );
     }

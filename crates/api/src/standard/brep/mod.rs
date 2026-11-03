@@ -224,13 +224,13 @@ fn write_body(
     for c in g.pcurves().iter() {
         carriers.pcurve(c)?;
     }
-    out.set("surface_count", Field::Int(g.surfaces().len() as i64))?;
-    out.set("curve_count", Field::Int(g.curves().len() as i64))?;
-    out.set("pcurve_count", Field::Int(g.pcurves().len() as i64))?;
+    out.set("surfaceCount", Field::Int(g.surfaces().len() as i64))?;
+    out.set("curveCount", Field::Int(g.curves().len() as i64))?;
+    out.set("pcurveCount", Field::Int(g.pcurves().len() as i64))?;
     carriers.finish(out)?;
     // Vertices and edges.
     out.set(
-        "vertex_names",
+        "vertexNames",
         Field::U32s(names.names(n.vertices().iter())?),
     )?;
     let vertices = t.vertex_ids().map(|v| t.vertex(v).precision());
@@ -239,17 +239,17 @@ fn write_body(
     let curve =
         |c: Option<_>| c.map_or(NONE, |c: kinogaki_geometry::brep::CurveId| c.index() as u32);
     out.set(
-        "edge_curves",
+        "edgeCurves",
         Field::U32s(edges.iter().map(|e| curve(e.curve())).collect()),
     )?;
     let intervals = edges.iter().flat_map(|e| e.interval()).collect();
-    out.set_rows("edge_intervals", 2, Field::F64s(intervals))?;
+    out.set_rows("edgeIntervals", 2, Field::F64s(intervals))?;
     let ends = edges
         .iter()
         .flat_map(|e| e.vertices().map(|v| v.index() as u32))
         .collect();
-    out.set_rows("edge_vertices", 2, Field::U32s(ends))?;
-    out.set("edge_names", Field::U32s(names.names(n.edges().iter())?))?;
+    out.set_rows("edgeVertices", 2, Field::U32s(ends))?;
+    out.set("edgeNames", Field::U32s(names.names(n.edges().iter())?))?;
     write_precisions(out, "edge", edges.iter().map(|e| e.precision()))?;
     // Faces, their loops and coedges, in order.
     let faces: Vec<_> = t.face_ids().collect();
@@ -257,20 +257,20 @@ fn write_body(
         .iter()
         .map(|&f| t.face(f).surface().index() as u32)
         .collect();
-    out.set("face_surfaces", Field::U32s(surfaces))?;
+    out.set("faceSurfaces", Field::U32s(surfaces))?;
     out.set(
-        "face_senses",
+        "faceSenses",
         Field::U8s(faces.iter().map(|&f| sense(t.face(f).sense())).collect()),
     )?;
-    out.set("face_names", Field::U32s(names.names(n.faces().iter())?))?;
+    out.set("faceNames", Field::U32s(names.names(n.faces().iter())?))?;
     write_precisions(out, "face", faces.iter().map(|&f| t.face(f).precision()))?;
     let loops: Vec<_> = faces.iter().flat_map(|&f| t.face_loops(f)).collect();
     out.set(
-        "face_loops",
+        "faceLoops",
         Field::U32s(offsets(faces.iter().map(|&f| t.face_loops(f).len()))),
     )?;
     out.set(
-        "loop_coedges",
+        "loopCoedges",
         Field::U32s(offsets(loops.iter().map(|&l| t.loop_coedges(l).len()))),
     )?;
     let coedges: Vec<_> = loops
@@ -279,40 +279,40 @@ fn write_body(
         .map(|c| t.coedge(c))
         .collect();
     out.set(
-        "coedge_edges",
+        "coedgeEdges",
         Field::U32s(coedges.iter().map(|c| c.edge().index() as u32).collect()),
     )?;
     out.set(
-        "coedge_senses",
+        "coedgeSenses",
         Field::U8s(coedges.iter().map(|c| sense(c.sense())).collect()),
     )?;
     let pcurves = coedges
         .iter()
         .map(|c| c.pcurve().map_or(NONE, |p| p.index() as u32))
         .collect();
-    out.set("coedge_pcurves", Field::U32s(pcurves))?;
+    out.set("coedgePcurves", Field::U32s(pcurves))?;
     write_precisions(out, "coedge", coedges.iter().map(|c| c.precision()))?;
     // Shells and lumps.
     let shells: Vec<_> = t.shell_ids().collect();
     out.set(
-        "shell_faces",
+        "shellFaces",
         Field::U32s(offsets(shells.iter().map(|&s| t.shell_faces(s).len()))),
     )?;
     let shell_faces = shells
         .iter()
         .flat_map(|&s| t.shell_faces(s))
         .map(|f| f.index() as u32);
-    out.set("shell_face_ids", Field::U32s(shell_faces.collect()))?;
+    out.set("shellFaceIds", Field::U32s(shell_faces.collect()))?;
     let lumps: Vec<_> = t.lump_ids().collect();
     out.set(
-        "lump_shells",
+        "lumpShells",
         Field::U32s(offsets(lumps.iter().map(|&l| t.lump_shells(l).len()))),
     )?;
     let lump_shells = lumps
         .iter()
         .flat_map(|&l| t.lump_shells(l))
         .map(|s| s.index() as u32);
-    out.set("lump_shell_ids", Field::U32s(lump_shells.collect()))?;
+    out.set("lumpShellIds", Field::U32s(lump_shells.collect()))?;
     attributes::write(body.attributes(), out)
 }
 
@@ -344,19 +344,19 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
     b.placement(placement(rows)?, instances?);
     // Carriers, in table order.
     let mut carriers = carriers::Reader::new(element)?;
-    let surfaces: Vec<_> = (0..attributes::count(element, "surface_count")?)
+    let surfaces: Vec<_> = (0..attributes::count(element, "surfaceCount")?)
         .map(|_| carriers.surface().map(|s| b.surface(s)))
         .collect::<Result<_, _>>()?;
-    let curves: Vec<_> = (0..attributes::count(element, "curve_count")?)
+    let curves: Vec<_> = (0..attributes::count(element, "curveCount")?)
         .map(|_| carriers.curve().map(|c| b.curve(c)))
         .collect::<Result<_, _>>()?;
-    let pcurves: Vec<_> = (0..attributes::count(element, "pcurve_count")?)
+    let pcurves: Vec<_> = (0..attributes::count(element, "pcurveCount")?)
         .map(|_| carriers.pcurve().map(|c| b.pcurve(c)))
         .collect::<Result<_, _>>()?;
     carriers.done()?;
     // Vertices and edges.
     let points = attributes::rows(element, "points")?;
-    let vertex_names = names.all(element.u32s("vertex_names")?)?;
+    let vertex_names = names.all(element.u32s("vertexNames")?)?;
     let precisions = read_precisions(element, "vertex", points.len())?;
     if vertex_names.len() != points.len() {
         return Err(Error::invalid(format_args!("{at}: vertex names missized")));
@@ -364,10 +364,10 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
     let vertices: Vec<_> = (points.iter().zip(precisions).zip(vertex_names))
         .map(|((&p, precision), name)| b.vertex(p, precision, name))
         .collect();
-    let edge_curves = element.u32s("edge_curves")?;
-    let intervals = element.f64s("edge_intervals")?;
-    let ends = element.u32s("edge_vertices")?;
-    let edge_names = names.all(element.u32s("edge_names")?)?;
+    let edge_curves = element.u32s("edgeCurves")?;
+    let intervals = element.f64s("edgeIntervals")?;
+    let ends = element.u32s("edgeVertices")?;
+    let edge_names = names.all(element.u32s("edgeNames")?)?;
     let n = edge_curves.len();
     if intervals.len() != 2 * n || ends.len() != 2 * n || edge_names.len() != n {
         return Err(Error::invalid(format_args!("{at}: edge columns missized")));
@@ -394,17 +394,17 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
         edges.push(b.edge(spec, name));
     }
     // Faces with their loops' coedges.
-    let face_surfaces = element.u32s("face_surfaces")?;
-    let face_senses = attributes::u8s(element, "face_senses")?;
-    let face_names = names.all(element.u32s("face_names")?)?;
+    let face_surfaces = element.u32s("faceSurfaces")?;
+    let face_senses = attributes::u8s(element, "faceSenses")?;
+    let face_names = names.all(element.u32s("faceNames")?)?;
     let nf = face_surfaces.len();
     if face_senses.len() != nf || face_names.len() != nf {
         return Err(Error::invalid(format_args!("{at}: face columns missized")));
     }
     let face_precisions = read_precisions(element, "face", nf)?;
-    let coedge_edges = element.u32s("coedge_edges")?;
-    let coedge_senses = attributes::u8s(element, "coedge_senses")?;
-    let coedge_pcurves = element.u32s("coedge_pcurves")?;
+    let coedge_edges = element.u32s("coedgeEdges")?;
+    let coedge_senses = attributes::u8s(element, "coedgeSenses")?;
+    let coedge_pcurves = element.u32s("coedgePcurves")?;
     let nc = coedge_edges.len();
     if coedge_senses.len() != nc || coedge_pcurves.len() != nc {
         return Err(Error::invalid(format_args!(
@@ -413,9 +413,9 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
     }
     let coedge_precisions = read_precisions(element, "coedge", nc)?;
     let ordinals: Vec<u32> = (0..nc as u32).collect();
-    let loop_runs = runs(&at, element.u32s("loop_coedges")?, &ordinals)?;
+    let loop_runs = runs(&at, element.u32s("loopCoedges")?, &ordinals)?;
     let loop_ordinals: Vec<u32> = (0..loop_runs.len() as u32).collect();
-    let face_runs = runs(&at, element.u32s("face_loops")?, &loop_ordinals)?;
+    let face_runs = runs(&at, element.u32s("faceLoops")?, &loop_ordinals)?;
     if face_runs.len() != nf {
         return Err(Error::invalid(format_args!("{at}: face loops missized")));
     }
@@ -456,8 +456,8 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
     let mut shells = Vec::new();
     for run in runs(
         &at,
-        element.u32s("shell_faces")?,
-        element.u32s("shell_face_ids")?,
+        element.u32s("shellFaces")?,
+        element.u32s("shellFaceIds")?,
     )? {
         let mut ids = Vec::with_capacity(run.len());
         for &f in run {
@@ -468,8 +468,8 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
     }
     for run in runs(
         &at,
-        element.u32s("lump_shells")?,
-        element.u32s("lump_shell_ids")?,
+        element.u32s("lumpShells")?,
+        element.u32s("lumpShellIds")?,
     )? {
         let mut ids = Vec::with_capacity(run.len());
         for &s in run {
@@ -507,20 +507,20 @@ fn write_datums(
         hints.extend(d.hint.center.into_iter().chain([d.hint.size]));
     }
     out.set(
-        "datum_names",
+        "datumNames",
         Field::U32s(names.names(datums.iter().map(|d| &d.name))?),
     )?;
-    out.set("datum_kinds", Field::U8s(kinds))?;
-    out.set("datum_reals", Field::F64s(reals))?;
-    out.set_rows("datum_hints", 4, Field::F64s(hints))
+    out.set("datumKinds", Field::U8s(kinds))?;
+    out.set("datumReals", Field::F64s(reals))?;
+    out.set_rows("datumHints", 4, Field::F64s(hints))
 }
 
 fn read_datums(element: &dyn ElementReader, names: &names::Table) -> Result<Vec<Datum>, Error> {
     let at = element.location();
-    let kinds = attributes::u8s(element, "datum_kinds")?;
-    let datum_names = names.all(element.u32s("datum_names")?)?;
-    let hints = element.f64s("datum_hints")?;
-    let mut reals = element.f64s("datum_reals")?;
+    let kinds = attributes::u8s(element, "datumKinds")?;
+    let datum_names = names.all(element.u32s("datumNames")?)?;
+    let hints = element.f64s("datumHints")?;
+    let mut reals = element.f64s("datumReals")?;
     if datum_names.len() != kinds.len() || hints.len() != 4 * kinds.len() {
         return Err(Error::invalid(format_args!("{at}: datum columns missized")));
     }

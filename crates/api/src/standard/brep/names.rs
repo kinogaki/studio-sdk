@@ -58,9 +58,9 @@ impl Writer {
     }
 
     pub(super) fn finish(self, out: &mut dyn ElementWriter) -> Result<(), Error> {
-        out.set("name_tags", Field::U8s(self.tags))?;
-        out.set("name_words", Field::I64s(self.words))?;
-        out.set("name_texts", Field::Texts(self.texts))
+        out.set("nameTags", Field::U8s(self.tags))?;
+        out.set("nameWords", Field::I64s(self.words))?;
+        out.set("nameTexts", Field::Texts(self.texts))
     }
 }
 
@@ -76,11 +76,11 @@ impl Table {
         let at = element.location();
         let mut words = Cursor {
             at: &at,
-            words: i64s(element, "name_words")?,
+            words: i64s(element, "nameWords")?,
         };
-        let mut texts = element.texts("name_texts")?.iter();
+        let mut texts = element.texts("nameTexts")?.iter();
         let mut names: Vec<Name> = Vec::new();
-        for &tag in u8s(element, "name_tags")? {
+        for &tag in u8s(element, "nameTags")? {
             let name = |words: &mut Cursor<'_>| -> Result<Name, Error> {
                 let i = words.u32()? as usize;
                 names

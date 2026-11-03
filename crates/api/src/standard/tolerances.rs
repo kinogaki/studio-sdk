@@ -24,16 +24,16 @@ impl Stored for Tolerances {
         Tolerances::default()
     }
     fn write(&self, to: &mut dyn ElementWriter) -> Result<(), Error> {
-        to.set("positional_mm", Field::Float(self.positional_mm()))?;
-        to.set("fit_mm", Field::Float(self.fit_mm()))?;
-        to.set("tangent_degrees", Field::Float(self.tangent_degrees()))?;
+        to.set("positionalMm", Field::Float(self.positional_mm()))?;
+        to.set("fitMm", Field::Float(self.fit_mm()))?;
+        to.set("tangentDegrees", Field::Float(self.tangent_degrees()))?;
         to.set("curvature", Field::Float(self.curvature()))
     }
     fn read(from: &dyn ElementReader) -> Result<Self, Error> {
         Tolerances::new(
-            from.float("positional_mm")?,
-            from.float("fit_mm")?,
-            from.float("tangent_degrees")?,
+            from.float("positionalMm")?,
+            from.float("fitMm")?,
+            from.float("tangentDegrees")?,
             from.float("curvature")?,
             1.0,
         )

@@ -70,8 +70,8 @@ fn a_broken_save_does_not_read() {
             .unwrap_err()
             .to_string()
     };
-    assert!(broken("name_tags", Field::U8s(vec![9])).contains("no name kind 9"));
-    assert!(broken("datum_kinds", Field::U8s(vec![0, 1, 7])).contains("no datum kind 7"));
+    assert!(broken("nameTags", Field::U8s(vec![9])).contains("no name kind 9"));
+    assert!(broken("datumKinds", Field::U8s(vec![0, 1, 7])).contains("no datum kind 7"));
     // An axis whose direction isn't unit: the value's own rule refuses it.
     let reals = [
         [0.0; 12].as_slice(),
@@ -80,7 +80,7 @@ fn a_broken_save_does_not_read() {
     ];
     let mut plane = reals.concat();
     plane[3..12].copy_from_slice(&[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
-    assert!(broken("datum_reals", Field::F64s(plane)).contains("datum"));
+    assert!(broken("datumReals", Field::F64s(plane)).contains("datum"));
 }
 
 #[test]
