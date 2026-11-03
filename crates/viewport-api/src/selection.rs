@@ -28,7 +28,7 @@ impl<'a> ElementSelection<'a> {
 
     /// This selection with `set` in its kind's slot (replacing what was there).
     pub fn with(mut self, set: &'a ElementSet) -> Self {
-        *self.slot_mut(Slot::of(set.kind)) = Some(set);
+        *self.slot_mut(Slot::of(set.kind())) = Some(set);
         self
     }
 
@@ -39,7 +39,7 @@ impl<'a> ElementSelection<'a> {
 
     /// Whether whole objects are selected (the faces slot holds objects).
     pub fn objects(&self) -> bool {
-        self.faces.is_some_and(|s| s.kind == ElementKind::Object)
+        self.faces.is_some_and(|s| s.kind() == ElementKind::Object)
     }
 
     /// Whether nothing is selected in any slot.
@@ -56,9 +56,9 @@ impl<'a> ElementSelection<'a> {
             (Slot::Points, self.points),
         ] {
             if let Some(set) = set
-                && Slot::of(set.kind) != slot
+                && Slot::of(set.kind()) != slot
             {
-                return Err(format!("a {:?} selection in the {slot:?} slot", set.kind));
+                return Err(format!("a {:?} selection in the {slot:?} slot", set.kind()));
             }
         }
         if self.objects() && (self.edges.is_some() || self.points.is_some()) {

@@ -51,8 +51,9 @@ pub struct Corner {
 ///   vertex's `component`): what point picks name.
 ///
 /// It is a [`SurfaceSource`] itself, so the host draws it as it is. Its
-/// identity is the allocation of a token made with it: a clone shares it,
-/// [`derived`](Self::derived) makes a new one.
+/// identity is the allocation of a token made with it: a clone shares it;
+/// [`derived`](Self::derived), [`with_lines`](Self::with_lines) and
+/// [`with_markers`](Self::with_markers) make a new one.
 #[derive(Clone)]
 pub struct Surface {
     points: Arc<[[f32; 3]]>,
@@ -176,7 +177,9 @@ impl Surface {
     }
 
     /// With `lines`: line vertices, two a segment, drawn and picked as
-    /// edges.
+    /// edges. A new surface: an identity of its own and no update, so it
+    /// never passes for the one it was made from (`topology` covers the
+    /// lines, as [`new`](Self::new) says).
     pub fn with_lines(mut self, lines: Arc<[OverlayVertex]>) -> Self {
         debug_assert!(lines.len().is_multiple_of(2), "two line vertices a segment");
         let segments = lines.len() / 2;
@@ -194,12 +197,20 @@ impl Surface {
             }])
         };
         self.lines = lines;
-        self
+        self.renewed()
     }
 
-    /// With point `markers`.
+    /// With point `markers`. A new surface, as with
+    /// [`with_lines`](Self::with_lines).
     pub fn with_markers(mut self, markers: Arc<[OverlayVertex]>) -> Self {
         self.markers = markers;
+        self.renewed()
+    }
+
+    /// This surface as a new one: its own identity, derived from nothing.
+    fn renewed(mut self) -> Self {
+        self.identity = Arc::new(());
+        self.update = None;
         self
     }
 
@@ -402,7 +413,7 @@ impl SurfaceSource for Surface {
         selection: &ElementSet,
         _budget: u64,
     ) -> Result<Vec<OverlayVertex>, String> {
-        if selection.kind != ElementKind::Edge {
+        if selection.kind() != ElementKind::Edge {
             return Ok(Vec::new());
         }
         Ok(self
@@ -566,6 +577,28 @@ mod tests {
         let edge = ElementSet::new(ElementKind::Edge, false, [2]);
         let outline = surface.selection_segments(&edge, u64::MAX).unwrap();
         assert_eq!(outline.iter().map(|v| v.point).collect::<Vec<_>>(), [2, 3]);
+    }
+
+    #[test]
+    fn new_lines_or_markers_make_a_new_surface() {
+        let surface = square();
+        let vertex = |point| OverlayVertex {
+            point,
+            component: 0,
+        };
+        let relined = surface
+            .clone()
+            .with_lines(Arc::from([vertex(0), vertex(2)]));
+        assert!(!relined.same(&surface), "other lines, another surface");
+        let marked = surface.clone().with_markers(Arc::from([vertex(1)]));
+        assert!(!marked.same(&surface), "other markers, another surface");
+        // A drag's frame, given new lines, derives from nothing.
+        let mut points = surface.points().to_vec();
+        points[1][2] += 1.0;
+        let dragged = surface.derived(points.into(), Ranges::of(1..2));
+        assert!(dragged.update().is_some());
+        let relined = dragged.with_lines(Arc::from([vertex(0), vertex(2)]));
+        assert!(relined.update().is_none() && relined.update_from(&surface).is_none());
     }
 
     #[test]

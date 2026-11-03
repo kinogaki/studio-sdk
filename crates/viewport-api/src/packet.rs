@@ -99,16 +99,32 @@ pub enum ElementKind {
     Object,
 }
 
-/// Selected element ids, sorted and unique. Each value gets a fresh revision
-/// when constructed; equal revisions compare equal without looking at the ids,
-/// so build a new set only when the selection actually changes and steady
-/// frames cost nothing. Different revisions fall back to comparing members.
+/// Selected element ids, sorted and unique. Immutable: each value gets a
+/// fresh revision when constructed, and nothing changes it after, so equal
+/// revisions compare equal without looking at the ids. Build a new set only
+/// when the selection actually changes and steady frames cost nothing.
+/// Different revisions fall back to comparing members.
+///
+/// ```
+/// use kinogaki_viewport_api::{ElementKind, ElementSet};
+///
+/// let edges = ElementSet::new(ElementKind::Edge, false, [3, 1]);
+/// assert_eq!(edges.clone(), edges); // one revision
+/// assert_ne!(ElementSet::all(ElementKind::Edge), edges);
+/// ```
+///
+/// A clone can't be changed into another selection under its revision:
+///
+/// ```compile_fail
+/// use kinogaki_viewport_api::{ElementKind, ElementSet};
+///
+/// let mut changed = ElementSet::new(ElementKind::Edge, false, [1]).clone();
+/// changed.all = true;
+/// ```
 #[derive(Clone, Debug)]
 pub struct ElementSet {
-    /// What the ids address.
-    pub kind: ElementKind,
-    /// Every element of `kind` is selected.
-    pub all: bool,
+    kind: ElementKind,
+    all: bool,
     ids: Arc<[u32]>,
     revision: u64,
 }
@@ -132,6 +148,14 @@ impl ElementSet {
     /// Every element of `kind`.
     pub fn all(kind: ElementKind) -> Self {
         Self::from_sorted(kind, true, Arc::from([]))
+    }
+    /// What the ids address.
+    pub fn kind(&self) -> ElementKind {
+        self.kind
+    }
+    /// Whether every element of [`kind`](Self::kind) is selected.
+    pub fn is_all(&self) -> bool {
+        self.all
     }
     /// Whether `id` is in the set.
     pub fn contains(&self, id: u32) -> bool {
