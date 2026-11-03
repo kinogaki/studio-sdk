@@ -12,6 +12,7 @@
 mod attribute;
 mod domain;
 mod ids;
+pub use ids::highest_id;
 pub mod names;
 mod text;
 mod types;
@@ -297,7 +298,7 @@ fn check_standard_attribute(
         Some(Standard::Attribute(..)) if name == names::ID => {
             let repeated = match (attribute.values(), replacing.map(Attribute::values)) {
                 (Values::I64(new), Some(Values::I64(old))) if ids::kept_or_above(new, old) => None,
-                (Values::I64(ids), _) => ids::repeated(ids),
+                (Values::I64(ids), _) => ids::repeated(ids.as_slice()),
                 _ => None,
             };
             match repeated {

@@ -75,13 +75,36 @@ impl Values {
         })
     }
 
+    /// The first value that is NaN or infinite (reals only) among the cells
+    /// `self` doesn't share with `base`, of their storage.
+    fn first_not_finite_after(&self, base: &Values) -> Option<usize> {
+        fn first<T: Copy>(
+            new: &Column<T>,
+            old: &Column<T>,
+            finite: impl Fn(T) -> bool,
+        ) -> Option<usize> {
+            new.unshared(old)
+                .filter(|r| r.start < new.len())
+                .find_map(|r| (r.start..r.end.min(new.len())).find(|&i| !finite(new[i])))
+        }
+        match (self, base) {
+            (Values::F32(new), Values::F32(old)) => first(new, old, f32::is_finite),
+            (Values::F64(new), Values::F64(old)) => first(new, old, f64::is_finite),
+            _ => None,
+        }
+    }
+
     /// The first value that is NaN or infinite (reals only), checked in
     /// parallel.
     fn first_not_finite(&self) -> Option<usize> {
         const BLOCK: usize = 262_144;
         match self {
-            Values::F32(c) => crate::parallel::first_refused(c, BLOCK, |x| x.is_finite()),
-            Values::F64(c) => crate::parallel::first_refused(c, BLOCK, |x| x.is_finite()),
+            Values::F32(c) => {
+                crate::parallel::first_refused(c.as_slice(), BLOCK, |x| x.is_finite())
+            }
+            Values::F64(c) => {
+                crate::parallel::first_refused(c.as_slice(), BLOCK, |x| x.is_finite())
+            }
             Values::I32(_) | Values::I64(_) | Values::Text(_) => None,
         }
     }
@@ -129,6 +152,36 @@ impl Attribute {
             ));
         }
         Self::checked(ty, values, None)
+    }
+
+    /// `values` in place of this attribute's, of its type, each item for an
+    /// element: what an edit makes of it. Only the cells they don't share
+    /// with this attribute's values are checked.
+    ///
+    /// # Errors
+    /// A rule the new cells break, or an array attribute (whose items may
+    /// move: [`arrays`](Self::arrays) checks them).
+    pub fn with_values(&self, values: Values) -> Result<Self, Error> {
+        if self.offsets.is_some() || values.storage() != self.values.storage() {
+            return Err(refused("no such values of this attribute".into()));
+        }
+        let width = usize::from(self.ty.width);
+        if !values.len().is_multiple_of(width) {
+            return Err(refused(format!(
+                "{} values aren't whole items of width {width}",
+                values.len()
+            )));
+        }
+        if let Some(at) = values.first_not_finite_after(&self.values) {
+            return Err(
+                Error::invalid(format!("value {at} is not finite")).element(at / width.max(1))
+            );
+        }
+        Ok(Self {
+            ty: self.ty,
+            values,
+            offsets: None,
+        })
     }
 
     /// `values` as arrays of items of `ty`: element `e`'s are the items
@@ -251,7 +304,7 @@ fn check_offsets(offsets: &Column<u32>, items: usize) -> Result<(), Error> {
         Some(0) => {}
         _ => return Err(refused("an array attribute's offsets start at 0".into())),
     }
-    if let Some(e) = offsets.windows(2).position(|w| w[1] < w[0]) {
+    if let Some(e) = offsets.as_slice().windows(2).position(|w| w[1] < w[0]) {
         return Err(
             Error::invalid(format!("element {e}'s array ends before it starts")).element(e),
         );

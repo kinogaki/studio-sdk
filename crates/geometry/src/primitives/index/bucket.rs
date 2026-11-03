@@ -133,7 +133,7 @@ pub(super) fn build(t: &Primitives) -> Tables {
 /// The primitive of every vertex.
 fn prim_of_vertices(t: &Primitives) -> Vec<u32> {
     let mut prim_of = vec![0u32; t.vertices.len()];
-    let offsets = &t.offsets;
+    let offsets = t.offsets.as_slice();
     parallel::chunks(&mut prim_of, BLOCK, |first, out| {
         let mut f = offsets.partition_point(|&o| o as usize <= first) - 1;
         for (i, prim) in out.iter_mut().enumerate() {

@@ -398,12 +398,12 @@ fn curves_stay_as_they_are_around_what_changes() {
     assert_eq!(table.kind(1), Kind::POLYLINE);
     assert_eq!(table.kind(2), Kind::POLYGON);
     let data = table.curves().unwrap();
-    assert_eq!(&**data.degrees(), &[3, 1, 1]);
+    assert_eq!(data.degrees().as_slice(), &[3, 1, 1]);
     assert_eq!(data.knots().of(0).len(), 8);
     assert!(data.knots().of(2).is_empty());
     let weights = data.weights().unwrap();
-    assert_eq!(&weights[..4], &[2.0, 3.0, 4.0, 5.0]);
-    assert_eq!(&weights[6..], &[1.0, 1.0, 1.0]);
+    assert_eq!(&weights.as_slice()[..4], &[2.0, 3.0, 4.0, 5.0]);
+    assert_eq!(&weights.as_slice()[6..], &[1.0, 1.0, 1.0]);
     // The curve removed: no curve data.
     let mut edit = Editor::new(&value);
     edit.remove_primitive(1);

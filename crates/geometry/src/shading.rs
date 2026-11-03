@@ -142,7 +142,7 @@ impl Geometry {
 
 /// Polygon `f`'s normal from its area, unit length (zero when it has
 /// none).
-fn face_normal(topology: &Primitives, positions: &[V3], f: usize) -> V3 {
+fn face_normal(topology: &Primitives, positions: &Column<V3>, f: usize) -> V3 {
     let ids = topology.primitive(f);
     let origin = positions[ids[0] as usize];
     let area = ids
@@ -161,7 +161,7 @@ fn face_normal(topology: &Primitives, positions: &[V3], f: usize) -> V3 {
 
 fn build(value: &Geometry, inputs: &Inputs) -> ShadingNormals {
     let topology = value.primitives();
-    let positions: &[V3] = value.positions();
+    let positions = value.positions();
     let faces: Vec<V3> = parallel::map(topology.len(), BLOCK, |r| {
         r.map(|f| match topology.kind(f).is_polygon() {
             true => face_normal(topology, positions, f),
@@ -202,7 +202,7 @@ fn refreshed(
     moved: &[u32],
 ) -> ShadingNormals {
     let topology = value.primitives();
-    let positions: &[V3] = value.positions();
+    let positions = value.positions();
     let point_faces = topology.index().point_faces();
     let mut changed: Vec<u32> = moved
         .iter()
@@ -266,7 +266,7 @@ impl Fan {
         local.clear();
         out.clear();
         let topology = value.primitives();
-        let positions: &[V3] = value.positions();
+        let positions = value.positions();
         let index = topology.index();
         let incident = &index.point_faces()[point];
         let here = positions[point];

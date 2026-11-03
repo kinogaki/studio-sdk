@@ -125,7 +125,7 @@ impl Elements {
 
     /// `ids`, strictly ascending and below `count`, in the smallest form.
     fn ascending(count: usize, ids: Column<u32>) -> Self {
-        debug_assert!(ids.windows(2).all(|w| w[0] < w[1]));
+        debug_assert!(ids.as_slice().windows(2).all(|w| w[0] < w[1]));
         if ids.len() == count {
             return Self::all(count);
         }
@@ -186,7 +186,7 @@ impl Elements {
     pub fn contains(&self, i: u32) -> bool {
         match &self.repr {
             Repr::All => i < self.count,
-            Repr::Sparse(ids) => ids.binary_search(&i).is_ok(),
+            Repr::Sparse(ids) => ids.as_slice().binary_search(&i).is_ok(),
             Repr::Dense(words, _) => i < self.count && words[i as usize / 64] >> (i % 64) & 1 == 1,
         }
     }
@@ -195,8 +195,8 @@ impl Elements {
     pub fn iter(&self) -> impl Iterator<Item = u32> + '_ {
         let (all, ids, words) = match &self.repr {
             Repr::All => (0..self.count, &[][..], &[][..]),
-            Repr::Sparse(ids) => (0..0, &ids[..], &[][..]),
-            Repr::Dense(words, _) => (0..0, &[][..], &words[..]),
+            Repr::Sparse(ids) => (0..0, ids.as_slice(), &[][..]),
+            Repr::Dense(words, _) => (0..0, &[][..], words.as_slice()),
         };
         let bits = words.iter().enumerate().flat_map(|(w, &bits)| {
             let mut rest = bits;

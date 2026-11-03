@@ -29,7 +29,7 @@ impl Knots {
 
     /// Primitive `p`'s knots.
     pub fn of(&self, p: usize) -> &[f64] {
-        &self.values[self.offsets[p] as usize..self.offsets[p + 1] as usize]
+        &self.values.as_slice()[self.offsets[p] as usize..self.offsets[p + 1] as usize]
     }
 }
 

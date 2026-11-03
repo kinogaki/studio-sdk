@@ -92,11 +92,13 @@ fn a_selection_is_valid_on_its_own_topology_and_within_its_elements() {
 fn resolved_lists_the_members_and_spells_out_all() {
     let p = value();
     let some = on(&p, Domain::Point, &[2, 5]);
-    assert_eq!(&*select::resolve(&some, &p).unwrap(), &[2, 5]);
+    assert_eq!(select::resolve(&some, &p).unwrap().as_slice(), &[2, 5]);
     let every = all(&p, Domain::Primitive);
-    assert_eq!(&*select::resolve(&every, &p).unwrap(), &[0, 1, 2]);
+    assert_eq!(select::resolve(&every, &p).unwrap().as_slice(), &[0, 1, 2]);
     assert_eq!(
-        &*select::resolve(&all(&p, Domain::Detail), &p).unwrap(),
+        select::resolve(&all(&p, Domain::Detail), &p)
+            .unwrap()
+            .as_slice(),
         &[0]
     );
 }
@@ -266,7 +268,7 @@ fn with_ids(insert: bool) -> Geometry {
     positions.extend(base.positions().iter().copied());
     let t = base.primitives();
     let mut offsets = vec![0u32, 3];
-    offsets.extend(t.offsets()[1..].iter().map(|o| o + 3));
+    offsets.extend(t.offsets().as_slice()[1..].iter().map(|o| o + 3));
     let mut vertices = vec![0u32, 1, 2];
     vertices.extend(t.vertices().iter().map(|v| v + 1));
     // The new triangle first: nothing else is renumbered but the points.

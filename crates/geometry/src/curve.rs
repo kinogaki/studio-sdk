@@ -1,6 +1,7 @@
 //! [`Curve`]: one primitive of a [`Geometry`] read as the curve it is —
 //! its parameter domain, its spans and the one exact evaluation every
 //! display, engine and kernel shares.
+use crate::column::Column;
 use crate::geometry::Geometry;
 use crate::limits::MAX_DEGREE;
 use crate::primitives::{Basis, Kind};
@@ -39,7 +40,7 @@ use crate::vec3::Vec3;
 /// ```
 #[derive(Clone, Copy, Debug)]
 pub struct Curve<'a> {
-    positions: &'a [[f64; 3]],
+    positions: Points<'a>,
     /// Its vertices' points.
     points: &'a [u32],
     /// Its vertices' weights, when the value's curves are rational.
@@ -62,6 +63,22 @@ pub struct Span {
     first: usize,
 }
 
+/// Where a curve reads its points: its value, or a drag's own.
+#[derive(Clone, Copy, Debug)]
+enum Points<'a> {
+    Value(&'a Column<[f64; 3]>),
+    Over(&'a [[f64; 3]]),
+}
+
+impl Points<'_> {
+    fn at(self, p: u32) -> [f64; 3] {
+        match self {
+            Points::Value(column) => column[p as usize],
+            Points::Over(positions) => positions[p as usize],
+        }
+    }
+}
+
 impl Geometry {
     /// Primitive `p` as a curve: a polygon or a polyline as its straight
     /// segments, a curve primitive by its basis.
@@ -73,9 +90,9 @@ impl Geometry {
         let vertices = table.primitive_vertices(p);
         let data = table.curves();
         Curve {
-            positions: self.positions().as_slice(),
+            positions: Points::Value(self.positions()),
             points: table.primitive(p),
-            weights: (data.and_then(|c| c.weights())).map(|w| &w[vertices]),
+            weights: (data.and_then(|c| c.weights())).map(|w| &w.as_slice()[vertices]),
             knots: data.map_or(&[][..], |c| c.knots().of(p)),
             kind: table.kind(p),
             degree: data.map_or(1, |c| c.degrees()[p] as usize),
@@ -95,7 +112,10 @@ impl<'a> Curve<'a> {
         'a: 'b,
     {
         let curve: Curve<'b> = self;
-        Curve { positions, ..curve }
+        Curve {
+            positions: Points::Over(positions),
+            ..curve
+        }
     }
 }
 
@@ -175,7 +195,7 @@ impl Curve<'_> {
 
     /// Control point `k` (wrapping).
     fn cv(&self, k: usize) -> [f64; 3] {
-        self.positions[self.points[k % self.points.len()] as usize]
+        self.positions.at(self.points[k % self.points.len()])
     }
 
     /// The point of unit span `s` (not NURBS) at `u`, `0` to `1` over it.
@@ -233,7 +253,7 @@ impl Curve<'_> {
         let value = |j: usize| {
             let v = first + j;
             let weight = self.weights.map_or(1.0, |w| w[v]);
-            homogeneous(self.positions[self.points[v] as usize], weight)
+            homogeneous(self.positions.at(self.points[v]), weight)
         };
         let knot = |i: usize| self.knots[first + i];
         rational(spline::de_boor(self.degree, t, knot, value))[0]

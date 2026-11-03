@@ -85,7 +85,10 @@ fn set_algebra_matches_a_btree_model_in_every_form() {
                 let listed = Elements::from_indices(count, want.iter().copied()).unwrap();
                 assert_eq!(got, listed);
                 assert_eq!(Elements::from_bits(count, got.words()).unwrap(), listed);
-                assert_eq!(&*got.indices(), want.iter().copied().collect::<Vec<_>>());
+                assert_eq!(
+                    got.indices().to_vec(),
+                    want.iter().copied().collect::<Vec<_>>()
+                );
                 for probe in [0u32, 1, 63, 64, count as u32, count as u32 + 5] {
                     assert_eq!(got.contains(probe), want.contains(&probe));
                 }

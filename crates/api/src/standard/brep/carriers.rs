@@ -63,14 +63,14 @@ impl Writer {
     }
 
     fn nurbs<const D: usize>(&mut self, n: &NurbsCurve<D>) {
-        let weights = n.weights().map_or(&[][..], |w| w.as_ref());
+        let weights = n.weights().map_or(&[][..], Column::as_slice);
         self.counts.extend([
             u32::from(n.degree()),
             count(n.knots().len()),
             count(n.points().len()),
             u32::from(n.weights().is_some()),
         ]);
-        self.reals.extend_from_slice(n.knots());
+        self.reals.extend_from_slice(n.knots().as_slice());
         self.reals.extend(n.points().iter().flatten());
         self.reals.extend_from_slice(weights);
     }
@@ -123,11 +123,11 @@ impl Writer {
                     cu?,
                     cv?,
                 ]);
-                self.reals.extend_from_slice(ku);
-                self.reals.extend_from_slice(kv);
+                self.reals.extend_from_slice(ku.as_slice());
+                self.reals.extend_from_slice(kv.as_slice());
                 self.reals.extend(n.points().iter().flatten());
                 self.reals
-                    .extend_from_slice(n.weights().map_or(&[][..], |w| w.as_ref()));
+                    .extend_from_slice(n.weights().map_or(&[][..], Column::as_slice));
             }
             Surface::Extrusion(e) => {
                 self.record(EXTRUSION, &e.direction().to_array());

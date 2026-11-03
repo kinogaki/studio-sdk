@@ -90,7 +90,7 @@ impl Brep {
     /// inverse); `None` when it isn't one of the value's of that domain.
     pub fn id(&self, domain: Domain, element: Element) -> Option<u32> {
         let bodies = |upto: usize| -> Option<usize> {
-            (self.bodies.get(..upto)?.iter())
+            (self.bodies.as_slice().get(..upto)?.iter())
                 .map(|b| b.count(domain))
                 .sum::<Option<usize>>()
         };
@@ -147,7 +147,7 @@ impl Brep {
         h.update(
             &self
                 .datums
-                .derived(|datums| DatumNames(datums_hash(datums)))
+                .derived(|datums| DatumNames(datums_hash(datums.as_slice())))
                 .0,
         );
         *h.finalize().as_bytes()

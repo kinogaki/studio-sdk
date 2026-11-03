@@ -111,7 +111,9 @@ fn instances_round_trip(value: &Instances, data: &Data) -> Result<(), String> {
 fn same_bits(a: &Data, b: &Data) -> bool {
     let bits = |p: &[[f64; 3]]| p.iter().flatten().map(|v| v.to_bits()).collect::<Vec<_>>();
     match (standard::geometry().get(a), standard::geometry().get(b)) {
-        (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
+        (Some(x), Some(y)) => {
+            x == y && bits(x.positions().as_slice()) == bits(y.positions().as_slice())
+        }
         _ => match (standard::brep().get(a), standard::brep().get(b)) {
             // Equal values whose saves are equal: the same bits.
             (Some(x), Some(y)) => x == y && saved(a) == saved(b),

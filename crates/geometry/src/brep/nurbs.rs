@@ -157,9 +157,9 @@ impl<const D: usize> NurbsCurve<D> {
     ) -> Result<Self, Error> {
         let () = Self::DIMENSION;
         let (knots, points) = (knots.into(), points.into());
-        check_knots(degree, &knots, points.len())?;
-        check_points(&points)?;
-        check_weights(weights.as_deref(), points.len())?;
+        check_knots(degree, knots.as_slice(), points.len())?;
+        check_points(points.as_slice())?;
+        check_weights(weights.as_ref().map(Column::as_slice), points.len())?;
         Ok(Self {
             degree,
             knots,
@@ -205,7 +205,7 @@ impl<const D: usize> NurbsCurve<D> {
     pub(crate) fn jet(&self, t: f64) -> [[f64; D]; 2] {
         let weight = |i: usize| self.weights.as_ref().map_or(1.0, |w| w[i]);
         spline::rational(spline::evaluate(
-            &self.knots,
+            self.knots.as_slice(),
             self.degree as usize,
             self.points.len(),
             t,
@@ -254,7 +254,7 @@ impl NurbsSurface {
         let points = points.into();
         let counts = [0, 1].map(|k| (knots[k].len()).saturating_sub(degrees[k] as usize + 1));
         for k in 0..2 {
-            check_knots(degrees[k], &knots[k], counts[k])?;
+            check_knots(degrees[k], knots[k].as_slice(), counts[k])?;
         }
         if counts[0].checked_mul(counts[1]) != Some(points.len()) {
             return Err(refuse(
@@ -263,8 +263,8 @@ impl NurbsSurface {
                 "a NURBS surface's control grid does not match its knots",
             ));
         }
-        check_points(&points)?;
-        check_weights(weights.as_deref(), points.len())?;
+        check_points(points.as_slice())?;
+        check_weights(weights.as_ref().map(Column::as_slice), points.len())?;
         Ok(Self {
             degrees,
             knots,
@@ -341,17 +341,17 @@ impl NurbsSurface {
         let [du, dv] = self.degrees.map(|d| d as usize);
         let [nu, nv] = self.counts;
         // Each row of constant i evaluated along v, then those along u.
-        let su = spline::span(&self.knots[0], du, nu, u);
+        let su = spline::span(self.knots[0].as_slice(), du, nu, u);
         let rows: Vec<[[f64; 4]; 2]> = (su - du..=su)
             .map(|i| {
-                spline::evaluate(&self.knots[1], dv, nv, v, |j| {
+                spline::evaluate(self.knots[1].as_slice(), dv, nv, v, |j| {
                     let w = self.weights.as_ref().map_or(1.0, |w| w[i * nv + j]);
                     spline::homogeneous(self.points[i * nv + j], w)
                 })
             })
             .collect();
         let along_u = |which: usize| {
-            spline::evaluate(&self.knots[0], du, nu, u, |i| {
+            spline::evaluate(self.knots[0].as_slice(), du, nu, u, |i| {
                 if (su - du..=su).contains(&i) {
                     rows[i + du - su][which]
                 } else {

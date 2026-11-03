@@ -97,7 +97,7 @@ impl Instances {
             }
             None => {}
         }
-        finite(&xforms)?;
+        finite(xforms.as_slice())?;
         let value = Self {
             prototypes,
             xforms,
@@ -121,7 +121,7 @@ impl Instances {
                 self.xforms.len()
             )));
         }
-        finite(&xforms)?;
+        finite(xforms.as_slice())?;
         Ok(Self {
             xforms,
             ..self.clone()

@@ -26,11 +26,11 @@
 //! exist. Enums are `#[non_exhaustive]`, and each says what a reader does
 //! with a variant it doesn't know.
 //!
-//! **Shared and immutable.** Arrays are [`Column`]s: shared buffers that
-//! adopt a `Vec` without copying it. A value is never changed in place: an
-//! edit (`with_positions`, `with_attributes`, [`Attributes::with`]) makes a
-//! new value sharing every column it didn't touch, and checks only what it
-//! replaced. Geometry keep their
+//! **Shared and immutable.** Arrays are [`Column`]s: shared cells that adopt
+//! a `Vec` without copying it. A value is never changed in place: an edit
+//! (`with_moved`, `with_attributes`, [`Attributes::with`]) makes a new value
+//! sharing every column and every cell it didn't touch, and checks only what
+//! it replaced. Geometry keep their
 //! primitives in one shared `Arc<Primitives>`, so moving points keeps the
 //! table, its edges and every cache built on it.
 //!
@@ -124,12 +124,13 @@ mod vec3;
 mod vector;
 mod xform;
 
+pub use attributes::highest_id;
 pub use attributes::names;
 pub use attributes::{
     Attribute, AttributeType, Attributes, Domain, Meaning, Storage, Text, Tuple, Values, check_name,
 };
 pub use bounds::Bounds;
-pub use column::Column;
+pub use column::{Column, Writer as ColumnWriter};
 pub use curve::{Curve, Span};
 pub use detail::{Detail, DisplayQuality};
 pub use diagnostic::{Diagnostic, Severity, TextSpan};
@@ -140,7 +141,8 @@ pub use geometry::Geometry;
 pub use incidence::Incidence;
 pub use instancing::placements;
 pub use primitives::{
-    Adjacency, Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, Walk,
+    Adjacency, Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, TableWriter,
+    Walk,
 };
 pub use sampled::Sampled;
 pub use selection::Selection;

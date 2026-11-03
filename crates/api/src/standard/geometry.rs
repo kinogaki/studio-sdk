@@ -81,7 +81,7 @@ pub(super) fn write_geometry(value: &Geometry, out: &mut dyn ElementWriter) -> R
     out.set_rows(
         "positions",
         3,
-        Field::F64s(attributes::flat(value.positions())),
+        Field::F64s(attributes::flat(value.positions().as_slice())),
     )?;
     let t = value.primitives();
     let key = Arc::as_ptr(t) as usize as u64;

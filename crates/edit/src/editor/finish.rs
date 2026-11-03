@@ -5,7 +5,8 @@ use super::change::{Change, Numbers};
 use super::layout::{Blends, Layout, Run, Span};
 use super::{Editor, Row};
 use kinogaki_geometry::{
-    Attributes, Basis, Column, CurveData, Domain, Error, Geometry, Kind, Knots, Primitives,
+    Attributes, Basis, Column, ColumnWriter, CurveData, Domain, Error, Geometry, Kind, Knots,
+    Primitives, TableWriter,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -42,12 +43,8 @@ impl Points {
 }
 
 /// The table as the edit has it, with where its elements came from.
-struct Rows {
-    offsets: Vec<u32>,
-    vertices: Vec<u32>,
-    kinds: Vec<Kind>,
-    /// All one kind while `kinds` is left empty: the table's, while it can.
-    uniform: Option<Kind>,
+struct Rows<'a> {
+    table: TableWriter<'a>,
     primitives: Layout,
     vertices_from: Layout,
     rewired: Vec<u32>,
@@ -105,15 +102,18 @@ impl Editor {
     fn remade(self, structural: bool) -> Result<(Geometry, Change), Error> {
         let points = self.points();
         let table = self.base.primitives();
-        let mut rows = structural.then(|| self.rows(&points)).transpose()?;
-        let primitives = Arc::new(match &mut rows {
-            Some(rows) => self.primitives_of(rows, points.layout.len())?,
-            None => table.with_points(points.layout.len())?,
-        });
+        let (primitives, rows) = if structural {
+            let mut rows = self.rows(&points)?;
+            let curves = self.curves_of(&rows);
+            let table = std::mem::replace(&mut rows.table, table.rewrite(0));
+            (Arc::new(table.finish(curves)?), Some(rows))
+        } else {
+            (Arc::new(table.with_points(points.layout.len())?), None)
+        };
         let positions = self.positions(&points);
         let attributes = self.attributes(&points, rows.as_ref(), &primitives)?;
         let change = self.change(&points, rows);
-        let value = Geometry::with_primitives(positions, primitives, attributes)?;
+        let value = self.base.edited(positions, primitives, attributes)?;
         Ok((value, change))
     }
 
@@ -144,13 +144,13 @@ impl Editor {
             layout.keep(0..base);
         }
         let mut next = 0;
-        for p in 0..total as u32 {
+        // Without renumbering only the new points need a look.
+        for p in if renumbers { 0 } else { base }..total as u32 {
             if renumbers && gone[p as usize] {
                 continue;
             }
             match p.checked_sub(base) {
-                None if renumbers => layout.keep(p..p + 1),
-                None => {}
+                None => layout.keep(p..p + 1),
                 Some(k) => {
                     layout.add(self.point_from[k as usize]);
                     added.push(self.added_points[k as usize]);
@@ -183,24 +183,20 @@ impl Editor {
         }
     }
 
-    /// The table's rows as the edit has them: kept rows copied in runs,
-    /// the rest written once each.
-    fn rows(&self, points: &Points) -> Result<Rows, Error> {
+    /// The table's rows as the edit has them: kept rows share their cells,
+    /// the rest are written once each.
+    fn rows(&self, points: &Points) -> Result<Rows<'_>, Error> {
         let table = self.base.primitives();
         let base = table.len() as u32;
         let wants_vertices = self.base.attributes().has(Domain::Vertex)
             || (table.curves()).is_some_and(|c| c.weights().is_some());
         let mut rows = Rows {
-            offsets: Vec::with_capacity(table.len() + self.added_rows.len() + 1),
-            vertices: Vec::with_capacity(table.vertex_count() + self.corners.len()),
-            kinds: Vec::new(),
-            uniform: table.uniform().or((base == 0).then_some(Kind::POLYGON)),
+            table: table.rewrite(points.layout.len()),
             primitives: Layout::default(),
             vertices_from: Layout::default(),
             rewired: Vec::new(),
             removed: Vec::new(),
         };
-        rows.offsets.push(0);
         // Base rows between the touched ones go in runs.
         let mut touched: Vec<u32> = (self.rewired.keys())
             .chain(self.removed_primitives.iter().filter(|&&p| p < base))
@@ -210,110 +206,93 @@ impl Editor {
         touched.dedup();
         let mut next = 0;
         for &p in &touched {
-            self.keep_rows(&mut rows, next..p, points, wants_vertices);
+            self.keep_rows(&mut rows, next..p, points, wants_vertices)?;
             next = p + 1;
             if self.removed_primitives.contains(&p) {
                 rows.removed.push(p);
             } else {
-                self.place_written(&mut rows, p, self.rewired[&p], points, wants_vertices);
+                self.place_written(&mut rows, p, self.rewired[&p], points, wants_vertices)?;
             }
         }
-        self.keep_rows(&mut rows, next..base, points, wants_vertices);
+        self.keep_rows(&mut rows, next..base, points, wants_vertices)?;
         for (k, &row) in self.added_rows.iter().enumerate() {
             let number = base + k as u32;
             if self.removed_primitives.contains(&number) {
                 rows.removed.push(number);
                 continue;
             }
-            self.place_written(&mut rows, number, row, points, wants_vertices);
+            self.place_written(&mut rows, number, row, points, wants_vertices)?;
         }
         rows.removed.sort_unstable();
         Ok(rows)
     }
 
-    /// `run`'s base rows, as they are: a copy when no point changes number.
+    /// `run`'s base rows, as they are: shared when no point changes number.
     fn keep_rows(
         &self,
-        rows: &mut Rows,
+        rows: &mut Rows<'_>,
         run: std::ops::Range<u32>,
         points: &Points,
         wants_vertices: bool,
-    ) {
+    ) -> Result<(), Error> {
         if run.is_empty() {
-            return;
+            return Ok(());
         }
         let table = self.base.primitives();
         let offsets = table.offsets();
         let Some(renumber) = points.renumber.as_deref() else {
             let (first, last) = (offsets[run.start as usize], offsets[run.end as usize]);
-            let shift = rows.vertices.len() as i64 - i64::from(first);
-            rows.vertices
-                .extend_from_slice(&table.vertices()[first as usize..last as usize]);
-            rows.offsets.extend(
-                offsets[run.start as usize + 1..=run.end as usize]
-                    .iter()
-                    .map(|&o| (i64::from(o) + shift) as u32),
-            );
-            rows.primitives.keep(run.clone());
+            rows.table.keep(run.start as usize..run.end as usize);
+            rows.primitives.keep(run);
             if wants_vertices {
                 rows.vertices_from.keep(first..last);
             }
-            self.keep_kinds(rows, run);
-            return;
+            return Ok(());
         };
+        let mut new = Vec::new();
         for p in run {
             let corners = table.primitive(p as usize);
-            let start = rows.vertices.len();
+            new.clear();
             // Mostly a point changes its number and nothing more.
             let plain = corners.iter().all(|&c| {
-                let new = renumber[c as usize];
-                rows.vertices.push(new);
-                new != GONE && !points.welded.get(c as usize).is_some_and(|&w| w)
+                let number = renumber[c as usize];
+                new.push(number);
+                number != GONE && !points.welded.get(c as usize).is_some_and(|&w| w)
             });
             if !plain {
-                rows.vertices.truncate(start);
                 let vertices = table.primitive_vertices(p as usize);
                 let corners = corners
                     .iter()
                     .zip(vertices)
                     .map(|(&c, v)| (renumber[c as usize], Vertex::Kept(v as u32)));
-                if place(rows, table.kind(p as usize), corners, wants_vertices) {
+                if place(rows, table.kind(p as usize), corners, wants_vertices)? {
                     rows.primitives.keep(p..p + 1);
                     rows.rewired.push(rows.primitives.len() as u32 - 1);
-                    self.keep_kinds(rows, p..p + 1);
                 } else {
                     rows.removed.push(p);
                 }
                 continue;
             }
-            rows.offsets.push(rows.vertices.len() as u32);
+            rows.table.write(table.kind(p as usize), &new)?;
             rows.primitives.keep(p..p + 1);
             if wants_vertices {
                 let range = table.primitive_vertices(p as usize);
                 rows.vertices_from
                     .keep(range.start as u32..range.end as u32);
             }
-            self.keep_kinds(rows, p..p + 1);
         }
-    }
-
-    /// Records the kinds of the kept rows `run`.
-    fn keep_kinds(&self, rows: &mut Rows, run: std::ops::Range<u32>) {
-        if rows.uniform.is_none() {
-            let table = self.base.primitives();
-            rows.kinds.extend(run.map(|p| table.kind(p as usize)));
-        }
+        Ok(())
     }
 
     /// A row the edit wrote for primitive `number`.
     fn place_written(
         &self,
-        rows: &mut Rows,
+        rows: &mut Rows<'_>,
         number: u32,
         row: Row,
         points: &Points,
         wants_vertices: bool,
-    ) {
+    ) -> Result<(), Error> {
         let range = row.start as usize..(row.start + row.len) as usize;
         let corners = self.corners[range.clone()]
             .iter()
@@ -325,9 +304,9 @@ impl Editor {
                 };
                 (points.number(point), vertex)
             });
-        if !place(rows, row.kind, corners, wants_vertices) {
+        if !place(rows, row.kind, corners, wants_vertices)? {
             rows.removed.push(number);
-            return;
+            return Ok(());
         }
         match number.checked_sub(self.base_primitives()) {
             None => {
@@ -336,37 +315,12 @@ impl Editor {
             }
             Some(k) => rows.primitives.add(self.primitive_from[k as usize]),
         }
-        match rows.uniform {
-            Some(kind) if kind == row.kind => {}
-            Some(kind) => {
-                // A second kind: the column starts, with the rows before it.
-                rows.kinds = vec![kind; rows.primitives.len() - 1];
-                rows.kinds.push(row.kind);
-                rows.uniform = None;
-            }
-            None => rows.kinds.push(row.kind),
-        }
-    }
-
-    /// The new table of `rows`, over `points` points, checked.
-    fn primitives_of(&self, rows: &mut Rows, points: usize) -> Result<Primitives, Error> {
-        let table = self.base.primitives();
-        let offsets = Column::new(std::mem::take(&mut rows.offsets));
-        let vertices = Column::new(std::mem::take(&mut rows.vertices));
-        if rows.uniform == Some(Kind::POLYGON) && table.curves().is_none() {
-            return Primitives::of_polygons(points, offsets, vertices);
-        }
-        let kinds = match rows.uniform {
-            Some(kind) => Column::new(vec![kind; rows.primitives.len()]),
-            None => Column::new(std::mem::take(&mut rows.kinds)),
-        };
-        let curves = self.curves_of(rows, vertices.len());
-        Primitives::new(points, offsets, vertices, kinds, curves)
+        Ok(())
     }
 
     /// The curve data of `rows`: degrees and knots by primitive, weights by
     /// vertex; present while a curve is. A row the edit wrote weighs 1.
-    fn curves_of(&self, rows: &Rows, vertices: usize) -> Option<CurveData> {
+    fn curves_of(&self, rows: &Rows<'_>) -> Option<CurveData> {
         let table = self.base.primitives();
         let data = table.curves()?;
         let (mut degrees, mut knot_offsets, mut knots) = (Vec::new(), vec![0u32], Vec::new());
@@ -391,12 +345,11 @@ impl Editor {
             return None;
         }
         let weights = data.weights().map(|w| {
-            let mut out = Vec::with_capacity(vertices);
+            let mut out = Vec::with_capacity(rows.table.vertex_count());
             for run in rows.vertices_from.runs() {
                 match run {
-                    Run::Kept(range) => {
-                        out.extend_from_slice(&w[range.start as usize..range.end as usize])
-                    }
+                    Run::Kept(range) => out
+                        .extend_from_slice(&w.as_slice()[range.start as usize..range.end as usize]),
                     Run::New(_) => out.push(1.0),
                 }
             }
@@ -413,14 +366,12 @@ impl Editor {
         if self.moved.is_empty() && layout.is_whole(base.len()) {
             return base.clone();
         }
-        let mut out = Vec::with_capacity(layout.len());
+        let mut out = ColumnWriter::new();
         let mut added = points.added.iter();
         for run in layout.runs() {
             match run {
-                Run::Kept(range) => {
-                    out.extend_from_slice(&base[range.start as usize..range.end as usize]);
-                }
-                Run::New(_) => out.extend(added.next()),
+                Run::Kept(range) => out.keep(base, range.start as usize..range.end as usize),
+                Run::New(_) => out.push(*added.next().expect("a position a new point")),
             }
         }
         for (&p, &at) in &self.moved {
@@ -428,7 +379,7 @@ impl Editor {
                 out[number as usize] = at;
             }
         }
-        Column::new(out)
+        out.finish()
     }
 
     /// The attributes and groups as the layouts say, sharing every domain
@@ -436,7 +387,7 @@ impl Editor {
     fn attributes(
         &self,
         points: &Points,
-        rows: Option<&Rows>,
+        rows: Option<&Rows<'_>>,
         primitives: &Primitives,
     ) -> Result<Arc<Attributes>, Error> {
         let table = self.base.primitives();
@@ -511,7 +462,7 @@ impl Editor {
     }
 
     /// The report.
-    fn change(&self, points: &Points, rows: Option<Rows>) -> Change {
+    fn change(&self, points: &Points, rows: Option<Rows<'_>>) -> Change {
         let base = self.base.positions();
         let mut moved: Vec<u32> = (self.moved.iter())
             .filter(|(p, at)| base[**p as usize].map(f64::to_bits) != at.map(f64::to_bits))
@@ -568,13 +519,13 @@ impl Editor {
 
 /// Puts a written or rewritten row into `rows`: corners gone drop,
 /// neighbours that became one point collapse to their first, and a row
-/// left too short goes. Whether it stayed.
+/// left too short goes. Whether it stayed; the error of the row it broke.
 fn place(
-    rows: &mut Rows,
+    rows: &mut Rows<'_>,
     kind: Kind,
     corners: impl Iterator<Item = (u32, Vertex)>,
     wants_vertices: bool,
-) -> bool {
+) -> Result<bool, Error> {
     let mut row: Vec<(u32, Vertex)> = Vec::new();
     for (point, vertex) in corners {
         if point != GONE && row.last().is_none_or(|last| last.0 != point) {
@@ -587,10 +538,11 @@ fn place(
     let linear = kind.basis() == Basis::Linear;
     let least = if kind.closed() { 3 } else { 2 };
     if linear && row.len() < least {
-        return false;
+        return Ok(false);
     }
-    for &(point, vertex) in &row {
-        rows.vertices.push(point);
+    let points: Vec<u32> = row.iter().map(|c| c.0).collect();
+    rows.table.write(kind, &points)?;
+    for &(_, vertex) in &row {
         if wants_vertices {
             match vertex {
                 Vertex::Kept(v) => rows.vertices_from.keep(v..v + 1),
@@ -598,6 +550,5 @@ fn place(
             }
         }
     }
-    rows.offsets.push(rows.vertices.len() as u32);
-    true
+    Ok(true)
 }

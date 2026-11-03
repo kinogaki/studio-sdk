@@ -3,7 +3,7 @@
 use super::layout::{Blends, Layout, Run, Source, strongest};
 use crate::ids;
 use kinogaki_geometry::{
-    Attribute, AttributeType, Column, Elements, Error, Meaning, Text, Values, names,
+    Attribute, AttributeType, Column, ColumnWriter, Elements, Error, Meaning, Text, Values, names,
 };
 
 /// How a new element's value comes from its sources.
@@ -87,46 +87,48 @@ impl Real for f64 {
 }
 
 /// Every element of `layout` from `values`, `width` values an element: a
-/// copy per kept run, `new` writing each new element.
+/// kept run shares its cells, `new` writes each new element.
 fn rows<T: Copy>(
-    values: &[T],
+    values: &Column<T>,
     width: usize,
     layout: &Layout,
     blends: &Blends,
-    mut new: impl FnMut(&[Source], &mut Vec<T>),
-) -> Vec<T> {
-    let mut out = Vec::with_capacity(layout.len() * width);
+    mut new: impl FnMut(&[Source], &mut ColumnWriter<T>),
+) -> Column<T> {
+    let mut out = ColumnWriter::new();
     for run in layout.runs() {
         match run {
             Run::Kept(range) => {
                 let (start, end) = (range.start as usize, range.end as usize);
-                out.extend_from_slice(&values[start * width..end * width]);
+                out.keep(values, start * width..end * width);
             }
             Run::New(span) => new(blends.of(*span), &mut out),
         }
     }
-    out
+    out.finish()
 }
 
 /// Blends `sources`' items of `values` into `out` by `rule`.
 fn blend_real<T: Real>(
-    values: &[T],
+    values: &Column<T>,
     width: usize,
     rule: Rule,
     sources: &[Source],
     default: &[f64],
-    out: &mut Vec<T>,
+    out: &mut ColumnWriter<T>,
 ) {
-    let item = |element: u32| &values[element as usize * width..(element as usize + 1) * width];
+    let item = |element: u32| {
+        (element as usize * width..(element as usize + 1) * width).map(|at| values[at])
+    };
     let total: f64 = sources.iter().map(|s| s.1).sum();
     // One source (or one with all the weight) is its value, every bit.
     let single = (sources.iter()).find(|s| s.1 == total && total > 0.0);
     if let Some(&(element, _)) = single {
-        out.extend_from_slice(item(element));
+        item(element).for_each(|x| out.push(x));
         return;
     }
     if total <= 0.0 {
-        out.extend(default.iter().map(|&x| T::from_f64(x)));
+        default.iter().for_each(|&x| out.push(T::from_f64(x)));
         return;
     }
     let mut mean = vec![0.0; width];
@@ -135,7 +137,7 @@ fn blend_real<T: Real>(
             let mut sum = 0.0;
             for &(element, weight) in sources.iter().filter(|s| s.1 > 0.0) {
                 sum += weight;
-                let q: Vec<f64> = item(element).iter().map(|x| x.to_f64()).collect();
+                let q: Vec<f64> = item(element).map(Real::to_f64).collect();
                 if sum == weight {
                     mean = q;
                 } else {
@@ -154,7 +156,7 @@ fn blend_real<T: Real>(
             }
         }
     }
-    out.extend(mean.iter().map(|&x| T::from_f64(x)));
+    mean.iter().for_each(|&x| out.push(T::from_f64(x)));
 }
 
 fn normalize(v: &mut [f64]) {
@@ -185,15 +187,17 @@ fn slerp(q: &mut [f64], to: &[f64], t: f64) {
 
 /// The strongest source's item of `values`, or `default` without sources.
 fn strongest_item<T: Copy>(
-    values: &[T],
+    values: &Column<T>,
     width: usize,
     sources: &[Source],
     default: T,
-    out: &mut Vec<T>,
+    out: &mut ColumnWriter<T>,
 ) {
     match strongest(sources) {
-        Some(e) => out.extend_from_slice(&values[e as usize * width..(e as usize + 1) * width]),
-        None => out.extend(std::iter::repeat_n(default, width)),
+        Some(e) => {
+            (e as usize * width..(e as usize + 1) * width).for_each(|at| out.push(values[at]))
+        }
+        None => (0..width).for_each(|_| out.push(default)),
     }
 }
 
@@ -244,23 +248,23 @@ fn carried_values(
     let rule = rule(ty);
     let default = default_item(ty);
     Ok(match values {
-        Values::F32(c) => Values::F32(Column::new(rows(c, width, layout, blends, |s, out| {
+        Values::F32(c) => Values::F32(rows(c, width, layout, blends, |s, out| {
             blend_real(c, width, rule, s, &default, out);
-        }))),
-        Values::F64(c) => Values::F64(Column::new(rows(c, width, layout, blends, |s, out| {
+        })),
+        Values::F64(c) => Values::F64(rows(c, width, layout, blends, |s, out| {
             blend_real(c, width, rule, s, &default, out);
-        }))),
-        Values::I32(c) => Values::I32(Column::new(rows(c, width, layout, blends, |s, out| {
+        })),
+        Values::I32(c) => Values::I32(rows(c, width, layout, blends, |s, out| {
             strongest_item(c, width, s, 0, out);
-        }))),
-        Values::I64(c) => Values::I64(Column::new(rows(c, width, layout, blends, |s, out| {
+        })),
+        Values::I64(c) => Values::I64(rows(c, width, layout, blends, |s, out| {
             strongest_item(c, width, s, 0, out);
-        }))),
+        })),
         Values::Text(t) => {
             let indices = rows(t.indices(), 1, layout, blends, |s, out| {
                 strongest_item(t.indices(), 1, s, Text::NONE, out);
             });
-            Values::Text(Text::new(indices.into(), t.table().clone())?)
+            Values::Text(t.with_indices(indices)?)
         }
         other => {
             return Err(Error::refused(format!(
@@ -282,29 +286,35 @@ pub(super) fn carried_attribute(
 ) -> Result<Attribute, Error> {
     let ty = attribute.ty();
     if let (names::ID, Values::I64(old)) = (name, attribute.values()) {
-        return fresh_ids(old, ty, layout);
+        return fresh_ids(old, attribute, layout);
     }
     if let Some(offsets) = attribute.offsets() {
         let width = usize::from(ty.width);
         return match attribute.values() {
             Values::F32(c) => {
-                let (o, v) = arrays(offsets, c, width, layout, blends);
+                let (o, v) = arrays(offsets.as_slice(), c.as_slice(), width, layout, blends);
                 Attribute::arrays(ty, o.into(), Values::F32(v.into()))
             }
             Values::F64(c) => {
-                let (o, v) = arrays(offsets, c, width, layout, blends);
+                let (o, v) = arrays(offsets.as_slice(), c.as_slice(), width, layout, blends);
                 Attribute::arrays(ty, o.into(), Values::F64(v.into()))
             }
             Values::I32(c) => {
-                let (o, v) = arrays(offsets, c, width, layout, blends);
+                let (o, v) = arrays(offsets.as_slice(), c.as_slice(), width, layout, blends);
                 Attribute::arrays(ty, o.into(), Values::I32(v.into()))
             }
             Values::I64(c) => {
-                let (o, v) = arrays(offsets, c, width, layout, blends);
+                let (o, v) = arrays(offsets.as_slice(), c.as_slice(), width, layout, blends);
                 Attribute::arrays(ty, o.into(), Values::I64(v.into()))
             }
             Values::Text(t) => {
-                let (o, v) = arrays(offsets, t.indices(), 1, layout, blends);
+                let (o, v) = arrays(
+                    offsets.as_slice(),
+                    t.indices().as_slice(),
+                    1,
+                    layout,
+                    blends,
+                );
                 let text = Text::new(v.into(), t.table().clone())?;
                 Attribute::arrays(ty, o.into(), Values::Text(text))
             }
@@ -316,24 +326,26 @@ pub(super) fn carried_attribute(
     }
     match carried_values(attribute.values(), ty, layout, blends)? {
         Values::Text(text) => Ok(Attribute::text(text)),
-        values => Attribute::new(ty, values),
+        values => attribute.with_values(values),
     }
 }
 
 /// Kept elements' ids and fresh ones for the rest.
-fn fresh_ids(old: &Column<i64>, ty: AttributeType, layout: &Layout) -> Result<Attribute, Error> {
+fn fresh_ids(
+    old: &Column<i64>,
+    attribute: &Attribute,
+    layout: &Layout,
+) -> Result<Attribute, Error> {
     let mut next = ids::fresh(old, layout.added())
         .ok_or_else(|| Error::refused("the new ids pass the largest id"))?;
-    let mut out = Vec::with_capacity(layout.len());
+    let mut out = ColumnWriter::new();
     for run in layout.runs() {
         match run {
-            Run::Kept(range) => {
-                out.extend_from_slice(&old[range.start as usize..range.end as usize]);
-            }
+            Run::Kept(range) => out.keep(old, range.start as usize..range.end as usize),
             Run::New(_) => out.push(next.next().expect("one fresh id a new element")),
         }
     }
-    Attribute::new(ty, Values::I64(out.into()))
+    attribute.with_values(Values::I64(out.finish()))
 }
 
 /// `group` laid out by `layout`: kept elements stay members; a new element

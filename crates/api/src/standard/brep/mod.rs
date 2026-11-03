@@ -70,7 +70,7 @@ impl DataCodec for BrepCodec {
             let mut child = out.child(&format!("body-{i}"), "body")?;
             write_body(body, &mut names, &mut *child)?;
         }
-        write_datums(value.datums(), &mut names, out)?;
+        write_datums(value.datums().as_slice(), &mut names, out)?;
         write_geometry(value.curves(), &mut *out.child("curves", "curves")?)?;
         attributes::write(value.detail(), out)?;
         names.finish(out)
@@ -205,7 +205,11 @@ fn write_body(
     out.set("name", Field::Int(i64::from(names.name(body.name())?)))?;
     out.set("tolerance", Field::Float(body.tolerance()))?;
     // Carriers.
-    out.set_rows("points", 3, Field::F64s(attributes::flat(g.points())))?;
+    out.set_rows(
+        "points",
+        3,
+        Field::F64s(attributes::flat(g.points().as_slice())),
+    )?;
     let mut carriers = carriers::Writer::default();
     for s in g.surfaces().iter() {
         carriers.surface(s)?;

@@ -37,9 +37,9 @@ use std::sync::Arc;
 /// assert_eq!(square.count(Domain::Edge), Some(4));
 ///
 /// // Move a point: the table is shared, not checked or rebuilt.
-/// let mut moved = square.positions().to_vec();
+/// let mut moved = square.positions().edit();
 /// moved[2][2] = 1.0;
-/// let lifted = square.with_positions(moved.into()).unwrap();
+/// let lifted = square.with_positions(moved.finish()).unwrap();
 /// assert!(std::sync::Arc::ptr_eq(lifted.primitives(), square.primitives()));
 /// ```
 #[derive(Clone, Debug, PartialEq)]
@@ -84,6 +84,35 @@ impl Geometry {
         })
     }
 
+    /// What an edit of this value makes: `positions` over `primitives`, with
+    /// `attributes`. Only the cells of the positions this value's don't share
+    /// are checked, and the attributes' sizes.
+    ///
+    /// # Errors
+    /// A bad position, a position count not the table's points, or a
+    /// missized or misplaced attribute.
+    pub fn edited(
+        &self,
+        positions: Column<[f64; 3]>,
+        primitives: Arc<Primitives>,
+        attributes: Arc<Attributes>,
+    ) -> Result<Self, Error> {
+        if positions.len() != primitives.points() {
+            return Err(Error::invalid(format!(
+                "{} positions for a table of {} points",
+                positions.len(),
+                primitives.points()
+            )));
+        }
+        positions::check_after(&positions, &self.positions)?;
+        check_attributes(&attributes, None, &primitives)?;
+        Ok(Self {
+            positions,
+            primitives,
+            attributes,
+        })
+    }
+
     /// This value with its points at `positions`, sharing the table and
     /// the attributes. Only the positions are checked.
     ///
@@ -98,11 +127,11 @@ impl Geometry {
         })
     }
 
-    /// This value with `points` at `at`, sharing the table and the
-    /// attributes: the one copy of the positions immutability asks, only
-    /// the points given checked, and [`moved_points`](Self::moved_points)
-    /// between the two known without comparing them. So a display patches
-    /// what moved at the cost of what moved.
+    /// This value with `points` at `at`, sharing the table, the attributes
+    /// and the cells of the positions no point falls in: only the points
+    /// given are checked, and [`moved_points`](Self::moved_points) between
+    /// the two reads those cells alone. So an edit and the display that
+    /// patches it cost what moved.
     ///
     /// ```
     /// use kinogaki_geometry::{Attributes, Geometry, Primitives};
@@ -117,9 +146,8 @@ impl Geometry {
     /// # Errors
     /// A point past the last, a bad position, or not one position a point.
     pub fn with_moved(&self, points: &[u32], at: &[[f64; 3]]) -> Result<Self, Error> {
-        let (positions, _) = positions::with_moved(&self.positions, points, at)?;
         Ok(Self {
-            positions,
+            positions: positions::with_moved(&self.positions, points, at)?,
             primitives: self.primitives.clone(),
             attributes: self.attributes.clone(),
         })
@@ -203,17 +231,14 @@ impl Geometry {
     /// ascending: what moved between two values of one table (a drag's
     /// steps), and what a display patches. Bitwise, so a point moved from
     /// `0.0` to `-0.0` moved (its bytes changed). Points past `before`'s
-    /// count are all among them. Known at once between a value and one
-    /// [`with_moved`](Self::with_moved) made of it; found by comparing
-    /// the columns otherwise.
+    /// count are all among them. Costs the cells the two columns don't
+    /// share: what [`with_moved`](Self::with_moved) wrote, or everything for
+    /// columns made apart.
     pub fn moved_points(&self, before: &Geometry) -> Vec<u32> {
         if self.positions.ptr_eq(&before.positions) {
             return Vec::new();
         }
-        match positions::moved_between(&self.positions, &before.positions) {
-            Some(points) => points.to_vec(),
-            None => positions::moved(&before.positions, &self.positions),
-        }
+        positions::moved(&before.positions, &self.positions)
     }
 }
 

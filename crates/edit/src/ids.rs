@@ -6,6 +6,7 @@
 //! ones ([`merged`]). So an id names one element for as long as it lives,
 //! whatever is inserted or removed around it, and a selection holding ids
 //! is found again after a change upstream ([`reresolve`](crate::select::reresolve)).
+use kinogaki_geometry::{Column, highest_id};
 use std::collections::HashSet;
 use std::ops::Range;
 
@@ -15,13 +16,14 @@ use std::ops::Range;
 /// ```
 /// use kinogaki_edit::ids;
 ///
-/// assert_eq!(ids::fresh(&[4, 9, 2], 3), Some(10..13));
-/// assert_eq!(ids::fresh(&[], 2), Some(0..2));
-/// assert_eq!(ids::fresh(&[i64::MAX], 1), None);
+/// let some = |ids: Vec<i64>| ids.into();
+/// assert_eq!(ids::fresh(&some(vec![4, 9, 2]), 3), Some(10..13));
+/// assert_eq!(ids::fresh(&some(vec![]), 2), Some(0..2));
+/// assert_eq!(ids::fresh(&some(vec![i64::MAX]), 1), None);
 /// ```
-pub fn fresh(existing: &[i64], count: usize) -> Option<Range<i64>> {
-    let start = match existing.iter().max() {
-        Some(&max) => max.checked_add(1)?,
+pub fn fresh(existing: &Column<i64>, count: usize) -> Option<Range<i64>> {
+    let start = match highest_id(existing) {
+        Some(max) => max.checked_add(1)?,
         None => 0,
     };
     let end = start.checked_add(i64::try_from(count).ok()?)?;
@@ -68,7 +70,7 @@ pub fn merged(inputs: &[Input<'_>]) -> Option<Vec<i64>> {
         })
         .copied()
         .collect();
-    let mut next = fresh(&every, 0)?.start;
+    let mut next = fresh(&Column::new(every), 0)?.start;
     let mut taken = HashSet::with_capacity(total);
     let mut out = Vec::with_capacity(total);
     for input in inputs {

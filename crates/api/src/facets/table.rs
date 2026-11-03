@@ -117,9 +117,8 @@ impl Cells {
         let first = offsets.get(rows.start).copied().unwrap_or(0);
         let last = offsets.get(rows.end).copied().unwrap_or(first);
         Cells::Lists {
-            offsets: offsets[rows.start..=rows.end]
-                .iter()
-                .map(|&o| o - first)
+            offsets: (rows.start..=rows.end)
+                .map(|at| offsets[at] - first)
                 .collect(),
             items: Box::new(items(attribute, first as usize..last as usize)),
         }
@@ -146,10 +145,10 @@ fn items(attribute: &Attribute, range: Range<usize>) -> Cells {
     let w = usize::from(attribute.ty().width);
     let values = range.start * w..range.end * w;
     match attribute.values() {
-        Values::F32(v) => Cells::Float(v[values].iter().map(|&x| f64::from(x)).collect()),
-        Values::F64(v) => Cells::Float(v[values].to_vec()),
-        Values::I32(v) => Cells::Integer(v[values].iter().map(|&x| i64::from(x)).collect()),
-        Values::I64(v) => Cells::Integer(v[values].to_vec()),
+        Values::F32(v) => Cells::Float(values.map(|at| f64::from(v[at])).collect()),
+        Values::F64(v) => Cells::Float(values.map(|at| v[at]).collect()),
+        Values::I32(v) => Cells::Integer(values.map(|at| i64::from(v[at])).collect()),
+        Values::I64(v) => Cells::Integer(values.map(|at| v[at]).collect()),
         Values::Text(t) => {
             Cells::Text(range.map(|i| t.get(i).unwrap_or_default().into()).collect())
         }

@@ -1,5 +1,6 @@
 //! The stable-id rule: a value's standard `id` attribute names each
 //! element of its domain once.
+use crate::column::Column;
 use crate::parallel;
 
 /// Values per parallel block.
@@ -11,14 +12,41 @@ const BUCKETS: usize = 64;
 /// ids above all of them: names each element once if `old` does, and tells
 /// so in one pass. What a kept column with fresh ids is, so an edit adding
 /// a few elements doesn't check a million again.
-pub(super) fn kept_or_above(new: &[i64], old: &[i64]) -> bool {
-    let mut rest = old.iter();
-    let kept = new.iter().take_while(|&id| rest.any(|o| o == id)).count();
-    let Some(&top) = old.iter().max() else {
+pub(super) fn kept_or_above(new: &Column<i64>, old: &Column<i64>) -> bool {
+    let Some(top) = highest_id(old) else {
         return false;
     };
-    let fresh = &new[kept..];
-    fresh.first().is_none_or(|&first| first > top) && fresh.is_sorted_by(|a, b| a < b)
+    // The common case, an edit's: every old id where it was, new ones after.
+    let same = old.len() <= new.len()
+        && new.unshared(old).all(|r| {
+            let r = r.start..r.end.min(old.len());
+            r.clone().all(|i| new[i] == old[i])
+        });
+    let kept = if same {
+        old.len()
+    } else {
+        let mut rest = old.iter();
+        new.iter().take_while(|&id| rest.any(|o| o == id)).count()
+    };
+    let mut before = top;
+    let fresh = (kept..new.len()).all(|i| {
+        let ascending = new[i] > before;
+        before = new[i];
+        ascending
+    });
+    if fresh {
+        // What a later edit's check and fresh ids would look for.
+        new.derived(|_| Highest(Some(before)));
+    }
+    fresh
+}
+
+/// The highest id of a column: its cache.
+struct Highest(Option<i64>);
+
+/// The highest of `ids`, found once per column.
+pub fn highest_id(ids: &Column<i64>) -> Option<i64> {
+    ids.derived(|ids| Highest(ids.iter().copied().max())).0
 }
 
 /// The first id (in bucket order) that `ids` holds twice, if any. Large

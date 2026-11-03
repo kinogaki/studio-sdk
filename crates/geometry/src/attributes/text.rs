@@ -21,7 +21,7 @@ use std::sync::Arc;
 /// use kinogaki_geometry::Text;
 ///
 /// let text = Text::from_strs(["/Materials/Red", "", "/Materials/Red", "/Materials/Blue"]);
-/// assert_eq!(&**text.indices(), &[0, Text::NONE, 0, 1]);
+/// assert_eq!(text.indices().as_slice(), &[0, Text::NONE, 0, 1]);
 /// assert_eq!(text.get(3), Some("/Materials/Blue"));
 /// assert_eq!(text.get(1), None);
 /// ```
@@ -69,6 +69,34 @@ impl Text {
             .element(at));
         }
         Ok(Self { indices, table })
+    }
+
+    /// `indices` over this text's table: what an edit makes of it, only the
+    /// cells they don't share with this text's checked.
+    ///
+    /// # Errors
+    /// An index past the table.
+    pub fn with_indices(&self, indices: Column<u32>) -> Result<Self, Error> {
+        let size = self.table.len() as u32;
+        let bad = (indices.unshared(&self.indices))
+            .filter(|r| r.start < indices.len())
+            .find_map(|r| {
+                (r.start..r.end.min(indices.len())).find(|&i| {
+                    let index = indices[i];
+                    index >= size && index != Self::NONE
+                })
+            });
+        if let Some(at) = bad {
+            return Err(Error::invalid(format!(
+                "element {at}'s text index {} is past the table of {size}",
+                indices[at]
+            ))
+            .element(at));
+        }
+        Ok(Self {
+            indices,
+            table: self.table.clone(),
+        })
     }
 
     /// The texts of `values` in order, `""` as no value.
@@ -135,7 +163,7 @@ impl Text {
     /// // A gather keeping the table: "b" is unused and "c" comes first.
     /// let gathered = Text::new(vec![2, 0, Text::NONE].into(), full.table().clone()).unwrap();
     /// let compact = gathered.compacted();
-    /// assert_eq!(&**compact.indices(), &[0, 1, Text::NONE]);
+    /// assert_eq!(compact.indices().as_slice(), &[0, 1, Text::NONE]);
     /// assert_eq!(compact.table().len(), 2);
     /// assert_eq!(compact, gathered);
     /// ```

@@ -9,11 +9,13 @@ mod fingerprint;
 mod index;
 mod kind;
 pub(crate) mod validate;
+mod writer;
 
 pub use components::Components;
 pub use curves::{CurveData, Knots};
 pub use index::{Adjacency, Index, Walk};
 pub use kind::{Basis, Kind};
+pub use writer::TableWriter;
 
 use crate::Error;
 use crate::column::Column;
@@ -91,6 +93,10 @@ pub struct Primitives {
     index: OnceLock<Index>,
     edge_count: OnceLock<usize>,
     fingerprint: OnceLock<[u8; 32]>,
+    /// Its cells' digests, once its fingerprint is asked for.
+    digests: OnceLock<fingerprint::Digests>,
+    /// The rows crossing from one run of the vertices to another.
+    stitches: OnceLock<Vec<(u32, Box<[u32]>)>>,
     derived: Derived,
 }
 
@@ -135,8 +141,8 @@ impl Primitives {
         };
         validate::primitives(
             points,
-            &offsets,
-            &vertices,
+            offsets.as_slice(),
+            vertices.as_slice(),
             &kinds,
             primitives,
             curves.as_ref(),
@@ -162,7 +168,14 @@ impl Primitives {
     ) -> Result<Self, Error> {
         let kinds = Kinds::All(Kind::POLYGON);
         let primitives = offsets.len().saturating_sub(1);
-        validate::primitives(points, &offsets, &vertices, &kinds, primitives, None)?;
+        validate::primitives(
+            points,
+            offsets.as_slice(),
+            vertices.as_slice(),
+            &kinds,
+            primitives,
+            None,
+        )?;
         Ok(Self::unchecked(points, offsets, vertices, kinds, None))
     }
 
@@ -183,6 +196,8 @@ impl Primitives {
             index: OnceLock::new(),
             edge_count: OnceLock::new(),
             fingerprint: OnceLock::new(),
+            digests: OnceLock::new(),
+            stitches: OnceLock::new(),
             derived: Derived::default(),
         }
     }
@@ -296,7 +311,34 @@ impl Primitives {
     /// When `p` is not a primitive.
     #[inline]
     pub fn primitive(&self, p: usize) -> &[u32] {
-        &self.vertices[self.offsets[p] as usize..self.offsets[p + 1] as usize]
+        let row = self.offsets[p] as usize..self.offsets[p + 1] as usize;
+        match self.vertices.run(row) {
+            Some(row) => row,
+            None => self.stitched(p),
+        }
+    }
+
+    /// The row of `p`, which crosses from one run of the vertices to
+    /// another: a copy kept with the table, one per crossing at most (a few
+    /// for an edit's table, none for a table made in one piece).
+    #[cold]
+    fn stitched(&self, p: usize) -> &[u32] {
+        let stitches = self.stitches.get_or_init(|| {
+            let mut rows: Vec<usize> = (self.vertices.breaks())
+                .map(|b| self.offsets.partition_point(|&o| o as usize <= b) - 1)
+                .collect();
+            rows.dedup();
+            (rows.into_iter())
+                .filter(|&row| row + 1 < self.offsets.len())
+                .map(|row| {
+                    let (a, b) = (self.offsets[row] as usize, self.offsets[row + 1] as usize);
+                    let corners = (a..b).map(|c| self.vertices[c]).collect();
+                    (row as u32, corners)
+                })
+                .collect::<Vec<(u32, Box<[u32]>)>>()
+        });
+        let at = stitches.partition_point(|row| (row.0 as usize) < p);
+        &stitches[at].1
     }
 
     /// Primitive `p`'s vertex ids.
@@ -344,8 +386,9 @@ impl Primitives {
 
     /// A 32-byte content hash of the points count, the offsets, the
     /// vertices, the kinds and the curve data (BLAKE3 of their
-    /// little-endian bytes): equal tables hash equal, in every session.
-    /// Computed once.
+    /// little-endian bytes, cell by cell): equal tables hash equal, in every
+    /// session. Computed once; a table an edit made hashes only the cells
+    /// it doesn't share.
     pub fn fingerprint(&self) -> [u8; 32] {
         *self.fingerprint.get_or_init(|| fingerprint::of(self))
     }

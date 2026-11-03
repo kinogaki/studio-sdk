@@ -76,7 +76,7 @@ fn curve_columns(c: &CurveData, primitives: usize, vertices: usize) -> Result<()
     if knots.offsets().len() != primitives + 1
         || knots.offsets().first() != Some(&0)
         || knots.offsets()[primitives] as usize != knots.values().len()
-        || knots.offsets().windows(2).any(|w| w[1] < w[0])
+        || knots.offsets().as_slice().windows(2).any(|w| w[1] < w[0])
     {
         return whole("the knot offsets must run from 0 to the knot count, one a primitive".into());
     }
@@ -112,7 +112,7 @@ fn primitive(
     let knots = curves.map_or(&[][..], |c| c.knots().of(p));
     let weights = curves
         .and_then(|c| c.weights())
-        .map(|w| &w[start as usize..end as usize]);
+        .map(|w| &w.as_slice()[start as usize..end as usize]);
     if kind.is_linear() {
         if degree != 1 || !knots.is_empty() || weights.is_some_and(|w| w.iter().any(|&w| w != 1.0))
         {
@@ -124,7 +124,7 @@ fn primitive(
 }
 
 /// What is wrong with a linear primitive's points, if anything.
-fn linear(ids: &[u32], closed: bool) -> Option<&'static str> {
+pub(super) fn linear(ids: &[u32], closed: bool) -> Option<&'static str> {
     if closed && ids.len() < 3 {
         return Some("has fewer than three vertices");
     }

@@ -29,7 +29,7 @@ fn a_repeated_id_is_refused_and_fresh_ids_are_above_the_maximum() {
             .with(Domain::Point, names::ID, column(many.clone()))
             .is_err()
     );
-    let fresh = ids::fresh(&many, 2).unwrap();
+    let fresh = ids::fresh(&many.clone().into(), 2).unwrap();
     assert!(fresh.start > *many.iter().max().unwrap() && fresh.end - fresh.start == 2);
 }
 

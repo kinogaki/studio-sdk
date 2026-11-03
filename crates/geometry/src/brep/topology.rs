@@ -308,13 +308,13 @@ impl BrepTopology {
     /// The faces of shell `s`.
     pub fn shell_faces(&self, s: ShellId) -> &[FaceId] {
         let s = self.shells[s.index()];
-        &self.shell_faces[s.first as usize..(s.first + s.len) as usize]
+        &self.shell_faces.as_slice()[s.first as usize..(s.first + s.len) as usize]
     }
 
     /// The shells of lump `l`, the outer first.
     pub fn lump_shells(&self, l: LumpId) -> &[ShellId] {
         let l = self.lumps[l.index()];
-        &self.lump_shells[l.first as usize..(l.first + l.len) as usize]
+        &self.lump_shells.as_slice()[l.first as usize..(l.first + l.len) as usize]
     }
 
     /// The coedges of edge `e`'s radial ring, from [`Edge::coedge`].
