@@ -10,7 +10,7 @@ use kinogaki_geometry::brep::{
 use kinogaki_geometry::{
     Attribute, Attributes, Basis, Column, Domain, Geometry, Kind, Meaning, Text,
 };
-use kinogaki_geometry::{Frame, Vec3, Xform};
+use kinogaki_geometry::{Frame, Vec3};
 use std::f64::consts::TAU;
 use std::sync::Arc;
 
@@ -26,6 +26,7 @@ pub(super) fn breps() -> Vec<(String, Brep)> {
     };
     vec![
         ("box".to_owned(), one(cuboid([0.0; 3], [1.0, 2.0, 3.0]))),
+        ("two boxes".to_owned(), two_boxes()),
         ("cylinder".to_owned(), one(cylinder(1.0, 2.0))),
         ("cone".to_owned(), one(cone(0.5, 1.0))),
         ("sphere".to_owned(), one(sphere(1.0))),
@@ -34,27 +35,28 @@ pub(super) fn breps() -> Vec<(String, Brep)> {
     ]
 }
 
-/// A value with every part: two bodies (one placed twice, with
-/// precisions and attributes on every domain), free curves, a datum of
+/// The box and a second one 5 along x: two bodies, twelve planar faces.
+fn two_boxes() -> Brep {
+    let body = |lo: [f64; 3], hi| (cuboid(lo, hi).build(Attributes::new())).expect("a box");
+    let bodies = vec![
+        body([0.0; 3], [1.0, 2.0, 3.0]),
+        body([5.0, 0.0, 0.0], [6.0, 2.0, 3.0]),
+    ];
+    Brep::new(bodies, Geometry::empty(), Vec::new(), Attributes::new()).expect("two boxes")
+}
+
+/// A value with every part: two bodies (one with precisions and
+/// attributes on every domain), free curves, a datum of
 /// each kind (named by names of every node: made, a part, merged) and
 /// Detail attributes.
 fn every_part() -> Brep {
-    let mut b = cuboid([0.0; 3], [1.0; 3]);
-    let up = Xform::translation(Vec3::new(0.0, 0.0, 3.0));
-    b.placement(Xform::IDENTITY, vec![up]);
+    let b = cuboid([0.0; 3], [1.0; 3]);
     let attributes = Attributes::new()
         .with(
             Domain::Object,
             "cad:output_by",
             Attribute::tuples::<i64>(vec![7], Meaning::None).unwrap(),
         )
-        .and_then(|a| {
-            a.with(
-                Domain::Instance,
-                "instance",
-                Attribute::tuples::<i64>(vec![0, 1], Meaning::None).unwrap(),
-            )
-        })
         .and_then(|a| {
             let red = Attribute::tuples(vec![[1.0f32, 0.0, 0.0]; 6], Meaning::Color).unwrap();
             a.with(Domain::Primitive, "Cd", red)

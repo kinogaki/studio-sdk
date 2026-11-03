@@ -146,14 +146,14 @@ mod tests {
             .and_then(|a| a.with(Domain::Point, names::PSCALE, k.unwrap()))
             .unwrap();
         let m = placements(&points(at.clone(), a))[0];
-        assert!(close(m.apply_vector(Vec3::X), Vec3::new(0.0, 2.0, 0.0)));
-        assert!(close(m.apply_vector(Vec3::Y), Vec3::new(-4.0, 0.0, 0.0)));
+        assert!(close(m.axes()[0], Vec3::new(0.0, 2.0, 0.0)));
+        assert!(close(m.axes()[1], Vec3::new(-4.0, 0.0, 0.0)));
         assert!(close(m.origin(), Vec3::new(1.0, 2.0, 3.0)));
         // N aims +Z, up turns +Y; up along N still makes a frame.
         let n = Attribute::tuples(vec![[1.0f32, 0.0, 0.0]; 4], Meaning::Normal).unwrap();
         let a = Attributes::new().with(Domain::Point, names::N, n).unwrap();
         let m = placements(&points(at.clone(), a))[0];
-        assert!(close(m.apply_vector(Vec3::Z), Vec3::X) && close(m.apply_vector(Vec3::Y), Vec3::Y));
+        assert!(close(m.axes()[2], Vec3::X) && close(m.axes()[1], Vec3::Y));
         let n = Attribute::tuples(vec![[0.0f32, 1.0, 0.0]; 4], Meaning::Normal).unwrap();
         let a = Attributes::new().with(Domain::Point, names::N, n).unwrap();
         let m = placements(&points(at.clone(), a))[0];

@@ -49,7 +49,6 @@ fn a_value_with_every_part_keeps_each_part() {
     assert_eq!(back.datums(), value.datums());
     assert_eq!(back.curves(), value.curves());
     assert_eq!(back.detail(), value.detail());
-    assert_eq!(back.bodies()[0].instances(), value.bodies()[0].instances());
     assert_eq!(
         back.bodies()[0].attributes(),
         value.bodies()[0].attributes()

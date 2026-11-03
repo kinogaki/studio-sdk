@@ -152,17 +152,6 @@ fn structure_is_checked() {
         refused(BrepBuilder::new(name(0), 0.0).build(Attributes::new())).0,
         "tolerance not positive"
     );
-    let mut scaled = BrepBuilder::new(name(0), 0.01);
-    let doubled = crate::Xform::from_rows([
-        [2.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-    ]);
-    scaled.placement(doubled, Vec::new());
-    assert_eq!(
-        refused(scaled.build(Attributes::new())).0,
-        "placement not rigid"
-    );
 }
 
 #[test]

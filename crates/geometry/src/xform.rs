@@ -2,12 +2,6 @@
 use crate::vec3::Vec3;
 use bytemuck::{Pod, Zeroable};
 
-/// How far `RᵀR` may stray from the identity for a placement to be
-/// rigid: rotations composed from angles, or read from a file's rounded
-/// decimals, stay within it; a scale or a shear does not. A structural
-/// check, not a modeling tolerance.
-const RIGID_SLACK: f64 = 1e-9;
-
 /// An affine placement, double precision: every placement the SDK
 /// exchanges (an object's, an item a file reads, a B-rep body's instance,
 /// a render prim's, a piece's copies, a move).
@@ -106,13 +100,6 @@ impl Xform {
         Vec3::new(row(0), row(1), row(2))
     }
 
-    /// Where direction `v` goes: the linear part alone.
-    pub fn apply_vector(&self, v: Vec3) -> Vec3 {
-        let r = &self.0;
-        let row = |i: usize| r[i][0] * v.x + r[i][1] * v.y + r[i][2] * v.z;
-        Vec3::new(row(0), row(1), row(2))
-    }
-
     /// The placement undoing it; `None` when its linear part is singular
     /// (or the inverse isn't finite).
     pub fn inverse(&self) -> Option<Xform> {
@@ -127,20 +114,6 @@ impl Xform {
         let t = self.origin();
         let inverse = Xform(rows.map(|row| [row.x, row.y, row.z, -row.dot(t)]));
         inverse.is_finite().then_some(inverse)
-    }
-
-    /// Whether it is a rotation and a translation: `RᵀR` within 1e-9 of
-    /// the identity in each entry and `det R > 0` (no scale, shear or
-    /// mirror), every entry finite.
-    pub(crate) fn is_rigid(&self) -> bool {
-        let axes = self.axes();
-        let orthonormal = (0..3).all(|i| {
-            (0..3).all(|j| {
-                let want = if i == j { 1.0 } else { 0.0 };
-                (axes[i].dot(axes[j]) - want).abs() <= RIGID_SLACK
-            })
-        });
-        self.is_finite() && orthonormal && axes[0].dot(axes[1].cross(axes[2])) > 0.0
     }
 
     /// Whether every entry is finite.
@@ -223,18 +196,7 @@ mod tests {
         assert_eq!(a.to_cols()[3], [1.0, -2.0, 0.5, 1.0]);
         assert_eq!(a.axes()[1], Vec3::new(0.5, 1.0, 0.25));
         assert_eq!(a.origin(), Vec3::new(1.0, -2.0, 0.5));
-        assert_eq!(a.apply_vector(Vec3::X), Vec3::new(2.0, 0.0, 0.0));
-    }
-
-    #[test]
-    fn only_rotations_and_translations_are_rigid() {
-        let raised = Xform::translation(Vec3::new(0.0, 0.0, 5.0));
-        assert!(raised.is_rigid());
-        assert!(!sheared().is_rigid());
-        let mirror = Xform::from_axes(-Vec3::X, Vec3::Y, Vec3::Z, Vec3::ZERO);
-        assert!(!mirror.is_rigid());
-        let nan = Xform::translation(Vec3::new(f64::NAN, 0.0, 0.0));
-        assert!(!nan.is_rigid() && !nan.is_finite());
+        assert_eq!(a.axes()[0], Vec3::new(2.0, 0.0, 0.0));
     }
 
     #[test]

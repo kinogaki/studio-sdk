@@ -4,7 +4,7 @@ use kinogaki_geometry::{Domain, Elements, Geometry, Primitives, Selection};
 use kinogaki_studio_api::codec::DataCodec;
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::element::MemoryElement;
-use kinogaki_studio_api::standard::{self, BrepCodec, GeometryCodec};
+use kinogaki_studio_api::standard::{self, BrepCodec, GeometryCodec, Instances, InstancesCodec};
 
 /// Saves each standard value with its codec and reads it back: the read
 /// value equals it bit for bit, and a selection of it round-trips too.
@@ -16,6 +16,9 @@ impl Consumer for Codecs {
         "codec round trip"
     }
     fn check(&self, _fixture: &str, data: &Data) -> Result<(), String> {
+        if let Some(value) = standard::instances().get(data) {
+            return instances_round_trip(value, data);
+        }
         let (codec, count): (&dyn DataCodec, Option<usize>) =
             if let Some(p) = standard::geometry().get(data) {
                 (&GeometryCodec, p.count(Domain::Point))
@@ -53,6 +56,44 @@ impl Consumer for Codecs {
     }
 }
 
+/// Instances saved and read back: the same placements bit for bit, the
+/// same prototype indices and attributes, and the very prototypes (memory
+/// keeps values as they are).
+fn instances_round_trip(value: &Instances, data: &Data) -> Result<(), String> {
+    let mut saved = MemoryElement::new("result");
+    (saved.write(|w| InstancesCodec.write(data, None, w))).map_err(|e| format!("write: {e}"))?;
+    let read = (saved.read(|r| InstancesCodec.read(r, None))).map_err(|e| format!("read: {e}"))?;
+    let back = standard::instances()
+        .get(&read)
+        .ok_or("read back as another type")?;
+    let bits = |v: &Instances| -> Vec<u64> {
+        v.xforms()
+            .iter()
+            .flat_map(|x| {
+                x.rows()
+                    .as_flattened()
+                    .iter()
+                    .map(|c| c.to_bits())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    };
+    let same = bits(back) == bits(value)
+        && back.prototype_indices().map(|c| c.to_vec())
+            == value.prototype_indices().map(|c| c.to_vec())
+        && back.attributes() == value.attributes()
+        && back.prototypes().len() == value.prototypes().len()
+        && back
+            .prototypes()
+            .iter()
+            .zip(value.prototypes())
+            .all(|(a, b)| a.ptr_eq(b));
+    match same {
+        true => Ok(()),
+        false => Err("the instances read back differ".into()),
+    }
+}
+
 /// Whether `a` and `b` hold equal standard values, comparing reals by
 /// their bits.
 fn same_bits(a: &Data, b: &Data) -> bool {
@@ -85,6 +126,16 @@ impl Consumer for Invariants {
         "invariants"
     }
     fn check(&self, _fixture: &str, data: &Data) -> Result<(), String> {
+        if let Some(v) = standard::instances().get(data) {
+            let indices = v.prototype_indices().cloned();
+            let again = Instances::new(
+                v.prototypes().to_vec(),
+                v.xforms().clone(),
+                indices,
+                v.attributes().clone(),
+            );
+            return again.map(|_| ()).map_err(|e| e.to_string());
+        }
         match standard::geometry().get(data) {
             Some(g) => geometry(g),
             None => Ok(()),

@@ -5,21 +5,19 @@ use super::names::Name;
 use super::topology::{BodyKind, BrepTopology, Names};
 use crate::Error;
 use crate::attributes::{Attributes, Domain};
-use crate::column::Column;
-use crate::xform::Xform;
 use std::sync::Arc;
 
 /// One B-rep body: exact geometry, its topology, the entities' persistent
-/// names, attributes and placements, and the positional tolerance it was
-/// built to. Made by [`BrepBuilder`](super::BrepBuilder); the rules are
+/// names and attributes, and the positional tolerance it was built to. A
+/// body is at its own origin; an assembly places bodies as the standard
+/// Instances of B-reps. Made by [`BrepBuilder`](super::BrepBuilder); the rules are
 /// [`super`]'s.
 ///
 /// **Domains** ([`count`](Self::count)): Object (the body: one element),
-/// Instance (each placement, the first included), Primitive (each face,
-/// in face order), Edge (each edge, in edge order) and Point (each
-/// vertex). Vertex (a polygon's corner) isn't used. Standard
-/// names: `name` (Instance: the occurrence path), `part` (Object), `Cd`
-/// and `material` (Object and Primitive).
+/// Primitive (each face, in face order), Edge (each edge, in edge order)
+/// and Point (each vertex). Vertex (a polygon's corner) isn't used.
+/// Standard names: `part` (Object), `Cd` and `material` (Object and
+/// Primitive).
 ///
 /// **Sharing.** Immutable and cheap to clone. The geometry, topology,
 /// names and attributes are each shared (`Arc`), and the `with_*` edits
@@ -29,8 +27,6 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Body {
     name: Name,
-    placement: Xform,
-    instances: Column<Xform>,
     tolerance: f64,
     geometry: Arc<Geometry>,
     topology: Arc<BrepTopology>,
@@ -44,8 +40,6 @@ impl Body {
     pub(super) fn checked(
         name: Name,
         tolerance: f64,
-        placement: Xform,
-        instances: Column<Xform>,
         geometry: Arc<Geometry>,
         topology: Arc<BrepTopology>,
         names: Arc<Names>,
@@ -61,8 +55,6 @@ impl Body {
         consistency::check(&topology, &geometry, tolerance)?;
         let body = Self {
             name,
-            placement,
-            instances,
             tolerance,
             geometry,
             topology,
@@ -73,19 +65,8 @@ impl Body {
         Ok(body)
     }
 
-    /// Its placements rigid ([`Xform::is_rigid`]), the attributes
-    /// `previous` doesn't hold as they are sized.
+    /// The attributes `previous` doesn't hold, as they are sized.
     fn check_attributes(&self, previous: Option<&Attributes>) -> Result<(), Error> {
-        if !std::iter::once(&self.placement)
-            .chain(self.instances.iter())
-            .all(Xform::is_rigid)
-        {
-            return Err(crate::brep::refused(
-                None,
-                "placement not rigid",
-                "a placement must be a rotation and a translation".into(),
-            ));
-        }
         (self.attributes).check("bodies", previous, |domain| self.count(domain))?;
         Ok(())
     }
@@ -93,16 +74,6 @@ impl Body {
     /// The body's persistent name.
     pub fn name(&self) -> &Name {
         &self.name
-    }
-
-    /// Where the body is drawn first, and where its picks resolve.
-    pub fn placement(&self) -> &Xform {
-        &self.placement
-    }
-
-    /// Where else it is drawn (assembly instances).
-    pub fn instances(&self) -> &Column<Xform> {
-        &self.instances
     }
 
     /// The positional tolerance P it was built to, in model units: within
@@ -140,14 +111,12 @@ impl Body {
         &self.attributes
     }
 
-    /// How many elements `domain` has: 1 for Object, the placements for
-    /// Instance, the faces for Primitive, the edges for Edge, the vertices
+    /// How many elements `domain` has: 1 for Object, the faces for Primitive, the edges for Edge, the vertices
     /// for Point; `None` for a domain a body doesn't have.
     pub fn count(&self, domain: Domain) -> Option<usize> {
         let t = &self.topology;
         Some(match domain {
             Domain::Object => 1,
-            Domain::Instance => 1 + self.instances.len(),
             Domain::Primitive => t.faces.len(),
             Domain::Edge => t.edges.len(),
             Domain::Point => t.vertices.len(),
@@ -189,25 +158,6 @@ impl Body {
             ..self.clone()
         };
         body.check_attributes(Some(&self.attributes))?;
-        Ok(body)
-    }
-
-    /// This body at `placement` and `instances`, sharing the rest.
-    ///
-    /// # Errors
-    /// A placement that isn't rigid, or instance attributes sized for
-    /// another number of placements.
-    pub fn with_placement(
-        &self,
-        placement: Xform,
-        instances: Column<Xform>,
-    ) -> Result<Self, Error> {
-        let body = Self {
-            placement,
-            instances,
-            ..self.clone()
-        };
-        body.check_attributes(None)?;
         Ok(body)
     }
 

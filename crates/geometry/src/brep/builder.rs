@@ -12,7 +12,6 @@ use crate::Error;
 use crate::attributes::Attributes;
 use crate::derived::Derived;
 use crate::vec3::Vec3;
-use crate::xform::Xform;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -60,15 +59,11 @@ pub struct CoedgeSpec {
 /// loops and their coedges are numbered in the order faces are added (the
 /// face's loops in order, each loop's coedges in order), and each edge's
 /// radial ring runs through its coedges in coedge order.
-///
-/// The placement defaults to the identity, with no further instances.
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct BrepBuilder {
     name: Name,
     tolerance: f64,
-    placement: Xform,
-    instances: Vec<Xform>,
     surfaces: Vec<Surface>,
     curves: Vec<Curve>,
     pcurves: Vec<PCurve>,
@@ -92,8 +87,6 @@ impl BrepBuilder {
         Self {
             name,
             tolerance,
-            placement: Xform::IDENTITY,
-            instances: Vec::new(),
             surfaces: Vec::new(),
             curves: Vec::new(),
             pcurves: Vec::new(),
@@ -109,12 +102,6 @@ impl BrepBuilder {
             shells: Vec::new(),
             lumps: Vec::new(),
         }
-    }
-
-    /// Places the body at `placement`, and again at each of `instances`.
-    pub fn placement(&mut self, placement: Xform, instances: Vec<Xform>) {
-        self.placement = placement;
-        self.instances = instances;
     }
 
     /// Adds a surface.
@@ -204,8 +191,6 @@ impl BrepBuilder {
         Body::checked(
             self.name,
             self.tolerance,
-            self.placement,
-            self.instances.into(),
             geometry,
             Arc::new(structure),
             names,

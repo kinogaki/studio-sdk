@@ -323,7 +323,7 @@ fn attributes_follow_the_body_classes() {
         )
         .unwrap();
     let body = b.clone().build(faces.clone()).unwrap();
-    assert_eq!(body.count(Domain::Instance), Some(1));
+    assert_eq!(body.count(Domain::Instance), None);
     assert_eq!(body.count(Domain::Vertex), None);
     let short = faces.with(
         Domain::Primitive,
@@ -343,26 +343,16 @@ fn attributes_follow_the_body_classes() {
         b.clone().build(corner.unwrap()).unwrap_err().kind,
         ErrorKind::Invalid
     );
-    // Instances: one Instance element a placement.
+    // An Instance attribute: a body has no such domain (instances place
+    // bodies as standard Instances).
     let names = Attributes::new()
         .with(
             Domain::Instance,
             "instance",
-            Attribute::tuples::<i64>(vec![0, 1], Meaning::None).unwrap(),
+            Attribute::tuples::<i64>(vec![0], Meaning::None).unwrap(),
         )
         .unwrap();
-    let mut placed = b.clone();
-    let up = crate::Xform::translation(crate::Vec3::new(0.0, 0.0, 3.0));
-    placed.placement(crate::Xform::IDENTITY, vec![up]);
-    let body = placed.build(names.clone()).unwrap();
-    assert_eq!(body.count(Domain::Instance), Some(2));
-    assert!(body.with_placement(up, Column::default()).is_err());
-    assert_eq!(
-        body.with_placement(up, vec![up].into())
-            .unwrap()
-            .placement(),
-        &up
-    );
+    assert_eq!(b.clone().build(names).unwrap_err().kind, ErrorKind::Invalid);
 }
 
 #[test]

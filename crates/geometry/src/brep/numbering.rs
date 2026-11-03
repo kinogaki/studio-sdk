@@ -40,7 +40,7 @@ fn numbered(domain: Domain) -> bool {
 
 impl Brep {
     /// How many elements of `domain` it holds, as one numbering across the
-    /// value: Detail one; Object its bodies and Instance their placements;
+    /// value: Detail one; Object its bodies;
     /// Primitive the bodies' faces, then the datum planes; Edge the bodies'
     /// edges, then the free curves, then the datum axes; Point the bodies'
     /// vertices, then the datum points. Bodies count in body order (a
@@ -49,11 +49,7 @@ impl Brep {
     pub fn count(&self, domain: Domain) -> Option<usize> {
         match domain {
             Domain::Detail => return Some(1),
-            Domain::Object
-            | Domain::Instance
-            | Domain::Primitive
-            | Domain::Edge
-            | Domain::Point => {}
+            Domain::Object | Domain::Primitive | Domain::Edge | Domain::Point => {}
             _ => return None,
         }
         let bodies: usize = (self.bodies.iter())

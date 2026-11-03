@@ -12,7 +12,7 @@ use crate::element::{ElementReader, ElementWriter, Field};
 use kinogaki_geometry::brep::{
     Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, Sense,
 };
-use kinogaki_geometry::{Frame, Vec3, Xform};
+use kinogaki_geometry::{Frame, Vec3};
 
 /// Saves [`Brep`]: one table of every persistent name the value holds
 /// (`name_tags`, `name_words`, `name_texts`), which everything else names
@@ -22,8 +22,9 @@ use kinogaki_geometry::{Frame, Vec3, Xform};
 /// [`GeometryCodec`](super::GeometryCodec) saves one); one
 /// child `body-<i>` (kind `body`) per body; and the Detail attributes.
 ///
-/// A body holds its `name`, `tolerance`, `placement` and `instances`
-/// (rows of 12 reals), its vertices' `points`, its carriers as one record
+/// A body (at its own origin: an assembly places bodies as
+/// [`Instances`](super::Instances)) holds its `name`, `tolerance`, its
+/// vertices' `points`, its carriers as one record
 /// stream (`surface_count`, `curve_count`, `pcurve_count` and the
 /// `carrier_*` fields), its topology as index columns (edges, faces with
 /// their loops' coedges in order, shells and lumps), the entities' names,
@@ -203,15 +204,6 @@ fn write_body(
     let (g, t, n) = (body.geometry(), body.topology(), body.names());
     out.set("name", Field::Int(i64::from(names.name(body.name())?)))?;
     out.set("tolerance", Field::Float(body.tolerance()))?;
-    out.set(
-        "placement",
-        Field::F64s(body.placement().rows().as_flattened().to_vec()),
-    )?;
-    let instances = body
-        .instances()
-        .iter()
-        .flat_map(|p| p.rows().as_flattened().to_vec());
-    out.set_rows("instances", 12, Field::F64s(instances.collect()))?;
     // Carriers.
     out.set_rows("points", 3, Field::F64s(attributes::flat(g.points())))?;
     let mut carriers = carriers::Writer::default();
@@ -318,30 +310,11 @@ fn write_body(
 
 fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, Error> {
     let at = element.location();
-    let placement = |rows: &[f64]| {
-        let mut m = [[0.0; 4]; 3];
-        m.as_flattened_mut().copy_from_slice(rows);
-        Xform::from_rows(m)
-    };
     let name = names.get(
         u32::try_from(element.int("name")?)
             .map_err(|_| Error::invalid(format_args!("{at}: no name")))?,
     )?;
     let mut b = BrepBuilder::new(name, element.float("tolerance")?);
-    let rows = element.f64s("placement")?;
-    if rows.len() != 12 {
-        return Err(Error::invalid(format_args!(
-            "{at}: a placement is 12 reals"
-        )));
-    }
-    let instances = element.f64s("instances")?;
-    if instances.len() % 12 != 0 {
-        return Err(Error::invalid(format_args!(
-            "{at}: instances are rows of 12"
-        )));
-    }
-    let instances = instances.chunks(12).map(placement).collect();
-    b.placement(placement(rows), instances);
     // Carriers, in table order.
     let mut carriers = carriers::Reader::new(element)?;
     let surfaces: Vec<_> = (0..attributes::count(element, "surfaceCount")?)

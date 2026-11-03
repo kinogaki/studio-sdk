@@ -13,8 +13,10 @@ use kinogaki_studio_api::standard;
 /// sharing points; curves of every basis, open and closed; a quad, a
 /// polyline and a NURBS curve sharing points; points only; every attribute
 /// type on every domain; groups with `.hidden` and `sharp`), and B-reps
-/// (a box, a cylinder, a cone, a sphere, a trimmed NURBS patch, and a
-/// value with every part the type has). With
+/// (a box, two boxes, a cylinder, a cone, a sphere, a trimmed NURBS patch, and a
+/// value with every part the type has), and instances (an assembly: two
+/// B-rep prototypes at three placements named by their occurrence paths;
+/// copies of a polygon grid, and instances of those). With
 /// `large`, a 1000 × 1000 quad grid too (1M faces).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Fixtures {
@@ -63,8 +65,61 @@ impl Producer for Fixtures {
             .breps()
             .into_iter()
             .map(|(n, b)| (n, standard::brep().wrap(b)));
-        geometry.chain(breps).collect()
+        geometry.chain(breps).chain(instances()).collect()
     }
+}
+
+/// The instances fixtures: an assembly of B-reps, copies of a grid, and
+/// instances of those copies.
+fn instances() -> Vec<(String, Data)> {
+    use kinogaki_geometry::{Vec3, Xform};
+    use kinogaki_studio_api::standard::Instances;
+    let breps = super::brep::breps();
+    let brep = |name: &str| {
+        let (_, b) = breps
+            .iter()
+            .find(|(n, _)| n == name)
+            .expect("a B-rep fixture");
+        standard::brep().wrap(b.clone())
+    };
+    let along = |n: usize| -> Column<Xform> {
+        (0..n)
+            .map(|i| Xform::translation(Vec3::new(2.0 * i as f64, 0.0, 0.0)))
+            .collect()
+    };
+    let paths = Attribute::text(Text::from_strs(["/Car/Wheel1", "/Car/Body", "/Car/Wheel2"]));
+    let named = Attributes::new()
+        .with(Domain::Instance, names::NAME, paths)
+        .expect("a name a placement");
+    let assembly = Instances::new(
+        vec![brep("cylinder"), brep("box")],
+        along(3),
+        Some(vec![0, 1, 0].into()),
+        named,
+    )
+    .expect("an assembly");
+    let copies = Instances::new(
+        vec![standard::geometry().wrap(grid(2))],
+        along(4),
+        None,
+        Attributes::new(),
+    )
+    .expect("copies");
+    let nested = Instances::new(
+        vec![standard::instances().wrap(copies.clone())],
+        along(2),
+        None,
+        Attributes::new(),
+    )
+    .expect("instances of instances");
+    [
+        ("assembly", assembly),
+        ("copies", copies),
+        ("instances of copies", nested),
+    ]
+    .into_iter()
+    .map(|(n, v)| (n.to_owned(), standard::instances().wrap(v)))
+    .collect()
 }
 
 /// Primitives as lists of points, `polygon` saying which close (polygons;
