@@ -139,7 +139,9 @@ pub use frame::Frame;
 pub use geometry::Geometry;
 pub use incidence::Incidence;
 pub use instancing::placements;
-pub use primitives::{Adjacency, Basis, CurveData, Edge, Index, Kind, Knots, Primitives};
+pub use primitives::{
+    Adjacency, Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, Walk,
+};
 pub use sampled::Sampled;
 pub use selection::Selection;
 pub use shading::ShadingNormals;

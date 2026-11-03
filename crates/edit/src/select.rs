@@ -1,6 +1,9 @@
 //! Selection rules: a [`Selection`] as another domain, the elements it
 //! holds, how it is found again after its value changed
-//! ([`reresolve`]), and how a pick grows before it becomes a selection.
+//! ([`reresolve`]), how a pick grows before it becomes a selection
+//! ([`expand`]: connected pieces, edge loops and rings), and what lies
+//! next to it ([`grow`], [`shrink`], [`boundary`]). Topology questions go
+//! to the table's one index, so a rule costs what it touches.
 //!
 //! One rule for every value: conversions read the value's
 //! [`Incidence`] (polygons and B-rep alike), so the levels row, the
@@ -22,7 +25,9 @@
 //! let faces = select::convert(&points, &p, Domain::Primitive).unwrap();
 //! assert_eq!(faces.members().iter().collect::<Vec<_>>(), [0]);
 //! ```
-use kinogaki_geometry::{Column, Domain, Elements, Error, Geometry, Incidence, Selection, names};
+use kinogaki_geometry::{
+    Column, Components, Domain, Elements, Error, Geometry, Incidence, Selection, names,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -180,6 +185,12 @@ pub enum Expand {
     /// points, and primitives sharing a non-blank `name` (an object's
     /// identity, docs/PARTS.md) kept together.
     Connected,
+    /// An Edge selection to the [edge loops](kinogaki_geometry::Index::edge_loop)
+    /// through it.
+    Loop,
+    /// An Edge selection to the [edge rings](kinogaki_geometry::Index::edge_ring)
+    /// through it.
+    Ring,
 }
 
 /// A selection level a context declares: the domain it selects and how
@@ -203,95 +214,214 @@ impl From<Domain> for Mode {
     }
 }
 
-/// `s` grown by `how` on `on`: with [`Expand::Connected`], every element
-/// of its domain in a piece one of its elements lies in. A selection
-/// that doesn't belong to `on`, of a domain without pieces (Detail) or
-/// of everything, stays as it is.
+/// `s` grown by `how` on `on`. With [`Expand::Connected`], every element
+/// of its domain in a piece one of its elements lies in; with
+/// [`Expand::Loop`] and [`Expand::Ring`], every edge on a walk through
+/// one of its edges. A selection that doesn't belong to `on`, of a domain
+/// the rule doesn't grow or of everything, stays as it is.
 pub fn expand(s: &Selection, on: &Geometry, how: &Expand) -> Selection {
-    let point_of = |domain: Domain| -> Option<Box<dyn Fn(u32) -> u32 + '_>> {
-        let topology = on.primitives();
-        Some(match domain {
-            Domain::Point => Box::new(|p| p),
-            Domain::Vertex => Box::new(|v| topology.vertices()[v as usize]),
-            Domain::Edge => Box::new(|e| topology.edges()[e as usize].points[0]),
-            Domain::Primitive => Box::new(|p| topology.primitive(p as usize)[0]),
-            _ => return None,
-        })
-    };
-    let (Expand::Connected, false, Ok(()), Some(point)) = (
-        how,
-        s.members().is_all(),
-        s.validate(on),
-        point_of(s.domain()),
-    ) else {
+    if s.members().is_all() || s.validate(on).is_err() {
         return s.clone();
-    };
-    let pieces = &pieces(on).0;
-    let mut held = vec![false; pieces.len()];
-    for i in s.members().iter() {
-        held[pieces[point(i) as usize] as usize] = true;
     }
-    let count = on.count(s.domain()).unwrap_or(0);
-    let members = Elements::from_fn(count, |i| held[pieces[point(i) as usize] as usize]);
+    let table = on.primitives();
+    let members = match (how, s.domain()) {
+        (Expand::Loop, Domain::Edge) => walked(s, on, |e| table.index().edge_loop(e).edges),
+        (Expand::Ring, Domain::Edge) => walked(s, on, |e| table.index().edge_ring(e).edges),
+        (Expand::Connected, Domain::Point | Domain::Vertex | Domain::Edge | Domain::Primitive) => {
+            let point = |i: u32| match s.domain() {
+                Domain::Point => i,
+                Domain::Vertex => table.vertices()[i as usize],
+                Domain::Edge => table.edges()[i as usize].points[0],
+                _ => table.primitive(i as usize)[0],
+            };
+            let pieces = pieces(on);
+            let mut held = vec![false; pieces.count()];
+            for i in s.members().iter() {
+                held[pieces.of_points()[point(i) as usize] as usize] = true;
+            }
+            let count = on.count(s.domain()).unwrap_or(0);
+            Elements::from_fn(count, |i| {
+                held[pieces.of_points()[point(i) as usize] as usize]
+            })
+        }
+        _ => return s.clone(),
+    };
     Selection::on(on, s.domain(), members, None).expect("a set of the domain's elements")
 }
 
-/// Each point's piece, by the smallest point in it.
-struct Pieces(Vec<u32>);
+/// The edges of `s`'s walks, each found once.
+fn walked(s: &Selection, on: &Geometry, walk: impl Fn(u32) -> Vec<u32>) -> Elements {
+    let count = on.count(Domain::Edge).unwrap_or(0);
+    let mut found = std::collections::HashSet::new();
+    for e in s.members().iter() {
+        if !found.contains(&e) {
+            found.extend(walk(e));
+        }
+    }
+    Elements::from_indices(count, found).expect("a walk's edges are the value's")
+}
 
-/// `on`'s pieces: points joined through a primitive, and the first points
-/// of primitives of one non-blank `name`, are one piece. The joins through
-/// primitives are a cache on the topology (built once, shared by every
-/// value holding it, so a drag or a rename rebuilds nothing of them);
-/// names join over a copy of it.
-fn pieces(on: &Geometry) -> Arc<Pieces> {
-    let topology = on.primitives();
-    let connected = topology.derived(|t| {
-        let mut parent: Vec<u32> = (0..t.points() as u32).collect();
-        for p in 0..t.len() {
-            let corners = t.primitive(p);
-            for &q in &corners[1..] {
-                join(&mut parent, corners[0], q);
+/// `s` with what lies next to it: a point's neighbours, the edges and
+/// primitives sharing a point with an edge or primitive of it, and the
+/// vertices on a selected vertex's point and on its neighbours. Costs what
+/// it touches. A selection that doesn't belong to `on`, or of a domain
+/// without neighbours (Detail), stays as it is.
+///
+/// ```
+/// use kinogaki_edit::select;
+/// use kinogaki_geometry::{Attributes, Domain, Elements, Geometry, Primitives, Selection};
+///
+/// // A strip of three quads.
+/// let t = Primitives::of_polygons(8, vec![0, 4, 8, 12].into(), vec![0, 1, 5, 4, 1, 2, 6, 5, 2, 3, 7, 6].into()).unwrap();
+/// let strip = Geometry::new(vec![[0.0; 3]; 8].into(), t, Attributes::new()).unwrap();
+/// let first = Elements::from_indices(3, [0]).unwrap();
+/// let first = Selection::on(&strip, Domain::Primitive, first, None).unwrap();
+/// let two = select::grow(&first, &strip);
+/// assert_eq!(two.members().iter().collect::<Vec<_>>(), [0, 1]);
+/// assert_eq!(select::shrink(&two, &strip).members().iter().collect::<Vec<_>>(), [0]);
+/// ```
+pub fn grow(s: &Selection, on: &Geometry) -> Selection {
+    if s.validate(on).is_err() || !has_neighbours(s.domain()) || s.members().is_all() {
+        return s.clone();
+    }
+    let mut grown: Vec<u32> = s.members().iter().collect();
+    for i in s.members().iter() {
+        around(on, s.domain(), i, &mut |near| grown.push(near));
+    }
+    let count = on.count(s.domain()).unwrap_or(0);
+    let members = Elements::from_indices(count, grown).expect("the value's own elements");
+    Selection::on(on, s.domain(), members, s.active()).expect("the active element stays")
+}
+
+/// `s` without what [`grow`] of the rest would take: the elements with
+/// everything next to them selected. So a whole surface stays whole.
+/// Stays as it is when [`grow`] would.
+pub fn shrink(s: &Selection, on: &Geometry) -> Selection {
+    if s.validate(on).is_err() || !has_neighbours(s.domain()) || s.members().is_all() {
+        return s.clone();
+    }
+    let kept = s.members().iter().filter(|&i| {
+        let mut inside = true;
+        around(on, s.domain(), i, &mut |near| {
+            inside &= s.contains(near);
+        });
+        inside
+    });
+    let count = on.count(s.domain()).unwrap_or(0);
+    let members = Elements::from_indices(count, kept).expect("the value's own elements");
+    let active = s.active().filter(|&a| members.contains(a));
+    Selection::on(on, s.domain(), members, active).expect("the active element stays")
+}
+
+fn has_neighbours(domain: Domain) -> bool {
+    matches!(
+        domain,
+        Domain::Point | Domain::Vertex | Domain::Edge | Domain::Primitive
+    )
+}
+
+/// Calls `near` with what lies next to element `i` of `domain`: the one
+/// relation [`grow`] and [`shrink`] share, and a symmetric one, so
+/// shrinking is growing the rest.
+fn around(on: &Geometry, domain: Domain, i: u32, near: &mut dyn FnMut(u32)) {
+    let table = on.primitives();
+    let index = table.index();
+    match domain {
+        Domain::Point => index.point_neighbours(i as usize).for_each(near),
+        Domain::Edge => {
+            for p in table.edges()[i as usize].points {
+                index.point_every_edge(p as usize).for_each(&mut *near);
             }
         }
-        Pieces(roots(parent))
-    });
+        Domain::Primitive => {
+            for &p in table.primitive(i as usize) {
+                index.point_primitives(p as usize).for_each(&mut *near);
+            }
+        }
+        _ => {
+            let point = table.vertices()[i as usize];
+            let mut on_point = |p: u32| {
+                for prim in index.point_primitives(p as usize) {
+                    for v in table.primitive_vertices(prim as usize) {
+                        if table.vertices()[v] == p {
+                            near(v as u32);
+                        }
+                    }
+                }
+            };
+            on_point(point);
+            index.point_neighbours(point as usize).for_each(on_point);
+        }
+    }
+}
+
+/// The edges of a Primitive selection's outline: those with exactly one
+/// selected polygon among their polygons (of every polygon, the edges the
+/// surface ends at, [`Index::boundary_edges`](kinogaki_geometry::Index::boundary_edges)).
+/// Costs what it touches.
+///
+/// ```
+/// use kinogaki_edit::select;
+/// use kinogaki_geometry::{Attributes, Domain, Elements, Geometry, Primitives, Selection};
+///
+/// // Two quads side by side, sharing the edge 1–4.
+/// let t = Primitives::of_polygons(6, vec![0, 4, 8].into(), vec![0, 1, 4, 3, 1, 2, 5, 4].into()).unwrap();
+/// let quads = Geometry::new(vec![[0.0; 3]; 6].into(), t, Attributes::new()).unwrap();
+/// let both = Selection::on(&quads, Domain::Primitive, Elements::all(2), None).unwrap();
+/// let around = select::boundary(&both, &quads).unwrap();
+/// assert_eq!(around.len(), 6);
+/// assert!(!around.contains(quads.primitives().edge_of(1, 4).unwrap()));
+/// ```
+///
+/// # Errors
+/// As [`Selection::validate`], or a selection of another domain.
+pub fn boundary(s: &Selection, on: &Geometry) -> Result<Selection, Error> {
+    s.validate(on)?;
+    if s.domain() != Domain::Primitive {
+        return Err(Error::invalid(format!(
+            "a boundary is of primitives, not of the {} domain",
+            s.domain().name()
+        )));
+    }
+    let table = on.primitives();
+    let index = table.index();
+    let count = table.edges().len();
+    let outline = |edges: Vec<u32>| Elements::from_indices(count, edges);
+    let members = if s.members().is_all() {
+        outline(index.boundary_edges().to_vec())?
+    } else {
+        let mut edges = Vec::new();
+        for p in s.members().iter() {
+            for &e in index.primitive_edges(p as usize) {
+                let polygons = &index.edge_faces()[e as usize];
+                if polygons.iter().filter(|&&f| s.contains(f)).count() == 1 {
+                    edges.push(e);
+                }
+            }
+        }
+        outline(edges)?
+    };
+    Selection::on(on, Domain::Edge, members, None)
+}
+
+/// `on`'s pieces: points joined through a primitive
+/// ([`Primitives::components`](kinogaki_geometry::Primitives::components),
+/// built once, so a drag or a rename rebuilds nothing of them), and the
+/// first points of primitives of one non-blank `name`, joined over a copy.
+fn pieces(on: &Geometry) -> Arc<Components> {
+    let table = on.primitives();
+    let connected = table.components();
     let Some(name) = on.attributes().text(Domain::Primitive, names::NAME) else {
         return connected;
     };
-    let mut parent = connected.0.clone();
     let mut first: HashMap<&str, u32> = HashMap::new();
+    let mut pairs = Vec::new();
     for (p, value) in name.iter().enumerate() {
         let Some(value) = value.filter(|v| !v.trim().is_empty()) else {
             continue;
         };
-        let point = topology.primitive(p)[0];
-        let at = *first.entry(value).or_insert(point);
-        join(&mut parent, at, point);
+        let point = table.primitive(p)[0];
+        pairs.push((*first.entry(value).or_insert(point), point));
     }
-    Arc::new(Pieces(roots(parent)))
-}
-
-/// The root of `p`'s set, halving the path on the way.
-fn root(parent: &mut [u32], mut p: u32) -> u32 {
-    while parent[p as usize] != p {
-        let up = parent[parent[p as usize] as usize];
-        parent[p as usize] = up;
-        p = up;
-    }
-    p
-}
-
-/// `a`'s and `b`'s sets as one, rooted at the smaller root.
-fn join(parent: &mut [u32], a: u32, b: u32) {
-    let (a, b) = (root(parent, a), root(parent, b));
-    parent[a.max(b) as usize] = a.min(b);
-}
-
-/// Every point's root.
-fn roots(mut parent: Vec<u32>) -> Vec<u32> {
-    for p in 0..parent.len() as u32 {
-        parent[p as usize] = root(&mut parent, p);
-    }
-    parent
+    Arc::new(connected.joined(pairs))
 }

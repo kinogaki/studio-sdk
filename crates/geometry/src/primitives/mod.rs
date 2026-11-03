@@ -3,14 +3,16 @@
 //! what is derived from it once: the canonical [`Index`] of edges and
 //! adjacency, the edge count, the polygons and the
 //! [`fingerprint`](Primitives::fingerprint).
+mod components;
 mod curves;
 mod fingerprint;
 mod index;
 mod kind;
 pub(crate) mod validate;
 
+pub use components::Components;
 pub use curves::{CurveData, Knots};
-pub use index::{Adjacency, Index};
+pub use index::{Adjacency, Index, Walk};
 pub use kind::{Basis, Kind};
 
 use crate::Error;
@@ -307,6 +309,13 @@ impl Primitives {
     /// The id of the edge joining points `a` and `b`, either way round.
     pub fn edge_of(&self, a: u32, b: u32) -> Option<u32> {
         self.index().edge_of(a, b)
+    }
+
+    /// The connected components of its points, found the first time they
+    /// are asked for (without the [`index`](Self::index)) and kept as long
+    /// as the table.
+    pub fn components(&self) -> Arc<Components> {
+        self.derived(components::of)
     }
 
     /// A 32-byte content hash of the points count, the offsets, the

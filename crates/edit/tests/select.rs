@@ -298,3 +298,134 @@ fn a_selection_with_ids_is_found_again_after_an_insert_upstream() {
     let moved = after.with_attributes(Attributes::new()).unwrap();
     assert_eq!(select::reresolve(&plain, &moved), None);
 }
+
+/// `n` × `m` quads with point `(i, j)` at `j * (n + 1) + i`.
+fn sheet(n: u32, m: u32) -> Geometry {
+    let at = |i: u32, j: u32| j * (n + 1) + i;
+    let mut corners = Vec::new();
+    for j in 0..m {
+        for i in 0..n {
+            corners.extend([at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)]);
+        }
+    }
+    let offsets: Vec<u32> = (0..=n * m).map(|f| 4 * f).collect();
+    let points = ((n + 1) * (m + 1)) as usize;
+    let table = Primitives::of_polygons(points, offsets.into(), corners.into()).unwrap();
+    Geometry::new(vec![[0.0; 3]; points].into(), table, Attributes::new()).unwrap()
+}
+
+#[test]
+fn grow_takes_what_lies_next_to_a_selection_in_every_domain() {
+    let p = sheet(3, 3);
+    let t = p.primitives().clone();
+    // The middle point of the sheet's second row of points.
+    let point = on(&p, Domain::Point, &[5]);
+    assert_eq!(ids(&select::grow(&point, &p)), [1, 4, 5, 6, 9]);
+    // The middle face touches all nine by a point.
+    let face = on(&p, Domain::Primitive, &[4]);
+    assert_eq!(ids(&select::grow(&face, &p)), (0..9).collect::<Vec<_>>());
+    let edge_id = edge(&p, 5, 6);
+    let grown = select::grow(&on(&p, Domain::Edge, &[edge_id]), &p);
+    let mut want = vec![edge_id];
+    for (a, b) in [(1, 5), (4, 5), (5, 9), (2, 6), (6, 7), (6, 10)] {
+        want.push(t.edge_of(a, b).unwrap());
+    }
+    want.sort_unstable();
+    assert_eq!(ids(&grown), want);
+    // A vertex: the corners on its point and its point's neighbours.
+    let vertex = t.primitive_vertices(0).start as u32;
+    let grown = select::grow(&on(&p, Domain::Vertex, &[vertex]), &p);
+    let points: std::collections::BTreeSet<u32> = (grown.members().iter())
+        .map(|v| t.vertices()[v as usize])
+        .collect();
+    assert_eq!(points.into_iter().collect::<Vec<_>>(), [0, 1, 4]);
+    // The selection's active element stays; Detail doesn't grow.
+    let members = Elements::from_indices(16, [5]).unwrap();
+    let with_active = Selection::on(&p, Domain::Point, members, Some(5)).unwrap();
+    assert_eq!(select::grow(&with_active, &p).active(), Some(5));
+    let detail = Selection::on(&p, Domain::Detail, Elements::all(1), None).unwrap();
+    assert_eq!(select::grow(&detail, &p), detail);
+    assert_eq!(select::shrink(&detail, &p), detail);
+}
+
+#[test]
+fn shrink_is_growing_the_rest_in_every_domain() {
+    let p = sheet(4, 3);
+    for domain in [
+        Domain::Point,
+        Domain::Edge,
+        Domain::Primitive,
+        Domain::Vertex,
+    ] {
+        let count = p.count(domain).unwrap() as u32;
+        // A deterministic scatter of sets, none and all among them.
+        for seed in 0..40u32 {
+            let members: Vec<u32> = (0..count)
+                .filter(|&i| seed == 0 || (i.wrapping_mul(2654435761) >> 7) % 40 < seed)
+                .collect();
+            let s = on(&p, domain, &members);
+            let rest: Vec<u32> = (0..count).filter(|i| !members.contains(i)).collect();
+            let grown_rest = select::grow(&on(&p, domain, &rest), &p);
+            let want: Vec<u32> = (0..count).filter(|&i| !grown_rest.contains(i)).collect();
+            let shrunk = ids(&select::shrink(&s, &p));
+            if s.members().is_all() {
+                assert_eq!(shrunk, members, "everything stays");
+            } else {
+                assert_eq!(shrunk, want, "{domain:?}, seed {seed}");
+            }
+        }
+    }
+}
+
+#[test]
+fn shrink_and_grow_leave_a_stale_selection_alone() {
+    let p = sheet(2, 2);
+    let s = stale(9, &[1]);
+    assert_eq!(select::grow(&s, &p), s);
+    assert_eq!(select::shrink(&s, &p), s);
+}
+
+#[test]
+fn loop_and_ring_grow_an_edge_selection_along_its_walks() {
+    let p = sheet(4, 3);
+    let at = |i: u32, j: u32| j * 5 + i;
+    let row = edge(&p, at(1, 1), at(2, 1));
+    let s = on(&p, Domain::Edge, &[row]);
+    let along = select::expand(&s, &p, &Expand::Loop);
+    let mut want: Vec<u32> = (0..4).map(|i| edge(&p, at(i, 1), at(i + 1, 1))).collect();
+    want.sort_unstable();
+    assert_eq!(ids(&along), want);
+    let across = select::expand(&s, &p, &Expand::Ring);
+    let mut want: Vec<u32> = (0..4).map(|j| edge(&p, at(1, j), at(2, j))).collect();
+    want.sort_unstable();
+    assert_eq!(ids(&across), want);
+    // Two edges of two walks: both; another domain stays as it is.
+    let column = edge(&p, at(2, 1), at(2, 2));
+    let both = select::expand(&on(&p, Domain::Edge, &[row, column]), &p, &Expand::Loop);
+    assert_eq!(both.len(), 4 + 3);
+    let face = on(&p, Domain::Primitive, &[0]);
+    assert_eq!(select::expand(&face, &p, &Expand::Loop), face);
+}
+
+#[test]
+fn a_boundary_is_a_regions_outline() {
+    let p = sheet(3, 3);
+    let t = p.primitives().clone();
+    // The whole sheet ends at its border.
+    let all_faces = all(&p, Domain::Primitive);
+    let border = select::boundary(&all_faces, &p).unwrap();
+    assert_eq!(border.len(), 12);
+    // The middle face and the one beside it: their six outer sides.
+    let region = on(&p, Domain::Primitive, &[4, 5]);
+    let outline = select::boundary(&region, &p).unwrap();
+    assert_eq!(outline.domain(), Domain::Edge);
+    assert_eq!(outline.len(), 6);
+    assert!(
+        !outline.contains(t.edge_of(6, 10).unwrap()),
+        "the side between them"
+    );
+    // Not of another domain, nor of another value.
+    assert!(select::boundary(&on(&p, Domain::Edge, &[0]), &p).is_err());
+    let other = sheet(1, 1);
+    assert!(select::boundary(&region, &other).is_err());
+}

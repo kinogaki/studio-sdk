@@ -14,9 +14,13 @@ mod bucket;
 mod sparse;
 #[cfg(test)]
 mod tests;
+mod walk;
+
+pub use walk::Walk;
 
 use super::{Edge, Kind, Primitives};
 use std::ops;
+use std::sync::OnceLock;
 
 pub(super) fn build(t: &Primitives) -> Index {
     if sparse_points(t) {
@@ -130,10 +134,27 @@ impl Adjacency {
     }
 }
 
-/// A table's edges and adjacency ([`Primitives::index`]). Rows are
-/// ascending unless said otherwise; primitives are named by their ids.
-/// "Lines" are the primitives that aren't polygons: polylines and curves
-/// (by their hulls).
+/// A table's edges and adjacency ([`Primitives::index`]), the one place
+/// topology is asked: which elements touch which, a point's neighbours,
+/// [edge loops and rings](Self::edge_loop) and
+/// [boundaries](Self::boundary_edges). Built once when first asked and
+/// shared by every value holding the table, so a question costs what it
+/// reads and nothing per frame. Rows are ascending unless said otherwise;
+/// primitives are named by their ids. "Lines" are the primitives that
+/// aren't polygons: polylines and curves (by their hulls).
+///
+/// ```
+/// use kinogaki_geometry::Primitives;
+///
+/// // Two quads side by side: 0 1 4 3 and 1 2 5 4.
+/// let t = Primitives::of_polygons(6, vec![0, 4, 8].into(), vec![0, 1, 4, 3, 1, 2, 5, 4].into()).unwrap();
+/// let index = t.index();
+/// assert_eq!(index.point_primitives(1).collect::<Vec<_>>(), [0, 1]);
+/// assert_eq!(index.point_neighbours(1).collect::<Vec<_>>(), [0, 2, 4]);
+/// let shared = t.edge_of(1, 4).unwrap() as usize;
+/// assert_eq!(index.edge_primitives(shared).collect::<Vec<_>>(), [0, 1]);
+/// assert!(!index.is_boundary(shared) && index.boundary_edges().len() == 6);
+/// ```
 #[derive(Debug)]
 pub struct Index {
     edges: Vec<Edge>,
@@ -144,6 +165,7 @@ pub struct Index {
     point_line_edges: Adjacency,
     point_faces: Adjacency,
     point_lines: Adjacency,
+    boundary: OnceLock<Vec<u32>>,
 }
 
 impl Index {
@@ -199,9 +221,51 @@ impl Index {
             .copied()
     }
 
+    /// The primitives through point `p`: polygons, then lines.
+    pub fn point_primitives(&self, p: usize) -> impl Iterator<Item = u32> + '_ {
+        self.point_faces[p]
+            .iter()
+            .chain(&self.point_lines[p])
+            .copied()
+    }
+
+    /// Every edge at point `p`: those polygons use, then those only lines
+    /// use.
+    pub fn point_every_edge(&self, p: usize) -> impl Iterator<Item = u32> + '_ {
+        self.point_edges[p]
+            .iter()
+            .chain(&self.point_line_edges[p])
+            .copied()
+    }
+
+    /// The points one edge from point `p`, each once, in the order of
+    /// [`point_every_edge`](Self::point_every_edge).
+    pub fn point_neighbours(&self, p: usize) -> impl Iterator<Item = u32> + '_ {
+        self.point_every_edge(p).map(move |e| {
+            let [a, b] = self.edges[e as usize].points;
+            if a as usize == p { b } else { a }
+        })
+    }
+
+    /// Whether edge `e` is a side of exactly one polygon: an edge of the
+    /// surface's border.
+    pub fn is_boundary(&self, e: usize) -> bool {
+        self.edge_faces[e].len() == 1
+    }
+
+    /// Every [boundary](Self::is_boundary) edge, ascending. Found once.
+    pub fn boundary_edges(&self) -> &[u32] {
+        self.boundary.get_or_init(|| {
+            (0..self.edges.len() as u32)
+                .filter(|&e| self.is_boundary(e as usize))
+                .collect()
+        })
+    }
+
     /// The bytes it holds, for memory accounting.
     pub fn bytes(&self) -> usize {
-        self.edges.capacity() * 8
+        self.boundary.get().map_or(0, |b| b.capacity() * 4)
+            + self.edges.capacity() * 8
             + self.edge_faces.bytes()
             + self.edge_lines.bytes()
             + self.primitive_edges.bytes()
@@ -317,6 +381,7 @@ impl Tables {
             point_line_edges,
             point_faces,
             point_lines,
+            boundary: OnceLock::new(),
         }
     }
 }
