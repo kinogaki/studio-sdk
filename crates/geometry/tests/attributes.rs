@@ -2,7 +2,7 @@
 //! arrays, indexed text, groups, and sharing between tables.
 use kinogaki_geometry::{
     Attribute, AttributeType, Attributes, Column, Domain, Elements, ErrorKind, Meaning, Polygons,
-    Storage, Text, Topology, Tuple, Values, check_name, limits::MAX_NAME, names,
+    Primitives, Storage, Text, Tuple, Values, check_name, limits::MAX_NAME, names,
 };
 use std::sync::Arc;
 
@@ -293,7 +293,7 @@ fn standard_names_fix_their_type_and_domains() {
 
 #[test]
 fn a_value_refuses_a_domain_it_does_not_have() {
-    let quad = Topology::new(4, vec![0, 4].into(), vec![0, 1, 2, 3].into(), 1).unwrap();
+    let quad = Primitives::of_polygons(4, vec![0, 4].into(), vec![0, 1, 2, 3].into()).unwrap();
     let square = Polygons::new(vec![[0.0; 3]; 4].into(), quad, Attributes::new()).unwrap();
     for domain in [Domain::Object, Domain::Instance] {
         let table = Attributes::new().with(domain, "w", f32s::<1>(1, Meaning::None));
@@ -307,7 +307,7 @@ fn a_value_refuses_a_domain_it_does_not_have() {
 
 #[test]
 fn replacing_one_column_shares_the_rest_and_checks_it_alone() {
-    let quad = Topology::new(4, vec![0, 4].into(), vec![0, 1, 2, 3].into(), 1).unwrap();
+    let quad = Primitives::of_polygons(4, vec![0, 4].into(), vec![0, 1, 2, 3].into()).unwrap();
     let mut table = Attributes::new();
     for name in ["a", "b", "c"] {
         table = table

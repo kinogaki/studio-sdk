@@ -2,7 +2,7 @@
 //! the cache following N and sharp, and the refresh after a drag matching
 //! a whole build.
 use kinogaki_geometry::{
-    Attribute, Attributes, Domain, Elements, Meaning, Polygons, Topology, names,
+    Attribute, Attributes, Domain, Elements, Meaning, Polygons, Primitives, names,
 };
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_6, PI};
 use std::sync::Arc;
@@ -14,13 +14,8 @@ fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Polygons {
         vertices.extend_from_slice(p);
         offsets.push(vertices.len() as u32);
     }
-    let topology = Topology::new(
-        positions.len(),
-        offsets.into(),
-        vertices.into(),
-        polygons.len(),
-    )
-    .unwrap();
+    let topology =
+        Primitives::of_polygons(positions.len(), offsets.into(), vertices.into()).unwrap();
     Polygons::new(positions.to_vec().into(), topology, Attributes::new()).unwrap()
 }
 

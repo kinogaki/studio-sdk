@@ -1,15 +1,15 @@
 //! When most point ids are unused, sorting the few segments avoids
 //! scanning point-sized bucket arrays. The order is the bucket build's.
-use super::{Edge, NO_EDGE, Tables, Topology, segment};
+use super::{Edge, NO_EDGE, Primitives, Tables, segment};
 
-pub(super) fn edges(topology: &Topology) -> Tables {
-    let vertex_count = topology.vertices.len();
+pub(super) fn edges(t: &Primitives) -> Tables {
+    let vertex_count = t.vertices.len();
     let mut occurrences = Vec::with_capacity(vertex_count);
     let mut prim_of = Vec::with_capacity(vertex_count);
-    for prim in 0..topology.primitives() {
-        for c in topology.primitive_vertices(prim) {
+    for prim in 0..t.len() {
+        for c in t.primitive_vertices(prim) {
             prim_of.push(prim as u32);
-            if let Some((low, high)) = segment(topology, prim, c) {
+            if let Some((low, high)) = segment(t, prim, c) {
                 occurrences.push((low, high, prim as u32, c as u32));
             }
         }

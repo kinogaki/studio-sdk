@@ -3,8 +3,8 @@
 use super::geometry::refuse;
 use crate::column::Column;
 use crate::error::GeometryError;
-use crate::limits::{MAX_COORDINATE, MAX_DEGREE};
-use crate::spline;
+use crate::limits::MAX_COORDINATE;
+use crate::spline::{self, KnotFault};
 
 /// How smoothly a closed NURBS direction continues across its seam.
 ///
@@ -24,58 +24,42 @@ pub enum SeamContinuity {
     Parametric,
 }
 
-/// Checks a clamped knot vector for `count` control points of `degree`:
-/// finite, never decreasing, the end knots each exactly `degree + 1`
-/// times, interior knots at most `degree` times, a domain of positive
-/// width.
+/// Checks a clamped knot vector for `count` control points of `degree`
+/// by the one NURBS rule ([`spline::nurbs_check`]): finite, never
+/// decreasing, the end knots each exactly `degree + 1` times, interior
+/// knots at most `degree` times, a domain of positive width.
 fn check_knots(degree: u8, knots: &[f64], count: usize) -> Result<(), GeometryError> {
-    let bad = |detail: &str| Err(refuse(None, "knots not clamped", detail));
-    if degree == 0 || degree > MAX_DEGREE {
-        return Err(refuse(
-            None,
+    let Err(fault) = spline::nurbs_check(degree, knots, count, true) else {
+        return Ok(());
+    };
+    let (phrase, detail) = match fault {
+        KnotFault::Degree => (
             "degree out of range",
             "a NURBS degree must be positive and at most the degree limit",
-        ));
-    }
-    let d = degree as usize;
-    if count < d + 1 {
-        return Err(refuse(
-            None,
+        ),
+        KnotFault::Few => (
             "too few control points",
             "a NURBS curve needs at least its degree plus one control points",
-        ));
-    }
-    if knots.len() != count + d + 1 {
-        return Err(refuse(
-            None,
+        ),
+        KnotFault::Count => (
             "wrong knot count",
             "a NURBS curve has its control point count plus its degree plus one knots",
-        ));
-    }
-    if knots.iter().any(|k| !k.is_finite()) || knots.windows(2).any(|w| w[1] < w[0]) {
-        return bad("knots must be finite and never decrease");
-    }
-    let (first, last) = (knots[0], knots[knots.len() - 1]);
-    if first >= last {
-        return bad("the knots must span an interval");
-    }
-    let n = knots.len();
-    if knots[d] != first
-        || knots[n - 1 - d] != last
-        || knots[d + 1] == first
-        || knots[n - 2 - d] == last
-    {
-        return bad("each end knot must be repeated exactly degree plus one times");
-    }
-    let interior = &knots[d + 1..n - 1 - d];
-    let mut run = 1;
-    for w in interior.windows(2) {
-        run = if w[1] == w[0] { run + 1 } else { 1 };
-        if run > d {
-            return bad("an interior knot may be repeated at most degree times");
-        }
-    }
-    Ok(())
+        ),
+        KnotFault::Order => (
+            "knots not clamped",
+            "knots must be finite and never decrease",
+        ),
+        KnotFault::Span => ("knots not clamped", "the knots must span an interval"),
+        KnotFault::Ends => (
+            "knots not clamped",
+            "each end knot must be repeated exactly degree plus one times",
+        ),
+        KnotFault::Interior => (
+            "knots not clamped",
+            "an interior knot may be repeated at most degree times",
+        ),
+    };
+    Err(refuse(None, phrase, detail))
 }
 
 fn check_points<const D: usize>(points: &[[f64; D]]) -> Result<(), GeometryError> {

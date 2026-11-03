@@ -6,7 +6,7 @@
 //! built from them, are identical to a serial build whatever the thread
 //! timing. Point adjacency rows are filled the same way and sorted
 //! ascending, which is the order a serial pass over edges and faces gives.
-use super::{Adjacency, Edge, NO_EDGE, Tables, Topology, segment};
+use super::{Adjacency, Edge, NO_EDGE, Primitives, Tables, segment};
 use crate::parallel;
 use std::ops::Range;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::Relaxed};
@@ -14,12 +14,12 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::Relaxed};
 /// Vertices or points per parallel block.
 const BLOCK: usize = 16_384;
 
-pub(super) fn build(topology: &Topology) -> Tables {
-    let points = topology.points;
-    let vertex_count = topology.vertices.len();
-    let prim_of = prim_of_vertices(topology);
+pub(super) fn build(t: &Primitives) -> Tables {
+    let points = t.points;
+    let vertex_count = t.vertices.len();
+    let prim_of = prim_of_vertices(t);
     // The segment leaving vertex `c`, as (low point, high point).
-    let low_high = |c: usize| segment(topology, prim_of[c] as usize, c);
+    let low_high = |c: usize| segment(t, prim_of[c] as usize, c);
 
     // Segments per low point, then (high << 32 | vertex) placed in rows.
     let counts = atomics(points);
@@ -131,9 +131,9 @@ pub(super) fn build(topology: &Topology) -> Tables {
 }
 
 /// The primitive of every vertex.
-fn prim_of_vertices(topology: &Topology) -> Vec<u32> {
-    let mut prim_of = vec![0u32; topology.vertices.len()];
-    let offsets = &topology.offsets;
+fn prim_of_vertices(t: &Primitives) -> Vec<u32> {
+    let mut prim_of = vec![0u32; t.vertices.len()];
+    let offsets = &t.offsets;
     parallel::chunks(&mut prim_of, BLOCK, |first, out| {
         let mut f = offsets.partition_point(|&o| o as usize <= first) - 1;
         for (i, prim) in out.iter_mut().enumerate() {
@@ -242,4 +242,47 @@ fn split_rows<'a, T>(values: &'a mut [T], offsets: &[u32]) -> Vec<Vec<&'a mut [T
             )
         })
         .collect()
+}
+
+/// How many unique edges: the segments' high points counted per low
+/// point and deduplicated row by row, in parallel, with none of the
+/// build's other tables.
+pub(super) fn count(t: &Primitives) -> usize {
+    let points = t.points;
+    let prim_of = prim_of_vertices(t);
+    let low_high = |c: usize| segment(t, prim_of[c] as usize, c);
+    let counts = atomics(points);
+    each(t.vertices.len(), |c| {
+        if let Some((low, _)) = low_high(c) {
+            counts[low as usize].fetch_add(1, Relaxed);
+        }
+    });
+    let starts = prefix(counts.into_iter().map(AtomicU32::into_inner));
+    let cursor: Vec<AtomicU32> = starts[..points]
+        .iter()
+        .map(|&s| AtomicU32::new(s))
+        .collect();
+    let slots = atomics(starts[points] as usize);
+    each(t.vertices.len(), |c| {
+        if let Some((low, high)) = low_high(c) {
+            let at = cursor[low as usize].fetch_add(1, Relaxed) as usize;
+            slots[at].store(high, Relaxed);
+        }
+    });
+    drop(cursor);
+    let mut highs: Vec<u32> = slots.into_iter().map(AtomicU32::into_inner).collect();
+    let mut row_edges = vec![0u32; points];
+    let blocks: Vec<_> = split_rows(&mut highs, &starts)
+        .into_iter()
+        .zip(row_edges.chunks_mut(BLOCK))
+        .collect();
+    parallel::each_block(blocks, |(rows, counts)| {
+        for (row, count) in rows.into_iter().zip(counts.iter_mut()) {
+            row.sort_unstable();
+            *count = (0..row.len())
+                .filter(|&i| i == 0 || row[i] != row[i - 1])
+                .count() as u32;
+        }
+    });
+    row_edges.iter().map(|&n| n as usize).sum()
 }

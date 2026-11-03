@@ -670,7 +670,9 @@ fn shown_polygons_are_the_ones_the_object_draws() {
         .into_iter()
         .next()
         .unwrap();
-    let faces: Vec<i32> = (0..grid.topology().polygons() as i32).rev().collect();
+    let faces: Vec<i32> = (0..grid.primitives().polygons().len() as i32)
+        .rev()
+        .collect();
     let named = (grid.attributes())
         .with(
             Domain::Primitive,

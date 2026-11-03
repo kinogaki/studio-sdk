@@ -1,9 +1,12 @@
-//! The topology fingerprint: BLAKE3 of the little-endian byte stream
-//! `points as u64 ++ polygons as u64 ++ offsets ++ vertices`.
+//! The table's fingerprint: BLAKE3 of the little-endian byte stream
+//! `points as u64 ++ primitives as u64 ++ offsets ++ vertices`; a table
+//! that isn't all polygons hashes that hash again with its kinds and curve
+//! data.
 //!
 //! Large inputs hash fixed-size subtrees in parallel and merge their
 //! chaining values in BLAKE3's own tree shape, which gives the hash of one
 //! sequential pass (tested against `blake3::hash`).
+use super::{Kind, Kinds, Primitives};
 use crate::parallel;
 use blake3::hazmat::{
     ChainingValue, HasherExt, Mode, merge_subtrees_non_root, merge_subtrees_root,
@@ -12,10 +15,40 @@ use blake3::hazmat::{
 /// Bytes per parallel leaf: a power of two of BLAKE3 chunks (256 chunks).
 const LEAF: usize = 256 * blake3::CHUNK_LEN;
 
-pub(super) fn of(points: usize, polygons: usize, offsets: &[u32], vertices: &[u32]) -> [u8; 32] {
+pub(super) fn of(t: &Primitives) -> [u8; 32] {
+    let rows = rows(t.points, t.len(), &t.offsets, &t.vertices);
+    if matches!(t.kinds, Kinds::All(Kind::POLYGON)) && t.curves.is_none() {
+        return rows;
+    }
+    let mut hash = blake3::Hasher::new();
+    hash.update(&rows);
+    match &t.kinds {
+        Kinds::All(kind) => hash.update(&[0, kind.byte()]),
+        Kinds::Each(kinds) => hash.update(&[1]).update(bytemuck::cast_slice(kinds)),
+    };
+    if let Some(c) = &t.curves {
+        hash.update(c.degrees());
+        let knots = c.knots();
+        for o in knots.offsets().iter() {
+            hash.update(&o.to_le_bytes());
+        }
+        for k in knots
+            .values()
+            .iter()
+            .chain(c.weights().into_iter().flatten())
+        {
+            hash.update(&k.to_le_bytes());
+        }
+        hash.update(&[u8::from(c.weights().is_some())]);
+    }
+    *hash.finalize().as_bytes()
+}
+
+/// The hash of the rows alone.
+fn rows(points: usize, primitives: usize, offsets: &[u32], vertices: &[u32]) -> [u8; 32] {
     let mut header = [0u8; 16];
     header[..8].copy_from_slice(&(points as u64).to_le_bytes());
-    header[8..].copy_from_slice(&(polygons as u64).to_le_bytes());
+    header[8..].copy_from_slice(&(primitives as u64).to_le_bytes());
     let message = Message {
         header,
         offsets,
@@ -113,9 +146,9 @@ fn little_endian(hash: &mut blake3::Hasher, values: &[u32]) {
 mod tests {
     use super::*;
 
-    fn sequential(points: usize, polygons: usize, offsets: &[u32], vertices: &[u32]) -> [u8; 32] {
+    fn sequential(points: usize, primitives: usize, offsets: &[u32], vertices: &[u32]) -> [u8; 32] {
         let mut bytes = (points as u64).to_le_bytes().to_vec();
-        bytes.extend((polygons as u64).to_le_bytes());
+        bytes.extend((primitives as u64).to_le_bytes());
         for v in offsets.iter().chain(vertices) {
             bytes.extend(v.to_le_bytes());
         }
@@ -144,7 +177,7 @@ mod tests {
                 .collect();
             let points = (1usize << 40) | 77;
             assert_eq!(
-                of(points, 3, &offsets, &vertices),
+                rows(points, 3, &offsets, &vertices),
                 sequential(points, 3, &offsets, &vertices),
                 "{words} words"
             );

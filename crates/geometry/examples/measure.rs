@@ -1,29 +1,33 @@
 //! Times the standard values' hot paths on a 1000 × 1000 quad grid
 //! (1,002,001 points, 1M faces, 4M vertices; point `N`, vertex `uv`, face
-//! `Cd` and `material`): best of 20 runs each.
+//! `Cd` and `material`): best of 20 runs each. Then, once, a 4472 × 4472
+//! grid (20M points and quads), past the former 2²³ limit: built,
+//! checked and its edges counted.
 //!
 //! ```sh
 //! cargo run --release -p kinogaki-geometry --example measure
 //! ```
 use kinogaki_geometry::{
-    Attribute, Attributes, Column, Domain, Meaning, Polygons, Text, Topology, names,
+    Attribute, Attributes, Column, Domain, Meaning, Polygons, Primitives, Text, names,
 };
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 const SIDE: u32 = 1000;
+/// The large grid's side: 4472² is 20M quads.
+const LARGE: u32 = 4472;
 const RUNS: usize = 20;
 
-fn grid() -> (Vec<[f64; 3]>, Vec<u32>, Vec<u32>) {
-    let row = SIDE + 1;
+fn grid(side: u32) -> (Vec<[f64; 3]>, Vec<u32>, Vec<u32>) {
+    let row = side + 1;
     let positions = (0..row * row)
         .map(|i| [(i % row) as f64, (i / row) as f64, 0.0])
         .collect();
-    let mut offsets = Vec::with_capacity((SIDE * SIDE + 1) as usize);
-    let mut vertices = Vec::with_capacity((SIDE * SIDE * 4) as usize);
+    let mut offsets = Vec::with_capacity((side * side + 1) as usize);
+    let mut vertices = Vec::with_capacity((side * side * 4) as usize);
     offsets.push(0);
-    for y in 0..SIDE {
-        for x in 0..SIDE {
+    for y in 0..side {
+        for x in 0..side {
             let p = y * row + x;
             vertices.extend([p, p + 1, p + row + 1, p + row]);
             offsets.push(vertices.len() as u32);
@@ -50,7 +54,7 @@ fn attributes(points: usize, vertices: usize, faces: usize) -> Attributes {
             a.with(
                 Domain::Vertex,
                 names::UV,
-                Attribute::tuples(vec![[0.5f32; 3]; vertices], Meaning::TextureCoord).unwrap(),
+                Attribute::tuples(vec![[0.5f32; 2]; vertices], Meaning::TextureCoord).unwrap(),
             )
         })
         .and_then(|a| {
@@ -82,7 +86,7 @@ fn report(what: &str, time: Duration) {
 }
 
 fn main() {
-    let (positions, offsets, vertices) = grid();
+    let (positions, offsets, vertices) = grid(SIDE);
     let (points, faces) = (positions.len(), offsets.len() - 1);
     let offsets = Column::new(offsets);
     let vertices = Column::new(vertices);
@@ -92,24 +96,31 @@ fn main() {
     );
 
     report(
-        "Topology::new (validation)",
+        "Primitives::new (validation)",
         best(
             || (),
-            |_| Topology::new(points, offsets.clone(), vertices.clone(), faces).unwrap(),
+            |_| Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
         ),
     );
-    let topology = Topology::new(points, offsets.clone(), vertices.clone(), faces).unwrap();
+    let topology = Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap();
     report(
-        "Topology::index (edges and adjacency)",
+        "Primitives::index (edges and adjacency)",
         best(
-            || Topology::new(points, offsets.clone(), vertices.clone(), faces).unwrap(),
+            || Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
             |t| t.index().edges().len(),
         ),
     );
     report(
-        "Topology::fingerprint",
+        "Primitives::edge_count (no index)",
         best(
-            || Topology::new(points, offsets.clone(), vertices.clone(), faces).unwrap(),
+            || Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
+            |t| t.edge_count(),
+        ),
+    );
+    report(
+        "Primitives::fingerprint",
+        best(
+            || Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
             |t| t.fingerprint(),
         ),
     );
@@ -120,7 +131,7 @@ fn main() {
         best(
             || {
                 (
-                    Topology::new(points, offsets.clone(), vertices.clone(), faces).unwrap(),
+                    Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
                     attributes.clone(),
                 )
             },
@@ -128,7 +139,7 @@ fn main() {
         ),
     );
     let value = Polygons::new(positions.clone(), topology, attributes).unwrap();
-    value.topology().index();
+    value.primitives().index();
     report(
         "with_positions (check 1M positions)",
         best(
@@ -155,5 +166,24 @@ fn main() {
             || positions.to_vec().into(),
             |p| value.with_positions(p).unwrap(),
         ),
+    );
+    large();
+}
+
+/// The 20M-quad grid, once: built and checked, its edges counted without
+/// the index.
+fn large() {
+    let (positions, offsets, vertices) = grid(LARGE);
+    let points = positions.len();
+    let start = Instant::now();
+    let t = Primitives::of_polygons(points, offsets.into(), vertices.into()).unwrap();
+    let value = Polygons::new(positions.into(), t, Attributes::new()).unwrap();
+    let built = start.elapsed();
+    let start = Instant::now();
+    let edges = value.primitives().edge_count();
+    println!(
+        "{points} points, {} quads: built {built:.1?}, {edges} edges counted {:.1?}",
+        value.primitives().len(),
+        start.elapsed()
     );
 }

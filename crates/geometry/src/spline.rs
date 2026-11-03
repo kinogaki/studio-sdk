@@ -108,3 +108,70 @@ pub(crate) fn evaluate(
     let first = span(knots, degree, count, t) - degree;
     de_boor(degree, t, |i| knots[first + i], |j| value(first + j))
 }
+
+/// What breaks the one NURBS knot rule ([`nurbs_check`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum KnotFault {
+    /// The degree is 0 or over [`MAX_DEGREE`].
+    Degree,
+    /// Fewer than `degree + 1` control values.
+    Few,
+    /// Not `count + degree + 1` knots.
+    Count,
+    /// A knot decreases or isn't finite.
+    Order,
+    /// The domain `knots[degree]..knots[count]` is empty.
+    Span,
+    /// Clamped only: an end knot not repeated exactly `degree + 1` times.
+    Ends,
+    /// Clamped only: an interior knot repeated more than `degree` times.
+    Interior,
+}
+
+/// The one knot rule of every NURBS curve, a B-rep's and a geometry
+/// value's alike: `knots` for `count` control values of `degree` are
+/// `count + degree + 1`, finite, never decreasing, over a domain of
+/// positive width; `clamped` (a B-rep's), also each end knot exactly
+/// `degree + 1` times and interior knots at most `degree` times.
+pub(crate) fn nurbs_check(
+    degree: u8,
+    knots: &[f64],
+    count: usize,
+    clamped: bool,
+) -> Result<(), KnotFault> {
+    if degree == 0 || degree > MAX_DEGREE {
+        return Err(KnotFault::Degree);
+    }
+    let d = degree as usize;
+    if count < d + 1 {
+        return Err(KnotFault::Few);
+    }
+    if knots.len() != count + d + 1 {
+        return Err(KnotFault::Count);
+    }
+    if knots.iter().any(|k| !k.is_finite()) || knots.windows(2).any(|w| w[1] < w[0]) {
+        return Err(KnotFault::Order);
+    }
+    if knots[d] >= knots[count] {
+        return Err(KnotFault::Span);
+    }
+    if !clamped {
+        return Ok(());
+    }
+    let (n, first, last) = (knots.len(), knots[0], knots[knots.len() - 1]);
+    if knots[d] != first
+        || knots[n - 1 - d] != last
+        || knots[d + 1] == first
+        || knots[n - 2 - d] == last
+    {
+        return Err(KnotFault::Ends);
+    }
+    let mut run = 1;
+    for w in knots[d + 1..n - 1 - d].windows(2) {
+        run = if w[1] == w[0] { run + 1 } else { 1 };
+        if run > d {
+            return Err(KnotFault::Interior);
+        }
+    }
+    Ok(())
+}

@@ -2,8 +2,8 @@
 //! the same selection as another domain, and connected pieces.
 use kinogaki_edit::select::{self, Coverage, Expand, Mode};
 use kinogaki_geometry::{
-    Attribute, Attributes, Domain, Elements, ErrorKind, Meaning, Polygons, Selection, Text,
-    Topology, names,
+    Attribute, Attributes, Domain, Elements, ErrorKind, Kind, Meaning, Polygons, Primitives,
+    Selection, Text, names,
 };
 
 /// A unit quad (0 1 2 3) and a triangle (1 4 2) sharing the edge 1–2, and
@@ -25,11 +25,13 @@ fn value() -> Polygons {
         [-1.0, 2.0, 0.0],
         [-2.0, 3.0, 1.0],
     ];
-    let topology = Topology::new(
+    let kinds = vec![Kind::POLYGON, Kind::POLYGON, Kind::POLYLINE];
+    let topology = Primitives::new(
         7,
         vec![0, 4, 7, 10].into(),
         vec![0, 1, 2, 3, 1, 4, 2, 3, 5, 6].into(),
-        2,
+        kinds.into(),
+        None,
     )
     .unwrap();
     Polygons::new(positions.into(), topology, Attributes::new()).unwrap()
@@ -58,7 +60,7 @@ fn ids(s: &Selection) -> Vec<u32> {
 
 /// The edge between points `a` and `b`.
 fn edge(p: &Polygons, a: u32, b: u32) -> u32 {
-    p.topology().index().edge_of(a, b).unwrap()
+    p.primitives().index().edge_of(a, b).unwrap()
 }
 
 #[test]
@@ -162,7 +164,7 @@ fn points_become_whole_polygons_and_edges_by_the_standard_rule() {
         [0, 1, 2, 3]
     );
     // Every result is made on the value's topology.
-    assert_eq!(faces.made_on(), Some(p.topology().fingerprint()));
+    assert_eq!(faces.made_on(), Some(p.primitives().fingerprint()));
 }
 
 #[test]
@@ -194,11 +196,10 @@ fn coverage_chooses_between_any_and_whole() {
 /// triangle named like the first quad when `named`.
 fn islands(named: bool) -> Polygons {
     let positions: Vec<[f64; 3]> = (0..11).map(|i| [f64::from(i), 0.0, 0.0]).collect();
-    let topology = Topology::new(
+    let topology = Primitives::of_polygons(
         11,
         vec![0, 4, 8, 11].into(),
         vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].into(),
-        3,
     )
     .unwrap();
     let mut attributes = Attributes::new();
@@ -224,7 +225,7 @@ fn connected_grows_a_pick_to_its_pieces_and_a_name_keeps_one_together() {
     let point = on(&p, Domain::Point, &[2]);
     let grown = select::expand(&point, &p, &Expand::Connected);
     assert_eq!(ids(&grown), [0, 1, 2, 3]);
-    assert_eq!(grown.made_on(), Some(p.topology().fingerprint()));
+    assert_eq!(grown.made_on(), Some(p.primitives().fingerprint()));
     // Named alike, the first quad and the triangle are one piece; a blank
     // name joins nothing.
     let named = islands(true);
@@ -263,12 +264,14 @@ fn with_ids(insert: bool) -> Polygons {
     // Point 0 is new (id 7); the old points move up by one.
     let mut positions = vec![[5.0, 5.0, 0.0]];
     positions.extend(base.positions().iter().copied());
-    let t = base.topology();
+    let t = base.primitives();
     let mut offsets = vec![0u32, 3];
     offsets.extend(t.offsets()[1..].iter().map(|o| o + 3));
     let mut vertices = vec![0u32, 1, 2];
     vertices.extend(t.vertices().iter().map(|v| v + 1));
-    let topology = Topology::new(8, offsets.into(), vertices.into(), 3).unwrap();
+    // The new triangle first: nothing else is renumbered but the points.
+    let kinds = vec![Kind::POLYGON, Kind::POLYGON, Kind::POLYGON, Kind::POLYLINE];
+    let topology = Primitives::new(8, offsets.into(), vertices.into(), kinds.into(), None).unwrap();
     let mut shifted = vec![7];
     shifted.extend(ids);
     let attributes = Attributes::new()
@@ -289,7 +292,7 @@ fn a_selection_with_ids_is_found_again_after_an_insert_upstream() {
     assert!(s.validate(&after).is_err());
     let found = select::reresolve(&s, &after).unwrap();
     assert_eq!((ids(&found), found.active()), (vec![3, 6], Some(6)));
-    assert_eq!(found.made_on(), Some(after.topology().fingerprint()));
+    assert_eq!(found.made_on(), Some(after.primitives().fingerprint()));
     // Without ids it can't be found again.
     let plain = on(&value(), Domain::Point, &[2]);
     let moved = after.with_attributes(Attributes::new()).unwrap();

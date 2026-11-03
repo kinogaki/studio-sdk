@@ -20,8 +20,9 @@ pub struct GeometryError {
 pub enum ErrorKind {
     /// A count is over a product limit ([`crate::limits`]).
     Limit,
-    /// The primitives' offsets or vertices break a topology rule.
-    Topology,
+    /// A primitive's offsets, vertices or kind break a rule of
+    /// [`Primitives`](crate::Primitives).
+    Primitive,
     /// A position is not finite, or too large.
     Position,
     /// An attribute or group is misnamed, mistyped or missized.

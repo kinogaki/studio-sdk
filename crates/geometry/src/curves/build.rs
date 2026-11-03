@@ -109,7 +109,7 @@ impl CurvesBuilder {
             periodic,
             knots: self
                 .knots
-                .map(|(offsets, values)| Knots { offsets, values }),
+                .map(|(offsets, values)| Knots::new(offsets, values)),
             weights: self.weights,
             attributes: self.attributes,
         };

@@ -6,7 +6,7 @@ use crate::kept::Kept;
 use crate::names;
 use crate::parallel;
 use crate::polygons::Polygons;
-use crate::topology::Topology;
+use crate::primitives::Primitives;
 use crate::vector::{self, V3};
 use std::sync::Arc;
 
@@ -43,13 +43,14 @@ pub struct ShadingNormals {
 }
 
 impl ShadingNormals {
-    /// Each polygon vertex's normal (vertex ids `0..polygon_vertices`;
-    /// polylines have none).
+    /// Each vertex's normal (zero on the vertices of primitives that
+    /// aren't polygons).
     pub fn vertices(&self) -> &Column<[f32; 3]> {
         &self.vertices
     }
 
-    /// Each polygon's own (flat) normal, from its area.
+    /// Each primitive's own (flat) normal, from its area (zero for one
+    /// that isn't a polygon).
     pub fn primitives(&self) -> &Column<[f32; 3]> {
         &self.primitives
     }
@@ -58,7 +59,7 @@ impl ShadingNormals {
 /// What normals are derived from besides the positions: each held, so it
 /// compares by identity while kept.
 struct Inputs {
-    topology: Arc<Topology>,
+    topology: Arc<Primitives>,
     authored: Option<(Domain, Arc<Attribute>)>,
     sharp: Option<Arc<Elements>>,
     smooth: Option<Arc<Elements>>,
@@ -72,7 +73,7 @@ impl Inputs {
             .find_map(|d| Some((d, attributes.get_shared(d, names::N)?.clone())));
         let group = |name| attributes.group_shared(Domain::Edge, name).cloned();
         Self {
-            topology: value.topology().clone(),
+            topology: value.primitives().clone(),
             authored,
             sharp: group(names::SHARP),
             smooth: group(names::SMOOTH),
@@ -141,7 +142,7 @@ impl Polygons {
 
 /// Polygon `f`'s normal from its area, unit length (zero when it has
 /// none).
-fn face_normal(topology: &Topology, positions: &[V3], f: usize) -> V3 {
+fn face_normal(topology: &Primitives, positions: &[V3], f: usize) -> V3 {
     let ids = topology.primitive(f);
     let origin = positions[ids[0] as usize];
     let area = ids
@@ -159,11 +160,14 @@ fn face_normal(topology: &Topology, positions: &[V3], f: usize) -> V3 {
 }
 
 fn build(value: &Polygons, inputs: &Inputs) -> ShadingNormals {
-    let topology = value.topology();
+    let topology = value.primitives();
     let positions: &[V3] = value.positions();
-    let faces: Vec<V3> = parallel::map(topology.polygons(), BLOCK, |r| {
-        r.map(|f| face_normal(topology, positions, f))
-            .collect::<Vec<_>>()
+    let faces: Vec<V3> = parallel::map(topology.len(), BLOCK, |r| {
+        r.map(|f| match topology.kind(f).is_polygon() {
+            true => face_normal(topology, positions, f),
+            false => [0.0; 3],
+        })
+        .collect::<Vec<_>>()
     })
     .concat();
     let fans = parallel::map(topology.points(), BLOCK, |r| {
@@ -174,7 +178,7 @@ fn build(value: &Polygons, inputs: &Inputs) -> ShadingNormals {
         }
         out
     });
-    let mut vertices = vec![[0.0f32; 3]; topology.polygon_vertices()];
+    let mut vertices = vec![[0.0f32; 3]; topology.vertex_count()];
     for &(v, n) in fans.iter().flatten() {
         vertices[v as usize] = n;
     }
@@ -197,7 +201,7 @@ fn refreshed(
     previous: &ShadingNormals,
     moved: &[u32],
 ) -> ShadingNormals {
-    let topology = value.topology();
+    let topology = value.primitives();
     let positions: &[V3] = value.positions();
     let point_faces = topology.index().point_faces();
     let mut changed: Vec<u32> = moved
@@ -261,7 +265,7 @@ impl Fan {
         } = self;
         local.clear();
         out.clear();
-        let topology = value.topology();
+        let topology = value.primitives();
         let positions: &[V3] = value.positions();
         let index = topology.index();
         let incident = &index.point_faces()[point];
@@ -291,7 +295,7 @@ impl Fan {
         links.clear();
         let flooded = inputs.authored.is_none().then_some(local.iter());
         links.extend(flooded.into_iter().flatten().map(|&(f, at, _, _)| {
-            let edges = &index.face_edges()[f as usize];
+            let edges = index.primitive_edges(f as usize);
             [edges[at], edges[(at + edges.len() - 1) % edges.len()]].map(|edge| {
                 let faces = &index.edge_faces()[edge as usize];
                 if set(&inputs.sharp, edge as usize) || faces.len() != 2 {

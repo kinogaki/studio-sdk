@@ -1,9 +1,8 @@
-//! Curves: each basis's rules, knots and weights, attributes, and the
-//! zero-copy view of a polygons value's polylines.
+//! Curves: each basis's rules, knots and weights, and attributes.
 use kinogaki_geometry::limits::MAX_DEGREE;
 use kinogaki_geometry::{
     Attribute, Attributes, Basis, Column, Curves, CurvesBuilder, Domain, Elements, ErrorKind,
-    Meaning, Polygons, Text, Topology, names,
+    Meaning, names,
 };
 use std::sync::Arc;
 
@@ -113,11 +112,11 @@ fn nurbs_need_knots_and_positive_weights() {
     );
     assert_eq!(
         refused(nurbs(knots(vec![0.0, 0.0, 0.0, 0.0, 1.0, 0.5, 1.0, 1.0]))),
-        "curve 0's knots decrease or are not finite"
+        "curve 0 has knots that decrease or are not finite"
     );
     assert_eq!(
         refused(nurbs(knots(vec![0.0; 8]))),
-        "curve 0's knots span no interval"
+        "curve 0 has knots that span no interval"
     );
     let e = nurbs(clamped())
         .weights(vec![1.0, 0.0, 1.0, 1.0].into())
@@ -125,7 +124,7 @@ fn nurbs_need_knots_and_positive_weights() {
         .unwrap_err();
     assert_eq!(
         (e.element(), e.message()),
-        (Some(1), "vertex 1's weight 0 is not above 0")
+        (Some(0), "curve 0 has a weight not above 0 at its vertex 1")
     );
     assert_eq!(
         refused(nurbs(clamped()).weights(vec![1.0; 3].into())),
@@ -228,86 +227,6 @@ fn attributes_are_sized_to_points_vertices_and_curves() {
     let moved = c.with_positions(vec![[1.0; 3]; 4].into()).unwrap();
     assert!(Arc::ptr_eq(moved.attributes(), c.attributes()) && moved.degrees().ptr_eq(c.degrees()));
     assert!(c.with_positions(vec![[1.0; 3]; 3].into()).is_err());
-}
-
-#[test]
-fn from_polylines_shares_the_buffers() {
-    // A quad, then two polylines: 0-4-5 and 5-6.
-    let t = Topology::new(
-        7,
-        vec![0, 4, 7, 9].into(),
-        vec![0, 1, 2, 3, 0, 4, 5, 5, 6].into(),
-        1,
-    )
-    .unwrap();
-    let positions: Vec<[f64; 3]> = (0..7).map(|i| [i as f64, 0.0, 0.0]).collect();
-    let attributes = Attributes::new()
-        .with(
-            Domain::Point,
-            names::WIDTH,
-            Attribute::tuples(vec![0.5f32; 7], Meaning::None).unwrap(),
-        )
-        .unwrap()
-        .with(
-            Domain::Vertex,
-            "t",
-            Attribute::tuples((0..9).map(f64::from).collect::<Vec<_>>(), Meaning::None).unwrap(),
-        )
-        .unwrap()
-        .with(
-            Domain::Primitive,
-            names::NAME,
-            Attribute::text(Text::from_strs(["quad", "a", "b"])),
-        )
-        .unwrap()
-        .with(
-            Domain::Edge,
-            "crease",
-            Attribute::tuples(vec![0.0; 7], Meaning::None).unwrap(),
-        )
-        .unwrap()
-        .with_group(
-            Domain::Primitive,
-            names::HIDDEN,
-            Elements::from_indices(3, [2]).unwrap(),
-        )
-        .unwrap();
-    let polygons = Polygons::new(positions.into(), t, attributes).unwrap();
-    let curves = Curves::from_polylines(&polygons);
-    assert_eq!((curves.curves(), curves.basis()), (2, Basis::Linear));
-    assert!(curves.positions().ptr_eq(polygons.positions()));
-    let points = curves.points().unwrap();
-    // A slice of the polygons' own vertex buffer.
-    assert!(
-        polygons
-            .topology()
-            .vertices()
-            .as_ptr_range()
-            .contains(&points.as_ptr())
-    );
-    assert_eq!(&**points, &[0, 4, 5, 5, 6]);
-    assert_eq!(&**curves.offsets(), &[0, 3, 5]);
-    let a = curves.attributes();
-    assert!(std::ptr::eq(
-        a.get(Domain::Point, names::WIDTH).unwrap(),
-        polygons
-            .attributes()
-            .get(Domain::Point, names::WIDTH)
-            .unwrap()
-    ));
-    let t = a.tuples::<f64>(Domain::Vertex, "t").unwrap();
-    assert_eq!(t, &[4.0, 5.0, 6.0, 7.0, 8.0]);
-    let shared = polygons
-        .attributes()
-        .tuples::<f64>(Domain::Vertex, "t")
-        .unwrap();
-    assert!(shared.as_ptr_range().contains(&t.as_ptr()));
-    let names = a.text(Domain::Primitive, names::NAME).unwrap();
-    assert_eq!((names.get(0), names.get(1)), (Some("a"), Some("b")));
-    assert!(a.get(Domain::Edge, "crease").is_none());
-    let hidden = a.group(Domain::Primitive, names::HIDDEN).unwrap();
-    assert_eq!(hidden.iter().collect::<Vec<_>>(), [1]);
-    assert_eq!(Curves::from_polylines(&Polygons::empty()).curves(), 0);
 }
 
 #[test]

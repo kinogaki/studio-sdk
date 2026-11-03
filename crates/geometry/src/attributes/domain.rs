@@ -23,7 +23,7 @@ pub enum Domain {
     /// face.
     Primitive,
     /// Each edge, in the value's edge order: a polygon value's canonical
-    /// order ([`Topology::edges`](crate::Topology::edges)), a B-rep body's
+    /// order ([`Primitives::edges`](crate::Primitives::edges)), a B-rep body's
     /// edge ids.
     Edge,
     /// Each point: a position, or a B-rep body's vertex.

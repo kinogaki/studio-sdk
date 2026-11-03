@@ -2,8 +2,8 @@
 //! types allow and every attribute type on every domain.
 use super::Producer;
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Elements, Meaning,
-    Polygons, Storage, Text, Topology, Values, names,
+    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Elements, Kind, Meaning,
+    Polygons, Primitives, Storage, Text, Values, names,
 };
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::standard;
@@ -110,10 +110,6 @@ impl Fixtures {
                         .points(vec![0, 1, 2, 2, 3].into()),
                 ),
             ),
-            (
-                "polylines as curves".into(),
-                Curves::from_polylines(&shared_points()),
-            ),
         ]
     }
 }
@@ -139,16 +135,36 @@ impl Producer for Fixtures {
     }
 }
 
-/// Primitives as lists of points, the first `polygons` polygons.
-fn value(positions: Vec<[f64; 3]>, prims: &[Vec<u32>], polygons: usize) -> Polygons {
+/// Primitives as lists of points, `polygon` saying which close (polygons;
+/// the others are polylines).
+fn value(
+    positions: Vec<[f64; 3]>,
+    prims: &[Vec<u32>],
+    polygon: impl Fn(usize) -> bool,
+) -> Polygons {
     let mut offsets = vec![0];
     let mut vertices = Vec::new();
     for p in prims {
         vertices.extend_from_slice(p);
         offsets.push(vertices.len() as u32);
     }
-    let t = Topology::new(positions.len(), offsets.into(), vertices.into(), polygons)
-        .expect("a valid fixture");
+    let kinds = (0..prims.len())
+        .map(|p| {
+            if polygon(p) {
+                Kind::POLYGON
+            } else {
+                Kind::POLYLINE
+            }
+        })
+        .collect();
+    let t = Primitives::new(
+        positions.len(),
+        offsets.into(),
+        vertices.into(),
+        kinds,
+        None,
+    )
+    .expect("a valid fixture");
     Polygons::new(positions.into(), t, Attributes::new()).expect("a valid fixture")
 }
 
@@ -168,8 +184,7 @@ fn grid(side: u32) -> Polygons {
             offsets.push(vertices.len() as u32);
         }
     }
-    let faces = offsets.len() - 1;
-    let t = Topology::new((row * row) as usize, offsets.into(), vertices.into(), faces)
+    let t = Primitives::of_polygons((row * row) as usize, offsets.into(), vertices.into())
         .expect("a grid");
     Polygons::new(positions.into(), t, Attributes::new()).expect("a grid")
 }
@@ -193,7 +208,7 @@ fn mixed() -> Polygons {
             vec![1, 2, 5, 4],
             vec![2, 6, 7, 5],
         ],
-        4,
+        |_| true,
     )
 }
 
@@ -211,12 +226,12 @@ fn concave() -> Polygons {
         [3.0, 2.0, 0.0],
         [3.5, 1.0, 0.0],
     ];
-    value(p, &[vec![0, 1, 2, 3, 4, 5], vec![6, 7, 8, 9]], 2)
+    value(p, &[vec![0, 1, 2, 3, 4, 5], vec![6, 7, 8, 9]], |_| true)
 }
 
 fn polylines_only() -> Polygons {
     let p = (0..6).map(|i| [i as f64, 0.0, (i % 2) as f64]).collect();
-    value(p, &[vec![0, 1, 2], vec![3, 4, 5, 3]], 0)
+    value(p, &[vec![0, 1, 2], vec![3, 4, 5, 3]], |_| false)
 }
 
 fn shared_points() -> Polygons {
@@ -227,11 +242,18 @@ fn shared_points() -> Polygons {
         [0.0, 1.0, 0.0],
         [2.0, 2.0, 0.0],
     ];
-    value(p, &[vec![0, 1, 2, 3], vec![2, 4], vec![3, 2, 1]], 1)
+    // A polyline first, the quad between two of them: any order.
+    value(p, &[vec![2, 4], vec![0, 1, 2, 3], vec![3, 2, 1]], |p| {
+        p == 1
+    })
 }
 
 fn points_only() -> Polygons {
-    value(vec![[0.0; 3], [1.0, 2.0, 3.0], [-1.0, 0.5, 2.0]], &[], 0)
+    value(
+        vec![[0.0; 3], [1.0, 2.0, 3.0], [-1.0, 0.5, 2.0]],
+        &[],
+        |_| true,
+    )
 }
 
 /// `values` as an attribute (a fixture's: always valid).

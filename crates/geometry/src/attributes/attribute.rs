@@ -4,7 +4,6 @@ use super::text::Text;
 use super::types::{AttributeType, Meaning, Storage};
 use crate::column::Column;
 use crate::error::{ErrorKind, GeometryError};
-use std::ops::Range;
 
 /// An attribute's values, flat: `width` values an item, items in element
 /// order (interleaved, so a `[f32; 3]` normal column uploads and indexes
@@ -74,17 +73,6 @@ impl Values {
             Values::I64(c) => *c.get(i)? as f64,
             Values::Text(_) => return None,
         })
-    }
-
-    /// The values in `range`, sharing the buffer.
-    fn slice(&self, range: Range<usize>) -> Self {
-        match self {
-            Values::F32(c) => Values::F32(c.slice(range)),
-            Values::F64(c) => Values::F64(c.slice(range)),
-            Values::I32(c) => Values::I32(c.slice(range)),
-            Values::I64(c) => Values::I64(c.slice(range)),
-            Values::Text(t) => Values::Text(t.slice(range)),
-        }
     }
 
     /// The first value that is NaN or infinite (reals only), checked in
@@ -262,29 +250,6 @@ impl Attribute {
         match &self.values {
             Values::Text(t) => Some(t),
             _ => None,
-        }
-    }
-
-    /// The attribute over the elements in `range`, sharing the values'
-    /// buffer (an array's offsets are rebased, a copy of `range.len() + 1`).
-    pub(crate) fn slice(&self, range: Range<usize>) -> Self {
-        let width = usize::from(self.ty.width);
-        match &self.offsets {
-            None => Self {
-                ty: self.ty,
-                values: (self.values).slice(range.start * width..range.end * width),
-                offsets: None,
-            },
-            Some(o) => {
-                let first = o[range.start];
-                let last = o[range.end];
-                let rebased = o[range.start..=range.end].iter().map(|&x| x - first);
-                Self {
-                    ty: self.ty,
-                    values: (self.values).slice(first as usize * width..last as usize * width),
-                    offsets: Some(rebased.collect()),
-                }
-            }
         }
     }
 }

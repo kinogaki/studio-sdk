@@ -8,8 +8,8 @@
 //!
 //! | Value | What |
 //! |---|---|
-//! | [`Polygons`] | polygons and polylines over shared points ([`Topology`]), with [`Attributes`] |
-//! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves ([`Basis`]) |
+//! | [`Polygons`] | polygons and polylines over shared points ([`Primitives`]), with [`Attributes`] |
+//! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves of one [`Basis`] |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
 //! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and groups ([`Elements`]) per [`Domain`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`], [`Incidence`] | selected elements of one domain, with the active one; which elements of a value touch which (selection rules live in `kinogaki-edit`) |
@@ -32,13 +32,13 @@
 //! edit (`with_positions`, `with_attributes`, [`Attributes::with`]) makes a
 //! new value sharing every column it didn't touch, and checks only what it
 //! replaced. Polygons keep their
-//! primitives in one shared `Arc<Topology>`, so moving points keeps the
-//! topology, its edges and every cache built on it.
+//! primitives in one shared `Arc<Primitives>`, so moving points keeps the
+//! table, its edges and every cache built on it.
 //!
-//! **Product limits** ([`limits`]): at most 8,388,608 points
-//! ([`MAX_POINTS`](limits::MAX_POINTS)), 8,388,608 primitives or curves
-//! ([`MAX_PRIMITIVES`](limits::MAX_PRIMITIVES)), 33,554,432 vertices
-//! ([`MAX_VERTICES`](limits::MAX_VERTICES)) and names of 256 bytes. Every
+//! **Product limits** ([`limits`]): every element id fits a `u32`
+//! ([`MAX_POINTS`](limits::MAX_POINTS), [`MAX_PRIMITIVES`](limits::MAX_PRIMITIVES),
+//! [`MAX_VERTICES`](limits::MAX_VERTICES): 2³² − 2 each) and names are
+//! at most 256 bytes. Every
 //! position component is finite and at most 1e100 in magnitude.
 //!
 //! # Caches derived from a standard value
@@ -48,48 +48,48 @@
 //! value, never as the value itself:
 //!
 //! 1. **Keys.** A cache is derived from one shared part of a value and is
-//!    keyed by that part's identity: the [`Topology`] for adjacency,
+//!    keyed by that part's identity: the [`Primitives`] for adjacency,
 //!    edges, half-edges, triangulation and triangle maps; the positions
 //!    [`Column`] for BVHs and bounds; an attribute's `Column` for anything
 //!    built from that attribute.
-//! 2. **Where caches live.** Use [`Topology::derived`] and
+//! 2. **Where caches live.** Use [`Primitives::derived`] and
 //!    [`Column::derived`]. A slot lives exactly as long as its part and is
 //!    shared by every value that shares the part, so a points-only edit
-//!    (`with_positions`) keeps every topology cache. Never keep a cache in
+//!    (`with_positions`) keeps every table cache. Never keep a cache in
 //!    a global map keyed by address.
 //! 3. **Readers.** Only the crate that defines a cache's type reads it. A
 //!    slot is never a channel between plugins.
 //! 4. **Never stored.** A cache is never saved, compared or treated as the
 //!    value. Dropping it may only cost time.
 //! 5. **Key lifetime.** [`Column::key`] and `ptr_eq` are valid while the
-//!    part lives, within one session. Use [`Topology::fingerprint`] or a
+//!    part lives, within one session. Use [`Primitives::fingerprint`] or a
 //!    stamp for anything that outlives it.
 //! 6. **Independent caches.** Two kernels' caches over one part are two
 //!    slots, and neither sees the other's.
 //!
-//! The canonical [`Index`] ([`Topology::index`]) is the one cache this
-//! crate defines over a topology: every kernel and Studio share its edges
+//! The canonical [`Index`] ([`Primitives::index`]) is the one cache this
+//! crate defines over a table: every kernel and Studio share its edges
 //! and numbering instead of building their own.
 //!
 //! ```
 //! use std::sync::Arc;
 //! use std::sync::atomic::{AtomicUsize, Ordering};
-//! use kinogaki_geometry::{Attributes, Polygons, Topology};
+//! use kinogaki_geometry::{Attributes, Polygons, Primitives};
 //!
-//! /// A kernel's own cache over a topology (its type is its key).
+//! /// A kernel's own cache over a table (its type is its key).
 //! struct Valence(Vec<u32>);
 //!
-//! let t = Topology::new(4, vec![0, 3, 6].into(), vec![0, 1, 2, 0, 2, 3].into(), 2).unwrap();
+//! let t = Primitives::of_polygons(4, vec![0, 3, 6].into(), vec![0, 1, 2, 0, 2, 3].into()).unwrap();
 //! let a = Polygons::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
 //! let builds = AtomicUsize::new(0);
 //! let valence = |p: &Polygons| {
-//!     p.topology().derived(|t| {
+//!     p.primitives().derived(|t| {
 //!         builds.fetch_add(1, Ordering::Relaxed);
 //!         Valence((0..t.points()).map(|i| t.index().point_faces()[i].len() as u32).collect())
 //!     })
 //! };
 //! assert_eq!(valence(&a).0, [2, 1, 2, 1]);
-//! // A points-only edit shares the topology, and so the cache.
+//! // A points-only edit shares the table, and so the cache.
 //! let b = a.with_positions(vec![[1.0; 3]; 4].into()).unwrap();
 //! assert!(Arc::ptr_eq(&valence(&a), &valence(&b)));
 //! assert_eq!(builds.load(Ordering::Relaxed), 1);
@@ -110,13 +110,13 @@ pub mod limits;
 pub mod parallel;
 mod polygons;
 mod positions;
+mod primitives;
 mod sampled;
 mod selection;
 mod shading;
 mod spline;
 mod time;
 mod tolerances;
-mod topology;
 mod triangulation;
 mod units;
 mod vec3;
@@ -129,19 +129,19 @@ pub use attributes::{
 };
 pub use bounds::Bounds;
 pub use column::Column;
-pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
+pub use curves::{CurveDisplay, Curves, CurvesBuilder};
 pub use detail::{Detail, DisplayQuality};
 pub use elements::Elements;
 pub use error::{ErrorKind, GeometryError};
 pub use frame::Frame;
 pub use incidence::Incidence;
 pub use polygons::Polygons;
+pub use primitives::{Adjacency, Basis, CurveData, Edge, Index, Kind, Knots, Primitives};
 pub use sampled::Sampled;
 pub use selection::Selection;
 pub use shading::ShadingNormals;
 pub use time::{Rate, Time};
 pub use tolerances::Tolerances;
-pub use topology::{Adjacency, Edge, Index, Topology};
 pub use triangulation::{Triangle, Triangulation};
 pub use units::{Units, UpAxis};
 pub use vec3::{Ray, Vec3};

@@ -334,17 +334,6 @@ impl Elements {
         let members = words.iter().map(|w| w.count_ones()).sum();
         Ok(Self::dense(count, Column::new(words), members))
     }
-
-    /// The members within `range`, renumbered from 0, as a set of
-    /// `range.len()` elements.
-    pub(crate) fn slice(&self, range: std::ops::Range<usize>) -> Self {
-        let ids: Vec<u32> = self
-            .iter()
-            .filter(|&i| range.contains(&(i as usize)))
-            .map(|i| i - range.start as u32)
-            .collect();
-        Self::ascending(range.len(), Column::new(ids))
-    }
 }
 
 /// Sets are equal when they are of the same count and have the same

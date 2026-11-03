@@ -170,14 +170,6 @@ impl Text {
             table: used.into(),
         }
     }
-
-    /// The elements in `range`, sharing the indices' buffer and the table.
-    pub(crate) fn slice(&self, range: std::ops::Range<usize>) -> Self {
-        Self {
-            indices: self.indices.slice(range),
-            table: self.table.clone(),
-        }
-    }
 }
 
 /// Texts are equal when every element's text is, whatever their tables.

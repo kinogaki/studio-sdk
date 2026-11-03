@@ -1,7 +1,7 @@
 //! Polygons as triangles: the display triangulation (exact outlines, the
 //! tolerant clip of cut outlines, the fan for damaged ones, n − 2 always),
 //! and the cache and its refresh after a drag matching a whole build.
-use kinogaki_geometry::{Attributes, Polygons, Topology};
+use kinogaki_geometry::{Attributes, Kind, Polygons, Primitives};
 use std::sync::Arc;
 
 /// One value of `polygons` (each a ring of point ids) over `positions`.
@@ -12,13 +12,8 @@ fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Polygons {
         vertices.extend_from_slice(p);
         offsets.push(vertices.len() as u32);
     }
-    let topology = Topology::new(
-        positions.len(),
-        offsets.into(),
-        vertices.into(),
-        polygons.len(),
-    )
-    .unwrap();
+    let topology =
+        Primitives::of_polygons(positions.len(), offsets.into(), vertices.into()).unwrap();
     Polygons::new(positions.to_vec().into(), topology, Attributes::new()).unwrap()
 }
 
@@ -151,12 +146,13 @@ fn triangles_are_n_minus_two_and_wind_with_the_polygon() {
         for (k, corners) in t.corners().iter().enumerate() {
             assert_eq!(
                 t.triangles()[k],
-                corners.map(|c| v.topology().vertices()[c as usize])
+                corners.map(|c| v.primitives().vertices()[c as usize])
             );
         }
     }
     // A polyline has no triangles.
-    let topology = Topology::new(2, vec![0, 2].into(), vec![0, 1].into(), 0).unwrap();
+    let line = vec![Kind::POLYLINE].into();
+    let topology = Primitives::new(2, vec![0, 2].into(), vec![0, 1].into(), line, None).unwrap();
     let line = Polygons::new(
         vec![[0.0; 3], [1.0, 0.0, 0.0]].into(),
         topology,
@@ -220,10 +216,10 @@ fn the_triangulation_is_kept_and_its_refresh_after_a_drag_matches_a_whole_build(
     let v = grid(120);
     let t = v.triangulation();
     assert!(Arc::ptr_eq(&t, &v.triangulation()), "kept on the positions");
-    let polygons = v.topology().polygons();
-    assert_eq!(t.len(), v.topology().polygon_vertices() - 2 * polygons);
+    let polygons = v.primitives().polygons().len();
+    assert_eq!(t.len(), v.primitives().vertex_count() - 2 * polygons);
     for p in [0, 1, 5, polygons - 1] {
-        let n = v.topology().primitive(p).len();
+        let n = v.primitives().primitive(p).len();
         assert_eq!(t.of(p).len(), n - 2);
         assert!(t.of(p).all(|i| t.primitives()[i] == p as u32));
     }

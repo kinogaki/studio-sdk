@@ -1,6 +1,6 @@
 //! The SDK's consumers: [`Codecs`] and [`Invariants`].
 use super::Consumer;
-use kinogaki_geometry::{Curves, Domain, Elements, Polygons, Selection, Topology};
+use kinogaki_geometry::{Curves, Domain, Elements, Polygons, Primitives, Selection};
 use kinogaki_studio_api::codec::DataCodec;
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::element::MemoryElement;
@@ -101,28 +101,25 @@ impl Consumer for Invariants {
 }
 
 fn polygons(p: &Polygons) -> Result<(), String> {
-    let t = p.topology();
-    let rebuilt = Topology::new(
-        t.points(),
-        t.offsets().clone(),
-        t.vertices().clone(),
-        t.polygons(),
-    )
-    .map_err(|e| e.to_string())?;
+    let t = p.primitives();
+    let curves = t.curves().map(|c| (**c).clone());
+    let (offsets, vertices) = (t.offsets().clone(), t.vertices().clone());
+    let rebuilt = Primitives::new(t.points(), offsets, vertices, t.kinds(), curves)
+        .map_err(|e| e.to_string())?;
     let again = Polygons::new(p.positions().clone(), rebuilt, (**p.attributes()).clone())
         .map_err(|e| e.to_string())?;
     if &again != p {
         return Err("rebuilt from its parts, the value differs".into());
     }
-    if again.topology().fingerprint() != t.fingerprint() {
-        return Err("an equal topology has another fingerprint".into());
+    if again.primitives().fingerprint() != t.fingerprint() {
+        return Err("an equal table has another fingerprint".into());
     }
     let edges = t.edges();
     if edges.windows(2).any(|w| w[0] >= w[1]) || edges.iter().any(|e| e.points[0] >= e.points[1]) {
         return Err("the edges are not in canonical order".into());
     }
     let index = t.index();
-    for prim in 0..t.primitives() {
+    for prim in 0..t.len() {
         let ids = t.primitive(prim);
         for (i, &e) in index.primitive_edges(prim).iter().enumerate() {
             let next = ids[(i + 1) % ids.len()];

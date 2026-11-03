@@ -106,12 +106,12 @@ impl Layout {
             && self.degrees.ptr_eq(&other.degrees)
             && self.periodic == other.periodic
             && same(
-                self.knots.as_ref().map(|k| &k.offsets),
-                other.knots.as_ref().map(|k| &k.offsets),
+                self.knots.as_ref().map(|k| k.offsets()),
+                other.knots.as_ref().map(|k| k.offsets()),
             )
             && same(
-                self.knots.as_ref().map(|k| &k.values),
-                other.knots.as_ref().map(|k| &k.values),
+                self.knots.as_ref().map(|k| k.values()),
+                other.knots.as_ref().map(|k| k.values()),
             )
             && same(self.weights.as_ref(), other.weights.as_ref())
     }

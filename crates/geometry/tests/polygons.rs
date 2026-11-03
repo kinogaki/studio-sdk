@@ -2,20 +2,21 @@
 //! edit keeps.
 use kinogaki_geometry::limits::MAX_POINTS;
 use kinogaki_geometry::{
-    Attribute, Attributes, Bounds, Domain, Elements, ErrorKind, Meaning, Polygons, Text, Topology,
-    Vec3, names,
+    Attribute, Attributes, Bounds, Domain, Elements, ErrorKind, Kind, Meaning, Polygons,
+    Primitives, Text, Vec3, names,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Two triangles sharing a side, then a polyline: 5 points, 3
 /// primitives, 8 vertices, 6 edges.
-fn topology() -> Topology {
-    Topology::new(
+fn topology() -> Primitives {
+    Primitives::new(
         5,
         vec![0, 3, 6, 8].into(),
         vec![0, 1, 2, 0, 2, 3, 3, 4].into(),
-        2,
+        vec![Kind::POLYGON, Kind::POLYGON, Kind::POLYLINE].into(),
+        None,
     )
     .unwrap()
 }
@@ -76,11 +77,11 @@ fn positions_must_be_finite_and_one_a_point() {
         p.pop();
     })
     .unwrap_err();
-    assert_eq!(e.message(), "4 positions for a topology of 5 points");
+    assert_eq!(e.message(), "4 positions for a table of 5 points");
     let far = value()
         .with_positions(vec![[0.0; 3]; 6].into())
         .unwrap_err();
-    assert_eq!(far.message(), "6 positions for a topology of 5 points");
+    assert_eq!(far.message(), "6 positions for a table of 5 points");
 }
 
 #[test]
@@ -88,7 +89,7 @@ fn the_first_bad_position_is_reported_on_large_values() {
     let mut p = vec![[0.0; 3]; 300_000];
     p[250_000][0] = f64::NAN;
     p[200_001][1] = f64::INFINITY;
-    let t = Topology::new(300_000, vec![0].into(), Vec::new().into(), 0).unwrap();
+    let t = Primitives::of_polygons(300_000, vec![0].into(), Vec::new().into()).unwrap();
     let e = Polygons::new(p.into(), t, Attributes::new()).unwrap_err();
     assert_eq!(e.element(), Some(200_001));
 }
@@ -119,7 +120,7 @@ fn the_first_bad_attribute_value_is_reported_on_large_values() {
 
 #[test]
 fn one_past_the_point_limit_is_refused() {
-    let t = Topology::new(MAX_POINTS + 1, vec![0].into(), Vec::new().into(), 0);
+    let t = Primitives::of_polygons(MAX_POINTS + 1, vec![0].into(), Vec::new().into());
     assert_eq!(t.unwrap_err().kind(), ErrorKind::Limit);
 }
 
@@ -172,7 +173,7 @@ fn attributes_are_sized_to_their_domain() {
         .with_group(Domain::Primitive, names::HIDDEN, Elements::none(3))
         .unwrap();
     let ok = p.with_attributes(sized).unwrap();
-    assert!(Arc::ptr_eq(ok.topology(), p.topology()) && ok.positions().ptr_eq(p.positions()));
+    assert!(Arc::ptr_eq(ok.primitives(), p.primitives()) && ok.positions().ptr_eq(p.positions()));
     let wrong = Attributes::new()
         .with(
             Domain::Vertex,
@@ -219,21 +220,21 @@ fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
     let a = value().with_attributes(attributes).unwrap();
     let builds = AtomicUsize::new(0);
     let cache = |p: &Polygons| {
-        p.topology().derived(|t| {
+        p.primitives().derived(|t| {
             builds.fetch_add(1, Ordering::Relaxed);
-            t.primitives()
+            t.len()
         })
     };
     cache(&a);
     let b = a.with_positions(vec![[2.0; 3]; 5].into()).unwrap();
     let c = b.with_positions(positions().into()).unwrap();
-    assert!(Arc::ptr_eq(a.topology(), c.topology()));
+    assert!(Arc::ptr_eq(a.primitives(), c.primitives()));
     assert!(Arc::ptr_eq(a.attributes(), c.attributes()));
     assert!(Arc::ptr_eq(&cache(&a), &cache(&c)));
     assert_eq!(builds.load(Ordering::Relaxed), 1);
     assert_eq!(
-        a.topology().index() as *const _,
-        c.topology().index() as *const _
+        a.primitives().index() as *const _,
+        c.primitives().index() as *const _
     );
     assert_eq!(c, a, "the same positions again: an equal value");
     assert_eq!(
@@ -244,15 +245,15 @@ fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
 }
 
 #[test]
-fn with_topology_reuses_a_checked_topology() {
+fn with_primitives_reuses_a_checked_topology() {
     let a = value();
-    let b = Polygons::with_topology(
+    let b = Polygons::with_primitives(
         vec![[3.0; 3]; 5].into(),
-        a.topology().clone(),
+        a.primitives().clone(),
         a.attributes().clone(),
     )
     .unwrap();
-    assert!(Arc::ptr_eq(a.topology(), b.topology()));
+    assert!(Arc::ptr_eq(a.primitives(), b.primitives()));
     let wrong = Arc::new(
         Attributes::new()
             .with(
@@ -262,7 +263,7 @@ fn with_topology_reuses_a_checked_topology() {
             )
             .unwrap(),
     );
-    assert!(Polygons::with_topology(positions().into(), a.topology().clone(), wrong).is_err());
+    assert!(Polygons::with_primitives(positions().into(), a.primitives().clone(), wrong).is_err());
 }
 
 #[test]

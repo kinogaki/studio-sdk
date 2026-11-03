@@ -7,7 +7,7 @@ use crate::column::Column;
 use crate::kept::Kept;
 use crate::parallel;
 use crate::polygons::Polygons;
-use crate::topology::Topology;
+use crate::primitives::{Kind, Primitives};
 use crate::vector::V3;
 use clip::{Outline, clip};
 use std::ops::Range;
@@ -31,7 +31,7 @@ pub struct Triangle {
 }
 
 /// A polygons value's **display triangulation**: every polygon as exactly
-/// n − 2 triangles (polylines have none), in primitive order.
+/// n − 2 triangles (other primitives have none), in primitive order.
 ///
 /// Each polygon is ear clipped in the plane facing it most. Where that
 /// fails it is clipped again tolerantly: outlines whose points coincide
@@ -49,10 +49,51 @@ pub struct Triangulation {
     corners: Column<[u32; 3]>,
     primitives: Column<u32>,
     fans: Column<u32>,
-    /// The topology's polygon offsets (shared), which place each polygon's
-    /// triangles.
-    offsets: Column<u32>,
-    polygons: usize,
+    /// Where each polygon's triangles start.
+    layout: Layout,
+}
+
+/// Where each primitive's triangles start: from the table's own offsets
+/// (shared) when every primitive is a polygon, else a column of its own.
+#[derive(Clone, Debug, PartialEq)]
+enum Layout {
+    /// Every primitive is a polygon; these are the table's offsets.
+    Polygons(Column<u32>),
+    /// Each primitive's first triangle, and the triangle count last.
+    Each(Column<u32>),
+}
+
+impl Layout {
+    fn of(t: &Primitives) -> Layout {
+        if t.uniform() == Some(Kind::POLYGON) {
+            return Layout::Polygons(t.offsets().clone());
+        }
+        let mut first = Vec::with_capacity(t.len() + 1);
+        let mut total = 0u32;
+        first.push(0);
+        for p in 0..t.len() {
+            if t.kind(p).is_polygon() {
+                total += t.primitive(p).len() as u32 - 2;
+            }
+            first.push(total);
+        }
+        Layout::Each(first.into())
+    }
+
+    /// How many triangles the primitives before `p` have.
+    fn before(&self, p: usize) -> usize {
+        match self {
+            Layout::Polygons(offsets) => offsets[p] as usize - 2 * p,
+            Layout::Each(first) => first[p] as usize,
+        }
+    }
+
+    /// How many primitives it places.
+    fn primitives(&self) -> usize {
+        match self {
+            Layout::Polygons(offsets) | Layout::Each(offsets) => offsets.len() - 1,
+        }
+    }
 }
 
 impl Triangulation {
@@ -73,13 +114,12 @@ impl Triangulation {
     }
 
     /// Polygon `polygon`'s triangles: its n − 2, wherever its outline
-    /// moves. Empty for a polyline or a primitive out of range.
+    /// moves. Empty for another primitive or one out of range.
     pub fn of(&self, polygon: usize) -> Range<usize> {
-        if polygon >= self.polygons {
+        if polygon >= self.layout.primitives() {
             return 0..0;
         }
-        let before = |p: usize| self.offsets[p] as usize - 2 * p;
-        before(polygon)..before(polygon + 1)
+        self.layout.before(polygon)..self.layout.before(polygon + 1)
     }
 
     /// The polygons shown as a fan (approximately), in order: their
@@ -99,13 +139,8 @@ impl Triangulation {
     }
 }
 
-/// How many triangles the polygons before `polygon` have: n − 2 each.
-fn triangles_before(topology: &Topology, polygon: usize) -> usize {
-    topology.offsets()[polygon] as usize - 2 * polygon
-}
-
 /// What a positions column keeps: the triangulation over each topology.
-type Triangulations = Kept<Arc<Topology>, Triangulation>;
+type Triangulations = Kept<Arc<Primitives>, Triangulation>;
 
 impl Polygons {
     /// The display [`Triangulation`]. It is derived from the topology and
@@ -115,11 +150,11 @@ impl Polygons {
     /// does so for the moved polygons alone).
     pub fn triangulation(&self) -> Arc<Triangulation> {
         let kept = self.positions().derived(|_| Triangulations::default());
-        if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.topology())) {
+        if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.primitives())) {
             return t;
         }
-        let built = Arc::new(build(self, 0..self.topology().polygons()));
-        kept.keep(self.topology().clone(), built.clone());
+        let built = Arc::new(build(self));
+        kept.keep(self.primitives().clone(), built.clone());
         built
     }
 
@@ -130,22 +165,22 @@ impl Polygons {
     /// differs. Otherwise it is built whole.
     pub fn triangulation_after(&self, before: &Polygons, moved: &[u32]) -> Arc<Triangulation> {
         let kept = self.positions().derived(|_| Triangulations::default());
-        if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.topology())) {
+        if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.primitives())) {
             return t;
         }
-        let previous = Arc::ptr_eq(before.topology(), self.topology())
+        let previous = Arc::ptr_eq(before.primitives(), self.primitives())
             .then(|| before.positions().derived(|_| Triangulations::default()))
-            .and_then(|k| k.find(|k| Arc::ptr_eq(k, self.topology())));
+            .and_then(|k| k.find(|k| Arc::ptr_eq(k, self.primitives())));
         let built = Arc::new(match previous {
             Some(previous) => rebuilt(self, &previous, moved),
-            None => build(self, 0..self.topology().polygons()),
+            None => build(self),
         });
-        kept.keep(self.topology().clone(), built.clone());
+        kept.keep(self.primitives().clone(), built.clone());
         built
     }
 }
 
-fn outline(topology: &Topology, polygon: usize) -> Outline<'_> {
+fn outline(topology: &Primitives, polygon: usize) -> Outline<'_> {
     Outline {
         points: topology.primitive(polygon),
         first: topology.offsets()[polygon],
@@ -156,7 +191,7 @@ fn outline(topology: &Topology, polygon: usize) -> Outline<'_> {
 /// Polygon `polygon` for display, appended to `out`: strictly, else
 /// tolerantly, else as a fan. Whether it fell back to the fan.
 fn display(
-    topology: &Topology,
+    topology: &Primitives,
     polygon: usize,
     position: &impl Fn(u32) -> V3,
     out: &mut Vec<Triangle>,
@@ -181,17 +216,20 @@ fn display(
     true
 }
 
-/// The triangles of `polygons` (a range of polygon ids), in order, with
-/// the fans among them.
-fn triangles_of(value: &Polygons, polygons: Range<usize>) -> (Vec<Triangle>, Vec<u32>) {
-    let topology = value.topology();
+/// The triangles of the polygons among `primitives` (a range of
+/// primitive ids), in order, with the fans among them.
+fn triangles_of(
+    value: &Polygons,
+    layout: &Layout,
+    primitives: Range<usize>,
+) -> (Vec<Triangle>, Vec<u32>) {
+    let topology = value.primitives();
     let positions = value.positions();
     let position = |p: u32| positions[p as usize];
-    let count =
-        triangles_before(topology, polygons.end) - triangles_before(topology, polygons.start);
+    let count = layout.before(primitives.end) - layout.before(primitives.start);
     let mut out = Vec::with_capacity(count);
     let mut fans = Vec::new();
-    for p in polygons {
+    for p in primitives.filter(|&p| topology.kind(p).is_polygon()) {
         if display(topology, p, &position, &mut out) {
             fans.push(p as u32);
         }
@@ -200,10 +238,10 @@ fn triangles_of(value: &Polygons, polygons: Range<usize>) -> (Vec<Triangle>, Vec
 }
 
 /// The triangulation of every polygon, in parallel blocks.
-fn build(value: &Polygons, polygons: Range<usize>) -> Triangulation {
-    let len = polygons.len();
-    let blocks = parallel::map(len, BLOCK, |r| {
-        triangles_of(value, polygons.start + r.start..polygons.start + r.end)
+fn build(value: &Polygons) -> Triangulation {
+    let layout = Layout::of(value.primitives());
+    let blocks = parallel::map(value.primitives().len(), BLOCK, |r| {
+        triangles_of(value, &layout, r)
     });
     let total = blocks.iter().map(|(t, _)| t.len()).sum();
     let (mut triangles, mut corners, mut primitives) = (
@@ -225,8 +263,7 @@ fn build(value: &Polygons, polygons: Range<usize>) -> Triangulation {
         corners: corners.into(),
         primitives: primitives.into(),
         fans: fans.into(),
-        offsets: value.topology().offsets().clone(),
-        polygons: value.topology().polygons(),
+        layout,
     }
 }
 
@@ -237,7 +274,7 @@ fn build(value: &Polygons, polygons: Range<usize>) -> Triangulation {
 /// `previous`'s own, shared: a drag that changes no triangle changes no
 /// triangle column.
 fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangulation {
-    let topology = value.topology();
+    let topology = value.primitives();
     let point_faces = topology.index().point_faces();
     let mut polygons: Vec<u32> = moved
         .iter()
@@ -255,7 +292,7 @@ fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangu
         .collect();
     for &p in &polygons {
         let range = previous.of(p as usize);
-        let (one, fanned) = triangles_of(value, p as usize..p as usize + 1);
+        let (one, fanned) = triangles_of(value, &previous.layout, p as usize..p as usize + 1);
         if !fanned.is_empty() {
             fans.push(p);
         }
@@ -280,7 +317,6 @@ fn rebuilt(value: &Polygons, previous: &Triangulation, moved: &[u32]) -> Triangu
         corners,
         primitives: previous.primitives.clone(),
         fans: fans.into(),
-        offsets: previous.offsets.clone(),
-        polygons: previous.polygons,
+        layout: previous.layout.clone(),
     }
 }

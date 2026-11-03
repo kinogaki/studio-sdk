@@ -12,7 +12,7 @@ use std::sync::Arc;
 fn every_fixture_passes_the_sdk_consumers() {
     let report = conformance::run(&[&Fixtures::default()], &[&Codecs, &Invariants]);
     assert!(report.failures().is_empty(), "{report}");
-    assert_eq!(report.outcomes.len(), 2 * (9 + 7 + 6));
+    assert_eq!(report.outcomes.len(), 2 * (9 + 6 + 6));
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn values_sharing_a_topology_share_it_once_read() {
         standard::polygons().get(&ra).unwrap(),
         standard::polygons().get(&rb).unwrap(),
     );
-    assert!(Arc::ptr_eq(ra.topology(), rb.topology()));
+    assert!(Arc::ptr_eq(ra.primitives(), rb.primitives()));
     assert_eq!(rb.positions()[3], [1.0; 3]);
 }
 
@@ -172,11 +172,10 @@ fn the_display_quality_saves_as_a_project_value_by_its_label() {
 fn equal_texts_save_alike_whatever_their_tables() {
     use kinogaki_studio_api::geometry::{Attribute, Attributes, Text};
     let quad = |text: Text| {
-        let t = kinogaki_studio_api::geometry::Topology::new(
+        let t = kinogaki_studio_api::geometry::Primitives::of_polygons(
             4,
             vec![0, 4].into(),
             vec![0, 1, 2, 3].into(),
-            1,
         )
         .unwrap();
         let attributes = Attributes::new()
@@ -200,11 +199,10 @@ fn equal_texts_save_alike_whatever_their_tables() {
 /// A quad saved with one attribute element written by hand: `fields` on
 /// `a0`, read back.
 fn read_quad_with(fields: &[(&str, Field)]) -> Result<Polygons, String> {
-    let quad = kinogaki_studio_api::geometry::Topology::new(
+    let quad = kinogaki_studio_api::geometry::Primitives::of_polygons(
         4,
         vec![0, 4].into(),
         vec![0, 1, 2, 3].into(),
-        1,
     )
     .unwrap();
     let value = Polygons::new(vec![[0.0; 3]; 4].into(), quad, Default::default()).unwrap();

@@ -9,10 +9,10 @@
 //!
 //! ```
 //! use kinogaki_edit::select;
-//! use kinogaki_geometry::{Attributes, Domain, Elements, Polygons, Selection, Topology};
+//! use kinogaki_geometry::{Attributes, Domain, Elements, Polygons, Selection, Primitives};
 //!
 //! // Two triangles sharing the edge 1–2.
-//! let t = Topology::new(4, vec![0, 3, 6].into(), vec![0, 1, 2, 1, 3, 2].into(), 2).unwrap();
+//! let t = Primitives::of_polygons(4, vec![0, 3, 6].into(), vec![0, 1, 2, 1, 3, 2].into()).unwrap();
 //! let p = Polygons::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
 //! let first = Elements::from_indices(2, [0]).unwrap();
 //! let first = Selection::on(&p, Domain::Primitive, first, None).unwrap();
@@ -120,10 +120,10 @@ pub fn resolve(s: &Selection, on: &dyn Incidence) -> Result<Column<u32>, Geometr
 ///
 /// ```
 /// use kinogaki_edit::select;
-/// use kinogaki_geometry::{Attribute, Attributes, Domain, Elements, Polygons, Selection, Topology, names};
+/// use kinogaki_geometry::{Attribute, Attributes, Domain, Elements, Polygons, Selection, Primitives, names};
 ///
 /// let with_ids = |points: usize, ids: Vec<i64>| {
-///     let t = Topology::new(points, vec![0, 3].into(), vec![0, 1, 2].into(), 1).unwrap();
+///     let t = Primitives::of_polygons(points, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
 ///     let ids = Attributes::new().with(Domain::Point, names::ID, Attribute::tuples(ids, kinogaki_geometry::Meaning::None).unwrap()).unwrap();
 ///     Polygons::new(vec![[0.0; 3]; points].into(), t, ids).unwrap()
 /// };
@@ -211,7 +211,7 @@ impl From<Domain> for Mode {
 /// of everything, stays as it is.
 pub fn expand(s: &Selection, on: &Polygons, how: &Expand) -> Selection {
     let point_of = |domain: Domain| -> Option<Box<dyn Fn(u32) -> u32 + '_>> {
-        let topology = on.topology();
+        let topology = on.primitives();
         Some(match domain {
             Domain::Point => Box::new(|p| p),
             Domain::Vertex => Box::new(|v| topology.vertices()[v as usize]),
@@ -247,10 +247,10 @@ struct Pieces(Vec<u32>);
 /// value holding it, so a drag or a rename rebuilds nothing of them);
 /// names join over a copy of it.
 fn pieces(on: &Polygons) -> Arc<Pieces> {
-    let topology = on.topology();
+    let topology = on.primitives();
     let connected = topology.derived(|t| {
         let mut parent: Vec<u32> = (0..t.points() as u32).collect();
-        for p in 0..t.primitives() {
+        for p in 0..t.len() {
             let corners = t.primitive(p);
             for &q in &corners[1..] {
                 join(&mut parent, corners[0], q);

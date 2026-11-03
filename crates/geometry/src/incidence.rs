@@ -37,9 +37,9 @@ impl Incidence for Polygons {
 
     /// Points and edges by the edges' ends; every other pair through the
     /// primitives' corners (a corner's point, its primitive, its vertex,
-    /// the edge it starts; a polyline's last corner starts none).
+    /// the edge it starts; an open primitive's last corner starts none).
     fn incident(&self, from: Domain, to: Domain, pair: &mut dyn FnMut(u32, u32)) {
-        let topology = self.topology();
+        let topology = self.primitives();
         let has = |d| Polygons::count(self, d).is_some();
         if from == to || !has(from) || !has(to) {
             return;
@@ -59,8 +59,7 @@ impl Incidence for Polygons {
             return;
         }
         let index = (from == Domain::Edge || to == Domain::Edge).then(|| topology.index());
-        let polygons = topology.polygons();
-        for p in 0..topology.primitives() {
+        for p in 0..topology.len() {
             let start = topology.offsets()[p] as usize;
             for (corner, &point) in topology.primitive(p).iter().enumerate() {
                 let element = |d: Domain| match d {
@@ -70,15 +69,7 @@ impl Incidence for Polygons {
                     Domain::Detail => Some(0),
                     Domain::Edge => {
                         let index = index.expect("an edge pair builds the index");
-                        if p < polygons {
-                            Some(index.face_edges().row(p)[corner])
-                        } else {
-                            index
-                                .polyline_edges()
-                                .row(p - polygons)
-                                .get(corner)
-                                .copied()
-                        }
+                        index.primitive_edges(p).get(corner).copied()
                     }
                     _ => None,
                 };
@@ -90,7 +81,7 @@ impl Incidence for Polygons {
     }
 
     fn fingerprint(&self) -> [u8; 32] {
-        self.topology().fingerprint()
+        self.primitives().fingerprint()
     }
 
     fn ids(&self, domain: Domain) -> Option<&Column<i64>> {

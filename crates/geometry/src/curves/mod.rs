@@ -2,7 +2,6 @@
 //! over shared control points — the standard value `kinogaki.curves`.
 mod build;
 mod display;
-mod polylines;
 mod validate;
 
 pub use build::CurvesBuilder;
@@ -13,95 +12,16 @@ use crate::column::Column;
 use crate::elements::Elements;
 use crate::error::GeometryError;
 use crate::positions;
+use crate::primitives::{Basis, Knots};
 use std::ops::Range;
 use std::sync::Arc;
-
-/// How a value's curves pass through their control points: one basis for
-/// every curve of a value.
-///
-/// New bases may be added. A reader that doesn't know a value's basis
-/// treats the value as read-only: it passes through unchanged, displays as
-/// its control polygon and renders as nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[non_exhaustive]
-pub enum Basis {
-    /// Straight segments between consecutive points: polylines. Degree 1.
-    Linear,
-    /// Bézier segments of the curve's degree, sharing end points: an open
-    /// curve has `k·degree + 1` control points, a periodic one
-    /// `k·degree`.
-    Bezier,
-    /// Uniform, non-rational B-splines of the curve's degree: clamped when
-    /// open (they start and end on their end points), wrapping when
-    /// periodic.
-    BSpline,
-    /// Catmull-Rom splines through every point (an open curve's ends
-    /// reflect their neighbours). Degree 3.
-    CatmullRom,
-    /// Rational B-splines with explicit knots and optional weights.
-    Nurbs,
-}
-
-impl Basis {
-    /// Every basis, in order.
-    pub const ALL: [Basis; 5] = [
-        Basis::Linear,
-        Basis::Bezier,
-        Basis::BSpline,
-        Basis::CatmullRom,
-        Basis::Nurbs,
-    ];
-
-    /// Its name in messages and files: `linear`, `bezier`, `bspline`,
-    /// `catmull_rom`, `nurbs`. Never renamed.
-    pub fn name(self) -> &'static str {
-        match self {
-            Basis::Linear => "linear",
-            Basis::Bezier => "bezier",
-            Basis::BSpline => "bspline",
-            Basis::CatmullRom => "catmull_rom",
-            Basis::Nurbs => "nurbs",
-        }
-    }
-
-    /// The basis named `name` ([`Basis::name`]).
-    pub fn from_name(name: &str) -> Option<Basis> {
-        Basis::ALL.into_iter().find(|b| b.name() == name)
-    }
-}
-
-/// The knot vectors of a NURBS value: curve `i`'s knots are
-/// `values[offsets[i]..offsets[i + 1]]`.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Knots {
-    offsets: Column<u32>,
-    values: Column<f64>,
-}
-
-impl Knots {
-    /// Where each curve's knots start, and the knot count last.
-    pub fn offsets(&self) -> &Column<u32> {
-        &self.offsets
-    }
-
-    /// Every curve's knots, one after another.
-    pub fn values(&self) -> &Column<f64> {
-        &self.values
-    }
-
-    /// Curve `i`'s knots.
-    pub(crate) fn of(&self, i: usize) -> &[f64] {
-        &self.values[self.offsets[i] as usize..self.offsets[i + 1] as usize]
-    }
-}
 
 /// Curves of one [`Basis`] over shared control points, with attributes.
 ///
 /// Curve `i`'s control vertices are `offsets[i]..offsets[i + 1]`. Each
 /// vertex names a point through `points` when the value has a point index
-/// (curves sharing points: chains of edges, the polylines of a
-/// [`Polygons`](crate::Polygons) value, [`Curves::from_polylines`]), else
-/// vertex `v` is point `v`.
+/// (curves sharing points: chains of edges), else vertex `v` is point
+/// `v`.
 ///
 /// **Domains** ([`count`](Self::count)): Point, Vertex, Primitive (each
 /// curve) and Detail. The standard `width` is a Point or Primitive f32.
