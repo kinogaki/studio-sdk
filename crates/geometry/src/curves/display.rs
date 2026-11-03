@@ -272,6 +272,23 @@ impl Curves {
         built
     }
 
+    /// The control points whose position differs from `before`'s bit for
+    /// bit, ascending (as [`Polygons::moved_points`](crate::Polygons::moved_points)),
+    /// when the two are one structure (the same basis, offsets, point
+    /// index, degrees, closed curves, knots and weights columns: a
+    /// [`with_positions`](Self::with_positions) edit); `None` otherwise.
+    /// What a display patches, and the `moved` that
+    /// [`display_after`](Self::display_after) takes.
+    pub fn moved_points(&self, before: &Curves) -> Option<Vec<u32>> {
+        if !Layout::of(self).same(&Layout::of(before)) {
+            return None;
+        }
+        if self.positions.ptr_eq(&before.positions) {
+            return Some(Vec::new());
+        }
+        Some(crate::positions::moved(&before.positions, &self.positions))
+    }
+
     /// The display, its untouched curves' points taken from `previous`.
     fn displayed(&self, previous: Option<(&CurveDisplay, &[bool])>) -> CurveDisplay {
         let mut positions = Vec::new();

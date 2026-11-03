@@ -497,3 +497,17 @@ mod display {
         assert_eq!(shown.offsets(), patched.offsets());
     }
 }
+
+#[test]
+fn moved_points_are_of_one_structure() {
+    let curve = one(Basis::Bezier, 4).degree(3).build().unwrap();
+    assert_eq!(curve.moved_points(&curve), Some(Vec::new()));
+    let mut at = curve.positions().to_vec();
+    at[2][1] = 1.0;
+    at[0][1] = -0.0;
+    let moved = curve.with_positions(at.into()).unwrap();
+    assert_eq!(moved.moved_points(&curve), Some(vec![0, 2]), "bitwise");
+    // Another structure over the same points: no move of it.
+    let other = one(Basis::Linear, 4).build().unwrap();
+    assert_eq!(other.moved_points(&curve), None);
+}
