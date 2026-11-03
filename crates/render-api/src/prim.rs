@@ -103,6 +103,19 @@ pub struct Mesh {
     pub path: Arc<str>,
 }
 
+impl Mesh {
+    /// What the [`MATERIAL_ID`](crate::aov::standard::MATERIAL_ID) output
+    /// writes where `triangle` is hit: its material's prim slot plus one,
+    /// the same on every mesh bound to that material whatever slot it
+    /// takes there; 0 where the engine's default material shades it (an
+    /// index past `materials`, or a triangle past the mesh).
+    pub fn material_id(&self, triangle: usize) -> u32 {
+        (self.material_slots.get(triangle))
+            .and_then(|&slot| self.materials.get(usize::from(slot)))
+            .map_or(0, |m| m.slot + 1)
+    }
+}
+
 /// Where a mesh attribute's values sit, and how a hit reads them (an
 /// integer one never blends: [`MeshAttribute::integer`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -374,5 +387,45 @@ impl Prim {
             Prim::Material(_) => PrimKind::Material,
             Prim::Texture(_) => PrimKind::Texture,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::id::PrimId;
+
+    fn mesh(materials: &[PrimId], slots: &[u16]) -> Mesh {
+        Mesh {
+            points: Arc::from([[0.0; 3]; 3]),
+            triangles: slots.iter().map(|_| [0, 1, 2]).collect(),
+            normals: None,
+            uvs: None,
+            material_slots: Arc::from(slots),
+            materials: Arc::from(materials),
+            attributes: Arc::from([]),
+            transform: IDENTITY,
+            motion: Motion::none(),
+            visible: true,
+            id: 1,
+            path: Arc::from("/m"),
+        }
+    }
+
+    #[test]
+    fn a_material_has_one_id_across_meshes() {
+        let id = |slot| PrimId {
+            slot,
+            generation: 0,
+        };
+        let (red, blue) = (id(4), id(9));
+        // Red is the first slot of one mesh and the second of another.
+        let one = mesh(&[red, blue], &[0, 1]);
+        let other = mesh(&[blue, red], &[1, 0, 7]);
+        assert_eq!(one.material_id(0), other.material_id(0));
+        assert_eq!(one.material_id(1), other.material_id(1));
+        assert_ne!(one.material_id(0), one.material_id(1));
+        assert_eq!(other.material_id(2), 0, "a slot past the list: the default");
+        assert_eq!(one.material_id(5), 0, "a triangle past the mesh");
     }
 }

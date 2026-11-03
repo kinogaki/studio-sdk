@@ -118,7 +118,10 @@ pub mod standard {
     pub const POSITION: &str = "position";
     /// The Mesh prim's `id` at the first hit.
     pub const OBJECT_ID: &str = "objectId";
-    /// The material's slot at the first hit.
+    /// The material at the first hit, by its Material prim
+    /// ([`Mesh::material_id`](crate::Mesh::material_id): one id a material
+    /// across every mesh, never a mesh's own slot index; 0 for the
+    /// engine's default material).
     pub const MATERIAL_ID: &str = "materialId";
     /// Cryptomatte of objects.
     pub const CRYPTO_OBJECT: &str = "CryptoObject";
