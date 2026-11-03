@@ -67,8 +67,10 @@ pub trait HostUndo {
 pub trait HostSlots {
     /// Slot `id`'s value; `None` when no package registered it.
     fn slot_any(&self, id: SlotId) -> Option<&(dyn Any + Send + Sync)>;
-    /// Slot `id`'s value to change in place, within whatever step is open
-    /// (none: the change rides along with the next step's snapshot). The
+    /// Slot `id`'s value to change in place, as a selection changes: no
+    /// undo step of its own (inside a gesture, part of its step); undo
+    /// restores the value the step it lies in came with. A change undo
+    /// should step through is [`set_slot_any`](Self::set_slot_any). The
     /// host copies a value a snapshot still shares first.
     fn slot_any_mut(&mut self, id: SlotId) -> Option<&mut (dyn Any + Send + Sync)>;
     /// Sets slot `id` to `value` as an undo step named `label` (inside the
