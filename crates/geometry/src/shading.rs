@@ -237,6 +237,11 @@ struct Fan {
     /// Per polygon through the point: the polygon, the point's place in
     /// it, its normal and its angle there.
     local: Vec<(u32, usize, V3, f64)>,
+    /// Per polygon through the point: the polygons a flood may reach from
+    /// it across its two edges at the point (their places in `local`),
+    /// each with whether the edge is smooth; none across a sharp edge or
+    /// an edge without exactly two polygons.
+    links: Vec<[Option<(usize, bool)>; 2]>,
     visited: Vec<bool>,
     stack: Vec<usize>,
     out: Vec<(u32, [f32; 3])>,
@@ -252,6 +257,7 @@ impl Fan {
     ) -> &[(u32, [f32; 3])] {
         let Self {
             local,
+            links,
             visited,
             stack,
             out,
@@ -282,6 +288,22 @@ impl Fan {
             };
             local.push((f, at, faces[f as usize], angle));
         }
+        let set =
+            |words: &Option<Column<u64>>, e: usize| words.as_deref().is_some_and(|w| is_set(w, e));
+        links.clear();
+        let flooded = inputs.authored.is_none().then_some(local.iter());
+        links.extend(flooded.into_iter().flatten().map(|&(f, at, _, _)| {
+            let edges = &index.face_edges()[f as usize];
+            [edges[at], edges[(at + edges.len() - 1) % edges.len()]].map(|edge| {
+                let faces = &index.edge_faces()[edge as usize];
+                if set(&inputs.sharp, edge as usize) || faces.len() != 2 {
+                    return None;
+                }
+                let other = if faces[0] == f { faces[1] } else { faces[0] };
+                let next = incident.iter().position(|&g| g == other)?;
+                Some((next, set(&inputs.smooth, edge as usize)))
+            })
+        }));
         visited.clear();
         visited.resize(incident.len(), false);
         for (i, &(face, at, own, _)) in local.iter().enumerate() {
@@ -304,24 +326,11 @@ impl Fan {
             stack.push(i);
             visited[i] = true;
             let mut sum = [0.0; 3];
-            let set = |words: &Option<Column<u64>>, e: usize| {
-                words.as_deref().is_some_and(|w| is_set(w, e))
-            };
             while let Some(k) = stack.pop() {
-                let (f, at, normal, angle) = local[k];
+                let (_, _, normal, angle) = local[k];
                 sum = vector::add(sum, vector::scale(normal, angle));
-                let edges = &index.face_edges()[f as usize];
-                for edge in [edges[at], edges[(at + edges.len() - 1) % edges.len()]] {
-                    let faces = &index.edge_faces()[edge as usize];
-                    if set(&inputs.sharp, edge as usize) || faces.len() != 2 {
-                        continue;
-                    }
-                    let soft = set(&inputs.smooth, edge as usize);
-                    let other = if faces[0] == f { faces[1] } else { faces[0] };
-                    if let Some(next) = incident.iter().position(|&g| g == other)
-                        && !visited[next]
-                        && (soft || vector::dot(own, local[next].2) >= CUSP_COSINE)
-                    {
+                for &(next, soft) in links[k].iter().flatten() {
+                    if !visited[next] && (soft || vector::dot(own, local[next].2) >= CUSP_COSINE) {
                         visited[next] = true;
                         stack.push(next);
                     }
