@@ -16,36 +16,24 @@
 //! while a document is open. OK or Apply puts the drafts in place: the
 //! user's values saved with the user's settings (never undone), the
 //! project's as one edit of the document (one undo step); Cancel drops
-//! them; Reset Page puts the page's package's values of its scope back
-//! at their defaults. A value set outside the window takes the same path
+//! them; Reset Page puts the page's own rows back at their defaults (its
+//! rows drawn over default values, each written back through
+//! [`PageRows::apply`]), so its package's other pages keep theirs. A value set outside the window takes the same path
 //! ([`HostDoc::set_stored_any`](crate::host::HostDoc::set_stored_any)).
 //!
 //! [`Stored`]: kinogaki_studio_api::Stored
-//! [`Scope::User`]: kinogaki_studio_api::Scope::User
-//! [`Scope::Project`]: kinogaki_studio_api::Scope::Project
 //! [`Package::with_stored`]: kinogaki_studio_api::Package::with_stored
 use super::parts::part;
 use crate::host::Cx;
 use crate::sheet::{Edits, Schema};
-use kinogaki_studio_api::StoredValues;
+use kinogaki_studio_api::{Scope, StoredValues};
 use std::fmt;
-
-/// Whose values a settings page edits, and so where it shows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PageScope {
-    /// The user's ([`Scope::User`](kinogaki_studio_api::Scope::User)):
-    /// a page of the window of its own.
-    User,
-    /// The open project's
-    /// ([`Scope::Project`](kinogaki_studio_api::Scope::Project)): a section
-    /// of Settings ▸ Project.
-    Project,
-}
 
 /// A page of the Settings window: its scope, its label and its rows.
 pub struct SettingsPage<S: ?Sized> {
-    /// Whose values it edits.
-    pub scope: PageScope,
+    /// Whose values it edits: the user's or the project's alone, as its
+    /// constructors make it.
+    pub(super) scope: Scope,
     /// The page's name in the window (a user page) or its section's heading
     /// on Settings ▸ Project ("Color").
     pub label: String,
@@ -54,17 +42,31 @@ pub struct SettingsPage<S: ?Sized> {
 }
 
 impl<S: ?Sized> SettingsPage<S> {
-    /// A page of `scope` labelled `label`, drawn by `rows`.
-    pub fn new(
-        scope: PageScope,
-        label: impl Into<String>,
-        rows: impl PageRows<S> + 'static,
-    ) -> Self {
+    /// A page of the user's values: a page of the window of its own,
+    /// labelled `label`, drawn by `rows`.
+    pub fn user(label: impl Into<String>, rows: impl PageRows<S> + 'static) -> Self {
+        Self::of(Scope::User, label, rows)
+    }
+
+    /// A page of the open project's values: a section of Settings ▸
+    /// Project, headed `label`, drawn by `rows`.
+    pub fn project(label: impl Into<String>, rows: impl PageRows<S> + 'static) -> Self {
+        Self::of(Scope::Project, label, rows)
+    }
+
+    fn of(scope: Scope, label: impl Into<String>, rows: impl PageRows<S> + 'static) -> Self {
         Self {
             scope,
             label: label.into(),
             rows: Box::new(rows),
         }
+    }
+}
+
+impl<S: ?Sized> SettingsPage<S> {
+    /// Whose values it edits: [`Scope::User`] or [`Scope::Project`].
+    pub fn scope(&self) -> Scope {
+        self.scope
     }
 }
 

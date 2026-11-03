@@ -18,8 +18,8 @@ use studio_ui_api::package::hosting::Registered;
 use studio_ui_api::package::{
     ContextPart, Display, DisplayKind, DisplayOption, DisplayScope, Edited, Ended, Held, Inspector,
     KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library, LiveTools, MarkingDefault,
-    MenuDefaults, PageRows, PageScope, Panel, PanelScope, Panels, Places, SettingsPage, Shared,
-    Situation, Takes, UiPackage, VocabularyItem, When, WithUi,
+    MenuDefaults, PageRows, Panel, PanelScope, Panels, Places, SettingsPage, Shared, Situation,
+    Takes, UiPackage, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
 use studio_ui_api::{ButtonSpec, Color, Modifiers, Painter, Pos, Rect, Stroke, Ui, Vec2};
@@ -87,8 +87,8 @@ impl UiPackage for Trees {
     }
     fn settings(&self) -> Vec<SettingsPage<Forest>> {
         vec![
-            SettingsPage::new(PageScope::User, "Forest", DensityPage),
-            SettingsPage::new(PageScope::Project, "Trees", SpacingPage),
+            SettingsPage::user("Forest", DensityPage),
+            SettingsPage::project("Trees", SpacingPage),
         ]
     }
     fn poll(&self, s: &mut Forest, _cx: &mut dyn Cx) {
@@ -422,12 +422,9 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     assert!(context.levels.is_some() && context.tools.is_some() && context.display.is_some());
     assert!(context.vocabulary.is_none());
     let pages: Vec<_> = (package.settings.iter())
-        .map(|p| (p.scope, p.label.as_str()))
+        .map(|p| (p.scope(), p.label.as_str()))
         .collect();
-    assert_eq!(
-        pages,
-        [(PageScope::User, "Forest"), (PageScope::Project, "Trees")]
-    );
+    assert_eq!(pages, [(Scope::User, "Forest"), (Scope::Project, "Trees")]);
     let levels = context.levels.as_ref().unwrap().levels();
     assert_eq!(levels.len(), 2);
     // The library is data, kept as given.

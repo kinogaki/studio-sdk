@@ -91,7 +91,7 @@ pub use parts::{
     Display, Inspector, Invoked, Levels, LiveTools, NumericBar, ObjectRows, Panels, RowAction,
     Timeline, Transforms, Vocabulary,
 };
-pub use settings::{PageRows, PageScope, SettingsPage};
+pub use settings::{PageRows, SettingsPage};
 pub use view::{Holds, KeyPress};
 
 use crate::host::{Cx, Waker};
