@@ -83,3 +83,36 @@ fn caches_built_on_many_threads_keep_one_value() {
     });
     assert!(kept.iter().all(|k| Arc::ptr_eq(k, &kept[0])));
 }
+
+#[test]
+fn threads_asking_at_once_build_a_cache_once() {
+    struct Sum(f64);
+    let column: Column<f64> = (0..1000).map(f64::from).collect();
+    let (builds, threads) = (AtomicUsize::new(0), 8);
+    let start = std::sync::Barrier::new(threads);
+    let sums: Vec<Arc<Sum>> = std::thread::scope(|scope| {
+        let asks: Vec<_> = (0..threads)
+            .map(|_| {
+                scope.spawn(|| {
+                    start.wait();
+                    column.derived(|values| {
+                        builds.fetch_add(1, Ordering::SeqCst);
+                        // A slow build: the others ask while it runs.
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        Sum(values.iter().sum())
+                    })
+                })
+            })
+            .collect();
+        asks.into_iter().map(|a| a.join().unwrap()).collect()
+    });
+    assert_eq!(
+        builds.load(Ordering::SeqCst),
+        1,
+        "one build for every thread"
+    );
+    assert!(
+        sums.iter()
+            .all(|s| Arc::ptr_eq(s, &sums[0]) && s.0 == 499_500.0)
+    );
+}
