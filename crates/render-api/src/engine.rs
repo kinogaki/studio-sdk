@@ -137,18 +137,47 @@ impl Default for Outputs {
     }
 }
 
-struct Slot<T> {
-    value: Option<T>,
-    delivered: bool,
+/// Why a [`Pending`] result never came.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RenderError {
+    /// The engine couldn't produce it, saying why (a readback failed, the
+    /// device was lost).
+    Failed(Arc<str>),
+    /// The engine let the request go without answering: it dropped the
+    /// [`Deliver`] (a view removed under it, the engine shut down).
+    Abandoned,
 }
 
-/// A result that arrives later, once. The producer holds the matching
-/// [`Deliver`]; delivering stores the value and wakes the host once.
+impl std::fmt::Display for RenderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RenderError::Failed(why) => f.write_str(why),
+            RenderError::Abandoned => f.write_str("the engine dropped the request"),
+        }
+    }
+}
+
+impl std::error::Error for RenderError {}
+
+/// What a pending result holds: nothing yet, its outcome, or its outcome
+/// taken.
+enum Slot<T> {
+    Waiting,
+    Resolved(Result<T, RenderError>),
+    Taken,
+}
+
+/// A result that arrives later, once: the value, or why it never will.
+/// The producer holds the matching [`Deliver`]; delivering, failing or
+/// dropping it resolves this one and wakes the host once, so a host never
+/// waits on a result no one will give.
 pub struct Pending<T> {
     slot: Arc<Mutex<Slot<T>>>,
 }
 
-/// The producing side of a [`Pending`].
+/// The producing side of a [`Pending`]. Dropped without
+/// [`deliver`](Self::deliver) or [`fail`](Self::fail), it resolves the
+/// result as [`RenderError::Abandoned`].
 pub struct Deliver<T> {
     slot: Arc<Mutex<Slot<T>>>,
     wake: Wake,
@@ -156,10 +185,7 @@ pub struct Deliver<T> {
 
 /// A pending result and the means to deliver it (waking `wake` once).
 pub fn pending<T>(wake: Wake) -> (Deliver<T>, Pending<T>) {
-    let slot = Arc::new(Mutex::new(Slot {
-        value: None,
-        delivered: false,
-    }));
+    let slot = Arc::new(Mutex::new(Slot::Waiting));
     (
         Deliver {
             slot: slot.clone(),
@@ -171,33 +197,59 @@ pub fn pending<T>(wake: Wake) -> (Deliver<T>, Pending<T>) {
 
 impl<T> Deliver<T> {
     /// Store the result and wake the host. Consumes the producer, so a
-    /// result is delivered at most once.
+    /// result is resolved at most once.
     pub fn deliver(self, value: T) {
-        {
+        self.resolve(Ok(value));
+    }
+
+    /// Resolve the result as failed, saying `why`, and wake the host.
+    pub fn fail(self, why: impl Into<Arc<str>>) {
+        self.resolve(Err(RenderError::Failed(why.into())));
+    }
+
+    /// Resolves the result as `outcome` unless it is resolved already, and
+    /// wakes the host when it was.
+    fn resolve(&self, outcome: Result<T, RenderError>) {
+        let resolved = {
             let mut slot = self.slot.lock().unwrap_or_else(|e| e.into_inner());
-            slot.value = Some(value);
-            slot.delivered = true;
+            let waiting = matches!(*slot, Slot::Waiting);
+            if waiting {
+                *slot = Slot::Resolved(outcome);
+            }
+            waiting
+        };
+        if resolved {
+            (self.wake)();
         }
-        (self.wake)();
+    }
+}
+
+impl<T> Drop for Deliver<T> {
+    fn drop(&mut self) {
+        self.resolve(Err(RenderError::Abandoned));
     }
 }
 
 impl<T> Pending<T> {
-    /// Whether the result has arrived (taken or not).
-    pub fn is_delivered(&self) -> bool {
-        self.slot
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .delivered
+    /// Whether the result is resolved (delivered, failed or abandoned;
+    /// taken or not).
+    pub fn is_resolved(&self) -> bool {
+        !matches!(
+            *self.slot.lock().unwrap_or_else(|e| e.into_inner()),
+            Slot::Waiting
+        )
     }
 
-    /// The result, the first time it is asked for after it arrived.
-    pub fn take(&self) -> Option<T> {
-        self.slot
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .value
-            .take()
+    /// The outcome, the first time it is asked for after it was resolved.
+    pub fn take(&self) -> Option<Result<T, RenderError>> {
+        let mut slot = self.slot.lock().unwrap_or_else(|e| e.into_inner());
+        match std::mem::replace(&mut *slot, Slot::Taken) {
+            Slot::Resolved(outcome) => Some(outcome),
+            other => {
+                *slot = other;
+                None
+            }
+        }
     }
 }
 
@@ -215,6 +267,50 @@ pub trait RenderEngine: Send {
     fn latest(&self, view: ViewId) -> Option<Arc<Frame>>;
     /// Pause or resume a view's refinement.
     fn pause(&mut self, view: ViewId, paused: bool);
-    /// Read a view's outputs once its samples are done.
+    /// Read a view's outputs once its samples are done. The result
+    /// resolves once: the outputs, or why there are none (a failed read,
+    /// or the request dropped with the view or the engine).
     fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Outputs>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn counted() -> (Wake, Arc<AtomicUsize>) {
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let count = wakes.clone();
+        let wake: Wake = Arc::new(move || {
+            count.fetch_add(1, Ordering::SeqCst);
+        });
+        (wake, wakes)
+    }
+
+    #[test]
+    fn a_dropped_deliverer_resolves_its_result_and_wakes_once() {
+        let (wake, wakes) = counted();
+        let (deliver, result) = pending::<u32>(wake);
+        std::thread::spawn(move || drop(deliver))
+            .join()
+            .expect("the producer runs");
+        assert!(result.is_resolved());
+        assert_eq!(wakes.load(Ordering::SeqCst), 1);
+        assert_eq!(result.take(), Some(Err(RenderError::Abandoned)));
+        assert_eq!(result.take(), None);
+    }
+
+    #[test]
+    fn a_failure_resolves_once_saying_why() {
+        let (wake, wakes) = counted();
+        let (deliver, result) = pending::<u32>(wake);
+        deliver.fail("the device was lost");
+        assert_eq!(
+            wakes.load(Ordering::SeqCst),
+            1,
+            "failing wakes; the drop after it doesn't"
+        );
+        let failed = RenderError::Failed(Arc::from("the device was lost"));
+        assert_eq!(result.take(), Some(Err(failed)));
+    }
 }

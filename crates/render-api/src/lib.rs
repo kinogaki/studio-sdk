@@ -55,8 +55,8 @@ pub use description::{
 };
 pub use dirty::Dirty;
 pub use engine::{
-    Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
-    ViewMode, Wake, pending,
+    Deliver, Frame, Outputs, Pending, RenderEngine, RenderError, RenderStats, ViewCamera, ViewDesc,
+    ViewId, ViewMode, Wake, pending,
 };
 pub use exchange::{Extra, ImportedMaterial, PreviewSurface};
 pub use id::{EngineId, IdAllocator, MaterialId, PrimId, TextureId};
