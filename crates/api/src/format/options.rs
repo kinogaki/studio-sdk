@@ -2,7 +2,7 @@
 //! out of a format's [`FormatOptions`], choices saved by a token of their
 //! own (`"m"`, `"Z"`, `"Keep"`) rather than an index so a saved setting
 //! survives a reordered list, and the rows most import dialogs show
-//! (sections, the units a file is taken to be in, a scale, toggles).
+//! (sections, a scale, toggles).
 //!
 //! ```
 //! use kinogaki_studio_api::format::options;
@@ -52,40 +52,6 @@ pub fn section(schema: Schema, format: &str, title: &str) -> Schema {
     schema.section(format!("import-{format}-{title}"), title, true)
 }
 
-/// A choice row's labels and the one chosen.
-#[derive(Clone, Copy, Debug)]
-pub struct Choices<'a> {
-    /// What each choice shows as.
-    pub labels: &'a [&'a str],
-    /// The chosen one's index.
-    pub selected: usize,
-}
-
-/// The two rows of the units a file is taken to be in: `up` (its axis
-/// choices) and `unit` (its length choices).
-pub fn units(schema: Schema, up: Choices<'_>, unit: Choices<'_>) -> Schema {
-    let labels = |c: Choices<'_>| c.labels.iter().map(|l| (*l).to_owned()).collect();
-    schema
-        .parameter(
-            Parameter::new(
-                "up",
-                "Up axis in file",
-                ParameterKind::Choice(labels(up)),
-                Value::Index(up.selected),
-            )
-            .keywords("axis y z orientation"),
-        )
-        .parameter(
-            Parameter::new(
-                "unit",
-                "Unit in file",
-                ParameterKind::Choice(labels(unit)),
-                Value::Index(unit.selected),
-            )
-            .keywords("length units scale meters"),
-        )
-}
-
 /// The `scale` row, within `SCALE`.
 pub fn scale(schema: Schema, scale: f64) -> Schema {
     schema.parameter(
@@ -114,19 +80,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rows_carry_their_names_and_choices() {
-        let up = Choices {
-            labels: &["Y", "Z"],
-            selected: 1,
-        };
-        let unit = Choices {
-            labels: &["mm", "m"],
-            selected: 0,
-        };
-        let schema = units(Schema::default(), up, unit);
-        let schema = scale(toggle(schema, "weld", "Weld", "merge", true), 2.0);
+    fn rows_carry_their_names_and_values() {
+        let schema = scale(
+            toggle(Schema::default(), "weld", "Weld", "merge", true),
+            2.0,
+        );
         let names: Vec<_> = schema.parameters().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, ["up", "unit", "weld", "scale"]);
-        assert_eq!(schema.parameters().next().unwrap().value, Value::Index(1));
+        assert_eq!(names, ["weld", "scale"]);
+        assert_eq!(schema.parameters().next().unwrap().value, Value::Bool(true));
     }
 }
