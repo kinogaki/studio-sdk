@@ -10,8 +10,8 @@ use kinogaki_studio_api::{
     ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId, StoredValues,
 };
 use studio_ui_api::host::{
-    Cx, Ground, HostDoc, HostSettingsExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows,
-    ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
+    Cx, Ground, HostDoc, HostSettingsExt, HostSlots, HostSlotsExt, HostUndo, InspectorCx, NodeRef,
+    NodeRows, ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
 };
 use studio_ui_api::package::{
     ContextPart, Edited, Held, Inspector, KeyBinding, KeyStore, KeysActive, LevelSpec, Levels,
@@ -171,7 +171,11 @@ impl Levels<Forest> for TreeLevels {
     fn choose(&self, s: &mut Forest, cx: &mut dyn Cx, level: usize) {
         s.level = level;
         // Choosing a level converts the selection, within the open step.
-        cx.slot_mut::<Picked>().0.clear();
+        cx.slot_any_mut(Picked::id())
+            .and_then(|v| v.downcast_mut::<Picked>())
+            .expect("registered")
+            .0
+            .clear();
     }
     fn toggle(&self, s: &mut Forest, cx: &mut dyn Cx, level: usize) {
         self.choose(s, cx, level);
@@ -488,7 +492,11 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
     assert_eq!(host.history(), ["Pick", "Change Level"]);
     assert_eq!(trees.state::<Forest>().level, 1);
     let drag = host.begin_gesture("Drag").unwrap();
-    host.slot_mut::<Picked>().0.push(9);
+    host.slot_any_mut(Picked::id())
+        .and_then(|v| v.downcast_mut::<Picked>())
+        .expect("registered")
+        .0
+        .push(9);
     host.cancel_gesture(drag);
     assert_eq!(host.slot::<Picked>(), &Picked::default());
     assert_eq!(host.history(), ["Pick", "Change Level"]);

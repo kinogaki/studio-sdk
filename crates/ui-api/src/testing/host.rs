@@ -3,7 +3,7 @@
 //! [`Hosting`]: a registered package with its state,
 //! called the way the host calls it (state taken out per call and put
 //! back, callbacks queued, never nested).
-use super::FakeNetwork;
+use super::{FakeNetwork, HostCall};
 use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
 use crate::host::{
     Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
@@ -28,70 +28,6 @@ use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-/// What a package asked of a [`FakeHost`], in order (queries are not
-/// recorded).
-#[derive(Clone, Debug, PartialEq)]
-pub enum HostCall {
-    /// [`HostUndo::begin_gesture`].
-    BeginGesture(String),
-    /// [`HostUndo::finish_gesture`].
-    FinishGesture,
-    /// [`HostUndo::cancel_gesture`].
-    CancelGesture,
-    /// [`HostUndo::back_to`].
-    BackTo(GestureMark),
-    /// [`HostUndo::undo`].
-    Undo,
-    /// [`HostUndo::redo`].
-    Redo,
-    /// [`HostSlots::set_slot_any`], by slot and step label.
-    SetSlot(SlotId, String),
-    /// [`HostSelection::select_objects`].
-    SelectObjects(Vec<ObjectRef>),
-    /// [`HostSelection::pick_node`].
-    PickNode(NodeRef, bool),
-    /// [`HostDoc::go_to`].
-    GoTo(Place),
-    /// [`HostDoc::set_time`].
-    SetTime(Time),
-    /// [`HostDoc::set_object_body`], by object and step label, whether or
-    /// not the body was taken.
-    SetBody(ObjectRef, String),
-    /// [`HostView::frame_bounds`].
-    Frame(Bounds),
-    /// [`HostView::look_at`]: the view, the frame and whether orthographic.
-    LookAt(usize, Frame, bool),
-    /// [`HostView::restore`].
-    Restore(usize),
-    /// [`HostView::redraw`].
-    Redraw,
-    /// [`HostStatus::fail`].
-    Fail(String),
-    /// [`HostStatus::info`].
-    Info(String),
-    /// [`HostStatus::console`]: level, subject, text.
-    Console(Severity, Option<String>, String),
-    /// [`HostShell::copy_text`].
-    CopyText(String),
-    /// [`Cx::latest`], by key.
-    Latest(String),
-    /// [`HostShell::run_action`].
-    RunAction(String, String),
-    /// [`HostTransform::set_transform_tool`].
-    SetTransformTool(TransformTool),
-    /// [`HostTransform::set_snapping`].
-    SetSnapping(bool),
-    /// [`HostTransform::set_transform_space`].
-    SetTransformSpace(TransformSpace),
-    /// [`HostSettings::set_section_any`].
-    SetSection(ContextId),
-    /// [`HostNetwork::edit_network`], by object and step label, whether or
-    /// not the edit held.
-    EditNetwork(ObjectRef, String),
-    /// [`Cx::node_rows`].
-    NodeRows(ObjectRef, NodeRef, RowsFor),
-}
 
 /// An object of a [`FakeHost`]'s scene.
 #[derive(Clone, Debug)]
@@ -365,7 +301,6 @@ impl HostUndo for FakeHost {
     }
     /// A fake host marks only gestures' starts.
     fn back_to(&mut self, mark: GestureMark) {
-        self.calls.push(HostCall::BackTo(mark));
         if let Some((_, _, before)) = &self.gesture
             && mark == GestureMark::new(self.gestures, 0)
         {

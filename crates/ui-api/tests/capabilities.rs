@@ -65,7 +65,6 @@ fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
     host.set_slot("step", Count(3));
     host.back_to(start);
     assert_eq!(host.slot::<Count>(), &Count(3));
-    assert!(host.take_calls().contains(&HostCall::BackTo(start)));
 }
 
 #[test]

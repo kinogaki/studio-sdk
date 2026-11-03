@@ -91,16 +91,6 @@ pub trait HostSlotsExt: HostSlots {
             .and_then(|v| v.downcast_ref())
             .unwrap_or_else(|| unregistered::<T>())
     }
-    /// Slot `T`'s value to change, not recorded (see
-    /// [`HostSlots::slot_any_mut`]).
-    ///
-    /// # Panics
-    /// When no package registered `T`.
-    fn slot_mut<T: Slot>(&mut self) -> &mut T {
-        self.slot_any_mut(T::id())
-            .and_then(|v| v.downcast_mut())
-            .unwrap_or_else(|| unregistered::<T>())
-    }
     /// Sets slot `T` to `value` as an undo step named `label`.
     ///
     /// # Panics

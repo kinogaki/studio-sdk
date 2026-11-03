@@ -14,13 +14,15 @@
 //! assert!(ui.button(&ButtonSpec::new("Apply")).clicked);
 //! assert_eq!(ui.calls(), [Call::Button("Apply".into())]);
 //! ```
+mod calls;
 mod host;
 mod network;
 mod painter;
 mod ui;
 mod ui_impl;
 
-pub use host::{FakeHost, FakeObject, HostCall, Hosting};
+pub use calls::HostCall;
+pub use host::{FakeHost, FakeObject, Hosting};
 pub use network::FakeNetwork;
 pub use painter::{GLYPH_ADVANCE, RecordingPainter};
 pub use ui::{Call, RecordingUi};
