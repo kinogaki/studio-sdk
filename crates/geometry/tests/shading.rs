@@ -130,6 +130,55 @@ fn sharp_edges_split_fans_and_authored_normals_come_first() {
     close(flat.shading_normals().vertices()[4], [0.0, 1.0, 0.0]);
 }
 
+/// A fan bending away from the vertex's own polygon: each polygon within
+/// the cusp of the next, the last past the cusp of the first. A corner of
+/// the first averages its own polygon and the next alone, with an empty
+/// sharp group as without one.
+#[test]
+fn one_rule_with_or_without_an_empty_group() {
+    let ring = |k: usize, z: f64| {
+        let t = k as f64 * PI / 3.0;
+        [t.cos(), t.sin(), z]
+    };
+    let v = value(
+        &[
+            [0.0; 3],
+            ring(0, 0.0),
+            ring(1, 0.0),
+            ring(2, 1.0),
+            ring(3, 2.5),
+        ],
+        &[&[0, 1, 2], &[0, 2, 3], &[0, 3, 4]],
+    );
+    let faces = v.shading_normals().primitives().to_vec();
+    let dot = |a: [f32; 3], b: [f32; 3]| (0..3).map(|k| a[k] * b[k]).sum::<f32>();
+    assert!(dot(faces[0], faces[1]) > 0.5 && dot(faces[1], faces[2]) > 0.5);
+    assert!(
+        dot(faces[0], faces[2]) < 0.5,
+        "the last past the first's cusp"
+    );
+    let plain = v.shading_normals();
+    let grouped = sharp(&v, false).shading_normals();
+    assert_eq!(
+        plain.vertices(),
+        grouped.vertices(),
+        "an empty group changes nothing"
+    );
+    // The first polygon's corner at the centre: its own and the next, by
+    // their angles there, not the last.
+    let points = [ring(0, 0.0), ring(1, 0.0), ring(2, 1.0)];
+    let angle = |a: [f64; 3], b: [f64; 3]| {
+        let d = |x: [f64; 3], y: [f64; 3]| (0..3).map(|k| x[k] * y[k]).sum::<f64>();
+        (d(a, b) / (d(a, a) * d(b, b)).sqrt()).acos()
+    };
+    let weights = [angle(points[0], points[1]), angle(points[1], points[2])];
+    let mean: [f64; 3] = std::array::from_fn(|k| {
+        weights[0] * f64::from(faces[0][k]) + weights[1] * f64::from(faces[1][k])
+    });
+    let length = mean.iter().map(|c| c * c).sum::<f64>().sqrt();
+    close(plain.vertices()[0], mean.map(|c| c / length));
+}
+
 #[test]
 fn fans_never_join_across_an_edge_of_three_polygons() {
     let v = value(

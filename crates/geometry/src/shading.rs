@@ -22,13 +22,12 @@ const CUSP_COSINE: f64 = 0.5;
 /// from the first class that has one: Vertex, Point, Primitive, Piece)
 /// gives each polygon vertex its normal. Otherwise each vertex averages
 /// the normals of the polygons around its point, weighted by each
-/// polygon's angle there. With a [`sharp`](names::SHARP) or
-/// [`smooth`](names::SMOOTH) edge group, it averages the polygons reached
-/// from its own across edges with exactly two polygons: never across a
-/// sharp edge, always across a smooth one (not also sharp), and across
-/// any other edge when the two polygons are within 60° (the cusp angle).
-/// Without either group, it averages every polygon through the point
-/// within 60° of its own. A vertex with nothing to average (or an
+/// polygon's angle there: the polygons reached from its own across edges
+/// with exactly two polygons, never across a [`sharp`](names::SHARP)
+/// edge, always across a [`smooth`](names::SMOOTH) one (not also sharp),
+/// and across any other edge when the polygon reached is within 60° (the
+/// cusp angle) of the vertex's own. One rule, with or without the groups:
+/// an empty group changes nothing. A vertex with nothing to average (or an
 /// authored normal of zero length) takes its polygon's normal.
 ///
 /// It is derived from the topology, the positions, `N`, `sharp` and
@@ -300,45 +299,35 @@ impl Fan {
                 ));
                 continue;
             }
-            let sum = if inputs.sharp.is_some() || inputs.smooth.is_some() {
-                visited.fill(false);
-                stack.clear();
-                stack.push(i);
-                visited[i] = true;
-                let mut sum = [0.0; 3];
-                let set = |words: &Option<Column<u64>>, e: usize| {
-                    words.as_deref().is_some_and(|w| is_set(w, e))
-                };
-                while let Some(k) = stack.pop() {
-                    let (f, at, normal, angle) = local[k];
-                    sum = vector::add(sum, vector::scale(normal, angle));
-                    let edges = &index.face_edges()[f as usize];
-                    for edge in [edges[at], edges[(at + edges.len() - 1) % edges.len()]] {
-                        let faces = &index.edge_faces()[edge as usize];
-                        if set(&inputs.sharp, edge as usize) || faces.len() != 2 {
-                            continue;
-                        }
-                        let soft = set(&inputs.smooth, edge as usize);
-                        let other = if faces[0] == f { faces[1] } else { faces[0] };
-                        if let Some(next) = incident.iter().position(|&g| g == other)
-                            && !visited[next]
-                            && (soft || vector::dot(normal, local[next].2) >= CUSP_COSINE)
-                        {
-                            visited[next] = true;
-                            stack.push(next);
-                        }
+            visited.fill(false);
+            stack.clear();
+            stack.push(i);
+            visited[i] = true;
+            let mut sum = [0.0; 3];
+            let set = |words: &Option<Column<u64>>, e: usize| {
+                words.as_deref().is_some_and(|w| is_set(w, e))
+            };
+            while let Some(k) = stack.pop() {
+                let (f, at, normal, angle) = local[k];
+                sum = vector::add(sum, vector::scale(normal, angle));
+                let edges = &index.face_edges()[f as usize];
+                for edge in [edges[at], edges[(at + edges.len() - 1) % edges.len()]] {
+                    let faces = &index.edge_faces()[edge as usize];
+                    if set(&inputs.sharp, edge as usize) || faces.len() != 2 {
+                        continue;
+                    }
+                    let soft = set(&inputs.smooth, edge as usize);
+                    let other = if faces[0] == f { faces[1] } else { faces[0] };
+                    if let Some(next) = incident.iter().position(|&g| g == other)
+                        && !visited[next]
+                        && (soft || vector::dot(own, local[next].2) >= CUSP_COSINE)
+                    {
+                        visited[next] = true;
+                        stack.push(next);
                     }
                 }
-                sum
-            } else {
-                local
-                    .iter()
-                    .filter(|l| vector::dot(l.2, own) >= CUSP_COSINE)
-                    .fold([0.0; 3], |s, l| vector::add(s, vector::scale(l.2, l.3)))
-            };
+            }
             let length = vector::length(sum);
-            // Divided, not scaled by the reciprocal: lib-mesh's arithmetic,
-            // bit for bit.
             let n = if length > 1e-20 {
                 sum.map(|c| c / length)
             } else {
