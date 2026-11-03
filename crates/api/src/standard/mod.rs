@@ -6,17 +6,17 @@
 //! reads and writes them through the handles here:
 //!
 //! ```
-//! use kinogaki_studio_api::geometry::Polygons;
+//! use kinogaki_studio_api::geometry::Geometry;
 //! use kinogaki_studio_api::standard;
 //!
-//! let data = standard::polygons().wrap(Polygons::empty());
-//! assert_eq!(data.ty().as_str(), standard::POLYGONS);
-//! assert!(standard::polygons().get(&data).is_some());
+//! let data = standard::geometry().wrap(Geometry::empty());
+//! assert_eq!(data.ty().as_str(), "kinogaki.core.geometry");
+//! assert!(standard::geometry().get(&data).is_some());
 //! assert!(standard::curves().get(&data).is_none());
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`PolygonsCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`],
+//! here ([`GeometryCodec`], [`CurvesCodec`], [`BrepCodec`], [`CameraCodec`],
 //! [`LightCodec`], [`PreviewMaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
@@ -33,9 +33,9 @@ mod brep;
 mod camera;
 mod color;
 mod curves;
+mod geometry;
 mod light;
 mod materials;
-mod polygons;
 mod quality;
 mod selection;
 mod tolerances;
@@ -44,9 +44,9 @@ pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use color::ColorConfiguration;
 pub use curves::CurvesCodec;
+pub use geometry::GeometryCodec;
 pub use light::LightCodec;
 pub use materials::PreviewMaterialsCodec;
-pub use polygons::PolygonsCodec;
 
 use crate::components::Components;
 use crate::data::Typed;
@@ -54,11 +54,11 @@ use crate::error::Error;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
-use kinogaki_geometry::{Curves, Domain, GeometryError, Polygons, Selection};
+use kinogaki_geometry::{Curves, Domain, Geometry, GeometryError, Selection};
 use kinogaki_render_api::ImportedMaterial;
 
-/// The id of [`Polygons`] values.
-pub const POLYGONS: &str = "kinogaki.core.polygons";
+/// The id of [`Geometry`] values: polygons, polylines and curves.
+pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
 /// The id of [`Curves`] values.
 pub const CURVES: &str = "kinogaki.core.curves";
 
@@ -69,9 +69,9 @@ pub const BREP: &str = "kinogaki.core.brep";
 /// geometry ([`preview_materials`]).
 pub(crate) const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
 
-/// The handle on [`Polygons`] values ([`POLYGONS`]).
-pub const fn polygons() -> Typed<Polygons> {
-    Typed::new(DataTypeId::declared(POLYGONS))
+/// The handle on [`Geometry`] values (`GEOMETRY`).
+pub const fn geometry() -> Typed<Geometry> {
+    Typed::new(DataTypeId::declared(GEOMETRY))
 }
 
 /// The handle on [`Curves`] values ([`CURVES`]).

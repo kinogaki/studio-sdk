@@ -289,7 +289,7 @@ pub struct Writing<'a> {
     /// An item's value as polygons, for a writer that writes only those
     /// (a B-rep through the installed mesher); `None` when nothing meshes
     /// it.
-    pub meshed: &'a (dyn Fn(&Data) -> Option<kinogaki_geometry::Polygons> + Sync),
+    pub meshed: &'a (dyn Fn(&Data) -> Option<kinogaki_geometry::Geometry> + Sync),
     /// The range being written, for a writer that writes
     /// [`frames`](FormatWriter::frames); `None` writes `items` alone.
     pub frames: Option<&'a dyn Frames>,

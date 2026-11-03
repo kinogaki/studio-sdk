@@ -148,7 +148,7 @@ impl Primitives {
         ))
     }
 
-    /// Polygons alone, checked: what most values are, held without a
+    /// Geometry alone, checked: what most values are, held without a
     /// kind column.
     ///
     /// # Errors

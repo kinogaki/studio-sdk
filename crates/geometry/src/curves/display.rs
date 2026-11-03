@@ -263,7 +263,7 @@ impl Curves {
     }
 
     /// The control points whose position differs from `before`'s bit for
-    /// bit, ascending (as [`Polygons::moved_points`](crate::Polygons::moved_points)),
+    /// bit, ascending (as [`Geometry::moved_points`](crate::Geometry::moved_points)),
     /// when the two are one structure (the same basis, offsets, point
     /// index, degrees, closed curves, knots and weights columns: a
     /// [`with_positions`](Self::with_positions) edit); `None` otherwise.

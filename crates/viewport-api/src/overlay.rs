@@ -18,7 +18,7 @@ pub struct OverlayLine {
     pub offset: [f32; 3],
 }
 /// One colored layer over a value's surface: filled polygons and lines.
-/// Polygons are filled with the packet's own triangles, so a layer stays
+/// Geometry are filled with the packet's own triangles, so a layer stays
 /// right on every packet of its topology (a drag clips concave polygons
 /// again); the ids shared, a renderer keeps their upload while the
 /// allocations stay.

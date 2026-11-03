@@ -2,7 +2,7 @@
 //! the same selection as another domain, and connected pieces.
 use kinogaki_edit::select::{self, Coverage, Expand, Mode};
 use kinogaki_geometry::{
-    Attribute, Attributes, Domain, Elements, ErrorKind, Kind, Meaning, Polygons, Primitives,
+    Attribute, Attributes, Domain, Elements, ErrorKind, Geometry, Kind, Meaning, Primitives,
     Selection, Text, names,
 };
 
@@ -15,7 +15,7 @@ use kinogaki_geometry::{
 ///   │  0  │ 1 4   5
 ///   0 ─── 1 ╱     (polyline 3–5–6)
 /// ```
-fn value() -> Polygons {
+fn value() -> Geometry {
     let positions = vec![
         [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
@@ -34,10 +34,10 @@ fn value() -> Polygons {
         None,
     )
     .unwrap();
-    Polygons::new(positions.into(), topology, Attributes::new()).unwrap()
+    Geometry::new(positions.into(), topology, Attributes::new()).unwrap()
 }
 
-fn on(p: &Polygons, domain: Domain, ids: &[u32]) -> Selection {
+fn on(p: &Geometry, domain: Domain, ids: &[u32]) -> Selection {
     let count = p.count(domain).unwrap();
     let members = Elements::from_indices(count, ids.iter().copied()).unwrap();
     Selection::on(p, domain, members, None).unwrap()
@@ -50,7 +50,7 @@ fn stale(count: usize, ids: &[u32]) -> Selection {
     s.restored(Some([7; 32]), None).unwrap()
 }
 
-fn all(p: &Polygons, domain: Domain) -> Selection {
+fn all(p: &Geometry, domain: Domain) -> Selection {
     Selection::on(p, domain, Elements::all(p.count(domain).unwrap()), None).unwrap()
 }
 
@@ -59,7 +59,7 @@ fn ids(s: &Selection) -> Vec<u32> {
 }
 
 /// The edge between points `a` and `b`.
-fn edge(p: &Polygons, a: u32, b: u32) -> u32 {
+fn edge(p: &Geometry, a: u32, b: u32) -> u32 {
     p.primitives().index().edge_of(a, b).unwrap()
 }
 
@@ -194,7 +194,7 @@ fn coverage_chooses_between_any_and_whole() {
 
 /// Two quads apart (0 1 2 3, 4 5 6 7) and a lone triangle (8 9 10), the
 /// triangle named like the first quad when `named`.
-fn islands(named: bool) -> Polygons {
+fn islands(named: bool) -> Geometry {
     let positions: Vec<[f64; 3]> = (0..11).map(|i| [f64::from(i), 0.0, 0.0]).collect();
     let topology = Primitives::of_polygons(
         11,
@@ -209,7 +209,7 @@ fn islands(named: bool) -> Polygons {
             .with(Domain::Primitive, names::NAME, Attribute::text(text))
             .unwrap();
     }
-    Polygons::new(positions.into(), topology, attributes).unwrap()
+    Geometry::new(positions.into(), topology, attributes).unwrap()
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn connected_grows_a_pick_to_its_pieces_and_a_name_keeps_one_together() {
 
 /// `value()` with point ids `ids` and, when `insert`, a new point and a
 /// triangle on it placed before everything else (an insert upstream).
-fn with_ids(insert: bool) -> Polygons {
+fn with_ids(insert: bool) -> Geometry {
     let base = value();
     let ids: Vec<i64> = (0..7).map(|i| 100 + i).collect();
     let column = |ids: Vec<i64>| Attribute::tuples(ids, Meaning::None).unwrap();
@@ -277,7 +277,7 @@ fn with_ids(insert: bool) -> Polygons {
     let attributes = Attributes::new()
         .with(Domain::Point, names::ID, column(shifted))
         .unwrap();
-    Polygons::new(positions.into(), topology, attributes).unwrap()
+    Geometry::new(positions.into(), topology, attributes).unwrap()
 }
 
 #[test]

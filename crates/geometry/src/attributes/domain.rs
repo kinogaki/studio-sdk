@@ -3,7 +3,7 @@
 /// The elements an attribute or group has one value per.
 ///
 /// Which domains a value has, and how many elements each holds, is the
-/// value's own: [`Polygons::count`](crate::Polygons::count),
+/// value's own: [`Geometry::count`](crate::Geometry::count),
 /// [`Curves::count`](crate::Curves::count),
 /// [`Body::count`](crate::brep::Body::count). A value refuses an attribute
 /// on a domain it doesn't have. New domains may be added; a reader that

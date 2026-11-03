@@ -9,11 +9,11 @@
 //!
 //! ```
 //! use kinogaki_edit::select;
-//! use kinogaki_geometry::{Attributes, Domain, Elements, Polygons, Selection, Primitives};
+//! use kinogaki_geometry::{Attributes, Domain, Elements, Geometry, Selection, Primitives};
 //!
 //! // Two triangles sharing the edge 1–2.
 //! let t = Primitives::of_polygons(4, vec![0, 3, 6].into(), vec![0, 1, 2, 1, 3, 2].into()).unwrap();
-//! let p = Polygons::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
+//! let p = Geometry::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
 //! let first = Elements::from_indices(2, [0]).unwrap();
 //! let first = Selection::on(&p, Domain::Primitive, first, None).unwrap();
 //! let points = select::convert(&first, &p, Domain::Point).unwrap();
@@ -23,7 +23,7 @@
 //! assert_eq!(faces.members().iter().collect::<Vec<_>>(), [0]);
 //! ```
 use kinogaki_geometry::{
-    Column, Domain, Elements, GeometryError, Incidence, Polygons, Selection, names,
+    Column, Domain, Elements, Geometry, GeometryError, Incidence, Selection, names,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -120,12 +120,12 @@ pub fn resolve(s: &Selection, on: &dyn Incidence) -> Result<Column<u32>, Geometr
 ///
 /// ```
 /// use kinogaki_edit::select;
-/// use kinogaki_geometry::{Attribute, Attributes, Domain, Elements, Polygons, Selection, Primitives, names};
+/// use kinogaki_geometry::{Attribute, Attributes, Domain, Elements, Geometry, Selection, Primitives, names};
 ///
 /// let with_ids = |points: usize, ids: Vec<i64>| {
 ///     let t = Primitives::of_polygons(points, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
 ///     let ids = Attributes::new().with(Domain::Point, names::ID, Attribute::tuples(ids, kinogaki_geometry::Meaning::None).unwrap()).unwrap();
-///     Polygons::new(vec![[0.0; 3]; points].into(), t, ids).unwrap()
+///     Geometry::new(vec![[0.0; 3]; points].into(), t, ids).unwrap()
 /// };
 /// let before = with_ids(3, vec![10, 11, 12]);
 /// let s = Selection::on(&before, Domain::Point, Elements::from_indices(3, [1, 2]).unwrap(), Some(2)).unwrap();
@@ -209,7 +209,7 @@ impl From<Domain> for Mode {
 /// of its domain in a piece one of its elements lies in. A selection
 /// that doesn't belong to `on`, of a domain without pieces (Detail) or
 /// of everything, stays as it is.
-pub fn expand(s: &Selection, on: &Polygons, how: &Expand) -> Selection {
+pub fn expand(s: &Selection, on: &Geometry, how: &Expand) -> Selection {
     let point_of = |domain: Domain| -> Option<Box<dyn Fn(u32) -> u32 + '_>> {
         let topology = on.primitives();
         Some(match domain {
@@ -246,7 +246,7 @@ struct Pieces(Vec<u32>);
 /// primitives are a cache on the topology (built once, shared by every
 /// value holding it, so a drag or a rename rebuilds nothing of them);
 /// names join over a copy of it.
-fn pieces(on: &Polygons) -> Arc<Pieces> {
+fn pieces(on: &Geometry) -> Arc<Pieces> {
     let topology = on.primitives();
     let connected = topology.derived(|t| {
         let mut parent: Vec<u32> = (0..t.points() as u32).collect();

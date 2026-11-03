@@ -10,7 +10,7 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
-use kinogaki_studio_api::geometry::Polygons;
+use kinogaki_studio_api::geometry::Geometry;
 use kinogaki_studio_api::id::StoredId;
 use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
@@ -180,7 +180,7 @@ pub trait HostDoc {
     /// (in the value's numbering), `N` and `uv` on the polygons' corners
     /// as the mesher made them. `None` while it isn't meshed
     /// yet, or for a value drawn otherwise (curves).
-    fn shown_polygons(&self, object: ObjectRef) -> Option<Polygons>;
+    fn shown_polygons(&self, object: ObjectRef) -> Option<Geometry>;
     /// Whether the node the open network displays is a held edit (an Edit
     /// Mesh): the library's entries for editing show, and a key store
     /// active while editing applies.

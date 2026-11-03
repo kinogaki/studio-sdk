@@ -2,8 +2,8 @@
 //! types allow and every attribute type on every domain.
 use super::Producer;
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Elements, Kind, Meaning,
-    Polygons, Primitives, Storage, Text, Values, names,
+    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Elements, Geometry, Kind,
+    Meaning, Primitives, Storage, Text, Values, names,
 };
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::standard;
@@ -28,7 +28,7 @@ impl Fixtures {
     }
 
     /// The polygons fixtures, by name.
-    pub fn polygons(&self) -> Vec<(String, Polygons)> {
+    pub fn polygons(&self) -> Vec<(String, Geometry)> {
         let mut out = vec![
             ("quad grid".to_owned(), grid(4)),
             ("mixed polygons".to_owned(), mixed()),
@@ -38,7 +38,7 @@ impl Fixtures {
             ("points only".to_owned(), points_only()),
             ("every attribute".to_owned(), every_attribute()),
             ("groups".to_owned(), groups()),
-            ("empty".to_owned(), Polygons::empty()),
+            ("empty".to_owned(), Geometry::empty()),
         ];
         if self.large {
             out.push(("1M-face grid".to_owned(), grid(1000)));
@@ -122,7 +122,7 @@ impl Producer for Fixtures {
         let polygons = self
             .polygons()
             .into_iter()
-            .map(|(n, p)| (n, standard::polygons().wrap(p)));
+            .map(|(n, p)| (n, standard::geometry().wrap(p)));
         let curves = self
             .curves()
             .into_iter()
@@ -141,7 +141,7 @@ fn value(
     positions: Vec<[f64; 3]>,
     prims: &[Vec<u32>],
     polygon: impl Fn(usize) -> bool,
-) -> Polygons {
+) -> Geometry {
     let mut offsets = vec![0];
     let mut vertices = Vec::new();
     for p in prims {
@@ -165,11 +165,11 @@ fn value(
         None,
     )
     .expect("a valid fixture");
-    Polygons::new(positions.into(), t, Attributes::new()).expect("a valid fixture")
+    Geometry::new(positions.into(), t, Attributes::new()).expect("a valid fixture")
 }
 
 /// A `side` × `side` grid of quads.
-fn grid(side: u32) -> Polygons {
+fn grid(side: u32) -> Geometry {
     let row = side + 1;
     let positions: Vec<[f64; 3]> = (0..row * row)
         .map(|i| [(i % row) as f64, (i / row) as f64, 0.0])
@@ -186,10 +186,10 @@ fn grid(side: u32) -> Polygons {
     }
     let t = Primitives::of_polygons((row * row) as usize, offsets.into(), vertices.into())
         .expect("a grid");
-    Polygons::new(positions.into(), t, Attributes::new()).expect("a grid")
+    Geometry::new(positions.into(), t, Attributes::new()).expect("a grid")
 }
 
-fn mixed() -> Polygons {
+fn mixed() -> Geometry {
     let p = vec![
         [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
@@ -212,7 +212,7 @@ fn mixed() -> Polygons {
     )
 }
 
-fn concave() -> Polygons {
+fn concave() -> Geometry {
     // An L and an arrow head.
     let p = vec![
         [0.0, 0.0, 0.0],
@@ -229,12 +229,12 @@ fn concave() -> Polygons {
     value(p, &[vec![0, 1, 2, 3, 4, 5], vec![6, 7, 8, 9]], |_| true)
 }
 
-fn polylines_only() -> Polygons {
+fn polylines_only() -> Geometry {
     let p = (0..6).map(|i| [i as f64, 0.0, (i % 2) as f64]).collect();
     value(p, &[vec![0, 1, 2], vec![3, 4, 5, 3]], |_| false)
 }
 
-fn shared_points() -> Polygons {
+fn shared_points() -> Geometry {
     let p = vec![
         [0.0, 0.0, 0.0],
         [1.0, 0.0, 0.0],
@@ -248,7 +248,7 @@ fn shared_points() -> Polygons {
     })
 }
 
-fn points_only() -> Polygons {
+fn points_only() -> Geometry {
     value(
         vec![[0.0; 3], [1.0, 2.0, 3.0], [-1.0, 0.5, 2.0]],
         &[],
@@ -289,7 +289,7 @@ fn text_lists(n: usize) -> Attribute {
     Attribute::arrays(ty, offsets.into(), Values::Text(text)).expect("a valid fixture attribute")
 }
 
-fn every_attribute() -> Polygons {
+fn every_attribute() -> Geometry {
     let base = mixed();
     let mut a = Attributes::new();
     for domain in [
@@ -369,7 +369,7 @@ fn every_attribute() -> Polygons {
     base.with_attributes(a).expect("sized")
 }
 
-fn groups() -> Polygons {
+fn groups() -> Geometry {
     let base = grid(3);
     let edges = base.count(Domain::Edge).expect("edges");
     let a = Attributes::new()

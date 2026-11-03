@@ -2,10 +2,10 @@
 use crate::attributes::{Attribute, Domain};
 use crate::column::Column;
 use crate::elements::Elements;
+use crate::geometry::Geometry;
 use crate::kept::Kept;
 use crate::names;
 use crate::parallel;
-use crate::polygons::Polygons;
 use crate::primitives::Primitives;
 use crate::vector::{self, V3};
 use std::sync::Arc;
@@ -66,7 +66,7 @@ struct Inputs {
 }
 
 impl Inputs {
-    fn of(value: &Polygons) -> Self {
+    fn of(value: &Geometry) -> Self {
         let attributes = value.attributes();
         let authored = [Domain::Vertex, Domain::Point, Domain::Primitive]
             .into_iter()
@@ -102,7 +102,7 @@ fn same_group(a: &Option<Arc<Elements>>, b: &Option<Arc<Elements>>) -> bool {
 
 type Normals = Kept<Inputs, ShadingNormals>;
 
-impl Polygons {
+impl Geometry {
     /// The [`ShadingNormals`]: built once per positions, topology, `N`,
     /// `sharp` and `smooth`.
     pub fn shading_normals(&self) -> Arc<ShadingNormals> {
@@ -121,7 +121,7 @@ impl Polygons {
     /// recomputing only the polygons through `moved` and the vertices
     /// around their points; `moved` must include every point whose
     /// position differs. Otherwise built whole.
-    pub fn shading_normals_after(&self, before: &Polygons, moved: &[u32]) -> Arc<ShadingNormals> {
+    pub fn shading_normals_after(&self, before: &Geometry, moved: &[u32]) -> Arc<ShadingNormals> {
         let inputs = Inputs::of(self);
         let kept = self.positions().derived(|_| Normals::default());
         if let Some(n) = kept.find(|k| k.same(&inputs)) {
@@ -159,7 +159,7 @@ fn face_normal(topology: &Primitives, positions: &[V3], f: usize) -> V3 {
     vector::normalize_or_zero(area)
 }
 
-fn build(value: &Polygons, inputs: &Inputs) -> ShadingNormals {
+fn build(value: &Geometry, inputs: &Inputs) -> ShadingNormals {
     let topology = value.primitives();
     let positions: &[V3] = value.positions();
     let faces: Vec<V3> = parallel::map(topology.len(), BLOCK, |r| {
@@ -196,7 +196,7 @@ fn finished(vertices: Vec<[f32; 3]>, faces: Vec<V3>) -> ShadingNormals {
 /// `previous` with the polygons through `moved` and the vertices around
 /// their points recomputed.
 fn refreshed(
-    value: &Polygons,
+    value: &Geometry,
     inputs: &Inputs,
     previous: &ShadingNormals,
     moved: &[u32],
@@ -251,7 +251,7 @@ struct Fan {
 impl Fan {
     fn at(
         &mut self,
-        value: &Polygons,
+        value: &Geometry,
         inputs: &Inputs,
         point: usize,
         faces: &[V3],

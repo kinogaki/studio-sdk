@@ -2,12 +2,12 @@
 //! the cache following N and sharp, and the refresh after a drag matching
 //! a whole build.
 use kinogaki_geometry::{
-    Attribute, Attributes, Domain, Elements, Meaning, Polygons, Primitives, names,
+    Attribute, Attributes, Domain, Elements, Geometry, Meaning, Primitives, names,
 };
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_6, PI};
 use std::sync::Arc;
 
-fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Polygons {
+fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Geometry {
     let mut offsets = vec![0u32];
     let mut vertices = Vec::new();
     for p in polygons {
@@ -16,11 +16,11 @@ fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Polygons {
     }
     let topology =
         Primitives::of_polygons(positions.len(), offsets.into(), vertices.into()).unwrap();
-    Polygons::new(positions.to_vec().into(), topology, Attributes::new()).unwrap()
+    Geometry::new(positions.to_vec().into(), topology, Attributes::new()).unwrap()
 }
 
 /// Two triangles folded `angle` apart across the side 0–1.
-fn folded(angle: f64) -> Polygons {
+fn folded(angle: f64) -> Geometry {
     value(
         &[
             [0.0; 3],
@@ -33,7 +33,7 @@ fn folded(angle: f64) -> Polygons {
 }
 
 /// `v` with every edge in edge group `name` (`all`), or none of them.
-fn edges(v: &Polygons, name: &str, all: bool) -> Polygons {
+fn edges(v: &Geometry, name: &str, all: bool) -> Geometry {
     let count = v.count(Domain::Edge).unwrap();
     let group = if all {
         Elements::from_indices(count, 0..count as u32).unwrap()
@@ -47,7 +47,7 @@ fn edges(v: &Polygons, name: &str, all: bool) -> Polygons {
     v.with_attributes(attributes).unwrap()
 }
 
-fn sharp(v: &Polygons, all: bool) -> Polygons {
+fn sharp(v: &Geometry, all: bool) -> Geometry {
     edges(v, names::SHARP, all)
 }
 
@@ -223,7 +223,7 @@ fn normals_are_kept_and_follow_n_and_sharp_without_new_positions() {
 }
 
 /// A bumpy grid of `n` × `n` quads.
-fn grid(n: usize) -> Polygons {
+fn grid(n: usize) -> Geometry {
     let side = n + 1;
     let positions: Vec<[f64; 3]> = (0..side * side)
         .map(|i| {

@@ -1,10 +1,10 @@
 //! The SDK's consumers: [`Codecs`] and [`Invariants`].
 use super::Consumer;
-use kinogaki_geometry::{Curves, Domain, Elements, Polygons, Primitives, Selection};
+use kinogaki_geometry::{Curves, Domain, Elements, Geometry, Primitives, Selection};
 use kinogaki_studio_api::codec::DataCodec;
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::element::MemoryElement;
-use kinogaki_studio_api::standard::{self, BrepCodec, CurvesCodec, PolygonsCodec};
+use kinogaki_studio_api::standard::{self, BrepCodec, CurvesCodec, GeometryCodec};
 
 /// Saves each standard value with its codec and reads it back: the read
 /// value equals it bit for bit, and a selection of it round-trips too.
@@ -17,8 +17,8 @@ impl Consumer for Codecs {
     }
     fn check(&self, _fixture: &str, data: &Data) -> Result<(), String> {
         let (codec, count): (&dyn DataCodec, Option<usize>) =
-            if let Some(p) = standard::polygons().get(data) {
-                (&PolygonsCodec, p.count(Domain::Point))
+            if let Some(p) = standard::geometry().get(data) {
+                (&GeometryCodec, p.count(Domain::Point))
             } else if let Some(c) = standard::curves().get(data) {
                 (&CurvesCodec, c.count(Domain::Point))
             } else if let Some(b) = standard::brep().get(data) {
@@ -59,7 +59,7 @@ impl Consumer for Codecs {
 /// their bits.
 fn same_bits(a: &Data, b: &Data) -> bool {
     let bits = |p: &[[f64; 3]]| p.iter().flatten().map(|v| v.to_bits()).collect::<Vec<_>>();
-    match (standard::polygons().get(a), standard::polygons().get(b)) {
+    match (standard::geometry().get(a), standard::geometry().get(b)) {
         (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
         _ => match (standard::curves().get(a), standard::curves().get(b)) {
             (Some(x), Some(y)) => x == y && bits(x.positions()) == bits(y.positions()),
@@ -90,7 +90,7 @@ impl Consumer for Invariants {
         "invariants"
     }
     fn check(&self, _fixture: &str, data: &Data) -> Result<(), String> {
-        if let Some(p) = standard::polygons().get(data) {
+        if let Some(p) = standard::geometry().get(data) {
             return polygons(p);
         }
         if let Some(c) = standard::curves().get(data) {
@@ -100,13 +100,13 @@ impl Consumer for Invariants {
     }
 }
 
-fn polygons(p: &Polygons) -> Result<(), String> {
+fn polygons(p: &Geometry) -> Result<(), String> {
     let t = p.primitives();
     let curves = t.curves().map(|c| (**c).clone());
     let (offsets, vertices) = (t.offsets().clone(), t.vertices().clone());
     let rebuilt = Primitives::new(t.points(), offsets, vertices, t.kinds(), curves)
         .map_err(|e| e.to_string())?;
-    let again = Polygons::new(p.positions().clone(), rebuilt, (**p.attributes()).clone())
+    let again = Geometry::new(p.positions().clone(), rebuilt, (**p.attributes()).clone())
         .map_err(|e| e.to_string())?;
     if &again != p {
         return Err("rebuilt from its parts, the value differs".into());

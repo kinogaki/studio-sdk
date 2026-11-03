@@ -1,11 +1,11 @@
-//! Polygons as triangles: the display triangulation (exact outlines, the
+//! Geometry as triangles: the display triangulation (exact outlines, the
 //! tolerant clip of cut outlines, the fan for damaged ones, n − 2 always),
 //! and the cache and its refresh after a drag matching a whole build.
-use kinogaki_geometry::{Attributes, Kind, Polygons, Primitives};
+use kinogaki_geometry::{Attributes, Geometry, Kind, Primitives};
 use std::sync::Arc;
 
 /// One value of `polygons` (each a ring of point ids) over `positions`.
-fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Polygons {
+fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Geometry {
     let mut offsets = vec![0u32];
     let mut vertices = Vec::new();
     for p in polygons {
@@ -14,11 +14,11 @@ fn value(positions: &[[f64; 3]], polygons: &[&[u32]]) -> Polygons {
     }
     let topology =
         Primitives::of_polygons(positions.len(), offsets.into(), vertices.into()).unwrap();
-    Polygons::new(positions.to_vec().into(), topology, Attributes::new()).unwrap()
+    Geometry::new(positions.to_vec().into(), topology, Attributes::new()).unwrap()
 }
 
 /// Twice the area the triangles of polygon `p` cover, seen along y.
-fn area_along_y(v: &Polygons, p: usize) -> f64 {
+fn area_along_y(v: &Geometry, p: usize) -> f64 {
     let t = v.triangulation();
     t.of(p)
         .map(|i| {
@@ -153,7 +153,7 @@ fn triangles_are_n_minus_two_and_wind_with_the_polygon() {
     // A polyline has no triangles.
     let line = vec![Kind::POLYLINE].into();
     let topology = Primitives::new(2, vec![0, 2].into(), vec![0, 1].into(), line, None).unwrap();
-    let line = Polygons::new(
+    let line = Geometry::new(
         vec![[0.0; 3], [1.0, 0.0, 0.0]].into(),
         topology,
         Attributes::new(),
@@ -181,7 +181,7 @@ fn a_skew_outline_that_collapses_in_every_axis_plane_clips_in_its_own_plane() {
 
 /// A grid of `n` × `n` quads in the xz plane, every fifth one dented
 /// (concave), as one value.
-fn grid(n: usize) -> Polygons {
+fn grid(n: usize) -> Geometry {
     let side = n + 1;
     let mut positions: Vec<[f64; 3]> = (0..side * side)
         .map(|i| [(i % side) as f64, 0.0, (i / side) as f64])

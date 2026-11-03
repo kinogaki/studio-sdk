@@ -11,7 +11,7 @@ use crate::cancel::CancelToken;
 use crate::error::Error;
 use crate::id::{DataTypeId, MesherId};
 use kinogaki_geometry::brep::{Body, FaceId};
-use kinogaki_geometry::{Detail, Polygons, Tolerances};
+use kinogaki_geometry::{Detail, Geometry, Tolerances};
 
 /// The Primitive i32 attribute naming the B-rep face a polygon of a
 /// [`Meshed`] mesh shows (the [`FaceId`]'s index); `-1` on its polylines.
@@ -94,7 +94,7 @@ pub trait Mesher: Send + Sync {
 pub struct Meshed {
     /// The faces' polygons, then the edges' polylines, over shared
     /// points ([`Mesher`]).
-    pub polygons: Polygons,
+    pub polygons: Geometry,
     /// The faces it couldn't mesh, in face order.
     pub failed: Vec<Failed>,
 }

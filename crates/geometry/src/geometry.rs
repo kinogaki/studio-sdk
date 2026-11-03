@@ -1,5 +1,5 @@
-//! [`Polygons`]: polygons and polylines over shared points, with
-//! attributes — the standard value `kinogaki.polygons`.
+//! [`Geometry`]: polygons, polylines and curves over shared points, with
+//! attributes — the standard value `kinogaki.core.geometry`.
 use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
 use crate::error::GeometryError;
@@ -7,14 +7,14 @@ use crate::positions;
 use crate::primitives::Primitives;
 use std::sync::Arc;
 
-/// Polygons, polylines and curves in one value: positions, a shared
+/// Geometry, polylines and curves in one value: positions, a shared
 /// [`Primitives`] table and [`Attributes`].
 ///
 /// **Domains** ([`count`](Self::count)): Point (each position), Vertex
 /// (each corner), Primitive (each polygon or polyline), Edge (each
 /// canonical edge), Detail (one). It has no Object or Instance domain.
 ///
-/// **Rules** ([`Polygons::new`] checks them, beside the table's own):
+/// **Rules** ([`Geometry::new`] checks them, beside the table's own):
 /// - one position per point of the table, each finite and at most
 ///   1e100 in each component;
 /// - every attribute and group has one entry per element of its domain
@@ -29,11 +29,11 @@ use std::sync::Arc;
 /// Primitive group) hides primitives.
 ///
 /// ```
-/// use kinogaki_geometry::{Attributes, Domain, Polygons, Primitives};
+/// use kinogaki_geometry::{Attributes, Domain, Geometry, Primitives};
 ///
 /// let quad = Primitives::of_polygons(4, vec![0, 4].into(), vec![0, 1, 2, 3].into()).unwrap();
 /// let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
-/// let square = Polygons::new(positions.into(), quad, Attributes::new()).unwrap();
+/// let square = Geometry::new(positions.into(), quad, Attributes::new()).unwrap();
 /// assert_eq!(square.count(Domain::Edge), Some(4));
 ///
 /// // Move a point: the table is shared, not checked or rebuilt.
@@ -43,13 +43,13 @@ use std::sync::Arc;
 /// assert!(std::sync::Arc::ptr_eq(lifted.primitives(), square.primitives()));
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-pub struct Polygons {
+pub struct Geometry {
     positions: Column<[f64; 3]>,
     primitives: Arc<Primitives>,
     attributes: Arc<Attributes>,
 }
 
-impl Polygons {
+impl Geometry {
     /// `positions` over `primitives`, with `attributes`, checked.
     ///
     /// # Errors
@@ -177,7 +177,7 @@ impl Polygons {
     /// steps), and what a display patches. Bitwise, so a point moved from
     /// `0.0` to `-0.0` moved (its bytes changed). Points past `before`'s
     /// count are all among them.
-    pub fn moved_points(&self, before: &Polygons) -> Vec<u32> {
+    pub fn moved_points(&self, before: &Geometry) -> Vec<u32> {
         if self.positions.ptr_eq(&before.positions) {
             return Vec::new();
         }
@@ -185,7 +185,7 @@ impl Polygons {
     }
 }
 
-impl Default for Polygons {
+impl Default for Geometry {
     fn default() -> Self {
         Self::empty()
     }

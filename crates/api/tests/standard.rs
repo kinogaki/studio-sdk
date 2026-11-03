@@ -1,8 +1,8 @@
 //! The standard data types: handles, codecs, the tolerances and display
 //! quality values and the conformance suite.
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::{Domain, Elements, Polygons, Selection, Tolerances};
-use kinogaki_studio_api::standard::{self, PolygonsCodec};
+use kinogaki_studio_api::geometry::{Domain, Elements, Geometry, Selection, Tolerances};
+use kinogaki_studio_api::standard::{self, GeometryCodec};
 use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue, Units, UpAxis};
 use kinogaki_studio_api_testing as conformance;
 use kinogaki_studio_api_testing::{Codecs, Consumer, Fixtures, Invariants};
@@ -49,7 +49,7 @@ fn a_failing_consumer_is_reported() {
     );
 }
 
-fn grid() -> Polygons {
+fn grid() -> Geometry {
     Fixtures::default()
         .polygons()
         .into_iter()
@@ -62,18 +62,18 @@ fn grid() -> Polygons {
 fn values_sharing_a_topology_share_it_once_read() {
     let a = grid();
     let b = a.with_positions(vec![[1.0; 3]; 25].into()).unwrap();
-    let (a, b) = (standard::polygons().wrap(a), standard::polygons().wrap(b));
+    let (a, b) = (standard::geometry().wrap(a), standard::geometry().wrap(b));
     let mut saved = MemoryElement::new("results");
     saved
         .write(|w| {
-            PolygonsCodec.write(&a, None, &mut *w.child("a", "result")?)?;
-            PolygonsCodec.write(&b, None, &mut *w.child("b", "result")?)
+            GeometryCodec.write(&a, None, &mut *w.child("a", "result")?)?;
+            GeometryCodec.write(&b, None, &mut *w.child("b", "result")?)
         })
         .unwrap();
     let (ra, rb) = saved
         .read(|r| {
             let read = |n| {
-                PolygonsCodec
+                GeometryCodec
                     .read(&*r.required_child(n).unwrap(), None)
                     .unwrap()
             };
@@ -81,8 +81,8 @@ fn values_sharing_a_topology_share_it_once_read() {
         })
         .unwrap();
     let (ra, rb) = (
-        standard::polygons().get(&ra).unwrap(),
-        standard::polygons().get(&rb).unwrap(),
+        standard::geometry().get(&ra).unwrap(),
+        standard::geometry().get(&rb).unwrap(),
     );
     assert!(Arc::ptr_eq(ra.primitives(), rb.primitives()));
     assert_eq!(rb.positions()[3], [1.0; 3]);
@@ -90,21 +90,21 @@ fn values_sharing_a_topology_share_it_once_read() {
 
 #[test]
 fn a_saved_value_breaking_a_rule_does_not_read() {
-    let data = standard::polygons().wrap(grid());
+    let data = standard::geometry().wrap(grid());
     let mut saved = MemoryElement::new("result");
     saved
-        .write(|w| PolygonsCodec.write(&data, None, w))
+        .write(|w| GeometryCodec.write(&data, None, w))
         .unwrap();
     // Point 0 of the saved positions made infinite.
     let mut bad = MemoryElement::new("result");
     bad.write(|w| {
-        PolygonsCodec.write(&data, None, w)?;
+        GeometryCodec.write(&data, None, w)?;
         let mut p: Vec<f64> = vec![0.0; 75];
         p[0] = f64::INFINITY;
         w.set_rows("positions", 3, Field::F64s(p))
     })
     .unwrap();
-    let error = bad.read(|r| PolygonsCodec.read(r, None)).unwrap_err();
+    let error = bad.read(|r| GeometryCodec.read(r, None)).unwrap_err();
     assert!(
         error.to_string().contains("point 0 is not finite"),
         "{error}"
@@ -113,7 +113,7 @@ fn a_saved_value_breaking_a_rule_does_not_read() {
 
 #[test]
 fn components_hold_a_standard_selection() {
-    let data = standard::polygons().wrap(grid());
+    let data = standard::geometry().wrap(grid());
     let members = Elements::from_indices(16, [3, 1]).unwrap();
     let s = Selection::new(Domain::Primitive, members, Some(3)).unwrap();
     let c = standard::components(data.ty(), s.clone());
@@ -181,11 +181,11 @@ fn equal_texts_save_alike_whatever_their_tables() {
         let attributes = Attributes::new()
             .with(Domain::Point, "label", Attribute::text(text))
             .unwrap();
-        standard::polygons().wrap(Polygons::new(vec![[0.0; 3]; 4].into(), t, attributes).unwrap())
+        standard::geometry().wrap(Geometry::new(vec![[0.0; 3]; 4].into(), t, attributes).unwrap())
     };
     let save = |data: &Data| {
         let mut saved = MemoryElement::new("result");
-        saved.write(|w| PolygonsCodec.write(data, None, w)).unwrap();
+        saved.write(|w| GeometryCodec.write(data, None, w)).unwrap();
         saved
     };
     // A gather keeping a larger, reordered table, and its compact twin.
@@ -198,19 +198,19 @@ fn equal_texts_save_alike_whatever_their_tables() {
 
 /// A quad saved with one attribute element written by hand: `fields` on
 /// `a0`, read back.
-fn read_quad_with(fields: &[(&str, Field)]) -> Result<Polygons, String> {
+fn read_quad_with(fields: &[(&str, Field)]) -> Result<Geometry, String> {
     let quad = kinogaki_studio_api::geometry::Primitives::of_polygons(
         4,
         vec![0, 4].into(),
         vec![0, 1, 2, 3].into(),
     )
     .unwrap();
-    let value = Polygons::new(vec![[0.0; 3]; 4].into(), quad, Default::default()).unwrap();
-    let data = standard::polygons().wrap(value);
+    let value = Geometry::new(vec![[0.0; 3]; 4].into(), quad, Default::default()).unwrap();
+    let data = standard::geometry().wrap(value);
     let mut saved = MemoryElement::new("result");
     saved
         .write(|w| {
-            PolygonsCodec.write(&data, None, w)?;
+            GeometryCodec.write(&data, None, w)?;
             let mut a = w.child("a0", "attribute")?;
             for (name, field) in fields {
                 a.set(name, field.clone())?;
@@ -218,9 +218,9 @@ fn read_quad_with(fields: &[(&str, Field)]) -> Result<Polygons, String> {
             Ok(())
         })
         .unwrap();
-    let read = saved.read(|r| PolygonsCodec.read(r, None));
+    let read = saved.read(|r| GeometryCodec.read(r, None));
     let read = read.map_err(|e| e.to_string())?;
-    Ok(standard::polygons().get(&read).unwrap().clone())
+    Ok(standard::geometry().get(&read).unwrap().clone())
 }
 
 #[test]

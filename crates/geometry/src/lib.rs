@@ -8,7 +8,7 @@
 //!
 //! | Value | What |
 //! |---|---|
-//! | [`Polygons`] | polygons and polylines over shared points ([`Primitives`]), with [`Attributes`] |
+//! | [`Geometry`] | polygons, polylines and curves over shared points: one [`Primitives`] table, each primitive of a [`Kind`] ([`Basis`] and closed), in any order, with [`Attributes`] |
 //! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves of one [`Basis`] |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
 //! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and groups ([`Elements`]) per [`Domain`]; [`Text`] is indexed; [standard names](names) |
@@ -31,7 +31,7 @@
 //! adopt a `Vec` without copying it. A value is never changed in place: an
 //! edit (`with_positions`, `with_attributes`, [`Attributes::with`]) makes a
 //! new value sharing every column it didn't touch, and checks only what it
-//! replaced. Polygons keep their
+//! replaced. Geometry keep their
 //! primitives in one shared `Arc<Primitives>`, so moving points keeps the
 //! table, its edges and every cache built on it.
 //!
@@ -74,15 +74,15 @@
 //! ```
 //! use std::sync::Arc;
 //! use std::sync::atomic::{AtomicUsize, Ordering};
-//! use kinogaki_geometry::{Attributes, Polygons, Primitives};
+//! use kinogaki_geometry::{Attributes, Geometry, Primitives};
 //!
 //! /// A kernel's own cache over a table (its type is its key).
 //! struct Valence(Vec<u32>);
 //!
 //! let t = Primitives::of_polygons(4, vec![0, 3, 6].into(), vec![0, 1, 2, 0, 2, 3].into()).unwrap();
-//! let a = Polygons::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
+//! let a = Geometry::new(vec![[0.0; 3]; 4].into(), t, Attributes::new()).unwrap();
 //! let builds = AtomicUsize::new(0);
-//! let valence = |p: &Polygons| {
+//! let valence = |p: &Geometry| {
 //!     p.primitives().derived(|t| {
 //!         builds.fetch_add(1, Ordering::Relaxed);
 //!         Valence((0..t.points()).map(|i| t.index().point_faces()[i].len() as u32).collect())
@@ -104,11 +104,11 @@ mod detail;
 mod elements;
 mod error;
 mod frame;
+mod geometry;
 mod incidence;
 mod kept;
 pub mod limits;
 pub mod parallel;
-mod polygons;
 mod positions;
 mod primitives;
 mod sampled;
@@ -134,8 +134,8 @@ pub use detail::{Detail, DisplayQuality};
 pub use elements::Elements;
 pub use error::{ErrorKind, GeometryError};
 pub use frame::Frame;
+pub use geometry::Geometry;
 pub use incidence::Incidence;
-pub use polygons::Polygons;
 pub use primitives::{Adjacency, Basis, CurveData, Edge, Index, Kind, Knots, Primitives};
 pub use sampled::Sampled;
 pub use selection::Selection;

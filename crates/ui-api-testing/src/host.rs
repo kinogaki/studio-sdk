@@ -6,7 +6,7 @@
 use super::{FakeNetwork, HostCall};
 use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
-use kinogaki_studio_api::geometry::Polygons;
+use kinogaki_studio_api::geometry::Geometry;
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::{Severity, Unit};
 use kinogaki_studio_api::session::SlotDoc;
@@ -41,7 +41,7 @@ pub struct FakeObject {
     pub shown: Option<(Data, Drawn)>,
     /// The polygons its shown result draws as, if any
     /// ([`HostDoc::shown_polygons`]).
-    pub polygons: Option<Polygons>,
+    pub polygons: Option<Geometry>,
 }
 
 /// What undo restores: the slots and the networks.
@@ -448,7 +448,7 @@ impl HostDoc for FakeHost {
     fn shown(&self, object: ObjectRef) -> Option<(Data, Drawn)> {
         self.scene.get(&object)?.shown.clone()
     }
-    fn shown_polygons(&self, object: ObjectRef) -> Option<Polygons> {
+    fn shown_polygons(&self, object: ObjectRef) -> Option<Geometry> {
         self.scene.get(&object)?.polygons.clone()
     }
     fn editing(&self) -> bool {

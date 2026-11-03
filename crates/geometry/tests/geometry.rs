@@ -1,8 +1,8 @@
-//! Polygons: positions and attribute rules, counts, and the sharing every
+//! Geometry: positions and attribute rules, counts, and the sharing every
 //! edit keeps.
 use kinogaki_geometry::limits::MAX_POINTS;
 use kinogaki_geometry::{
-    Attribute, Attributes, Bounds, Domain, Elements, ErrorKind, Kind, Meaning, Polygons,
+    Attribute, Attributes, Bounds, Domain, Elements, ErrorKind, Geometry, Kind, Meaning,
     Primitives, Text, Vec3, names,
 };
 use std::sync::Arc;
@@ -31,8 +31,8 @@ fn positions() -> Vec<[f64; 3]> {
     ]
 }
 
-fn value() -> Polygons {
-    Polygons::new(positions().into(), topology(), Attributes::new()).unwrap()
+fn value() -> Geometry {
+    Geometry::new(positions().into(), topology(), Attributes::new()).unwrap()
 }
 
 #[test]
@@ -47,8 +47,8 @@ fn counts_are_the_domains_elements() {
         p.bounds(),
         Bounds::of([Vec3::ZERO, Vec3::new(1.0, 2.0, 1.0)])
     );
-    assert_eq!(Polygons::empty().bounds(), None);
-    assert_eq!(Polygons::empty().count(Domain::Point), Some(0));
+    assert_eq!(Geometry::empty().bounds(), None);
+    assert_eq!(Geometry::empty().count(Domain::Point), Some(0));
 }
 
 #[test]
@@ -56,11 +56,11 @@ fn positions_must_be_finite_and_one_a_point() {
     let with = |change: fn(&mut Vec<[f64; 3]>)| {
         let mut p = positions();
         change(&mut p);
-        Polygons::new(p.into(), topology(), Attributes::new())
+        Geometry::new(p.into(), topology(), Attributes::new())
     };
     assert!(with(|p| p[3][1] = 1e100).is_ok());
     for bad in [f64::NAN, f64::INFINITY, -1.1e100] {
-        let e = Polygons::new(
+        let e = Geometry::new(
             {
                 let mut p = positions();
                 p[3][2] = bad;
@@ -90,7 +90,7 @@ fn the_first_bad_position_is_reported_on_large_values() {
     p[250_000][0] = f64::NAN;
     p[200_001][1] = f64::INFINITY;
     let t = Primitives::of_polygons(300_000, vec![0].into(), Vec::new().into()).unwrap();
-    let e = Polygons::new(p.into(), t, Attributes::new()).unwrap_err();
+    let e = Geometry::new(p.into(), t, Attributes::new()).unwrap_err();
     assert_eq!(e.element(), Some(200_001));
 }
 
@@ -219,7 +219,7 @@ fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
         .unwrap();
     let a = value().with_attributes(attributes).unwrap();
     let builds = AtomicUsize::new(0);
-    let cache = |p: &Polygons| {
+    let cache = |p: &Geometry| {
         p.primitives().derived(|t| {
             builds.fetch_add(1, Ordering::Relaxed);
             t.len()
@@ -247,7 +247,7 @@ fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
 #[test]
 fn with_primitives_reuses_a_checked_topology() {
     let a = value();
-    let b = Polygons::with_primitives(
+    let b = Geometry::with_primitives(
         vec![[3.0; 3]; 5].into(),
         a.primitives().clone(),
         a.attributes().clone(),
@@ -263,7 +263,7 @@ fn with_primitives_reuses_a_checked_topology() {
             )
             .unwrap(),
     );
-    assert!(Polygons::with_primitives(positions().into(), a.primitives().clone(), wrong).is_err());
+    assert!(Geometry::with_primitives(positions().into(), a.primitives().clone(), wrong).is_err());
 }
 
 #[test]

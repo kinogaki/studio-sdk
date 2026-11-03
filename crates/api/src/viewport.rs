@@ -140,7 +140,7 @@ impl Surface {
     /// index the face number), its corners sharing the polygon's normal,
     /// fanned into triangles from its first corner, and every distinct
     /// polygon edge a line (edge ids in first-seen order). `topology` is as
-    /// in [`new`](Self::new). Polygons are convex, wound counterclockwise
+    /// in [`new`](Self::new). Geometry are convex, wound counterclockwise
     /// seen from outside, and index `points`; a degenerate polygon's
     /// corners face +Z.
     ///

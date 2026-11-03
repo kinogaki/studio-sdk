@@ -1,14 +1,14 @@
-//! [`PolygonsCodec`]: how [`Polygons`] values save.
-use super::{attributes, invalid, polygons, selection};
+//! [`GeometryCodec`]: how [`Geometry`] values save.
+use super::{attributes, geometry, invalid, selection};
 use crate::codec::DataCodec;
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
-use kinogaki_geometry::{CurveData, Kind, Knots, Polygons, Primitives};
+use kinogaki_geometry::{CurveData, Geometry, Kind, Knots, Primitives};
 use std::sync::Arc;
 
-/// Saves [`Polygons`]: the field `positions` (rows of 3 reals), the child
+/// Saves [`Geometry`]: the field `positions` (rows of 3 reals), the child
 /// `primitives` (kind `primitives`: `points`, `offsets`, `vertices`,
 /// `kinds`, one [byte](kinogaki_geometry::Kind::byte) a primitive, and
 /// when a primitive is a curve the child `curves`: `degrees`,
@@ -23,30 +23,30 @@ use std::sync::Arc;
 /// ```
 /// use kinogaki_studio_api::DataCodec;
 /// use kinogaki_studio_api::element::MemoryElement;
-/// use kinogaki_studio_api::geometry::{Attributes, Polygons, Primitives};
-/// use kinogaki_studio_api::standard::{self, PolygonsCodec};
+/// use kinogaki_studio_api::geometry::{Attributes, Geometry, Primitives};
+/// use kinogaki_studio_api::standard::{self, GeometryCodec};
 ///
 /// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
-/// let triangle = Polygons::new(vec![[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]].into(), t, Attributes::new()).unwrap();
-/// let data = standard::polygons().wrap(triangle.clone());
+/// let triangle = Geometry::new(vec![[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]].into(), t, Attributes::new()).unwrap();
+/// let data = standard::geometry().wrap(triangle.clone());
 /// let mut saved = MemoryElement::new("result");
-/// saved.write(|w| PolygonsCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| PolygonsCodec.read(r, None)).unwrap();
-/// assert_eq!(standard::polygons().get(&read), Some(&triangle));
+/// saved.write(|w| GeometryCodec.write(&data, None, w)).unwrap();
+/// let read = saved.read(|r| GeometryCodec.read(r, None)).unwrap();
+/// assert_eq!(standard::geometry().get(&read), Some(&triangle));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PolygonsCodec;
+pub struct GeometryCodec;
 
-impl DataCodec for PolygonsCodec {
+impl DataCodec for GeometryCodec {
     fn write(
         &self,
         data: &Data,
         _base: Option<&Data>,
         out: &mut dyn ElementWriter,
     ) -> Result<(), Error> {
-        let value = polygons()
+        let value = geometry()
             .get(data)
-            .ok_or_else(|| Error::invalid("not polygons"))?;
+            .ok_or_else(|| Error::invalid("not geometry"))?;
         out.set_rows(
             "positions",
             3,
@@ -110,9 +110,9 @@ impl DataCodec for PolygonsCodec {
         })?;
         let positions = attributes::rows(element, "positions")?.into();
         let attributes = Arc::new(attributes::read(element)?);
-        let value = Polygons::with_primitives(positions, primitives, attributes)
+        let value = Geometry::with_primitives(positions, primitives, attributes)
             .map_err(|e| invalid(&at, e))?;
-        Ok(polygons().wrap(value))
+        Ok(geometry().wrap(value))
     }
 
     fn write_components(
@@ -129,9 +129,9 @@ impl DataCodec for PolygonsCodec {
         element: &dyn ElementReader,
         data: &Data,
     ) -> Result<Components, Error> {
-        let value = polygons()
+        let value = geometry()
             .get(data)
-            .ok_or_else(|| Error::invalid("not polygons"))?;
+            .ok_or_else(|| Error::invalid("not geometry"))?;
         selection::read(element, data.ty(), |domain| value.count(domain))
     }
 }

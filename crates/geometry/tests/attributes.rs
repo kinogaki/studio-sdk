@@ -1,7 +1,7 @@
 //! The attribute model: types, standard names, adoption without copies,
 //! arrays, indexed text, groups, and sharing between tables.
 use kinogaki_geometry::{
-    Attribute, AttributeType, Attributes, Column, Domain, Elements, ErrorKind, Meaning, Polygons,
+    Attribute, AttributeType, Attributes, Column, Domain, Elements, ErrorKind, Geometry, Meaning,
     Primitives, Storage, Text, Tuple, Values, check_name, limits::MAX_NAME, names,
 };
 use std::sync::Arc;
@@ -294,7 +294,7 @@ fn standard_names_fix_their_type_and_domains() {
 #[test]
 fn a_value_refuses_a_domain_it_does_not_have() {
     let quad = Primitives::of_polygons(4, vec![0, 4].into(), vec![0, 1, 2, 3].into()).unwrap();
-    let square = Polygons::new(vec![[0.0; 3]; 4].into(), quad, Attributes::new()).unwrap();
+    let square = Geometry::new(vec![[0.0; 3]; 4].into(), quad, Attributes::new()).unwrap();
     for domain in [Domain::Object, Domain::Instance] {
         let table = Attributes::new().with(domain, "w", f32s::<1>(1, Meaning::None));
         let refused = square.with_attributes(table.unwrap()).unwrap_err();
@@ -314,7 +314,7 @@ fn replacing_one_column_shares_the_rest_and_checks_it_alone() {
             .with(Domain::Point, name, f32s::<3>(4, Meaning::None))
             .unwrap();
     }
-    let square = Polygons::new(vec![[0.0; 3]; 4].into(), quad, table).unwrap();
+    let square = Geometry::new(vec![[0.0; 3]; 4].into(), quad, table).unwrap();
     let edited = (square
         .attributes()
         .with(Domain::Point, "b", f32s::<3>(4, Meaning::None)))

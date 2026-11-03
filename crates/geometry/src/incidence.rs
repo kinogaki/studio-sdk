@@ -1,10 +1,10 @@
 //! [`Incidence`]: which elements of a value touch which, the one structure
 //! selection rules read (`kinogaki-edit`'s conversions), implemented by
-//! every standard value with elements: [`Polygons`] and [`Brep`].
+//! every standard value with elements: [`Geometry`] and [`Brep`].
 use crate::attributes::{Domain, Values, names};
 use crate::brep::Brep;
 use crate::column::Column;
-use crate::polygons::Polygons;
+use crate::geometry::Geometry;
 
 /// A value's elements per domain and how they touch: a polygon its
 /// points, vertices and edges; an edge its points; a B-rep body its faces,
@@ -30,9 +30,9 @@ pub trait Incidence {
     fn ids(&self, domain: Domain) -> Option<&Column<i64>>;
 }
 
-impl Incidence for Polygons {
+impl Incidence for Geometry {
     fn count(&self, domain: Domain) -> Option<usize> {
-        Polygons::count(self, domain)
+        Geometry::count(self, domain)
     }
 
     /// Points and edges by the edges' ends; every other pair through the
@@ -40,7 +40,7 @@ impl Incidence for Polygons {
     /// the edge it starts; an open primitive's last corner starts none).
     fn incident(&self, from: Domain, to: Domain, pair: &mut dyn FnMut(u32, u32)) {
         let topology = self.primitives();
-        let has = |d| Polygons::count(self, d).is_some();
+        let has = |d| Geometry::count(self, d).is_some();
         if from == to || !has(from) || !has(to) {
             return;
         }

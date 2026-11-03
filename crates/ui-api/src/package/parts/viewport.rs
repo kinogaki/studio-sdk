@@ -14,7 +14,7 @@ use crate::package::edited::Edited;
 use crate::package::view::{Holds, KeyPress};
 use crate::sheet::{Edits, Schema};
 use crate::{Painter, Ui};
-use kinogaki_studio_api::geometry::Polygons;
+use kinogaki_studio_api::geometry::Geometry;
 
 part! {
     /// A context's live tools over the views: their input, keys and
@@ -67,7 +67,7 @@ part! {
         /// [`tools`](Self::tools); the same value (its positions and
         /// topology shared) while nothing changed costs nothing. `None`:
         /// none.
-        fn own_targets(&self, s: &S, cx: &dyn Cx) -> Option<Polygons> {
+        fn own_targets(&self, s: &S, cx: &dyn Cx) -> Option<Geometry> {
             let _ = (s, cx);
             None
         }

@@ -8,7 +8,7 @@
 //! cargo run --release -p kinogaki-geometry --example measure
 //! ```
 use kinogaki_geometry::{
-    Attribute, Attributes, Column, Domain, Meaning, Polygons, Primitives, Text, names,
+    Attribute, Attributes, Column, Domain, Geometry, Meaning, Primitives, Text, names,
 };
 use std::hint::black_box;
 use std::time::{Duration, Instant};
@@ -127,7 +127,7 @@ fn main() {
     let attributes = attributes(points, vertices.len(), faces);
     let positions = Column::new(positions);
     report(
-        "Polygons::new (positions, attributes checked)",
+        "Geometry::new (positions, attributes checked)",
         best(
             || {
                 (
@@ -135,10 +135,10 @@ fn main() {
                     attributes.clone(),
                 )
             },
-            |(t, a)| Polygons::new(positions.clone(), t, a).unwrap(),
+            |(t, a)| Geometry::new(positions.clone(), t, a).unwrap(),
         ),
     );
-    let value = Polygons::new(positions.clone(), topology, attributes).unwrap();
+    let value = Geometry::new(positions.clone(), topology, attributes).unwrap();
     value.primitives().index();
     report(
         "with_positions (check 1M positions)",
@@ -161,7 +161,7 @@ fn main() {
         ),
     );
     report(
-        "Polygons::with_positions (shared topology)",
+        "Geometry::with_positions (shared table)",
         best(
             || positions.to_vec().into(),
             |p| value.with_positions(p).unwrap(),
@@ -177,7 +177,7 @@ fn large() {
     let points = positions.len();
     let start = Instant::now();
     let t = Primitives::of_polygons(points, offsets.into(), vertices.into()).unwrap();
-    let value = Polygons::new(positions.into(), t, Attributes::new()).unwrap();
+    let value = Geometry::new(positions.into(), t, Attributes::new()).unwrap();
     let built = start.elapsed();
     let start = Instant::now();
     let edges = value.primitives().edge_count();
