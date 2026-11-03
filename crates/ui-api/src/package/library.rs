@@ -361,9 +361,12 @@ pub enum BarMenu {
     Transform,
 }
 
-/// The host's Repeat item: a context that offers Repeat (a
-/// [`MenuEntry::Repeat`], a marking menu's or shelf's Repeat) lists an
-/// item of this name, labelled "Repeat"; the host runs and names it.
+/// The host's Repeat, an item of core's own vocabulary that every
+/// context's menus offer beside its own items: a marking menu's or a
+/// shelf's entry names it (a menu's is [`MenuEntry::Repeat`]), and the
+/// host runs again the context's last repeatable item
+/// ([`Places::repeatable`]), naming it after that item ("Repeat Bevel").
+/// A library never lists it.
 pub const REPEAT: &str = "command:repeat";
 
 /// An entry of a right-click or menu bar menu.
