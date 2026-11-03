@@ -13,6 +13,12 @@
 //! [`ElementKind::Edge`](crate::ElementKind::Edge)) can hold ids of several
 //! classes, and a pick turns a packet id back into (class, id) with
 //! [`LineClass::local`].
+//!
+//! A class's lines select at one level ([`LineClass::selects`]): edges, or
+//! faces when the lines draw a primitive that has no triangles (a curve
+//! drawn as its samples). A face class's line `local` is face `local`, so
+//! it picks, hovers and boxes as that face.
+use crate::ElementKind;
 use std::{ops::Range, sync::Arc};
 
 /// A class's id, unique within its packet and below [`LineClassId::LIMIT`]
@@ -125,18 +131,32 @@ pub struct LineClass {
     pub first_id: u32,
     /// How many line ids the class has.
     pub ids: u32,
+    /// The level its lines select: [`ElementKind::Edge`] (each line an
+    /// edge, by its packet-wide id) or [`ElementKind::Face`] (line `local`
+    /// is face `local`, so `ids` is at most the packet's faces).
+    pub selects: ElementKind,
 }
 impl LineClass {
-    /// The packet-wide id of this class's `local` id.
-    pub fn global(&self, local: u32) -> u32 {
-        self.first_id + local
-    }
     /// This class's own id of packet-wide `id`, when it is one of its ids.
     pub fn local(&self, id: u32) -> Option<u32> {
         id.checked_sub(self.first_id).filter(|&l| l < self.ids)
     }
+    /// The element line `local` selects at [`selects`](Self::selects): its
+    /// packet-wide id for an edge class, the face itself for a face class.
+    pub fn element(&self, local: u32) -> u32 {
+        match self.selects {
+            ElementKind::Face => local,
+            _ => self.first_id + local,
+        }
+    }
+    /// The packet-wide id of face `face`'s line, when this is a face class
+    /// that draws it.
+    pub fn face_line(&self, face: u32) -> Option<u32> {
+        (self.selects == ElementKind::Face && face < self.ids).then(|| self.first_id + face)
+    }
     /// Classes of one packet must cover distinct segments and distinct ids,
-    /// with distinct class ids below the limit.
+    /// with distinct class ids below the limit, each selecting edges or
+    /// faces.
     pub fn validate(classes: &[LineClass], segments: usize) -> Result<(), String> {
         let mut seen = 0u32;
         for (at, c) in classes.iter().enumerate() {
@@ -144,6 +164,12 @@ impl LineClass {
                 return Err(format!("line class {} has a repeated or large id", c.name));
             }
             seen |= 1 << c.id.0;
+            if !matches!(c.selects, ElementKind::Edge | ElementKind::Face) {
+                return Err(format!(
+                    "line class {} selects neither edges nor faces",
+                    c.name
+                ));
+            }
             if c.segments.start > c.segments.end || c.segments.end as usize > segments {
                 return Err(format!("line class {} exceeds the packet's lines", c.name));
             }
@@ -188,12 +214,13 @@ mod tests {
             ids: segments.len() as u32,
             segments,
             first_id,
+            selects: ElementKind::Edge,
         }
     }
     #[test]
     fn classes_map_ids_both_ways_and_refuse_overlaps_and_bad_styles() {
         let hull = class(3, 4..7, 10);
-        assert_eq!(hull.global(2), 12);
+        assert_eq!(hull.element(2), 12);
         assert_eq!(hull.local(12), Some(2));
         assert_eq!(hull.local(13), None);
         assert_eq!(hull.local(9), None);
@@ -203,8 +230,23 @@ mod tests {
         assert!(LineClass::validate(&[edges.clone(), class(1, 3..5, 20)], 7).is_err());
         assert!(LineClass::validate(&[edges.clone(), class(1, 4..6, 2)], 7).is_err());
         assert!(LineClass::validate(&[edges.clone(), class(0, 4..6, 20)], 7).is_err());
-        let mut thin = hull;
+        let mut thin = hull.clone();
         thin.style.selected.width = thin.style.hover.width;
-        assert!(LineClass::validate(&[edges, thin], 7).is_err());
+        assert!(LineClass::validate(&[edges.clone(), thin], 7).is_err());
+        // An edge class's lines select by packet-wide id, a face class's
+        // as their faces.
+        assert_eq!(hull.face_line(2), None);
+        let curves = LineClass {
+            selects: ElementKind::Face,
+            ..hull
+        };
+        assert_eq!((curves.element(2), curves.face_line(2)), (2, Some(12)));
+        assert_eq!(curves.face_line(3), None);
+        assert!(LineClass::validate(&[edges.clone(), curves.clone()], 7).is_ok());
+        let points = LineClass {
+            selects: ElementKind::Point,
+            ..curves
+        };
+        assert!(LineClass::validate(&[edges, points], 7).is_err());
     }
 }

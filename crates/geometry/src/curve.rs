@@ -83,6 +83,22 @@ impl Geometry {
     }
 }
 
+impl<'a> Curve<'a> {
+    /// The same curve over `positions` in place of its value's points
+    /// (in the value's numbering): where a drag shows them, so a preview
+    /// evaluates exactly as the moved value will.
+    ///
+    /// # Panics
+    /// Evaluating it panics when `positions` misses one of its points.
+    pub fn over<'b>(self, positions: &'b [[f64; 3]]) -> Curve<'b>
+    where
+        'a: 'b,
+    {
+        let curve: Curve<'b> = self;
+        Curve { positions, ..curve }
+    }
+}
+
 impl Curve<'_> {
     /// Its kind.
     pub fn kind(&self) -> Kind {

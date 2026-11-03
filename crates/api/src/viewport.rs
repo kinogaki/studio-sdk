@@ -235,6 +235,7 @@ impl Surface {
                 segments: 0..segments as u32,
                 first_id: 0,
                 ids,
+                selects: ElementKind::Edge,
             }])
         };
         self.lines = lines;
@@ -508,10 +509,12 @@ pub enum HitTarget {
         /// Where on it.
         bary: [f32; 3],
     },
-    /// Segment `segment` (an index into the surface's segments) of edge
+    /// Segment `segment` (an index into the surface's segments) of line
     /// `id`, at `t` from its first point (0) to its second (1).
     Line {
-        /// The edge id.
+        /// The element the line selects at its class's level
+        /// ([`LineClass::element`]): its packet-wide id for an edge, the
+        /// face for a face class's line (a curve drawn as its samples).
         id: u32,
         /// The segment.
         segment: u32,
