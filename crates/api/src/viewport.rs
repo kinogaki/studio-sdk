@@ -12,6 +12,7 @@
 //! markers. The host uploads a packet's shared arrays as they are and, for
 //! a surface [`derived`](Surface::derived) from the one on screen, only the
 //! points that moved.
+use crate::error::Error;
 use crate::math::Vec3;
 use crate::render::Ranges;
 use kinogaki_viewport_api::{
@@ -84,22 +85,46 @@ impl Surface {
     /// type's key for the connectivity (corners, triangles, lines and
     /// markers): equal keys mean equal connectivity, so the host keeps its
     /// buffers.
+    ///
+    /// # Errors
+    /// When a corner names a point past `points` or a face past `faces`,
+    /// a triangle a corner past `corners`, or the triangles aren't in face
+    /// order.
     pub fn new(
         points: Arc<[[f32; 3]]>,
         corners: Arc<[Corner]>,
         triangles: Arc<[[u32; 3]]>,
         faces: usize,
         topology: u64,
-    ) -> Self {
+    ) -> Result<Self, Error> {
+        if let Some(c) = (corners.iter()).find(|c| c.point as usize >= points.len()) {
+            return Err(Error::invalid(format_args!(
+                "a corner on point {} of {}",
+                c.point,
+                points.len()
+            )));
+        }
+        if let Some(c) = corners.iter().find(|c| c.face as usize >= faces) {
+            return Err(Error::invalid(format_args!(
+                "a corner of face {} of {faces}",
+                c.face
+            )));
+        }
+        if triangles
+            .iter()
+            .flatten()
+            .any(|&c| c as usize >= corners.len())
+        {
+            return Err(Error::invalid("a triangle past the corners"));
+        }
         let face = |t: &[u32; 3]| corners[t[0] as usize].face as usize;
-        debug_assert!(
-            triangles.windows(2).all(|w| face(&w[0]) <= face(&w[1])),
-            "triangles in face order"
-        );
+        if !triangles.windows(2).all(|w| face(&w[0]) <= face(&w[1])) {
+            return Err(Error::invalid("triangles out of face order"));
+        }
         let face_starts = (0..=faces)
             .map(|f| triangles.partition_point(|t| face(t) < f) as u32)
             .collect();
-        Self {
+        Ok(Self {
             points,
             corners,
             triangles,
@@ -111,7 +136,7 @@ impl Surface {
             topology,
             identity: Arc::new(()),
             update: None,
-        }
+        })
     }
 
     /// Flat-shaded `polygons` over `points`: each polygon a face (its
@@ -126,20 +151,22 @@ impl Surface {
     /// use kinogaki_studio_api::Surface;
     ///
     /// let square = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
-    /// let surface = Surface::polygons(square, [[0, 1, 2, 3]], 1);
+    /// let surface = Surface::polygons(square, [[0, 1, 2, 3]], 1)?;
     /// assert_eq!((surface.faces(), surface.triangles().len()), (1, 2));
     /// assert_eq!(surface.lines().len(), 8); // four edges, two vertices each
     /// assert_eq!(surface.corners()[0].normal, [0.0, 0.0, 1.0]);
+    /// assert!(Surface::polygons(square, [[0, 1, 4]], 1).is_err());
+    /// # Ok::<(), kinogaki_studio_api::Error>(())
     /// ```
     ///
-    /// # Panics
+    /// # Errors
     ///
     /// When a polygon indexes past `points`.
     pub fn polygons<P: AsRef<[u32]>>(
         points: impl Into<Arc<[[f32; 3]]>>,
         polygons: impl IntoIterator<Item = P>,
         topology: u64,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let points = points.into();
         let mut corners = Vec::new();
         let mut triangles = Vec::new();
@@ -148,6 +175,12 @@ impl Surface {
         let mut faces = 0;
         for (face, polygon) in polygons.into_iter().enumerate() {
             let polygon = polygon.as_ref();
+            if let Some(&p) = polygon.iter().find(|&&p| p as usize >= points.len()) {
+                return Err(Error::invalid(format_args!(
+                    "polygon {face} on point {p} of {}",
+                    points.len()
+                )));
+            }
             let normal = newell_normal(&points, polygon);
             let first = corners.len() as u32;
             corners.extend(polygon.iter().map(|&point| Corner {
@@ -172,7 +205,7 @@ impl Surface {
             }
             faces += 1;
         }
-        Self::new(points, corners.into(), triangles.into(), faces, topology)
+        Self::new(points, corners.into(), triangles.into(), faces, topology)?
             .with_lines(lines.into(), topology)
     }
 
@@ -180,8 +213,15 @@ impl Surface {
     /// edges, `topology` the key of the connectivity with them (as in
     /// [`new`](Self::new)). A new surface: an identity of its own and no
     /// update, so it never passes for the one it was made from.
-    pub fn with_lines(mut self, lines: Arc<[OverlayVertex]>, topology: u64) -> Self {
-        debug_assert!(lines.len().is_multiple_of(2), "two line vertices a segment");
+    ///
+    /// # Errors
+    /// When a segment lacks its second vertex or a vertex names a point
+    /// past the surface's.
+    pub fn with_lines(mut self, lines: Arc<[OverlayVertex]>, topology: u64) -> Result<Self, Error> {
+        if !lines.len().is_multiple_of(2) {
+            return Err(Error::invalid("a line segment without its end"));
+        }
+        self.check_vertices(&lines)?;
         let segments = lines.len() / 2;
         self.classes = if segments == 0 {
             Arc::from([])
@@ -197,14 +237,37 @@ impl Surface {
             }])
         };
         self.lines = lines;
-        self.renewed(topology)
+        Ok(self.renewed(topology))
     }
 
     /// With point `markers`, `topology` the key of the connectivity with
     /// them. A new surface, as with [`with_lines`](Self::with_lines).
-    pub fn with_markers(mut self, markers: Arc<[OverlayVertex]>, topology: u64) -> Self {
+    ///
+    /// # Errors
+    /// When a marker names a point past the surface's.
+    pub fn with_markers(
+        mut self,
+        markers: Arc<[OverlayVertex]>,
+        topology: u64,
+    ) -> Result<Self, Error> {
+        self.check_vertices(&markers)?;
         self.markers = markers;
-        self.renewed(topology)
+        Ok(self.renewed(topology))
+    }
+
+    /// An error unless every one of `vertices` is on one of the points.
+    fn check_vertices(&self, vertices: &[OverlayVertex]) -> Result<(), Error> {
+        match vertices
+            .iter()
+            .find(|v| v.point as usize >= self.points.len())
+        {
+            Some(v) => Err(Error::invalid(format_args!(
+                "a line or marker on point {} of {}",
+                v.point,
+                self.points.len()
+            ))),
+            None => Ok(()),
+        }
     }
 
     /// This surface as a new one of connectivity `topology`: its own
@@ -525,6 +588,7 @@ mod tests {
             1,
             42,
         )
+        .unwrap()
         .with_lines(
             [
                 (0, 0),
@@ -540,7 +604,9 @@ mod tests {
             .into(),
             42,
         )
+        .unwrap()
         .with_markers((0..4).map(|i| vertex(i, i)).collect(), 42)
+        .unwrap()
     }
 
     #[test]
@@ -591,10 +657,14 @@ mod tests {
         };
         let relined = surface
             .clone()
-            .with_lines(Arc::from([vertex(0), vertex(2)]), 43);
+            .with_lines(Arc::from([vertex(0), vertex(2)]), 43)
+            .unwrap();
         assert!(!relined.same(&surface), "other lines, another surface");
         assert_eq!(relined.topology_key()[0], 43, "of another connectivity");
-        let marked = surface.clone().with_markers(Arc::from([vertex(1)]), 44);
+        let marked = surface
+            .clone()
+            .with_markers(Arc::from([vertex(1)]), 44)
+            .unwrap();
         assert!(!marked.same(&surface), "other markers, another surface");
         assert_eq!(marked.topology_key()[0], 44);
         // A drag's frame, given new lines, derives from nothing.
@@ -602,8 +672,53 @@ mod tests {
         points[1][2] += 1.0;
         let dragged = surface.derived(points.into(), Ranges::of(1..2));
         assert!(dragged.update().is_some());
-        let relined = dragged.with_lines(Arc::from([vertex(0), vertex(2)]), 43);
+        let relined = dragged
+            .with_lines(Arc::from([vertex(0), vertex(2)]), 43)
+            .unwrap();
         assert!(relined.update().is_none() && relined.update_from(&surface).is_none());
+    }
+
+    #[test]
+    fn a_surface_refuses_what_indexes_past_its_arrays() {
+        let points: Arc<[[f32; 3]]> = Arc::from([[0.0; 3]; 3]);
+        let corner = |point, face| Corner {
+            point,
+            face,
+            normal: [0.0, 0.0, 1.0],
+        };
+        let corners: Arc<[Corner]> = Arc::from([corner(0, 0), corner(1, 0), corner(2, 0)]);
+        let triangle: Arc<[[u32; 3]]> = Arc::from([[0, 1, 2]]);
+        let make = |corners: &Arc<[Corner]>, triangles: &Arc<[[u32; 3]]>, faces| {
+            Surface::new(points.clone(), corners.clone(), triangles.clone(), faces, 0)
+        };
+        assert!(make(&corners, &triangle, 1).is_ok());
+        let off: Arc<[Corner]> = Arc::from([corner(0, 0), corner(1, 0), corner(3, 0)]);
+        assert!(
+            make(&off, &triangle, 1).is_err(),
+            "a corner past the points"
+        );
+        assert!(
+            make(&corners, &triangle, 0).is_err(),
+            "a corner past the faces"
+        );
+        let past: Arc<[[u32; 3]]> = Arc::from([[0, 1, 3]]);
+        assert!(
+            make(&corners, &past, 1).is_err(),
+            "a triangle past the corners"
+        );
+        let two = Arc::from([corner(0, 1), corner(1, 1), corner(2, 1), corner(0, 0)]);
+        let unordered: Arc<[[u32; 3]]> = Arc::from([[0, 1, 2], [3, 3, 3]]);
+        assert!(make(&two, &unordered, 2).is_err(), "faces out of order");
+        assert!(Surface::polygons(points.clone(), [[0, 1, 5]], 0).is_err());
+        let surface = make(&corners, &triangle, 1).unwrap();
+        let vertex = |point| OverlayVertex {
+            point,
+            component: 0,
+        };
+        let lines = |l: &[OverlayVertex]| surface.clone().with_lines(Arc::from(l), 1);
+        assert!(lines(&[vertex(0)]).is_err(), "a segment without its end");
+        assert!(lines(&[vertex(0), vertex(3)]).is_err(), "past the points");
+        assert!(surface.with_markers(Arc::from([vertex(9)]), 1).is_err());
     }
 
     #[test]
@@ -638,7 +753,7 @@ mod tests {
             [1.0, 0.0, -1.0],
             [1.0, 1.0, -1.0],
         ];
-        let surface = Surface::polygons(points, [&[0, 1, 2, 3][..], &[1, 4, 5, 2]], 3);
+        let surface = Surface::polygons(points, [&[0, 1, 2, 3][..], &[1, 4, 5, 2]], 3).unwrap();
         assert_eq!((surface.faces(), surface.topology()), (2, 3));
         assert_eq!(surface.corners().len(), 8);
         assert_eq!(
@@ -655,7 +770,7 @@ mod tests {
         );
         assert_eq!(surface.corners()[0].normal, [0.0, 0.0, 1.0]);
         // A degenerate polygon faces +Z.
-        let flat = Surface::polygons([[0.0; 3]; 3], [[0, 1, 2]], 0);
+        let flat = Surface::polygons([[0.0; 3]; 3], [[0, 1, 2]], 0).unwrap();
         assert_eq!(flat.corners()[0].normal, [0.0, 0.0, 1.0]);
     }
 
@@ -669,7 +784,7 @@ mod tests {
             [2.0, 0.0, 0.0],
         ];
         // A quad (two triangles), then a triangle.
-        let surface = Surface::polygons(points, [&[0, 1, 2, 3][..], &[1, 4, 2]], 1);
+        let surface = Surface::polygons(points, [&[0, 1, 2, 3][..], &[1, 4, 2]], 1).unwrap();
         assert_eq!(surface.face_triangles(0), 0..2);
         assert_eq!(surface.face_triangles(1), 2..3);
         assert_eq!(surface.face_triangles(2), 0..0, "out of range");

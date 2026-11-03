@@ -168,7 +168,7 @@ impl Displayable for BoxType {
         _: &DisplayRequest,
         _: &CancelToken,
     ) -> Result<Drawn, Error> {
-        let surface = Surface::polygons(box_of(data)?.points(), FACES, TOPOLOGY);
+        let surface = Surface::polygons(box_of(data)?.points(), FACES, TOPOLOGY)?;
         Ok(Drawn::one(Arc::new(surface)))
     }
     fn highlight(&self, _: &Data, _: &Drawn, _: &Components) -> ElementSet {

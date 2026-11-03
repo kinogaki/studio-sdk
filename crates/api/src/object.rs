@@ -291,17 +291,25 @@ impl PublishedMaterial {
     /// Material `key` (its path step below the object), called `label`,
     /// looking as `preview`.
     ///
-    /// # Panics
-    /// When `key` is not an [`is_path_step`] (a packaging error).
-    pub fn new(key: impl Into<String>, label: impl Into<String>, preview: PreviewSurface) -> Self {
+    /// # Errors
+    /// When `key` is not an [`is_path_step`].
+    pub fn new(
+        key: impl Into<String>,
+        label: impl Into<String>,
+        preview: PreviewSurface,
+    ) -> Result<Self, crate::Error> {
         let key = key.into();
-        assert!(is_path_step(&key), "{key:?} is not a path step");
-        Self {
+        if !is_path_step(&key) {
+            return Err(crate::Error::invalid(format_args!(
+                "{key:?} is not a path step"
+            )));
+        }
+        Ok(Self {
             key,
             label: label.into(),
             preview,
             unavailable: None,
-        }
+        })
     }
 
     /// Its path step below its object.
