@@ -69,7 +69,7 @@ pub struct SettingsSection<S: ?Sized = dyn Any> {
     pages: fn() -> Vec<String>,
     type_name: &'static str,
     defaults: fn() -> Value,
-    copy: fn(&dyn Any) -> Value,
+    copy: fn(&dyn Any) -> Box<dyn Any + Send + Sync>,
     eq: fn(&dyn Any, &dyn Any) -> bool,
     debug: fn(&dyn Any, &mut fmt::Formatter<'_>) -> fmt::Result,
     page: fn(&dyn Any, &str, &mut dyn Any, &mut dyn Cx) -> Schema<u32>,
@@ -111,7 +111,7 @@ impl<S: 'static> SettingsSection<S> {
             pages: T::pages,
             type_name: std::any::type_name::<T>(),
             defaults: || Arc::new(T::defaults()),
-            copy: |v| Arc::new(typed::<T>(v).clone()),
+            copy: |v| Box::new(typed::<T>(v).clone()),
             eq: |a, b| a.downcast_ref::<T>() == b.downcast_ref::<T>(),
             debug: |v, f| fmt::Debug::fmt(typed::<T>(v), f),
             page: |v, page, s, cx| typed::<T>(v).page(page, state::<T>(s), cx),
@@ -176,8 +176,8 @@ impl<S: ?Sized> SettingsSection<S> {
         (self.defaults)()
     }
 
-    /// A copy of `value` (a draft to edit).
-    pub fn copy(&self, value: &dyn Any) -> Arc<dyn Any + Send + Sync> {
+    /// A copy of `value` of its own (a draft to edit, then share).
+    pub fn copy(&self, value: &dyn Any) -> Box<dyn Any + Send + Sync> {
         (self.copy)(value)
     }
 
