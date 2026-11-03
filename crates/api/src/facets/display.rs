@@ -26,7 +26,8 @@ pub enum DrawPurpose {
 }
 
 /// What [`Displayable::prepare`] is asked for: the object's display
-/// quality, whether a gesture is under way, what the value is drawn for, the object's body when the value is an object's
+/// quality, whether a gesture is under way, whether a view shades by
+/// curvature, what the value is drawn for, the object's body when the value is an object's
 /// result (its display settings: a mesh's subdivision display), the
 /// project's tolerances, which an approximate display (a B-rep's mesh, a
 /// sampled surface) is made to, and the project's units, which a display
@@ -42,6 +43,13 @@ pub struct DisplayRequest {
     /// The user is dragging or playing: prepare fast, leaving finer work
     /// to [`Displayable::refine`] once the scene rests.
     pub interactive: bool,
+    /// A view that shows shades by curvature: make the curvature the
+    /// packet carries (its vertices' `curvature`,
+    /// [`SurfaceSource::curvature_range`]), where the value rests when
+    /// `interactive`. Otherwise it may be left at zero: it is looked at,
+    /// so nothing pays for it unseen. The host asks again when a view
+    /// turns to it.
+    pub curvature: bool,
     /// What it is drawn for.
     pub purpose: DrawPurpose,
     /// The object's body, when the value is an object's result.
@@ -58,6 +66,7 @@ impl fmt::Debug for DisplayRequest {
         f.debug_struct("DisplayRequest")
             .field("quality", &self.quality)
             .field("interactive", &self.interactive)
+            .field("curvature", &self.curvature)
             .field("purpose", &self.purpose)
             .field("body", &self.body.is_some())
             .field("tolerances", &self.tolerances)
