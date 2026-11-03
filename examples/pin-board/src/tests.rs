@@ -3,7 +3,7 @@
 //! undo steps and label themselves, and the inspector shows the count.
 use super::*;
 use studio_ui_api::host::HostUndo;
-use studio_ui_api::package::Registered;
+use studio_ui_api::package::hosting::Registered;
 use studio_ui_api::{Pos, Rect, Vec2};
 use studio_ui_api_testing::{Call, FakeHost, Hosting, RecordingUi};
 

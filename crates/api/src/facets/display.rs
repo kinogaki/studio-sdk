@@ -91,7 +91,7 @@ pub enum Role {
         marks: bool,
     },
     /// A templated node's result: faint wires in its place. While a live
-    /// tool is up (`ViewportLayer::live_node`), the host marks the branch
+    /// tool is up (`LiveTools::live_node`), the host marks the branch
     /// a click would take and the ones wired into the tool's node.
     Template {
         /// The node.

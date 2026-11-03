@@ -8,9 +8,9 @@
 //! geometry to turn pointer motion into it. The maths is the host's own,
 //! so hits and drags agree with what the host draws.
 //!
-//! A context whose selection the gizmo moves needs none of this: it says
-//! [`ViewportLayer::transforms`](crate::package::ViewportLayer::transforms)
-//! and the host runs the drag (handles, typed values, steps, snapping),
+//! A context whose selection the gizmo moves needs none of this: its
+//! [`Transforms::gizmo`](crate::package::Transforms::gizmo) says
+//! [`GizmoUse::Selection`](crate::package::GizmoUse::Selection) and the host runs the drag (handles, typed values, steps, snapping),
 //! handing it each [`TransformStep`] to apply.
 mod geometry;
 mod hit;

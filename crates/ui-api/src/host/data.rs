@@ -2,7 +2,7 @@
 //! and nodes, where the user is, one view as a package sees it, what a
 //! node's rows drawn by the host did, and the user's preferences.
 use crate::gizmo::TransformTool;
-use crate::{Modifiers, Pos, Projection, Rect, Response, Slot};
+use crate::{Pos, Projection, Rect, Response, Slot};
 use kinogaki_studio_api::geometry::Ray;
 use kinogaki_studio_api::{ContextId, Units, Vec3};
 pub use kinogaki_studio_api::{NodeRef, ObjectRef};
@@ -66,12 +66,16 @@ pub struct Ground {
     pub step: f64,
 }
 
-/// One view as a package's viewport layer sees it this frame: what its
-/// pointer handling needs, as plain data.
+/// One view as a package's viewport parts see it this frame: what its
+/// pointer handling needs, as plain data. The frame's pointer, keys and
+/// modifiers are its input ([`ViewCx::input`](super::ViewCx::input)).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct View {
     /// Where it is on screen.
     pub rect: Rect,
+    /// Where the view pane all the views are in is (a pane-wide panel's
+    /// place).
+    pub pane: Rect,
     /// Its index among the views (0 with one view).
     pub index: usize,
     /// It is the active view (the others only draw).
@@ -80,26 +84,29 @@ pub struct View {
     pub modal: bool,
     /// The view's own response this frame (its clicks and drags).
     pub response: Response,
-    /// The pointer is over the viewport's controls: core's, and the
-    /// context's own ([`controls`](crate::package::ViewportLayer::controls),
-    /// which isn't told its own).
-    pub over_chrome: bool,
-    /// The view cube took the pointer this frame.
-    pub over_cube: bool,
-    /// A handle Studio shows is under the pointer in this view, or one is
-    /// being dragged: a live tool leaves the press to it.
-    pub over_handle: bool,
-    /// The pointer, when it is over the view.
-    pub pointer: Option<Pos>,
-    /// The modifiers held.
-    pub modifiers: Modifiers,
-    /// Ctrl+Shift: a click opens the list of everything under the pointer.
-    pub stacking: bool,
+    /// What the pointer is over in the view.
+    pub over: PointerOver,
     /// A painter slot under everything else drawn over the view (point
     /// labels' backdrops).
     pub under: Slot,
     /// Its camera.
     pub camera: ViewCamera,
+}
+
+/// What the pointer is over in a view, the first that holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PointerOver {
+    /// A handle Studio shows, or one being dragged (wherever the pointer
+    /// is): a live tool leaves the press to it.
+    Handle,
+    /// Not the view: elsewhere, or nowhere in the window.
+    Off,
+    /// The viewport's controls: core's, or the context's own panels.
+    Chrome,
+    /// The view cube, or a drag of it.
+    Cube,
+    /// The view itself: a live tool's to take.
+    Free,
 }
 
 impl View {

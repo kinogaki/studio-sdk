@@ -1,7 +1,9 @@
-//! The plain values a context's parts hand the host: levels, the stacked
-//! list's candidates, what live tools take, the numeric bar, its time and
-//! The host draws all of them with its own components,
+//! The plain values a context's parts and the host exchange: levels, the
+//! stacked list's candidates, what live tools take and why they end, the
+//! gizmo shown, panels, the numeric bar and a context's time. The host
+//! draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
+use crate::{Id, Rect};
 use kinogaki_studio_api::edit::select::Mode;
 use kinogaki_studio_api::params::Unit;
 use std::sync::Arc;
@@ -51,20 +53,94 @@ pub struct Candidate {
     pub label: String,
 }
 
-/// What a context's live tools take this frame, before camera navigation.
+/// What a context's live tools take of a view's input this frame
+/// ([`LiveTools::tools`](super::LiveTools::tools)), before core's own; each
+/// left `false` stays core's.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Tools {
-    /// A tool owns the pointer: no picking, no gizmo.
-    pub busy: bool,
-    /// The wheel belongs to the tool, not the camera.
+pub struct Takes {
+    /// Clicks, boxes and the stacked list: core picks nothing.
+    pub picks: bool,
+    /// The transform gizmo: core shows none in the view.
+    pub gizmo: bool,
+    /// The selected node's handles: core shows none in the view.
+    pub handles: bool,
+    /// What lies under the pointer: core shows nothing hovered.
+    pub hover: bool,
+    /// The wheel: the camera doesn't dolly.
     pub wheel: bool,
-    /// No right-click menu now.
+    /// The right-click: no views' menu.
     pub menu: bool,
+}
+
+impl Takes {
+    /// Every one: a tool that owns the view's pointer.
+    pub const ALL: Takes = Takes {
+        picks: true,
+        gizmo: true,
+        handles: true,
+        hover: true,
+        wheel: true,
+        menu: true,
+    };
+}
+
+/// Which transform gizmo the views show for a context's selection
+/// ([`Transforms::gizmo`](super::Transforms::gizmo)).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GizmoUse {
+    /// Neither: nothing to move.
+    #[default]
+    None,
+    /// The host's gizmo at the selection's pivot, its drags handed to
+    /// [`Transforms::transform`](super::Transforms::transform); the selected
+    /// node's gizmo handles hide.
+    Selection,
+    /// The selected node's declared handles, in the transform tool's
+    /// place (Maya's manipulators).
+    NodeHandles,
+}
+
+/// Why a live gesture ends ([`LiveTools::cancel`](super::LiveTools::cancel)).
+///
+/// Escape is taken by the first of: a handle drag under way (it puts back
+/// the drag alone; the live tool stays), the host's open popup, popover,
+/// menu or Tab browser (it closes), the transform tool's Pick (it ends),
+/// and then the live tool, which is told [`Ended::Escape`]. The tools' own
+/// [`key`](super::LiveTools::key) never sees Escape.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ended {
+    /// The user pressed Escape over the views.
+    Escape,
+    /// An undo or redo: what the gesture did is about to change under it.
+    Undo,
+    /// The location left the context (another object, a level up).
+    Left,
+}
+
+/// A context's floating panel over the views ([`Panels`](super::Panels)).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Panel {
+    /// Its id, unique among the context's panels this frame; a view's
+    /// own panel names its view.
+    pub id: Id,
+    /// Where it is, in screen points.
+    pub rect: Rect,
+    /// Over what.
+    pub scope: PanelScope,
+}
+
+/// What a [`Panel`] lies over.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PanelScope {
+    /// One view: drawn clipped to it.
+    View,
+    /// The whole view pane (a tool's card): drawn once, over every view.
+    Pane,
 }
 
 /// The numeric bar under the active view: its fields in order.
 #[derive(Clone, Debug, PartialEq)]
-pub struct NumericBar {
+pub struct NumericFields {
     /// The fields.
     pub fields: Vec<BarField>,
     /// What the numbers measure.
@@ -100,7 +176,7 @@ pub enum BarValue {
 }
 
 impl BarValue {
-    /// The value [`ViewportLayer::apply_numeric`](super::ViewportLayer::apply_numeric)
+    /// The value [`NumericBar::apply`](super::NumericBar::apply)
     /// gets as current.
     pub fn value(&self) -> f64 {
         match *self {

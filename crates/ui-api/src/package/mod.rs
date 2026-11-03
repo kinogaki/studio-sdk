@@ -25,7 +25,7 @@
 //!     Package::new(PackageId::declared("acme.trees"), "Trees").with_ui(TreesUi)
 //! }
 //! # let package = package();
-//! # assert!(studio_ui_api::package::Registered::of(&package).is_some());
+//! # assert!(studio_ui_api::package::hosting::Registered::of(&package).is_some());
 //! // kinogaki_studio_api::export_package!(package);
 //! ```
 //!
@@ -40,9 +40,10 @@
 //!
 //! **A context** ([`ContextPart`]) is an id, its [`Library`] (what it
 //! offers the host's menus, keys, Tab and viewport chrome, as data) and a
-//! set of optional parts: the selection [`Levels`], the [`ViewportLayer`],
-//! the [`Inspector`], the [`Vocabulary`] that runs its items, the
-//! [`ObjectRows`] for the object
+//! set of optional parts: the selection [`Levels`]; in the viewport its
+//! [`LiveTools`], [`Panels`], [`Transforms`], [`Display`], [`Timeline`]
+//! and [`NumericBar`]; the [`Inspector`], the [`Vocabulary`] that runs
+//! its items, the [`ObjectRows`] for the object
 //! kinds it owns (their creations are the kinds' own,
 //! `ObjectKindSpec::creations`). A part a
 //! context leaves out is never another context's. In a context whose
@@ -54,12 +55,22 @@
 //! part left out is nothing there.
 //!
 //! **Adding the UI** ([`WithUi::with_ui`]) erases the state's type: the
-//! host reads every package's UI as a [`Registered`]
-//! ([`Registered::of`]), whose parts take the state as `dyn Any` and
-//! downcast it back.
+//! host reads every package's UI as a [`hosting::Registered`], whose parts
+//! take the state as `dyn Any` and downcast it back.
+//!
+//! **A frame**, for the open context's viewport parts, in order:
+//! [`LiveTools::holds`]; then for each view [`Panels::panels`] (where its
+//! panels are, which take the pointer from the view) and
+//! [`LiveTools::tools`] before the camera's navigation, then core's gizmo,
+//! handles and picks as the tools leave them ([`Takes`]); the frame's
+//! commands; then once [`Display::settle`]; then for each drawn view
+//! [`Display::overlay`], each panel's [`Panels::panel`], and
+//! [`Display::edited`]. Keys come before all of it ([`LiveTools::key`]),
+//! and [`LiveTools::cancel`] ends a live gesture ([`Ended`]).
 mod data;
 mod display;
 mod edited;
+pub mod hosting;
 mod library;
 mod parts;
 mod project;
@@ -67,8 +78,8 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, TimeDomain, TimeMark,
-    TimeUnits, Tools,
+    BarField, BarValue, Candidate, Ended, GizmoUse, LevelPreset, LevelSpec, NumericFields, Panel,
+    PanelScope, Takes, TimeDomain, TimeMark, TimeUnits,
 };
 pub use display::{DisplayKind, DisplayOption, DisplayScope};
 pub use edited::{Edited, Ghost, GhostTone};
@@ -77,8 +88,10 @@ pub use library::{
     Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT, Shared, Shelf,
     ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
-pub(crate) use parts::Erased;
-pub use parts::{Inspector, Invoked, Levels, ObjectRows, RowAction, ViewportLayer, Vocabulary};
+pub use parts::{
+    Display, Inspector, Invoked, Levels, LiveTools, NumericBar, ObjectRows, Panels, RowAction,
+    Timeline, Transforms, Vocabulary,
+};
 pub use project::{ProjectSection, ProjectSettingsSection};
 pub use settings::{Section, SettingsSection};
 pub use view::{Holds, KeyPress};
@@ -87,7 +100,6 @@ use crate::host::{Cx, Waker};
 use kinogaki_studio_api::{ContextId, Package, PackageUi};
 use std::any::Any;
 use std::fmt;
-use std::sync::Arc;
 
 /// A package's UI, as the package writes it. Its id, label and session
 /// slots are its [`Package`]'s.
@@ -137,14 +149,37 @@ pub struct ContextPart<S: ?Sized> {
     pub library: Library,
     /// Its selection levels; `None`: whole objects.
     pub levels: Option<Box<dyn Levels<S>>>,
-    /// What it adds to the viewport.
-    pub viewport: Option<Box<dyn ViewportLayer<S>>>,
+    /// Its live tools' input over the views.
+    pub tools: Option<Box<dyn LiveTools<S>>>,
+    /// Its floating panels over the views.
+    pub panels: Option<Box<dyn Panels<S>>>,
+    /// The host's transform tools over its selection.
+    pub transforms: Option<Box<dyn Transforms<S>>>,
+    /// What it draws in the views.
+    pub display: Option<Box<dyn Display<S>>>,
+    /// Its own time.
+    pub timeline: Option<Box<dyn Timeline<S>>>,
+    /// A live tool's numeric bar.
+    pub numeric: Option<Box<dyn NumericBar<S>>>,
     /// Its inspector.
     pub inspector: Option<Box<dyn Inspector<S>>>,
     /// Its tools and commands.
     pub vocabulary: Option<Box<dyn Vocabulary<S>>>,
     /// Inspector rows of the object kinds it owns.
     pub objects: Option<Box<dyn ObjectRows<S>>>,
+}
+
+/// `with_*`: the context with part `$field` given.
+macro_rules! with {
+    ($($(#[$doc:meta])* $with:ident: $field:ident: $trait:ident),* $(,)?) => {
+        $(
+            $(#[$doc])*
+            pub fn $with(mut self, part: impl $trait<S> + 'static) -> Self {
+                self.$field = Some(Box::new(part));
+                self
+            }
+        )*
+    };
 }
 
 impl<S: ?Sized> ContextPart<S> {
@@ -154,7 +189,12 @@ impl<S: ?Sized> ContextPart<S> {
             id,
             library: Library::default(),
             levels: None,
-            viewport: None,
+            tools: None,
+            panels: None,
+            transforms: None,
+            display: None,
+            timeline: None,
+            numeric: None,
             inspector: None,
             vocabulary: None,
             objects: None,
@@ -167,59 +207,27 @@ impl<S: ?Sized> ContextPart<S> {
         self
     }
 
-    /// With selection levels.
-    pub fn with_levels(mut self, part: impl Levels<S> + 'static) -> Self {
-        self.levels = Some(Box::new(part));
-        self
-    }
-
-    /// With a viewport layer.
-    pub fn with_viewport(mut self, part: impl ViewportLayer<S> + 'static) -> Self {
-        self.viewport = Some(Box::new(part));
-        self
-    }
-
-    /// With an inspector.
-    pub fn with_inspector(mut self, part: impl Inspector<S> + 'static) -> Self {
-        self.inspector = Some(Box::new(part));
-        self
-    }
-
-    /// With a vocabulary.
-    pub fn with_vocabulary(mut self, part: impl Vocabulary<S> + 'static) -> Self {
-        self.vocabulary = Some(Box::new(part));
-        self
-    }
-
-    /// With object rows.
-    pub fn with_objects(mut self, part: impl ObjectRows<S> + 'static) -> Self {
-        self.objects = Some(Box::new(part));
-        self
-    }
-}
-
-impl<S: 'static> ContextPart<S> {
-    /// The same context over the host's erased state.
-    fn erase(self) -> ContextPart<dyn Any> {
-        ContextPart {
-            id: self.id,
-            library: self.library,
-            levels: self
-                .levels
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Levels<dyn Any>>),
-            viewport: self
-                .viewport
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn ViewportLayer<dyn Any>>),
-            inspector: self
-                .inspector
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Inspector<dyn Any>>),
-            vocabulary: self
-                .vocabulary
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn Vocabulary<dyn Any>>),
-            objects: self
-                .objects
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn ObjectRows<dyn Any>>),
-        }
+    with! {
+        /// With selection levels.
+        with_levels: levels: Levels,
+        /// With live tools.
+        with_tools: tools: LiveTools,
+        /// With panels.
+        with_panels: panels: Panels,
+        /// With the host's transform tools.
+        with_transforms: transforms: Transforms,
+        /// With what it draws in the views.
+        with_display: display: Display,
+        /// With its own time.
+        with_timeline: timeline: Timeline,
+        /// With a numeric bar.
+        with_numeric: numeric: NumericBar,
+        /// With an inspector.
+        with_inspector: inspector: Inspector,
+        /// With a vocabulary.
+        with_vocabulary: vocabulary: Vocabulary,
+        /// With object rows.
+        with_objects: objects: ObjectRows,
     }
 }
 
@@ -230,86 +238,15 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("id", &self.id)
             .field("items", &self.library.items.len())
             .field("levels", &has(self.levels.is_some()))
-            .field("viewport", &has(self.viewport.is_some()))
+            .field("tools", &has(self.tools.is_some()))
+            .field("panels", &has(self.panels.is_some()))
+            .field("transforms", &has(self.transforms.is_some()))
+            .field("display", &has(self.display.is_some()))
+            .field("timeline", &has(self.timeline.is_some()))
+            .field("numeric", &has(self.numeric.is_some()))
             .field("inspector", &has(self.inspector.is_some()))
             .field("vocabulary", &has(self.vocabulary.is_some()))
             .field("objects", &has(self.objects.is_some()))
-            .finish()
-    }
-}
-
-/// The host's state of one package (`UiPackage::State`, erased).
-pub type State = Box<dyn Any>;
-
-/// A package's UI, its state's type erased: what the host reads from the
-/// package ([`Registered::of`]).
-pub struct Registered {
-    /// Its contexts, over the erased state.
-    pub contexts: Vec<ContextPart<dyn Any>>,
-    /// Its settings sections.
-    pub settings: Vec<SettingsSection>,
-    /// Its sections of Settings ▸ Project.
-    pub project_sections: Vec<ProjectSettingsSection>,
-    package: Arc<dyn Calls>,
-}
-
-/// The package-wide calls of a registered package, over the erased state.
-trait Calls: Send + Sync {
-    fn state(&self, wake: Waker) -> State;
-    fn poll(&self, s: &mut dyn Any, cx: &mut dyn Cx);
-    fn reset(&self, s: &mut dyn Any, cx: &mut dyn Cx);
-}
-
-impl<P: UiPackage> Calls for P {
-    fn state(&self, wake: Waker) -> State {
-        Box::new(UiPackage::state(self, wake))
-    }
-    fn poll(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
-        UiPackage::poll(self, own(s), cx)
-    }
-    fn reset(&self, s: &mut dyn Any, cx: &mut dyn Cx) {
-        UiPackage::reset(self, own(s), cx)
-    }
-}
-
-fn own<S: 'static>(s: &mut dyn Any) -> &mut S {
-    s.downcast_mut()
-        .expect("the host lends each package its own state")
-}
-
-impl Registered {
-    /// `package`'s UI; `None`: a headless package.
-    pub fn of(package: &Package) -> Option<&Registered> {
-        package.ui.as_ref()?.parts().downcast_ref()
-    }
-
-    /// A new host's state of the package.
-    pub fn state(&self, wake: Waker) -> State {
-        self.package.state(wake)
-    }
-
-    /// [`UiPackage::poll`] with the package's `state`.
-    pub fn poll(&self, state: &mut dyn Any, cx: &mut dyn Cx) {
-        self.package.poll(state, cx)
-    }
-
-    /// [`UiPackage::reset`] with the package's `state`.
-    pub fn reset(&self, state: &mut dyn Any, cx: &mut dyn Cx) {
-        self.package.reset(state, cx)
-    }
-
-    /// Context `id`'s part.
-    pub fn context(&self, id: ContextId) -> Option<&ContextPart<dyn Any>> {
-        self.contexts.iter().find(|c| c.id == id)
-    }
-}
-
-impl fmt::Debug for Registered {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Registered")
-            .field("contexts", &self.contexts)
-            .field("settings", &self.settings)
-            .field("project_sections", &self.project_sections)
             .finish()
     }
 }
@@ -324,18 +261,7 @@ pub trait WithUi {
 
 impl WithUi for Package {
     fn with_ui(mut self, ui: impl UiPackage) -> Self {
-        let registered = Registered {
-            contexts: ui.contexts().into_iter().map(ContextPart::erase).collect(),
-            settings: ui
-                .settings()
-                .into_iter()
-                .map(SettingsSection::erase)
-                .collect(),
-            project_sections: (ui.project_sections().into_iter())
-                .map(ProjectSettingsSection::erase)
-                .collect(),
-            package: Arc::new(ui),
-        };
+        let registered = hosting::Registered::new(ui);
         let contexts = registered.contexts.iter().map(|c| c.id).collect();
         self.ui = Some(PackageUi::new(contexts, registered));
         self

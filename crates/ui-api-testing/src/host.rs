@@ -26,7 +26,7 @@ use studio_ui_api::host::{
     LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View, ViewCamera,
     ViewCx, Waker,
 };
-use studio_ui_api::package::{Registered, State};
+use studio_ui_api::package::hosting::{Registered, State};
 
 /// An object of a [`FakeHost`]'s scene.
 #[derive(Clone, Debug)]
@@ -98,6 +98,8 @@ pub struct FakeHost {
     pub cameras: Vec<ViewCamera>,
     /// The view a view call is about.
     pub view: Option<View>,
+    /// This frame's input, as view calls see it ([`ViewCx::input`]).
+    pub input: studio_ui_api::Input,
     /// What the inspector shows.
     pub inspected: Inspected,
     /// The user's preferences.
@@ -175,6 +177,7 @@ impl FakeHost {
             networks: BTreeMap::new(),
             cameras: Vec::new(),
             view: None,
+            input: Default::default(),
             inspected: Inspected::default(),
             prefs: HostPrefs::default(),
             theme: studio_ui_api::Theme::default(),
@@ -673,6 +676,10 @@ impl ViewCx for FakeHost {
         self.view
             .as_ref()
             .expect("a view call on a FakeHost with its `view` set")
+    }
+    /// Its `input` field.
+    fn input(&self) -> &studio_ui_api::Input {
+        &self.input
     }
     /// Its `snap` field.
     fn snap(

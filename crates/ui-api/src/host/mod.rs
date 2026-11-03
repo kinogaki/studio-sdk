@@ -43,7 +43,8 @@ pub use capabilities::{
     HostSlotsExt, HostStatus, HostTools, HostTransform, HostUndo, HostView,
 };
 pub use data::{
-    Ground, HostPrefs, Inspected, NodeRef, NodeRows, ObjectRef, Place, View, ViewCamera,
+    Ground, HostPrefs, Inspected, NodeRef, NodeRows, ObjectRef, Place, PointerOver, View,
+    ViewCamera,
 };
 pub use network::HostNetwork;
 
@@ -119,14 +120,18 @@ pub trait Cx:
     ) -> NodeRows;
 }
 
-/// The context of a call about one view: a viewport layer's
-/// [`controls`](crate::package::ViewportLayer::controls),
-/// [`tools`](crate::package::ViewportLayer::tools),
-/// [`overlay`](crate::package::ViewportLayer::overlay) and
-/// [`edited`](crate::package::ViewportLayer::edited).
+/// The context of a call about one view: the open context's
+/// [`LiveTools::tools`](crate::package::LiveTools::tools),
+/// [`Panels::panels`](crate::package::Panels::panels),
+/// [`Display::overlay`](crate::package::Display::overlay) and
+/// [`Display::edited`](crate::package::Display::edited).
 pub trait ViewCx: Cx {
     /// The view.
     fn view(&self) -> &View;
+    /// This frame's input as the view's calls see it: the pointer, the
+    /// modifiers, the keys and typing the tools didn't take
+    /// ([`LiveTools::key`](crate::package::LiveTools::key)), the wheel.
+    fn input(&self) -> &crate::Input;
     /// The best of `targets` within `radius` pixels of screen point `at`
     /// in this view, as the host's gizmo snaps: the value `on` names
     /// asked through its type's `Snappable`, nothing of it moving, hidden
@@ -153,7 +158,7 @@ pub trait ViewCx: Cx {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapOn {
     /// The open object's shown value, with the targets its layer adds
-    /// through [`ViewportLayer::own_targets`](crate::package::ViewportLayer::own_targets).
+    /// through [`LiveTools::own_targets`](crate::package::LiveTools::own_targets).
     Open,
     /// That object's shown value.
     Object(ObjectRef),

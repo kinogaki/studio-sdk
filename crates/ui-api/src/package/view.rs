@@ -2,8 +2,8 @@
 //! press ([`KeyPress`]) and what a live gesture holds ([`Holds`]).
 use crate::Event;
 
-/// A key or typed text over the viewport, as a layer's
-/// [`key`](super::ViewportLayer::key) sees it: before any binding runs,
+/// A key or typed text over the viewport, as live tools'
+/// [`key`](super::LiveTools::key) see it: before any binding runs,
 /// after the host's own modal state (a dialog, a menu, the document's
 /// commands such as Save and Undo) had it.
 #[derive(Clone, Debug, PartialEq)]
@@ -18,10 +18,6 @@ pub struct KeyPress {
     pub browser: bool,
     /// The key chooses a transform tool (Q, W, E, R, T).
     pub tool_key: bool,
-    /// A text field has the keyboard (the layer's own value field, or one
-    /// of the host's): only the layer's value field takes the event then,
-    /// never a live tool's own keys.
-    pub typing: bool,
 }
 
 /// What a live gesture keeps from the rest of the viewport.

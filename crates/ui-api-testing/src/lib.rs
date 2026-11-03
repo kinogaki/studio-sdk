@@ -4,7 +4,8 @@
 //! show and draw, and play back scripted user actions, with no window and
 //! no GPU; [`FakeHost`] stands in for Studio's host interface, with its
 //! objects' networks [`FakeNetwork`]s, and [`Hosting`] calls a registered
-//! package's parts on it as the host does.
+//! package's parts on it as the host does; [`view`] and [`camera`] are the
+//! views a view call is about.
 //!
 //! ```
 //! use studio_ui_api_testing::{Call, RecordingUi};
@@ -21,9 +22,11 @@ mod network;
 mod painter;
 mod ui;
 mod ui_impl;
+mod view;
 
 pub use calls::HostCall;
 pub use host::{FakeHost, FakeObject, Hosting};
 pub use network::FakeNetwork;
 pub use painter::{GLYPH_ADVANCE, RecordingPainter};
 pub use ui::{Call, RecordingUi};
+pub use view::{camera, view};

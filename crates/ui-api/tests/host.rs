@@ -10,20 +10,18 @@ use kinogaki_studio_api::{
     ContextId, Error, ObjectKindId, Package, PackageId, Slot, SlotId, StoredValues,
 };
 use studio_ui_api::host::{
-    Cx, Ground, HostDoc, HostSettingsExt, HostSlots, HostSlotsExt, HostUndo, InspectorCx, NodeRef,
-    NodeRows, ObjectRef, Place, View, ViewCamera, ViewCx, Waker,
+    Cx, HostDoc, HostSettingsExt, HostSlots, HostSlotsExt, HostUndo, InspectorCx, NodeRef,
+    NodeRows, ObjectRef, Place, View, ViewCx, Waker,
 };
+use studio_ui_api::package::hosting::Registered;
 use studio_ui_api::package::{
-    ContextPart, DisplayKind, DisplayOption, DisplayScope, Edited, Held, Inspector, KeyBinding,
-    KeyStore, KeysActive, LevelSpec, Levels, Library, MarkingDefault, MenuDefaults, Places,
-    ProjectSection, ProjectSettingsSection, Registered, Section, SettingsSection, Shared,
-    Situation, Tools, UiPackage, ViewportLayer, VocabularyItem, When, WithUi,
+    ContextPart, Display, DisplayKind, DisplayOption, DisplayScope, Edited, Ended, Held, Inspector,
+    KeyBinding, KeyStore, KeysActive, LevelSpec, Levels, Library, LiveTools, MarkingDefault,
+    MenuDefaults, Panel, PanelScope, Panels, Places, ProjectSection, ProjectSettingsSection,
+    Section, SettingsSection, Shared, Situation, Takes, UiPackage, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
-use studio_ui_api::{
-    ButtonSpec, Color, Modifiers, Pos, Projection, Rect, Response, Slot as PaintSlot, Stroke, Ui,
-    Vec2,
-};
+use studio_ui_api::{ButtonSpec, Color, Modifiers, Painter, Pos, Rect, Stroke, Ui, Vec2};
 use studio_ui_api_testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
 
 fn forest() -> ContextId {
@@ -80,7 +78,9 @@ impl UiPackage for Trees {
             ContextPart::new(forest())
                 .with_library(library())
                 .with_levels(TreeLevels)
-                .with_viewport(TreeView)
+                .with_tools(TreeView)
+                .with_panels(TreeView)
+                .with_display(TreeView)
                 .with_inspector(TreeInspector),
         ]
     }
@@ -191,41 +191,56 @@ const LEAVES: DisplayOption = DisplayOption {
     kind: DisplayKind::Toggle { on: false },
 };
 
-impl ViewportLayer<Forest> for TreeView {
-    fn tools(&self, _s: &mut Forest, cx: &mut dyn ViewCx, _ui: &mut dyn Ui) -> Tools {
-        Tools {
-            busy: cx.view().modifiers.shift,
-            ..Tools::default()
+/// Shift takes the views' picks.
+impl LiveTools<Forest> for TreeView {
+    fn tools(&self, _s: &mut Forest, cx: &mut dyn ViewCx) -> Takes {
+        Takes {
+            picks: cx.input().modifiers.shift,
+            ..Takes::default()
         }
     }
-    fn overlay(&self, s: &mut Forest, cx: &mut dyn ViewCx, ui: &mut dyn Ui) {
-        s.overlays += 1;
-        let Some(at) = cx.view().pointer else {
-            return;
-        };
-        let stroke = Stroke::new(1.0, Color::WHITE);
-        ui.painter().circle_stroke(at, 4.0, stroke);
+    fn cancel(&self, s: &mut Forest, _cx: &mut dyn Cx, _why: Ended) {
+        s.planting = None;
     }
-    /// Leaves over the trees in the views showing them.
-    fn edited(&self, _s: &mut Forest, cx: &mut dyn ViewCx) -> Option<Edited> {
+}
+
+/// A ring at the pointer; leaves over the trees in the views showing
+/// them.
+impl Display<Forest> for TreeView {
+    fn edited(&self, _s: &Forest, cx: &dyn ViewCx) -> Option<Edited> {
         (cx.displayed(LEAVES.id) == 1).then(Edited::default)
     }
-    /// The card's place, over the view's top left corner while Plant runs.
-    fn controls(&self, s: &Forest, cx: &dyn ViewCx) -> Vec<Rect> {
+    fn settle(&self, s: &mut Forest, _cx: &mut dyn Cx) {
+        s.overlays += 1;
+    }
+    fn overlay(&self, _s: &Forest, cx: &dyn ViewCx, painter: &dyn Painter) {
+        let Some(at) = cx.input().pointer.hover else {
+            return;
+        };
+        painter.circle_stroke(at, 4.0, Stroke::new(1.0, Color::WHITE));
+    }
+}
+
+/// Plant's card, over the view's top left corner while it runs.
+impl Panels<Forest> for TreeView {
+    fn panels(&self, s: &Forest, cx: &dyn ViewCx) -> Vec<Panel> {
         let at = cx.view().rect.min;
-        let card = Rect::from_min_size(at, Vec2::new(120.0, 80.0));
+        let card = Panel {
+            id: studio_ui_api::Id::new("toy.trees.plant"),
+            rect: Rect::from_min_size(at, Vec2::new(120.0, 80.0)),
+            scope: PanelScope::View,
+        };
         s.planting.map(|_| card).into_iter().collect()
     }
-    /// Plant's card: its node's rows, More while some are left out, Done
-    /// ending it.
-    fn cards(&self, s: &mut Forest, cx: &mut dyn Cx, ui: &mut dyn Ui, rect: Rect) {
+    /// Its node's rows, More while some are left out, Done ending it.
+    fn panel(&self, s: &mut Forest, cx: &mut dyn Cx, panel: &Panel, ui: &mut dyn Ui) {
         let (Some(node), Some(object)) = (s.planting, cx.place().object) else {
             return;
         };
         let spec = studio_ui_api::CardSpec {
-            id: studio_ui_api::Id::new("toy.trees.plant"),
-            rect,
-            bounds: rect,
+            id: panel.id,
+            rect: panel.rect,
+            bounds: panel.rect,
             title: "Plant",
             more: (s.more || s.hidden).then_some(s.more),
         };
@@ -381,36 +396,9 @@ fn rect() -> Rect {
     Rect::from_min_size(Pos::ZERO, Vec2::new(400.0, 300.0))
 }
 
-fn view(pointer: Option<Pos>, modifiers: Modifiers) -> View {
-    View {
-        rect: rect(),
-        index: 0,
-        interactive: true,
-        modal: false,
-        response: Response::new(Default::default(), rect()),
-        over_chrome: false,
-        over_cube: false,
-        over_handle: false,
-        pointer,
-        modifiers,
-        stacking: false,
-        under: PaintSlot(0),
-        camera: ViewCamera {
-            projection: Projection {
-                clip_from_object: Default::default(),
-                object_from_clip: Default::default(),
-                backward: kinogaki_studio_api::Vec3::new(0.0, 0.0, 1.0),
-            },
-            eye: kinogaki_studio_api::Vec3::new(0.0, 0.0, 10.0),
-            target: kinogaki_studio_api::Vec3::ZERO,
-            orthographic: false,
-            ground: Ground {
-                origin: kinogaki_studio_api::Vec3::ZERO,
-                normal: kinogaki_studio_api::Vec3::new(0.0, 1.0, 0.0),
-                step: 1.0,
-            },
-        },
-    }
+/// The trees' view: the testing crate's, at [`rect`].
+fn view() -> View {
+    studio_ui_api_testing::view(rect())
 }
 
 #[test]
@@ -423,7 +411,7 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     let package = Registered::of(&whole).unwrap();
     assert!(Registered::of(&Package::new(PackageId::declared("toy.bare"), "Bare")).is_none());
     let context = package.context(forest()).unwrap();
-    assert!(context.levels.is_some() && context.viewport.is_some());
+    assert!(context.levels.is_some() && context.tools.is_some() && context.display.is_some());
     assert!(context.vocabulary.is_none());
     assert_eq!(package.settings[0].context(), forest());
     let levels = context.levels.as_ref().unwrap().levels();
@@ -504,20 +492,30 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
 }
 
 #[test]
-fn a_viewport_layer_reads_its_view_and_draws_through_the_painter() {
+fn the_viewport_parts_read_the_views_input_and_draw_through_the_painter() {
     let mut host = host();
     let mut trees = hosted(&host);
-    host.view = Some(view(Some(Pos::new(10.0, 20.0)), Modifiers::SHIFT));
-    let mut ui = RecordingUi::new(rect());
-    let tools = trees.with(|p, s| {
-        let layer = p.contexts[0].viewport.as_ref().unwrap();
-        let tools = layer.tools(s, &mut host, &mut ui);
-        layer.overlay(s, &mut host, &mut ui);
-        tools
+    host.view = Some(view());
+    host.input.pointer.hover = Some(Pos::new(10.0, 20.0));
+    host.input.modifiers = Modifiers::SHIFT;
+    let painter = studio_ui_api_testing::RecordingPainter::new(rect());
+    let takes = trees.with(|p, s| {
+        let context = &p.contexts[0];
+        let takes = context.tools.as_ref().unwrap().tools(s, &mut host);
+        let display = context.display.as_ref().unwrap();
+        display.settle(s, &mut host);
+        display.overlay(s, &host, &painter);
+        takes
     });
-    assert!(tools.busy);
-    assert_eq!(ui.painter_record().shapes().len(), 1);
-    assert_eq!(trees.state::<Forest>().overlays, 1);
+    assert_eq!(
+        takes,
+        Takes {
+            picks: true,
+            ..Takes::default()
+        }
+    );
+    assert_eq!(painter.shapes().len(), 1);
+    assert_eq!(trees.state::<Forest>().overlays, 1, "settled once");
 }
 
 #[test]
@@ -529,22 +527,27 @@ fn a_views_calls_answer_its_own_display_options_and_place() {
     let at = |index: usize| View {
         index,
         rect: Rect::from_min_size(Pos::new(index as f32 * 400.0, 0.0), Vec2::new(400.0, 300.0)),
-        ..view(None, Modifiers::NONE)
+        ..view()
     };
     let asked = |host: &mut FakeHost, trees: &mut Hosting, index| {
         host.view = Some(at(index));
         trees.with(|p, s| {
-            let layer = p.contexts[0].viewport.as_ref().unwrap();
-            let controls = layer.controls(s, host);
-            (layer.edited(s, host).is_some(), controls)
+            let context = &p.contexts[0];
+            let panels = context.panels.as_ref().unwrap().panels(s, host);
+            let edited = context.display.as_ref().unwrap().edited(s, host);
+            (edited.is_some(), panels)
         })
     };
-    let (leaves, controls) = asked(&mut host, &mut trees, 0);
+    let (leaves, panels) = asked(&mut host, &mut trees, 0);
     assert!(!leaves, "view 0 has them off");
-    assert_eq!(controls[0].min, Pos::ZERO);
-    let (leaves, controls) = asked(&mut host, &mut trees, 1);
+    assert_eq!(panels[0].rect.min, Pos::ZERO);
+    let (leaves, panels) = asked(&mut host, &mut trees, 1);
     assert!(leaves, "view 1 has them on");
-    assert_eq!(controls[0].min, Pos::new(400.0, 0.0), "over its own view");
+    assert_eq!(
+        panels[0].rect.min,
+        Pos::new(400.0, 0.0),
+        "over its own view"
+    );
 }
 
 #[test]
@@ -747,8 +750,13 @@ fn a_tools_card_shows_its_nodes_rows_and_more_while_some_are_left_out() {
     trees.with(|_, s| s.downcast_mut::<Forest>().unwrap().planting = Some(NodeRef(3)));
     let mut cards = |host: &mut FakeHost, ui: &mut RecordingUi| {
         trees.with(|p, s| {
-            let layer = p.contexts[0].viewport.as_ref().unwrap();
-            layer.cards(s, host, ui, rect());
+            let panels = p.contexts[0].panels.as_ref().unwrap();
+            let panel = Panel {
+                id: studio_ui_api::Id::new("toy.trees.plant"),
+                rect: rect(),
+                scope: PanelScope::View,
+            };
+            panels.panel(s, host, &panel, ui);
         });
     };
     let mut ui = RecordingUi::new(rect());

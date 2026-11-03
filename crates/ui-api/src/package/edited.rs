@@ -1,5 +1,5 @@
 //! What a context adds over the open object in one view: the value its
-//! [`ViewportLayer::edited`](super::ViewportLayer::edited) returns each
+//! [`Display::edited`](super::Display::edited) returns each
 //! frame (overlays and guides; core draws the object's value
 //! itself, and marks the templated pieces a live tool picks from), and
 //! the points a drag is moving ([`Moving`]), which core previews over
@@ -25,9 +25,12 @@ use std::sync::Arc;
 /// way) never draw on the wrong one.
 #[derive(Clone, Default)]
 pub struct Edited {
-    /// Diagnostic findings and edge marks over `value`'s points and
-    /// polygons.
-    pub overlays: Option<Arc<OverlayDraw>>,
+    /// Layers of diagnostic findings and edge marks over the shown
+    /// value's points and polygons, drawn in order; each is bound to the
+    /// topology it was made for ([`OverlayDraw::on`]) and shows only over
+    /// a packet of that topology, so a layer still made for the last cook
+    /// leaves the others showing.
+    pub overlays: Vec<Arc<OverlayDraw>>,
     /// A tool's guides; CAD's tessellation.
     pub guides: Option<Arc<GuideDraw>>,
     /// Every point marker of the surface shows, at any level (a context's
@@ -78,6 +81,7 @@ pub enum GhostTone {
 impl fmt::Debug for Edited {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edited")
+            .field("overlays", &self.overlays.len())
             .field("points", &self.points)
             .field("pieces", &self.pieces)
             .field("moving", &self.moving.as_ref().map(|m| m.points.len()))

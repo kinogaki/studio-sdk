@@ -427,12 +427,6 @@ pub struct ViewportSpec {
     pub own_snapping: Option<bool>,
     /// Where the transform pivot starts.
     pub default_pivot: Pivot,
-    /// The host's transform tools for the context's selection: the left
-    /// toolbar's Select, Move, Rotate, Scale, Manipulator and Pivot, and
-    /// the Gear's tool settings (the tool's space) before the context's
-    /// own [rows](super::ViewportLayer::gear). The gizmo itself shows where
-    /// [`ViewportLayer::transforms`](super::ViewportLayer::transforms) says.
-    pub transform: bool,
 }
 
 impl Default for ViewportSpec {
@@ -442,7 +436,6 @@ impl Default for ViewportSpec {
             snap_steps: true,
             own_snapping: None,
             default_pivot: Pivot::Center,
-            transform: false,
         }
     }
 }

@@ -4,8 +4,7 @@
 //! option's value, draws its row in each view's Display popover after
 //! core's own rows, and answers a view call's
 //! [`ViewCx::displayed`](crate::host::ViewCx::displayed); the context draws
-//! what the option shows (in its [`edited`](super::ViewportLayer::edited)
-//! or [`overlay`](super::ViewportLayer::overlay)).
+//! what the option shows (its [`Display`](super::Display): `edited` or `overlay`).
 //!
 //! A value is the host's stored state of the option's scope: a
 //! [`PerView`](DisplayScope::PerView) option is each view's own, saved with
