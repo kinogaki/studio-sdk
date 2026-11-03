@@ -3,7 +3,7 @@
 use kinogaki_studio_api::element::{Field, MemoryElement};
 use kinogaki_studio_api::geometry::{Class, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, PolygonsCodec};
-use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue};
+use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue, Units, UpAxis};
 use kinogaki_studio_api_testing as conformance;
 use kinogaki_studio_api_testing::{Codecs, Consumer, Fixtures, Invariants};
 use std::sync::Arc;
@@ -125,15 +125,17 @@ fn components_hold_a_standard_selection() {
 fn the_tolerances_save_as_a_project_value() {
     let value = StoredValue::of::<Tolerances>();
     assert_eq!(value.id().as_str(), "kinogaki.core.tolerances");
-    let inches = Tolerances::default().with_unit(25.4).unwrap();
+    let units = Units::new(0.0254, UpAxis::Z).unwrap();
+    let inches = Tolerances::default().with_units(units);
     let mut saved = MemoryElement::new("tolerances");
     saved.write(|w| value.write(&inches, w)).unwrap();
     let read = saved.read(|r| value.read(r)).unwrap();
-    // The model unit isn't saved (the project's units are its source): the
-    // value reads back unsized, and sized again it is the same.
+    // The model's units aren't saved (the project's units are their
+    // source): the value reads back in millimeters, and given the units
+    // again it is the same.
     let read = read.downcast_ref::<Tolerances>().unwrap();
-    assert_eq!(read.millimeters_per_unit(), 1.0);
-    assert_eq!(read.with_unit(25.4).unwrap(), inches);
+    assert_eq!(read.units(), Units::MILLIMETERS);
+    assert_eq!(read.with_units(units), inches);
     let mut wrong = MemoryElement::new("tolerances");
     wrong
         .write(|w| {

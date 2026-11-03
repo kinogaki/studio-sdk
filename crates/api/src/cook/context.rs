@@ -5,7 +5,7 @@ use crate::cook::{CookError, Inside, Project, Resolved};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, Value};
-use crate::time::Time;
+use kinogaki_geometry::{Rate, Time};
 use std::any::Any;
 use std::ops::Range;
 
@@ -28,7 +28,7 @@ pub struct CookCx<'a> {
     incoming: Option<&'a Components>,
     cancel: &'a CancelToken,
     time: Time,
-    fps: f64,
+    rate: Rate,
     node: u64,
     resolved: &'a [(String, Resolved)],
     project: Option<&'a Project<'a>>,
@@ -60,7 +60,7 @@ impl<'a> CookCx<'a> {
             incoming: None,
             cancel,
             time: Time::ZERO,
-            fps: 24.0,
+            rate: Rate::FILM,
             node: 0,
             resolved: &[],
             project: None,
@@ -134,9 +134,9 @@ impl<'a> CookCx<'a> {
         self
     }
 
-    /// In a document showing `fps` frames a second.
-    pub fn with_fps(mut self, fps: f64) -> Self {
-        self.fps = fps;
+    /// In a document showing `rate` frames a second.
+    pub fn with_rate(mut self, rate: Rate) -> Self {
+        self.rate = rate;
         self
     }
 
@@ -292,9 +292,9 @@ impl<'a> CookCx<'a> {
     }
 
     /// The document's frames a second: what [`time`](Self::time) is in
-    /// frames ([`Time::frame`]), and a frame's length.
-    pub fn fps(&self) -> f64 {
-        self.fps
+    /// frames ([`Time::frame`]).
+    pub fn rate(&self) -> Rate {
+        self.rate
     }
 
     /// The node's scratch value of type `T`, made with `T::default()` when

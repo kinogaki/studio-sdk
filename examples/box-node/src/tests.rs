@@ -3,6 +3,7 @@
 //! reads the handles the node type binds; and adds the node to a Boxes
 //! network, as Tab does, on the SDK's fake host.
 use super::*;
+use kinogaki_studio_api::Vec3;
 use kinogaki_studio_api::cook::{Constraint, Space};
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
@@ -222,12 +223,12 @@ fn the_node_binds_a_box_handle_to_its_center_and_sides() {
         assert!(values.contains_key(name), "{name} is declared");
     }
     assert!(handle.shown(&values));
-    assert_eq!(center.read(&values), Some([0.0; 3]));
-    assert_eq!(size.read(&values), Some([1.0; 3]));
+    assert_eq!(center.read(&values), Some(Vec3::ZERO));
+    assert_eq!(size.read(&values), Some(Vec3::new(1.0, 1.0, 1.0)));
     // A drag's write is what the next cook reads.
     let mut moved = values;
-    size.write(&mut moved, [2.0, 1.0, 1.0]);
-    center.write(&mut moved, [0.5, 0.0, 0.0]);
+    size.write(&mut moved, [2.0, 1.0, 1.0].into());
+    center.write(&mut moved, [0.5, 0.0, 0.0].into());
     let cancel = CancelToken::default();
     let mut scratch = None;
     let mut cx = CookCx::new(&moved, &cancel, &mut scratch);

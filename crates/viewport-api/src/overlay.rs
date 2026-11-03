@@ -3,6 +3,7 @@
 //! never to a packet), and tool guides with their own world-space
 //! positions.
 use crate::SurfaceSource;
+use kinogaki_geometry::Vec3;
 use std::sync::Arc;
 
 /// A segment between two point ids. An ordinary edge has zero offset; a point
@@ -100,7 +101,7 @@ pub struct GuideDraw {
     /// The point `positions` are offsets from, in the value's space (as a
     /// packet's are from [`SurfaceSource::origin`], so guides far from the
     /// origin stay precise); typically the value's bounds center.
-    pub origin: [f64; 3],
+    pub origin: Vec3,
     /// The guides' own points, as f32 offsets from `origin`.
     pub positions: Vec<[f32; 3]>,
     /// The segments (ids index `positions`).

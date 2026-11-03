@@ -5,7 +5,7 @@ use crate::data::Data;
 use crate::id::{ContextId, NodeTypeId};
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
-use crate::time::Time;
+use kinogaki_geometry::Time;
 
 /// One network, read through the host (a package's UI reaches an
 /// object's through the UI API's `HostNetwork`). Nodes are named by the host's ids, which are unique through every

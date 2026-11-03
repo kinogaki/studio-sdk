@@ -1,5 +1,6 @@
 //! Declared prims, materials, outputs and motion.
 use super::*;
+use kinogaki_geometry::{Sampled, Xform};
 
 #[test]
 fn engines_declare_types_and_apply_schemas_to_them() {
@@ -172,31 +173,15 @@ fn outputs_have_one_id_each_and_engines_list_theirs() {
 }
 
 #[test]
-fn motion_is_one_placement_a_time_ascending() {
-    let moved = [[2.0, 0.0, 0.0, 1.0]; 4];
-    let two = Motion::new([-0.25, 0.25], [IDENTITY, moved]).unwrap();
-    assert!(!two.is_empty() && Motion::<Matrix>::none().is_empty());
-    assert!(
-        Motion::new([0.25, -0.25], [IDENTITY, moved]).is_none(),
-        "descending"
-    );
-    assert!(
-        Motion::new([0.0, 0.0], [IDENTITY, moved]).is_none(),
-        "twice at a time"
-    );
-    assert!(
-        Motion::new([0.0], [IDENTITY, moved]).is_none(),
-        "a placement a time"
-    );
-    assert!(Motion::new([f32::NAN], [IDENTITY]).is_none());
-    // An Instancer's samples are its copies a time.
-    let copies: Copies = Arc::from([[[1.0, 0.0, 0.0, 0.0]; 3]]);
-    assert!(Motion::new([0.0, 0.5], [copies.clone(), copies]).is_some());
+fn an_instancer_samples_all_its_copies_a_time_and_a_camera_blurs_while_open() {
+    let copies: Arc<[Xform]> = Arc::from([Xform::IDENTITY; 3]);
+    let moving = Sampled::new([0.0, 0.5], [copies.clone(), copies]).unwrap();
+    assert!(!moving.is_still() && moving.values()[1].len() == 3);
     // A camera blurs while its shutter is open.
     let open = Camera {
         shutter: [-0.25, 0.25],
         ..Camera::default()
     };
     assert!(open.blurs() && !Camera::default().blurs());
-    assert_eq!(format!("{:?}", Dirty::MOTION), "Dirty(MOTION)");
+    assert_eq!(format!("{:?}", Dirty::TRANSFORM), "Dirty(TRANSFORM)");
 }

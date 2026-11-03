@@ -2,7 +2,6 @@
 //! squares and rotation rings, and drag deltas along axes and planes.
 use crate::geom::{Pos, Rect, Vec2, vec2};
 use crate::projection::Projection;
-use crate::vec3::{add, dot, is_finite, scale as times, sub};
 use kinogaki_studio_api::Vec3;
 
 /// A gizmo handle. Axes are 0, 1 and 2 (the frame's X, Y and Z).
@@ -58,11 +57,8 @@ impl GizmoFrame {
         [[0.23, 0.23], [0.40, 0.23], [0.40, 0.40], [0.23, 0.40]]
             .into_iter()
             .map(|[a, b]| {
-                let across = add(
-                    times(self.axes[(axis + 1) % 3], a),
-                    times(self.axes[(axis + 2) % 3], b),
-                );
-                self.project(add(self.center, times(across, self.length)))
+                let across = self.axes[(axis + 1) % 3] * a + self.axes[(axis + 2) % 3] * b;
+                self.project(self.center + across * self.length)
             })
             .collect()
     }
@@ -78,11 +74,9 @@ impl GizmoFrame {
         (0..=64)
             .map(|i| {
                 let angle = i as f64 * std::f64::consts::TAU / 64.0;
-                let around = add(
-                    times(self.axes[(axis + 1) % 3], angle.cos()),
-                    times(self.axes[(axis + 2) % 3], angle.sin()),
-                );
-                self.project(add(self.center, times(times(around, self.length), radius)))
+                let around = self.axes[(axis + 1) % 3] * angle.cos()
+                    + self.axes[(axis + 2) % 3] * angle.sin();
+                self.project(self.center + around * self.length * radius)
             })
             .collect()
     }
@@ -92,7 +86,7 @@ impl GizmoFrame {
     /// plane square, and in the view's plane through the middle otherwise.
     pub fn delta(&self, start: Pos, at: Pos, handle: Handle) -> Vec3 {
         if let Handle::Axis(axis) = handle {
-            let tip = add(self.center, times(self.axes[axis], self.length));
+            let tip = self.center + self.axes[axis] * self.length;
             let Some((a, b)) = self.project(self.center).zip(self.project(tip)) else {
                 return Vec3::ZERO;
             };
@@ -101,7 +95,7 @@ impl GizmoFrame {
                 return Vec3::ZERO;
             }
             let along = ((at - start).dot(line) / line.length_sq()) as f64;
-            return times(times(self.axes[axis], along), self.length);
+            return self.axes[axis] * along * self.length;
         }
         let normal = if let Handle::Plane(axis) = handle {
             self.axes[axis]
@@ -110,7 +104,7 @@ impl GizmoFrame {
         };
         self.on_plane(start, normal)
             .zip(self.on_plane(at, normal))
-            .map_or(Vec3::ZERO, |(a, b)| sub(b, a))
+            .map_or(Vec3::ZERO, |(a, b)| b - a)
     }
 
     /// Where the ray under screen point `p` meets the plane through the
@@ -121,17 +115,14 @@ impl GizmoFrame {
             (local.x / self.rect.width()) as f64,
             (local.y / self.rect.height()) as f64,
         ]);
-        let facing = dot(ray.direction, normal);
+        let facing = ray.direction.dot(normal);
         if facing.abs() < 1e-7 {
             return None;
         }
-        let reach = dot(sub(self.center, ray.origin), normal);
-        let d = times(ray.direction, reach);
-        let point = add(
-            ray.origin,
-            Vec3::new(d.x / facing, d.y / facing, d.z / facing),
-        );
-        is_finite(point).then_some(point)
+        let reach = (self.center - ray.origin).dot(normal);
+        let d = ray.direction * reach;
+        let point = ray.origin + Vec3::new(d.x / facing, d.y / facing, d.z / facing);
+        point.is_finite().then_some(point)
     }
 }
 
@@ -194,12 +185,12 @@ pub fn scale(frame: &GizmoFrame, handle: Handle, delta: Vec3, pixels: Vec2, snap
             let amount = if handle == Handle::Center {
                 (pixels.x - pixels.y) as f64 / 100.0
             } else {
-                dot(delta, frame.axes[axis]) / frame.length
+                delta.dot(frame.axes[axis]) / frame.length
             };
             *factor = stepped(1.0 + amount, 0.1, snap).max(0.001);
         }
     }
-    Vec3::from_array(factors)
+    Vec3::from(factors)
 }
 
 #[cfg(test)]
@@ -207,7 +198,6 @@ pub(crate) mod tests {
     use super::*;
     use crate::geom::pos;
     use crate::projection::test_camera::projection;
-    use crate::vec3::length;
 
     /// A unit gizmo at the origin of an 800 × 600 view, the default camera
     /// orbiting the origin.
@@ -231,9 +221,9 @@ pub(crate) mod tests {
             let f = frame(ortho);
             for axis in 0..3 {
                 let start = f.project(f.center).unwrap();
-                let end = f.project(add(f.center, f.axes[axis])).unwrap();
+                let end = f.project(f.center + f.axes[axis]).unwrap();
                 let moved = f.delta(start, end, Handle::Axis(axis));
-                assert!(length(sub(moved, f.axes[axis])) < 1e-5, "{moved:?}");
+                assert!((moved - f.axes[axis]).length() < 1e-5, "{moved:?}");
             }
         }
     }
@@ -244,7 +234,7 @@ pub(crate) mod tests {
         let start = f.project(Vec3::ZERO).unwrap();
         let end = f.project(Vec3::new(0.4, 0.7, 0.0)).unwrap();
         let delta = f.delta(start, end, Handle::Plane(2));
-        assert!(length(sub(delta, Vec3::new(0.4, 0.7, 0.0))) < 1e-5);
+        assert!((delta - Vec3::new(0.4, 0.7, 0.0)).length() < 1e-5);
         assert_eq!(
             scale(
                 &f,
@@ -266,8 +256,8 @@ pub(crate) mod tests {
         let f = frame(false);
         let start = f.project(Vec3::ZERO).unwrap();
         let moved = f.delta(start, start + vec2(40.0, -30.0), Handle::Center);
-        assert!(length(moved) > 0.1);
-        assert!(dot(moved, f.projection.backward).abs() < 1e-9);
+        assert!(moved.length() > 0.1);
+        assert!(moved.dot(f.projection.backward).abs() < 1e-9);
     }
 
     #[test]

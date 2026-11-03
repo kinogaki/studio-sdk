@@ -8,12 +8,11 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
-use kinogaki_geometry::Frame;
 use kinogaki_geometry::GeometryError;
 use kinogaki_geometry::brep::{
-    Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec,
-    Placement, Sense,
+    Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, Sense,
 };
+use kinogaki_geometry::{Frame, Vec3, Xform};
 
 /// Saves [`Brep`]: one table of every persistent name the value holds
 /// (`name_tags`, `name_words`, `name_texts`), which everything else names
@@ -318,10 +317,10 @@ fn write_body(
 
 fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, Error> {
     let at = element.location();
-    let placement = |rows: &[f64]| -> Result<Placement, Error> {
+    let placement = |rows: &[f64]| {
         let mut m = [[0.0; 4]; 3];
         m.as_flattened_mut().copy_from_slice(rows);
-        Placement::new(m).map_err(|e| invalid(&at, e))
+        Xform::from_rows(m)
     };
     let name = names.get(
         u32::try_from(element.int("name")?)
@@ -340,8 +339,8 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
             "{at}: instances are rows of 12"
         )));
     }
-    let instances: Result<Vec<_>, _> = instances.chunks(12).map(placement).collect();
-    b.placement(placement(rows)?, instances?);
+    let instances = instances.chunks(12).map(placement).collect();
+    b.placement(placement(rows), instances);
     // Carriers, in table order.
     let mut carriers = carriers::Reader::new(element)?;
     let surfaces: Vec<_> = (0..attributes::count(element, "surfaceCount")?)
@@ -362,7 +361,7 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
         return Err(Error::invalid(format_args!("{at}: vertex names missized")));
     }
     let vertices: Vec<_> = (points.iter().zip(precisions).zip(vertex_names))
-        .map(|((&p, precision), name)| b.vertex(p, precision, name))
+        .map(|((&p, precision), name)| b.vertex(p.into(), precision, name))
         .collect();
     let edge_curves = element.u32s("edgeCurves")?;
     let intervals = element.f64s("edgeIntervals")?;
@@ -492,19 +491,23 @@ fn write_datums(
         match d.kind {
             DatumKind::Plane(f) => {
                 kinds.push(0);
-                reals.extend([f.origin(), f.x(), f.y(), f.z()].as_flattened());
+                reals.extend(
+                    [f.origin(), f.x(), f.y(), f.z()]
+                        .map(Vec3::to_array)
+                        .as_flattened(),
+                );
             }
             DatumKind::Axis { origin, direction } => {
                 kinds.push(1);
-                reals.extend(origin.into_iter().chain(direction));
+                reals.extend(origin.to_array().into_iter().chain(direction.to_array()));
             }
             DatumKind::Point(p) => {
                 kinds.push(2);
-                reals.extend(p);
+                reals.extend(p.to_array());
             }
             _ => return Err(Error::invalid("a datum of a kind this version can't save")),
         }
-        hints.extend(d.hint.center.into_iter().chain([d.hint.size]));
+        hints.extend(d.hint.center.to_array().into_iter().chain([d.hint.size]));
     }
     out.set(
         "datumNames",
@@ -536,7 +539,7 @@ fn read_datums(element: &dyn ElementReader, names: &names::Table) -> Result<Vec<
     };
     let mut datums = Vec::with_capacity(kinds.len());
     for (i, (&kind, name)) in kinds.iter().zip(datum_names).enumerate() {
-        let v = |r: &[f64], k: usize| [r[k], r[k + 1], r[k + 2]];
+        let v = |r: &[f64], k: usize| Vec3::new(r[k], r[k + 1], r[k + 2]);
         let kind = match kind {
             0 => {
                 let r = take(12)?;
@@ -558,7 +561,7 @@ fn read_datums(element: &dyn ElementReader, names: &names::Table) -> Result<Vec<
             name,
             kind,
             hint: DatumHint {
-                center: [h[0], h[1], h[2]],
+                center: Vec3::new(h[0], h[1], h[2]),
                 size: h[3],
             },
         });

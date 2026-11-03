@@ -14,7 +14,8 @@ use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
-use kinogaki_render_api::{Camera, IDENTITY, Motion, Projection};
+use kinogaki_geometry::{Sampled, Xform};
+use kinogaki_render_api::{Camera, Projection};
 
 /// The largest lens, film or distance value a camera takes.
 const MAX_VALUE: f32 = 1e12;
@@ -22,9 +23,8 @@ const MAX_VALUE: f32 = 1e12;
 /// The lens of `camera`, when it is one: positive focal length, film back
 /// and near distance, a far distance beyond the near one, a focus distance
 /// and f-number of at least 0, a shutter closing no earlier than it opens,
-/// every value finite and within range. Its transform, motion and scale
-/// are dropped (the identity, none, a metre a unit): what a camera value
-/// holds.
+/// every value finite and within range. Its placement is dropped (the
+/// identity, still): what a camera value holds.
 ///
 /// # Errors
 /// A value out of range.
@@ -55,9 +55,7 @@ pub fn lens(camera: Camera) -> Result<Camera, Error> {
         return Err(Error::invalid("invalid camera"));
     }
     Ok(Camera {
-        transform: IDENTITY,
-        motion: Motion::none(),
-        mm_per_unit: Camera::default().mm_per_unit,
+        xform: Sampled::still(Xform::IDENTITY),
         ..camera
     })
 }
@@ -211,14 +209,14 @@ mod tests {
             assert!(lens(bad).is_err());
         }
         let placed = Camera {
-            transform: [
-                [2.0, 0.0, 0.0, 0.0],
-                [0.0, 2.0, 0.0, 0.0],
-                [0.0, 0.0, 2.0, 0.0],
-                [1.0, 2.0, 3.0, 1.0],
-            ],
-            mm_per_unit: 10.0,
-            motion: Motion::new([0.0], [IDENTITY]).unwrap(),
+            xform: Sampled::new(
+                [0.0, 0.5],
+                [
+                    Xform::IDENTITY,
+                    Xform::translation(kinogaki_geometry::Vec3::new(1.0, 2.0, 3.0)),
+                ],
+            )
+            .unwrap(),
             ..Camera::default()
         };
         assert_eq!(lens(placed).unwrap(), Camera::default(), "unplaced");

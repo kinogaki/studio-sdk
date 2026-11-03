@@ -8,10 +8,10 @@ use kinogaki_geometry::Tolerances;
 
 /// The project value `kinogaki.tolerances`: the element `tolerances` among
 /// the project's settings, with the reals `positional_mm`, `fit_mm`,
-/// `tangent_degrees` and `curvature`. The model unit isn't saved here: the
-/// project's units are its one source, and core hands kernels the value
-/// with `millimeters_per_unit` from them ([`Tolerances::with_unit`]), so
-/// the two never disagree. A value read back holds 1 mm a unit until then.
+/// `tangent_degrees` and `curvature`. The model's units aren't saved here:
+/// the project's units are their one source, and core hands kernels the
+/// value with them ([`Tolerances::with_units`]), so the two never disagree.
+/// A value read back holds the default's millimeters until then.
 /// Core registers it; every kernel reads the same value.
 impl Stored for Tolerances {
     fn id() -> StoredId {
@@ -35,7 +35,7 @@ impl Stored for Tolerances {
             from.float("fitMm")?,
             from.float("tangentDegrees")?,
             from.float("curvature")?,
-            1.0,
+            Tolerances::default().units(),
         )
         .map_err(|e| invalid(&from.location(), e))
     }

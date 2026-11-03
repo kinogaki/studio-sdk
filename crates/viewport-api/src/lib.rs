@@ -20,13 +20,13 @@
 //!   [`FaceNormals`], and [`SceneLines`] for glyphs placed in the world
 //!   (cameras, lights).
 //!
-//! Vectors are `[f64; 3]`, quaternions `[x, y, z, w]` and matrices
-//! `[[f64; 4]; 4]`, column by column: plain data each side converts to its
-//! own maths at the boundary.
+//! Points and directions are the SDK's [`Vec3`](kinogaki_geometry::Vec3),
+//! placements its [`Xform`](kinogaki_geometry::Xform) and quaternions
+//! `[x, y, z, w]`; the GPU's f32 records are made where they are uploaded.
 //!
 //! The `bytemuck` feature derives `bytemuck::Pod` on the records a renderer
 //! uploads as bytes ([`Vertex`], [`OverlayVertex`], [`OverlayLine`]).
-//! Without it the crate depends on the standard library alone.
+//! Besides it, the crate depends on the SDK's geometry vocabulary alone.
 mod color;
 mod lines;
 mod looks;

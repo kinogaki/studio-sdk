@@ -1,6 +1,6 @@
 //! [`BrepBuilder`]: the one way to make a [`Body`], and the structural
 //! half of its rules (the geometric half is `consistency`).
-use super::body::{Body, Placement};
+use super::body::Body;
 use super::geometry::{Curve, Geometry, PCurve, Surface};
 use super::names::Name;
 use super::topology::{BrepTopology, Coedge, Edge, Face, Loop, Lump, Names, Sense, Shell, Vertex};
@@ -11,6 +11,8 @@ use super::{
 use crate::attributes::Attributes;
 use crate::derived::Derived;
 use crate::error::GeometryError;
+use crate::vec3::Vec3;
+use crate::xform::Xform;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -59,14 +61,14 @@ pub struct CoedgeSpec {
 /// face's loops in order, each loop's coedges in order), and each edge's
 /// radial ring runs through its coedges in coedge order.
 ///
-/// Placement defaults to the identity, with no further instances.
+/// The placement defaults to the identity, with no further instances.
 #[derive(Clone, Debug)]
 #[must_use]
 pub struct BrepBuilder {
     name: Name,
     tolerance: f64,
-    placement: Placement,
-    instances: Vec<Placement>,
+    placement: Xform,
+    instances: Vec<Xform>,
     surfaces: Vec<Surface>,
     curves: Vec<Curve>,
     pcurves: Vec<PCurve>,
@@ -90,7 +92,7 @@ impl BrepBuilder {
         Self {
             name,
             tolerance,
-            placement: Placement::IDENTITY,
+            placement: Xform::IDENTITY,
             instances: Vec::new(),
             surfaces: Vec::new(),
             curves: Vec::new(),
@@ -110,7 +112,7 @@ impl BrepBuilder {
     }
 
     /// Places the body at `placement`, and again at each of `instances`.
-    pub fn placement(&mut self, placement: Placement, instances: Vec<Placement>) {
+    pub fn placement(&mut self, placement: Xform, instances: Vec<Xform>) {
         self.placement = placement;
         self.instances = instances;
     }
@@ -134,8 +136,8 @@ impl BrepBuilder {
     }
 
     /// Adds a vertex at `point`, tolerant within `precision` when given.
-    pub fn vertex(&mut self, point: [f64; 3], precision: Option<f64>, name: Name) -> VertexId {
-        self.points.push(point);
+    pub fn vertex(&mut self, point: Vec3, precision: Option<f64>, name: Name) -> VertexId {
+        self.points.push(point.to_array());
         self.vertices.push(Vertex { precision });
         self.vertex_names.push(name);
         VertexId::new(self.vertices.len() - 1)

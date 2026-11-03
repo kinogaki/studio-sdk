@@ -7,11 +7,11 @@ use super::super::invalid;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
 use kinogaki_geometry::Column;
-use kinogaki_geometry::Frame;
 use kinogaki_geometry::brep::{
     Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Line, Line2, NurbsCurve,
     NurbsSurface, Offset, PCurve, Plane, Revolution, SeamContinuity, Sphere, Surface, Torus,
 };
+use kinogaki_geometry::{Frame, Vec3};
 use std::sync::Arc;
 
 const PLANE: u8 = 1;
@@ -58,7 +58,7 @@ impl Writer {
 
     fn frame(&mut self, f: &Frame) {
         for v in [f.origin(), f.x(), f.y(), f.z()] {
-            self.reals.extend_from_slice(&v);
+            self.reals.extend_from_slice(&v.to_array());
         }
     }
 
@@ -130,12 +130,12 @@ impl Writer {
                     .extend_from_slice(n.weights().map_or(&[][..], |w| w.as_ref()));
             }
             Surface::Extrusion(e) => {
-                self.record(EXTRUSION, &e.direction());
+                self.record(EXTRUSION, &e.direction().to_array());
                 self.curve(e.profile())?;
             }
             Surface::Revolution(r) => {
-                self.record(REVOLUTION, &r.origin());
-                self.reals.extend(r.axis());
+                self.record(REVOLUTION, &r.origin().to_array());
+                self.reals.extend(r.axis().to_array());
                 self.curve(r.profile())?;
             }
             Surface::Offset(o) => {
@@ -150,8 +150,8 @@ impl Writer {
     pub(super) fn curve(&mut self, c: &Curve) -> Result<(), Error> {
         match c {
             Curve::Line(l) => {
-                self.record(LINE, &l.origin());
-                self.reals.extend(l.direction());
+                self.record(LINE, &l.origin().to_array());
+                self.reals.extend(l.direction().to_array());
             }
             Curve::Circle(c) => {
                 self.record(CIRCLE, &[]);
@@ -299,10 +299,10 @@ impl<'a> Reader<'a> {
     fn frame(&mut self) -> Result<Frame, Error> {
         let [o0, o1, o2, x0, x1, x2, y0, y1, y2, z0, z1, z2] = self.reals::<12>()?;
         self.checked(Frame::new(
-            [o0, o1, o2],
-            [x0, x1, x2],
-            [y0, y1, y2],
-            [z0, z1, z2],
+            Vec3::new(o0, o1, o2),
+            Vec3::new(x0, x1, x2),
+            Vec3::new(y0, y1, y2),
+            Vec3::new(z0, z1, z2),
         ))
     }
 
@@ -379,14 +379,14 @@ impl<'a> Reader<'a> {
                 Surface::Nurbs(Arc::new(self.checked(s)?))
             }
             EXTRUSION => {
-                let direction = self.reals()?;
+                let direction = Vec3::from(self.reals::<3>()?);
                 let profile = Arc::new(self.curve()?);
                 Surface::Extrusion(self.checked(Extrusion::new(profile, direction))?)
             }
             REVOLUTION => {
                 let [o0, o1, o2, a0, a1, a2] = self.reals()?;
                 let profile = Arc::new(self.curve()?);
-                let r = Revolution::new(profile, [o0, o1, o2], [a0, a1, a2]);
+                let r = Revolution::new(profile, Vec3::new(o0, o1, o2), Vec3::new(a0, a1, a2));
                 Surface::Revolution(self.checked(r)?)
             }
             OFFSET => {
@@ -407,7 +407,7 @@ impl<'a> Reader<'a> {
         Ok(match self.tag()? {
             LINE => {
                 let [o0, o1, o2, d0, d1, d2] = self.reals()?;
-                Curve::Line(self.checked(Line::new([o0, o1, o2], [d0, d1, d2]))?)
+                Curve::Line(self.checked(Line::new(Vec3::new(o0, o1, o2), Vec3::new(d0, d1, d2)))?)
             }
             CIRCLE => {
                 let frame = self.frame()?;

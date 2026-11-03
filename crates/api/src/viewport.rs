@@ -13,8 +13,8 @@
 //! a surface [`derived`](Surface::derived) from the one on screen, only the
 //! points that moved.
 use crate::error::Error;
-use crate::math::Vec3;
 use crate::render::Ranges;
+use kinogaki_geometry::{Bounds, Vec3};
 use kinogaki_viewport_api::{
     BufferRanges, Column, DrawUpdate, LineClass, LineClassId, LineStyle, Vertex,
 };
@@ -352,8 +352,8 @@ impl Surface {
 
 impl SurfaceSource for Surface {
     /// Its points are absolute.
-    fn origin(&self) -> [f64; 3] {
-        [0.0; 3]
+    fn origin(&self) -> Vec3 {
+        Vec3::ZERO
     }
 
     fn face_triangles(&self, face: u32) -> Range<usize> {
@@ -418,16 +418,8 @@ impl SurfaceSource for Surface {
         self.faces
     }
 
-    fn bounds(&self) -> Option<([f64; 3], [f64; 3])> {
-        self.points.iter().fold(None, |b, p| {
-            let p = p.map(f64::from);
-            Some(b.map_or((p, p), |(lo, hi): ([f64; 3], [f64; 3])| {
-                (
-                    std::array::from_fn(|i| lo[i].min(p[i])),
-                    std::array::from_fn(|i| hi[i].max(p[i])),
-                )
-            }))
-        })
+    fn bounds(&self) -> Option<Bounds> {
+        Bounds::of(self.points.iter().map(|p| Vec3::from(p.map(f64::from))))
     }
 
     fn topology_key(&self) -> [u8; 32] {
@@ -601,7 +593,7 @@ mod tests {
         assert!(SurfaceSource::points(&surface).is_empty());
         assert_eq!(surface.element_count(ElementKind::Edge), 4);
         assert_eq!(surface.element_count(ElementKind::Face), 1);
-        assert_eq!(surface.bounds().unwrap().1, [1.0, 1.0, 0.0]);
+        assert_eq!(surface.bounds().unwrap().max, Vec3::new(1.0, 1.0, 0.0));
         assert_eq!(surface.topology_key()[0], 42);
         assert!(surface.update().is_none());
         LineClass::validate(surface.line_classes(), lines.len() / 2).unwrap();
@@ -759,6 +751,6 @@ mod tests {
         assert_eq!(surface.face_triangles(0), 0..2);
         assert_eq!(surface.face_triangles(1), 2..3);
         assert_eq!(surface.face_triangles(2), 0..0, "out of range");
-        assert_eq!(surface.origin(), [0.0; 3]);
+        assert_eq!(surface.origin(), [0.0; 3].into());
     }
 }

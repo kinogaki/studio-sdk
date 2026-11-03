@@ -47,7 +47,7 @@ fn a_box_reads_back_by_the_conventions() {
     assert_eq!(FaceId::from_index(&body, 6), None);
     assert_eq!(
         VertexId::from_index(&body, 7).map(|v| body.geometry().point(v)),
-        Some([2.0, 3.0, 4.0])
+        Some(crate::Vec3::new(2.0, 3.0, 4.0))
     );
 }
 
@@ -82,7 +82,10 @@ fn a_cone_closes_at_its_apex_with_a_pole_edge() {
     let pole = EdgeId::from_index(&body, 0).unwrap();
     assert_eq!(t.edge(pole).curve(), None);
     assert_eq!(t.edge_coedges(pole).count(), 1);
-    assert_eq!(body.geometry().point(t.edge(pole).vertices()[0]), [0.0; 3]);
+    assert_eq!(
+        body.geometry().point(t.edge(pole).vertices()[0]),
+        [0.0; 3].into()
+    );
 }
 
 #[test]
@@ -111,8 +114,8 @@ fn a_trimmed_patch_is_a_sheet_on_its_surface() {
         for k in 0..=8 {
             let s = e.interval()[0] + (e.interval()[1] - e.interval()[0]) * k as f64 / 8.0;
             assert!(close(
-                surface.point(p.point(s)).unwrap(),
-                curve.point(s),
+                surface.point(p.point(s)).unwrap().into(),
+                curve.point(s).into(),
                 1e-12
             ));
         }
@@ -236,9 +239,9 @@ fn fingerprints_follow_structure_and_names_never_geometry() {
 fn fingerprints_name_datums_and_free_curves_in_order() {
     let point = |index: u32, at: [f64; 3]| Datum {
         name: name(index),
-        kind: DatumKind::Point(at),
+        kind: DatumKind::Point(at.into()),
         hint: DatumHint {
-            center: at,
+            center: at.into(),
             size: 1.0,
         },
     };
@@ -324,13 +327,8 @@ fn attributes_follow_the_body_classes() {
         .with(Class::Instance, "instance", Attribute::integer(vec![0, 1]))
         .unwrap();
     let mut placed = b.clone();
-    let up = Placement::new([
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 3.0],
-    ])
-    .unwrap();
-    placed.placement(Placement::IDENTITY, vec![up]);
+    let up = crate::Xform::translation(crate::Vec3::new(0.0, 0.0, 3.0));
+    placed.placement(crate::Xform::IDENTITY, vec![up]);
     let body = placed.build(names.clone()).unwrap();
     assert_eq!(body.count(Class::Instance), Some(2));
     assert!(body.with_placement(up, Column::default()).is_err());
@@ -348,11 +346,11 @@ fn a_value_holds_bodies_curves_and_datums() {
     let datum = Datum {
         name: name(1),
         kind: DatumKind::Axis {
-            origin: [0.0; 3],
-            direction: [0.0, 0.0, 1.0],
+            origin: [0.0; 3].into(),
+            direction: [0.0, 0.0, 1.0].into(),
         },
         hint: DatumHint {
-            center: [0.0; 3],
+            center: [0.0; 3].into(),
             size: 2.0,
         },
     };
@@ -366,8 +364,8 @@ fn a_value_holds_bodies_curves_and_datums() {
     assert_eq!((value.bodies().len(), value.datums().len()), (1, 1));
     let skew = Datum {
         kind: DatumKind::Axis {
-            origin: [0.0; 3],
-            direction: [0.0, 0.0, 2.0],
+            origin: [0.0; 3].into(),
+            direction: [0.0, 0.0, 2.0].into(),
         },
         ..datum
     };

@@ -152,7 +152,7 @@
 //!     BodyKind, BrepBuilder, Circle, Circle2, CoedgeSpec, Curve, EdgeSpec, FaceSpec, Name,
 //!     OperationId, PCurve, Plane, Sense, Surface,
 //! };
-//! use kinogaki_geometry::{Attributes, Frame};
+//! use kinogaki_geometry::{Attributes, Frame, Vec3};
 //! use std::f64::consts::TAU;
 //!
 //! // A unit disc: one plane face bounded by one circular edge.
@@ -161,7 +161,7 @@
 //! let plane = b.surface(Surface::Plane(Plane::new(Frame::WORLD)));
 //! let circle = b.curve(Curve::Circle(Circle::new(Frame::WORLD, 1.0).unwrap()));
 //! let chart = b.pcurve(PCurve::Circle(Circle2::new([0.0; 2], [1.0, 0.0], 1.0, true).unwrap()));
-//! let v = b.vertex([1.0, 0.0, 0.0], None, name(1));
+//! let v = b.vertex(Vec3::X, None, name(1));
 //! let rim = b.edge(EdgeSpec { curve: Some(circle), interval: [0.0, TAU], vertices: [v, v], precision: None }, name(2));
 //! let side = CoedgeSpec { edge: rim, sense: Sense::Same, pcurve: Some(chart), precision: None };
 //! let disc = b.face(FaceSpec { surface: plane, sense: Sense::Same, precision: None }, vec![vec![side]], name(3));
@@ -186,7 +186,7 @@ mod nurbs;
 mod tests;
 mod topology;
 
-pub use body::{Body, Placement};
+pub use body::Body;
 pub use builder::{BrepBuilder, CoedgeSpec, EdgeSpec, FaceSpec};
 pub use geometry::{
     Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Geometry, Line, Line2,
@@ -211,6 +211,7 @@ use crate::column::Column;
 use crate::curves::Curves;
 use crate::error::GeometryError;
 use crate::limits::MAX_COORDINATE;
+use crate::vec3::Vec3;
 use std::sync::Arc;
 
 /// The most entities of one kind a body holds (2²⁸), and the most bodies
@@ -230,12 +231,12 @@ pub enum DatumKind {
     /// An axis: a line through `origin` along the unit `direction`.
     Axis {
         /// A point on it.
-        origin: [f64; 3],
+        origin: Vec3,
         /// Its unit direction.
-        direction: [f64; 3],
+        direction: Vec3,
     },
     /// A point.
-    Point([f64; 3]),
+    Point(Vec3),
 }
 
 /// How a datum is drawn: around `center` (on the datum), `size` the half
@@ -244,7 +245,7 @@ pub enum DatumKind {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DatumHint {
     /// The point it is drawn around.
-    pub center: [f64; 3],
+    pub center: Vec3,
     /// Its half size, not negative.
     pub size: f64,
 }
@@ -319,12 +320,8 @@ impl Brep {
             ));
         }
         for (i, d) in self.datums.iter().enumerate() {
-            let finite = |p: [f64; 3]| p.iter().all(|c| c.abs() <= MAX_COORDINATE);
-            let unit = |v: [f64; 3]| {
-                finite(v)
-                    && ((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) - 1.0).abs()
-                        <= 16.0 * f64::EPSILON
-            };
+            let finite = |p: Vec3| p.to_array().iter().all(|c| c.abs() <= MAX_COORDINATE);
+            let unit = |v: Vec3| finite(v) && (v.dot(v) - 1.0).abs() <= 16.0 * f64::EPSILON;
             let kind = match d.kind {
                 DatumKind::Plane(_) => true,
                 DatumKind::Axis { origin, direction } => finite(origin) && unit(direction),

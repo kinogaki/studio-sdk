@@ -11,6 +11,7 @@ use crate::derived::Derived;
 use crate::error::GeometryError;
 use crate::frame::{Frame, finite, is_unit, length_squared};
 use crate::limits::MAX_COORDINATE;
+use crate::vec3::Vec3;
 use std::f64::consts::{FRAC_PI_2, TAU};
 use std::fmt;
 use std::sync::Arc;
@@ -27,8 +28,8 @@ fn positive(value: f64, what: &'static str) -> Result<f64, GeometryError> {
     }
 }
 
-fn point<const N: usize>(p: [f64; N]) -> Result<[f64; N], GeometryError> {
-    if finite(p) {
+fn point<P: Copy + Into<[f64; N]>, const N: usize>(p: P) -> Result<P, GeometryError> {
+    if finite(p.into()) {
         Ok(p)
     } else {
         Err(refuse(
@@ -39,8 +40,8 @@ fn point<const N: usize>(p: [f64; N]) -> Result<[f64; N], GeometryError> {
     }
 }
 
-fn unit<const N: usize>(v: [f64; N]) -> Result<[f64; N], GeometryError> {
-    if is_unit(v) {
+fn unit<V: Copy + Into<[f64; N]>, const N: usize>(v: V) -> Result<V, GeometryError> {
+    if is_unit(v.into()) {
         Ok(v)
     } else {
         Err(refuse(
@@ -248,7 +249,7 @@ impl Torus {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Extrusion {
     profile: Arc<Curve>,
-    direction: [f64; 3],
+    direction: Vec3,
 }
 
 impl Extrusion {
@@ -256,10 +257,10 @@ impl Extrusion {
     ///
     /// # Errors
     /// A direction that isn't unit, or a line swept along itself.
-    pub fn new(profile: Arc<Curve>, direction: [f64; 3]) -> Result<Self, GeometryError> {
+    pub fn new(profile: Arc<Curve>, direction: Vec3) -> Result<Self, GeometryError> {
         let direction = unit(direction)?;
         if let Curve::Line(line) = profile.as_ref()
-            && crate::vector::cross(line.direction, direction) == [0.0; 3]
+            && line.direction.cross(direction) == Vec3::ZERO
         {
             return Err(refuse(
                 None,
@@ -276,7 +277,7 @@ impl Extrusion {
     }
 
     /// The unit direction.
-    pub fn direction(&self) -> [f64; 3] {
+    pub fn direction(&self) -> Vec3 {
         self.direction
     }
 }
@@ -287,8 +288,8 @@ impl Extrusion {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Revolution {
     profile: Arc<Curve>,
-    origin: [f64; 3],
-    axis: [f64; 3],
+    origin: Vec3,
+    axis: Vec3,
 }
 
 impl Revolution {
@@ -297,11 +298,7 @@ impl Revolution {
     ///
     /// # Errors
     /// An origin not finite, or an axis that isn't unit.
-    pub fn new(
-        profile: Arc<Curve>,
-        origin: [f64; 3],
-        axis: [f64; 3],
-    ) -> Result<Self, GeometryError> {
+    pub fn new(profile: Arc<Curve>, origin: Vec3, axis: Vec3) -> Result<Self, GeometryError> {
         Ok(Self {
             profile,
             origin: point(origin)?,
@@ -315,12 +312,12 @@ impl Revolution {
     }
 
     /// A point of the axis.
-    pub fn origin(&self) -> [f64; 3] {
+    pub fn origin(&self) -> Vec3 {
         self.origin
     }
 
     /// The axis's unit direction.
-    pub fn axis(&self) -> [f64; 3] {
+    pub fn axis(&self) -> Vec3 {
         self.axis
     }
 }
@@ -402,8 +399,8 @@ pub enum Surface {
 /// `origin + t·direction` with a unit direction: `t` is arc length.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Line {
-    origin: [f64; 3],
-    direction: [f64; 3],
+    origin: Vec3,
+    direction: Vec3,
 }
 
 impl Line {
@@ -411,7 +408,7 @@ impl Line {
     ///
     /// # Errors
     /// An origin not finite, or a direction that isn't unit.
-    pub fn new(origin: [f64; 3], direction: [f64; 3]) -> Result<Self, GeometryError> {
+    pub fn new(origin: Vec3, direction: Vec3) -> Result<Self, GeometryError> {
         Ok(Self {
             origin: point(origin)?,
             direction: unit(direction)?,
@@ -419,12 +416,12 @@ impl Line {
     }
 
     /// The point at `t = 0`.
-    pub fn origin(&self) -> [f64; 3] {
+    pub fn origin(&self) -> Vec3 {
         self.origin
     }
 
     /// The unit direction.
-    pub fn direction(&self) -> [f64; 3] {
+    pub fn direction(&self) -> Vec3 {
         self.direction
     }
 }
@@ -752,8 +749,8 @@ impl Geometry {
     ///
     /// # Panics
     /// When `v` is not of a body sharing these tables.
-    pub fn point(&self, v: VertexId) -> [f64; 3] {
-        self.points[v.index()]
+    pub fn point(&self, v: VertexId) -> Vec3 {
+        Vec3::from(self.points[v.index()])
     }
 
     /// Every vertex's point, by id.

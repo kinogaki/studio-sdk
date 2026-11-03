@@ -2,7 +2,8 @@
 //! edit keeps.
 use kinogaki_geometry::limits::MAX_POINTS;
 use kinogaki_geometry::{
-    Attribute, Attributes, Class, ErrorKind, Group, Polygons, Text, Topology, TypeInfo, names,
+    Attribute, Attributes, Bounds, Class, ErrorKind, Group, Polygons, Text, Topology, TypeInfo,
+    Vec3, names,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -50,7 +51,10 @@ fn counts_are_the_classes_elements() {
             Some(8)
         ]
     );
-    assert_eq!(p.bounds(), Some([[0.0, 0.0, 0.0], [1.0, 2.0, 1.0]]));
+    assert_eq!(
+        p.bounds(),
+        Bounds::of([Vec3::ZERO, Vec3::new(1.0, 2.0, 1.0)])
+    );
     assert_eq!(Polygons::empty().bounds(), None);
     assert_eq!(Polygons::empty().count(Class::Point), Some(0));
 }
@@ -251,7 +255,7 @@ fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
     assert_eq!(c, a, "the same positions again: an equal value");
     assert_eq!(
         b.bounds(),
-        Some([[2.0; 3]; 2]),
+        Some(Bounds::point(Vec3::new(2.0, 2.0, 2.0))),
         "bounds follow the positions"
     );
 }

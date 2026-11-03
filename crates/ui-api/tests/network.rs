@@ -46,8 +46,8 @@ impl NodeType for Source {
         let arrow = |label: &str, number: &str| {
             let kind = HandleKind::Distance {
                 distance: number.into(),
-                origin: Vector::fixed([0.0; 3]),
-                direction: Vector::fixed([1.0, 0.0, 0.0]),
+                origin: Vector::fixed([0.0; 3].into()),
+                direction: Vector::fixed([1.0, 0.0, 0.0].into()),
             };
             Handle::new(label, kind)
         };

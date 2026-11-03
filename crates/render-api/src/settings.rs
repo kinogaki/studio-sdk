@@ -5,6 +5,7 @@
 //! A descriptor says what a value holds, how a UI edits it, and when it is
 //! shown or applies, so a host draws any engine's rows without knowing it.
 
+use kinogaki_geometry::Units;
 use std::sync::Arc;
 
 use crate::id::{PrimId, TextureId};
@@ -110,12 +111,10 @@ pub struct RenderSettings {
     pub resolution: [u32; 2],
     /// The Camera prim final frames render through (none: the view's camera).
     pub camera: Option<PrimId>,
-    /// Millimetres in one scene unit (1000 for metres): what real sizes in
-    /// materials (an anodized part's grain) are measured against.
-    pub mm_per_unit: f32,
-    /// The world's up direction (unit): what "up" means to sky light and
-    /// height fog.
-    pub up: [f32; 3],
+    /// The scene's units: what real sizes (a lens's millimetres, an
+    /// anodized part's grain) are measured against, and the axis that is
+    /// up to sky light and height fog.
+    pub units: Units,
     /// The engine's settings, by its descriptors' names; one missing takes
     /// its descriptor's default.
     pub values: SettingValues,
@@ -126,8 +125,7 @@ impl Default for RenderSettings {
         RenderSettings {
             resolution: [1920, 1080],
             camera: None,
-            mm_per_unit: 1000.0,
-            up: [0.0, 1.0, 0.0],
+            units: Units::METERS,
             values: Vec::new(),
         }
     }

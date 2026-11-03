@@ -3,23 +3,21 @@
 //! curve's `t0`", "material on the left"). Nothing beyond that: no
 //! closest points, intersections or bounds.
 use super::geometry::{Curve, PCurve, Surface};
-use crate::vector::{add, cross, dot, normalize_or_zero, scale, sub};
+use crate::vec3::Vec3;
 use std::f64::consts::TAU;
 
-type V3 = [f64; 3];
-
-fn along(frame_x: V3, frame_y: V3, c: f64, s: f64) -> V3 {
-    add(scale(frame_x, c), scale(frame_y, s))
+fn along(frame_x: Vec3, frame_y: Vec3, c: f64, s: f64) -> Vec3 {
+    frame_x * c + frame_y * s
 }
 
 impl Surface {
     /// The point at `uv`; `None` only for an offset where its base has no
     /// normal (a pole, a collapsed side).
-    pub fn point(&self, uv: [f64; 2]) -> Option<[f64; 3]> {
+    pub fn point(&self, uv: [f64; 2]) -> Option<Vec3> {
         match self {
             Surface::Offset(off) => {
                 let p = off.base().point(uv)?;
-                Some(add(p, scale(off.base().normal(uv)?, off.distance())))
+                Some(p + off.base().normal(uv)? * off.distance())
             }
             _ => Some(self.partials(uv)?[0]),
         }
@@ -33,20 +31,20 @@ impl Surface {
     /// (NURBS, an extrusion, a revolution) they need its second
     /// derivatives, which nothing here evaluates: `None`, and a kernel
     /// evaluates such an offset itself.
-    pub(crate) fn partials(&self, uv: [f64; 2]) -> Option<[[f64; 3]; 3]> {
+    pub(crate) fn partials(&self, uv: [f64; 2]) -> Option<[Vec3; 3]> {
         let [u, v] = uv;
         Some(match self {
             Surface::Plane(p) => {
                 let f = p.frame();
-                [add(f.origin(), along(f.x(), f.y(), u, v)), f.x(), f.y()]
+                [f.origin() + along(f.x(), f.y(), u, v), f.x(), f.y()]
             }
             Surface::Cylinder(c) => {
                 let (f, r) = (c.frame(), c.radius());
                 let (s, co) = u.sin_cos();
                 let ring = along(f.x(), f.y(), co, s);
                 [
-                    add(add(f.origin(), scale(ring, r)), scale(f.z(), v)),
-                    scale(along(f.x(), f.y(), -s, co), r),
+                    f.origin() + ring * r + f.z() * v,
+                    along(f.x(), f.y(), -s, co) * r,
                     f.z(),
                 ]
             }
@@ -57,9 +55,9 @@ impl Surface {
                 let (s, co) = u.sin_cos();
                 let ring = along(f.x(), f.y(), co, s);
                 [
-                    add(add(f.origin(), scale(ring, rho)), scale(f.z(), v)),
-                    scale(along(f.x(), f.y(), -s, co), rho),
-                    add(scale(ring, slope), f.z()),
+                    f.origin() + ring * rho + f.z() * v,
+                    along(f.x(), f.y(), -s, co) * rho,
+                    ring * slope + f.z(),
                 ]
             }
             Surface::Sphere(sp) => {
@@ -68,9 +66,9 @@ impl Surface {
                 let (sp_, cp) = v.sin_cos();
                 let ring = along(f.x(), f.y(), co, s);
                 [
-                    add(f.origin(), add(scale(ring, r * cp), scale(f.z(), r * sp_))),
-                    scale(along(f.x(), f.y(), -s, co), r * cp),
-                    add(scale(ring, -r * sp_), scale(f.z(), r * cp)),
+                    f.origin() + (ring * (r * cp) + f.z() * (r * sp_)),
+                    along(f.x(), f.y(), -s, co) * (r * cp),
+                    ring * (-r * sp_) + f.z() * (r * cp),
                 ]
             }
             Surface::Torus(t) => {
@@ -79,46 +77,39 @@ impl Surface {
                 let (sp, cp) = v.sin_cos();
                 let ring = along(f.x(), f.y(), co, s);
                 [
-                    add(
-                        f.origin(),
-                        add(scale(ring, big + r * cp), scale(f.z(), r * sp)),
-                    ),
-                    scale(along(f.x(), f.y(), -s, co), big + r * cp),
-                    add(scale(ring, -r * sp), scale(f.z(), r * cp)),
+                    f.origin() + (ring * (big + r * cp) + f.z() * (r * sp)),
+                    along(f.x(), f.y(), -s, co) * (big + r * cp),
+                    ring * (-r * sp) + f.z() * (r * cp),
                 ]
             }
-            Surface::Nurbs(n) => n.jet(uv),
+            Surface::Nurbs(n) => n.jet(uv).map(Vec3::from),
             Surface::Extrusion(e) => {
                 let [p, d] = e.profile().jet(u);
-                [add(p, scale(e.direction(), v)), d, e.direction()]
+                [p + e.direction() * v, d, e.direction()]
             }
             Surface::Revolution(r) => {
                 // o + q∥ + cos θ·q⊥ + sin θ·(a × q⊥), q = C(t) − o.
                 let (o, a) = (r.origin(), r.axis());
                 let [p, d] = r.profile().jet(v);
                 let (s, co) = u.sin_cos();
-                let turn = |q: V3, with_axial: bool| {
-                    let axial = scale(a, dot(q, a));
-                    let radial = sub(q, axial);
-                    let turned = cross(a, radial);
-                    let round = add(scale(radial, co), scale(turned, s));
-                    let d_round = add(scale(radial, -s), scale(turned, co));
-                    (if with_axial { add(round, axial) } else { round }, d_round)
+                let turn = |q: Vec3, with_axial: bool| {
+                    let axial = a * q.dot(a);
+                    let radial = q - axial;
+                    let turned = a.cross(radial);
+                    let round = radial * co + turned * s;
+                    let d_round = radial * -s + turned * co;
+                    (if with_axial { round + axial } else { round }, d_round)
                 };
-                let (point, d_theta) = turn(sub(p, o), true);
+                let (point, d_theta) = turn(p - o, true);
                 let (d_t, _) = turn(d, true);
-                [add(o, point), d_theta, d_t]
+                [o + point, d_theta, d_t]
             }
             Surface::Offset(off) => {
                 let (base, d) = (off.base(), off.distance());
                 let [p, du, dv] = base.partials(uv)?;
                 let [nu, nv] = base.normal_partials(uv)?;
                 let n = base.normal(uv)?;
-                [
-                    add(p, scale(n, d)),
-                    add(du, scale(nu, d)),
-                    add(dv, scale(nv, d)),
-                ]
+                [p + n * d, du + nu * d, dv + nv * d]
             }
         })
     }
@@ -126,26 +117,23 @@ impl Surface {
     /// The derivatives `[∂N/∂u, ∂N/∂v]` of the unit [`normal`](Self::normal)
     /// at `uv`, for the kinds whose normal has a closed form (plane,
     /// cylinder, cone, sphere, torus); `None` for the others.
-    fn normal_partials(&self, uv: [f64; 2]) -> Option<[V3; 2]> {
+    fn normal_partials(&self, uv: [f64; 2]) -> Option<[Vec3; 2]> {
         let [u, v] = uv;
         let (s, co) = u.sin_cos();
         // The ring's derivative in u: the frame's tangent of the turn.
-        let tangent = |x: V3, y: V3| along(x, y, -s, co);
+        let tangent = |x: Vec3, y: Vec3| along(x, y, -s, co);
         Some(match self {
-            Surface::Plane(_) => [[0.0; 3]; 2],
-            Surface::Cylinder(c) => [tangent(c.frame().x(), c.frame().y()), [0.0; 3]],
+            Surface::Plane(_) => [Vec3::ZERO; 2],
+            Surface::Cylinder(c) => [tangent(c.frame().x(), c.frame().y()), Vec3::ZERO],
             Surface::Cone(c) => {
                 let f = c.frame();
-                [scale(tangent(f.x(), f.y()), c.half_angle().cos()), [0.0; 3]]
+                [tangent(f.x(), f.y()) * c.half_angle().cos(), Vec3::ZERO]
             }
             Surface::Sphere(sp) => {
                 let f = sp.frame();
                 let (sv, cv) = v.sin_cos();
                 let ring = along(f.x(), f.y(), co, s);
-                [
-                    scale(tangent(f.x(), f.y()), cv),
-                    add(scale(ring, -sv), scale(f.z(), cv)),
-                ]
+                [tangent(f.x(), f.y()) * cv, ring * -sv + f.z() * cv]
             }
             Surface::Torus(t) => {
                 let f = t.frame();
@@ -157,8 +145,8 @@ impl Surface {
                     1.0
                 };
                 [
-                    scale(tangent(f.x(), f.y()), side * cv),
-                    scale(add(scale(ring, -sv), scale(f.z(), cv)), side),
+                    tangent(f.x(), f.y()) * (side * cv),
+                    (ring * -sv + f.z() * cv) * side,
                 ]
             }
             _ => return None,
@@ -172,7 +160,7 @@ impl Surface {
     /// degenerate torus's turns inside out where `R + r cos φ < 0`). An
     /// offset's is its base's. `None` where the partials are parallel or
     /// undefined.
-    pub fn normal(&self, uv: [f64; 2]) -> Option<[f64; 3]> {
+    pub fn normal(&self, uv: [f64; 2]) -> Option<Vec3> {
         let [u, v] = uv;
         match self {
             Surface::Plane(p) => Some(p.frame().z()),
@@ -185,21 +173,21 @@ impl Surface {
                 let f = c.frame();
                 let (sa, ca) = c.half_angle().sin_cos();
                 let (s, co) = u.sin_cos();
-                Some(sub(scale(along(f.x(), f.y(), co, s), ca), scale(f.z(), sa)))
+                Some(along(f.x(), f.y(), co, s) * ca - f.z() * sa)
             }
             Surface::Sphere(sp) => {
                 let f = sp.frame();
                 let (s, co) = u.sin_cos();
                 let (sv, cv) = v.sin_cos();
-                Some(add(scale(along(f.x(), f.y(), co, s), cv), scale(f.z(), sv)))
+                Some(along(f.x(), f.y(), co, s) * cv + f.z() * sv)
             }
             Surface::Torus(t) => {
                 let f = t.frame();
                 let (s, co) = u.sin_cos();
                 let (sv, cv) = v.sin_cos();
-                let n = add(scale(along(f.x(), f.y(), co, s), cv), scale(f.z(), sv));
+                let n = along(f.x(), f.y(), co, s) * cv + f.z() * sv;
                 Some(if t.major() + t.minor() * cv < 0.0 {
-                    scale(n, -1.0)
+                    -n
                 } else {
                     n
                 })
@@ -207,8 +195,7 @@ impl Surface {
             Surface::Offset(off) => off.base().normal(uv),
             _ => {
                 let [_, du, dv] = self.partials(uv)?;
-                let n = normalize_or_zero(cross(du, dv));
-                (n != [0.0; 3]).then_some(n)
+                du.cross(dv).normalized()
             }
         }
     }
@@ -233,30 +220,30 @@ impl Surface {
 
 impl Curve {
     /// The point at `t`.
-    pub fn point(&self, t: f64) -> [f64; 3] {
+    pub fn point(&self, t: f64) -> Vec3 {
         self.jet(t)[0]
     }
 
-    pub(crate) fn jet(&self, t: f64) -> [[f64; 3]; 2] {
+    pub(crate) fn jet(&self, t: f64) -> [Vec3; 2] {
         match self {
-            Curve::Line(l) => [add(l.origin(), scale(l.direction(), t)), l.direction()],
+            Curve::Line(l) => [l.origin() + l.direction() * t, l.direction()],
             Curve::Circle(c) => {
                 let (f, r) = (c.frame(), c.radius());
                 let (s, co) = t.sin_cos();
                 [
-                    add(f.origin(), scale(along(f.x(), f.y(), co, s), r)),
-                    scale(along(f.x(), f.y(), -s, co), r),
+                    f.origin() + along(f.x(), f.y(), co, s) * r,
+                    along(f.x(), f.y(), -s, co) * r,
                 ]
             }
             Curve::Ellipse(e) => {
                 let (f, [a, b]) = (e.frame(), e.semi_axes());
                 let (s, co) = t.sin_cos();
                 [
-                    add(f.origin(), along(f.x(), f.y(), a * co, b * s)),
+                    f.origin() + along(f.x(), f.y(), a * co, b * s),
                     along(f.x(), f.y(), -a * s, b * co),
                 ]
             }
-            Curve::Nurbs(n) => n.jet(t),
+            Curve::Nurbs(n) => n.jet(t).map(Vec3::from),
         }
     }
 }

@@ -456,6 +456,7 @@ name = "kinogaki-viewport-api"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "kinogaki-geometry",
 ]
 
 [[package]]

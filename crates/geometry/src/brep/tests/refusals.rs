@@ -23,12 +23,12 @@ fn structure_is_checked() {
         let p = b.pcurve(PCurve::Circle(
             Circle2::new([0.0; 2], [1.0, 0.0], 1.0, true).unwrap(),
         ));
-        let v = b.vertex([1.0, 0.0, 0.0], None, name(1));
+        let v = b.vertex(Vec3::from([1.0, 0.0, 0.0]), None, name(1));
         (b, plane, circle, p, v)
     };
     // An open loop.
     let (mut b, plane, circle, p, v) = disc();
-    let w = b.vertex([0.0, 1.0, 0.0], None, name(2));
+    let w = b.vertex(Vec3::from([0.0, 1.0, 0.0]), None, name(2));
     let e = b.edge(edge(circle, [0.0, FRAC_PI_2], [v, w]), name(3));
     let f = b.face(
         face(plane, Sense::Same),
@@ -54,7 +54,7 @@ fn structure_is_checked() {
     assert_eq!(refused(b.build(Attributes::new())).0, "empty edge interval");
     // A pole edge between two vertices.
     let (mut b, plane, _, p, v) = disc();
-    let w = b.vertex([0.0, 1.0, 0.0], None, name(2));
+    let w = b.vertex(Vec3::from([0.0, 1.0, 0.0]), None, name(2));
     let e = b.edge(
         EdgeSpec {
             curve: None,
@@ -146,19 +146,22 @@ fn structure_is_checked() {
     assert_eq!(refused(b.build(Attributes::new())).0, "dangling reference");
     // A negative precision; a tolerance that isn't positive.
     let (mut b, ..) = disc();
-    b.vertex([0.0; 3], Some(-1.0), name(9));
+    b.vertex(Vec3::from([0.0; 3]), Some(-1.0), name(9));
     assert_eq!(refused(b.build(Attributes::new())).0, "precision negative");
     assert_eq!(
         refused(BrepBuilder::new(name(0), 0.0).build(Attributes::new())).0,
         "tolerance not positive"
     );
-    assert!(
-        Placement::new([
-            [2.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0]
-        ])
-        .is_err()
+    let mut scaled = BrepBuilder::new(name(0), 0.01);
+    let doubled = crate::Xform::from_rows([
+        [2.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ]);
+    scaled.placement(doubled, Vec::new());
+    assert_eq!(
+        refused(scaled.build(Attributes::new())).0,
+        "placement not rigid"
     );
 }
 
@@ -173,7 +176,7 @@ fn consistency_is_checked_at_ends_and_joins() {
         let p = b.pcurve(PCurve::Circle(
             Circle2::new([0.0; 2], [1.0, 0.0], 1.0, true).unwrap(),
         ));
-        let v = b.vertex([1.05, 0.0, 0.0], precision, name(1));
+        let v = b.vertex(Vec3::from([1.05, 0.0, 0.0]), precision, name(1));
         let e = b.edge(edge(circle, [0.0, TAU], [v, v]), name(2));
         let f = b.face(
             face(plane, Sense::Same),
@@ -193,7 +196,7 @@ fn consistency_is_checked_at_ends_and_joins() {
     let p = b.pcurve(PCurve::Circle(
         Circle2::new([0.5, 0.0], [1.0, 0.0], 1.0, true).unwrap(),
     ));
-    let v = b.vertex([1.0, 0.0, 0.0], None, name(1));
+    let v = b.vertex(Vec3::from([1.0, 0.0, 0.0]), None, name(1));
     let e = b.edge(edge(circle, [0.0, TAU], [v, v]), name(2));
     let f = b.face(
         face(plane, Sense::Same),
@@ -210,13 +213,13 @@ fn consistency_is_checked_at_ends_and_joins() {
     // loop jumps lifts mid-way.
     let mut b = cylinder(1.0, 2.0);
     let side = b.surface(Surface::Cylinder(Cylinder::new(Frame::WORLD, 1.0).unwrap()));
-    let a = b.vertex([1.0, 0.0, 5.0], None, name(100));
-    let c = b.vertex([-1.0, 0.0, 5.0], None, name(101));
+    let a = b.vertex(Vec3::from([1.0, 0.0, 5.0]), None, name(100));
+    let c = b.vertex(Vec3::from([-1.0, 0.0, 5.0]), None, name(101));
     let raised = Frame::new(
-        [0.0, 0.0, 5.0],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
+        Vec3::from([0.0, 0.0, 5.0]),
+        Vec3::from([1.0, 0.0, 0.0]),
+        Vec3::from([0.0, 1.0, 0.0]),
+        Vec3::from([0.0, 0.0, 1.0]),
     )
     .unwrap();
     let rim = b.curve(Curve::Circle(Circle::new(raised, 1.0).unwrap()));

@@ -41,12 +41,13 @@
 //!   ([`Registry::check`]); a plugin library exports its package through
 //!   [`export_package!`] ([`entry`]).
 //!
-//! And the plain types those exchange: [`math`] (vectors, placements, units,
-//! bounds), [`params`] (parameter values, schemas, diagnostics),
-//! [`element`] (the project's element tree codecs write), [`viewport`]
-//! (display surfaces, element sets, picks), [`refs`] (the host's objects
-//! and nodes), [`render`] (neutral render items), [`time`] (the scene's
-//! time) and [`anim`] (a parameter's keys over time).
+//! And the plain types those exchange: the geometry crate's one vocabulary
+//! ([`Vec3`], [`Xform`], [`Bounds`], [`Units`], [`Time`] and [`Rate`]),
+//! [`params`] (parameter values, schemas, diagnostics), [`element`] (the
+//! project's element tree codecs write), [`viewport`] (display surfaces,
+//! element sets, picks), [`refs`] (the host's objects and nodes),
+//! [`render`] (neutral render items) and [`anim`] (a parameter's keys over
+//! time).
 //!
 //! **Self-contained.** The crate depends on the standard library and the
 //! SDK's leaf crates alone (the standard geometry values, the render
@@ -74,7 +75,6 @@ pub mod format;
 pub mod held;
 pub mod icon;
 pub mod id;
-pub mod math;
 pub mod mesher;
 pub mod network;
 pub mod object;
@@ -86,11 +86,13 @@ pub mod render;
 pub mod session;
 pub mod standard;
 pub mod stored;
-pub mod time;
 pub mod viewport;
 
 /// The standard geometry values: what the [`standard`] data types are.
 pub use kinogaki_geometry as geometry;
+/// The SDK's one vocabulary of vectors, placements, boxes, units and time,
+/// which every crate exchanges: the standard geometry values' own.
+pub use kinogaki_geometry::{Bounds, Rate, Time, Units, UpAxis, Vec3, Xform};
 
 pub use anim::{Interp, Key};
 pub use cancel::CancelToken;
@@ -108,7 +110,7 @@ pub use error::Error;
 pub use facets::{
     CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn, Look, Materials,
     ObjectPicking, Pickable, Piece, RenderCx, Renderable, Rendered, Role, SnapHit, SnapKind,
-    SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally, WorldRay,
+    SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally,
 };
 pub use format::{
     FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Purpose, Reading, Writing,
@@ -119,7 +121,6 @@ pub use id::{
     ContextId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId, SlotId,
     StoredId,
 };
-pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
 pub use mesher::{Failed, Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
@@ -133,5 +134,4 @@ pub use registry::{Registry, RegistryError};
 pub use render::{PlainTriangles, RenderItem, TriangleSource};
 pub use session::{GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
-pub use time::Time;
 pub use viewport::{ElementKind, ElementSet, Hit, Surface, SurfaceSource};

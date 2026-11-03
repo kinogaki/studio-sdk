@@ -15,5 +15,7 @@ workspace = true
 bytemuck = ["dep:bytemuck"]
 
 [dependencies]
+# The SDK's one vector and placement (`Vec3`, `Xform`).
+kinogaki-geometry.workspace = true
 # Byte casts for GPU uploads, from crates.io at an exact version.
 bytemuck = { version = "=1.25.2", features = ["derive"], optional = true }

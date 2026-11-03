@@ -68,8 +68,8 @@ pub use material::{
     Constant, ImageUse, Link, MaterialNetwork, NetworkError, NodeIndex, ShaderNode,
 };
 pub use prim::{
-    AttributeDomain, Camera, Copies, IDENTITY, Instancer, Material, Matrix, Mesh, MeshAttribute,
-    Motion, Numbers, Prim, PrimKind, Projection, TexelFormat, Texture, TextureColorSpace,
+    AttributeDomain, Camera, Instancer, Material, Mesh, MeshAttribute, Numbers, Prim, PrimKind,
+    Projection, TexelFormat, Texture, TextureColorSpace,
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};

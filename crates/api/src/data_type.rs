@@ -14,7 +14,7 @@ use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::facets::{Displayable, Look, ObjectPicking, Pickable, Renderable, Snappable, Tabular};
 use crate::id::DataTypeId;
-use crate::math::Bounds;
+use kinogaki_geometry::Bounds;
 
 /// A display color: 8-bit sRGB. Wires of a data type, and the tiles of
 /// object kinds, are drawn in it.

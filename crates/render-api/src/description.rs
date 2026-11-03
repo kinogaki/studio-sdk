@@ -96,7 +96,7 @@ pub trait MaterialRules: Send + Sync {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MotionSupport {
     /// Placed prims moving: their placements across the shutter
-    /// ([`crate::Motion`]).
+    /// ([`Sampled`](crate::geometry::Sampled) with more than one sample).
     pub transforms: bool,
     /// Points moving by their velocities (the `v` attribute).
     pub(crate) velocities: bool,

@@ -89,7 +89,7 @@ impl DataType for CloudType {
         CLOUD.get(data).map_or(0, |c| c.0.len() * 24)
     }
     fn bounds(&self, data: &Data) -> Option<Bounds> {
-        let points = CLOUD.get(data)?.0.iter().map(|&p| Vec3::from_array(p));
+        let points = CLOUD.get(data)?.0.iter().map(|&p| Vec3::from(p));
         points.map(Bounds::point).reduce(Bounds::union)
     }
     fn info(&self, data: &Data) -> Vec<InfoRow> {

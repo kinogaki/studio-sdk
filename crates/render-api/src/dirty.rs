@@ -21,7 +21,8 @@ impl Dirty {
     pub const UVS: Dirty = Dirty(1 << 3);
     /// Mesh per-triangle material slots or the slots' materials.
     pub const MATERIAL_SLOTS: Dirty = Dirty(1 << 4);
-    /// A Mesh, Instancer, Camera or Light placement.
+    /// A Mesh, Instancer, Camera or Light placement, or its samples across
+    /// the shutter.
     pub const TRANSFORM: Dirty = Dirty(1 << 5);
     /// Whether a Mesh or Light is rendered.
     pub const VISIBILITY: Dirty = Dirty(1 << 6);
@@ -31,10 +32,8 @@ impl Dirty {
     pub const NETWORK: Dirty = Dirty(1 << 8);
     /// Mesh attributes the materials read (names, layout or values).
     pub const ATTRIBUTES: Dirty = Dirty(1 << 10);
-    /// A placed prim's placements across the shutter (its `motion`) alone.
-    pub const MOTION: Dirty = Dirty(1 << 11);
     /// How many bits there are.
-    pub(crate) const COUNT: usize = 12;
+    pub(crate) const COUNT: usize = 11;
     /// Every bit.
     pub const ALL: Dirty = Dirty((1 << Dirty::COUNT) - 1);
 
@@ -50,7 +49,6 @@ impl Dirty {
         "NETWORK",
         "PIXELS",
         "ATTRIBUTES",
-        "MOTION",
     ];
 
     /// The raw bits.

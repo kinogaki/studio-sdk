@@ -13,7 +13,7 @@
 //! a host keying them over time ([`setting_parameter`]). Shader node types
 //! (an engine's material vocabulary as nodes of a Material's network) are
 //! the render package's, not the SDK's.
-use crate::math::Mat4;
+use kinogaki_geometry::Xform;
 use std::fmt;
 use std::sync::Arc;
 
@@ -39,7 +39,7 @@ pub enum RenderItem {
         /// Placements relative to the object, which the host places in the
         /// world: the first is the item itself, the rest are copies that
         /// share its acceleration structure. Empty: not rendered.
-        placements: Arc<[Mat4]>,
+        placements: Arc<[Xform]>,
         /// Its name (a body's), the name Cryptomatte gives the object.
         label: Option<Arc<str>>,
     },
@@ -51,7 +51,7 @@ impl RenderItem {
         Self::Triangles {
             part,
             source,
-            placements: Arc::from([Mat4::IDENTITY]),
+            placements: Arc::from([Xform::IDENTITY]),
             label: None,
         }
     }

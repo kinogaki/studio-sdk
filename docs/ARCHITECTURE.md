@@ -118,7 +118,7 @@ Facets are optional:
 |---|---|---|
 | `Displayable` | the viewport | levels (`ElementKind`s), `prepare` → `Drawn` (pieces: packets with their placements, roles and how they draw while the object is open, plus type-owned detail) over the value shown before, `refine` once a value rests, `highlight` → `ElementSet`, `convert`, the status bar's counts (`tally` → `Tally`s) and a selection's box for the pivot (`bounds_of`) |
 | `Pickable` | viewport picking | the host finds packet elements (`Hit`s, box `ElementSet`s); the facet turns them into `Components` and combines selections |
-| `ObjectPicking` (`picking`) | the object levels | how an object holding the value is hit by a `WorldRay` and framed; without it core frames the value by its `bounds` and doesn't pick it |
+| `ObjectPicking` (`picking`) | the object levels | how an object holding the value is hit by a `Ray` (at its world `Xform`) and framed; without it core frames the value by its `bounds` and doesn't pick it |
 | `Look` (`look`) | shading | the pieces' colors while shaded and whether the value renders as a volume; without it the value shows as clay |
 | `Snappable` (`snapping`) | gizmo moves | what a move may land on in the value, for the user's `SnapTargets` (points, edges' middles, faces' centers, edges, surfaces): a `SnapQuery` answered with `SnapHit`s, a surface's with its normal there; the host keeps the rest of snapping (the master switch, the grid, ranking across objects, feedback) |
 | `Tabular` | the spreadsheet | tables, columns, and cells read a range of rows at a time |
@@ -283,7 +283,7 @@ Icons mark what has no text of its own: toolbar buttons, tab buttons, the kinds 
 
 Long work polls a `CancelToken`: preparing a display, converting, reading a file.
 
-`Time` is the scene moment that cooks and render prims read: frame, seconds and fps.
+`Time` is the scene moment that cooks and render prims read: a whole number of ticks (1/705,600,000 s, so frames at the common rates are exact); `Rate` is frames a second, checked finite and above zero, and converts between the two. A value across a frame's shutter is `Sampled` (one sample holds still): render prims' placements are `Sampled<Xform>`.
 
 ## Rendering
 

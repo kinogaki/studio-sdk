@@ -321,8 +321,13 @@ mod display {
         builder.build().unwrap()
     }
 
-    fn close(a: [f64; 3], b: [f64; 3], tolerance: f64) -> bool {
-        (0..3).all(|c| (a[c] - b[c]).abs() <= tolerance)
+    fn close(
+        a: impl Into<kinogaki_geometry::Vec3>,
+        b: impl Into<kinogaki_geometry::Vec3>,
+        tolerance: f64,
+    ) -> bool {
+        let d = a.into() - b.into();
+        [d.x, d.y, d.z].iter().all(|c| c.abs() <= tolerance)
     }
 
     #[test]
@@ -341,7 +346,7 @@ mod display {
         assert_eq!(quarter.domain(0), [0.0, 1.0]);
         for k in 0..=100 {
             let p = quarter.point(0, k as f64 / 100.0);
-            assert!((p[0].hypot(p[1]) - 1.0).abs() < 1e-12, "{p:?}");
+            assert!((p.x.hypot(p.y) - 1.0).abs() < 1e-12, "{p:?}");
         }
         let display = quarter.display();
         assert_eq!(display.positions().len(), SAMPLES + 1);
@@ -363,8 +368,8 @@ mod display {
         ];
         let cubic = curve(Basis::Bezier, p.clone(), 3, false);
         assert_eq!(cubic.domain(0), [0.0, 1.0]);
-        assert_eq!(cubic.point(0, 0.0), p[0]);
-        assert_eq!(cubic.point(0, 1.0), p[3]);
+        assert_eq!(cubic.point(0, 0.0), p[0].into());
+        assert_eq!(cubic.point(0, 1.0), p[3].into());
         // At t = ½: (p0 + 3 p1 + 3 p2 + p3) / 8.
         let half: [f64; 3] =
             std::array::from_fn(|c| (p[0][c] + 3.0 * p[1][c] + 3.0 * p[2][c] + p[3][c]) / 8.0);
@@ -380,7 +385,7 @@ mod display {
         assert!(close(spline.point(0, 3.0), line[5], 1e-12));
         for k in 0..=30 {
             let p = spline.point(0, k as f64 / 10.0);
-            assert!((p[1] - 2.0 * p[0]).abs() < 1e-12, "on the line: {p:?}");
+            assert!((p.y - 2.0 * p.x).abs() < 1e-12, "on the line: {p:?}");
         }
     }
 

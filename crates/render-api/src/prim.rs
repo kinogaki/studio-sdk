@@ -3,73 +3,19 @@
 //! types an engine declares (lights, fog: [`crate::declared`]). Payloads are `Arc` data, so sending a prim again costs a few
 //! reference counts, never a copy of its arrays.
 //!
-//! Matrices are column-major `[[f32; 4]; 4]` (glam's `to_cols_array_2d`):
-//! `transform[3]` is the translation. Positions and lengths are in scene
-//! units; camera lens and film back are in millimetres.
+//! Placements are [`Xform`]s across the frame's shutter ([`Sampled`]: one
+//! sample for a prim that doesn't move), in the SDK's one convention; an
+//! engine converts them to its own single-precision layout where it
+//! uploads them. Positions
+//! and lengths are in scene units (the [`RenderSettings`](crate::RenderSettings)'
+//! units say what one is); camera lens and film back are in millimetres.
 
+use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
 use crate::declared::Declared;
 use crate::id::{MaterialId, PrimId};
 use crate::material::MaterialNetwork;
-
-/// A column-major 4×4 matrix.
-pub type Matrix = [[f32; 4]; 4];
-
-/// The identity matrix.
-pub const IDENTITY: Matrix = [
-    [1.0, 0.0, 0.0, 0.0],
-    [0.0, 1.0, 0.0, 0.0],
-    [0.0, 0.0, 1.0, 0.0],
-    [0.0, 0.0, 0.0, 1.0],
-];
-
-/// A prim's placements across the shutter, for motion blur: `values[k]`
-/// at `times[k]`, in frames relative to the frame rendered, ascending.
-/// Empty: it doesn't move, its rest placement holding all the shutter. A
-/// host sends samples only to an engine whose
-/// [`MotionSupport`](crate::MotionSupport) takes them.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Motion<T> {
-    /// The sample times.
-    pub times: Arc<[f32]>,
-    /// One placement a time.
-    pub values: Arc<[T]>,
-}
-
-impl<T> Motion<T> {
-    /// No motion.
-    pub fn none() -> Motion<T> {
-        Motion {
-            times: Arc::from([]),
-            values: Arc::from([]),
-        }
-    }
-
-    /// `values` at `times`, when there is one a time and the times are
-    /// finite and ascending.
-    pub fn new(times: impl Into<Arc<[f32]>>, values: impl Into<Arc<[T]>>) -> Option<Motion<T>> {
-        let (times, values) = (times.into(), values.into());
-        let ascending = times.windows(2).all(|t| t[0] < t[1]);
-        let fits = times.len() == values.len() && times.iter().all(|t| t.is_finite());
-        (ascending && fits).then_some(Motion { times, values })
-    }
-
-    /// Whether it holds no samples: the prim doesn't move.
-    pub fn is_empty(&self) -> bool {
-        self.times.is_empty()
-    }
-}
-
-impl<T> Default for Motion<T> {
-    fn default() -> Motion<T> {
-        Motion::none()
-    }
-}
-
-/// An Instancer's copies' placements: each the matrix's first three rows,
-/// row-major.
-pub type Copies = Arc<[[[f32; 4]; 3]]>;
 
 /// A triangle mesh in its own space.
 #[derive(Clone, Debug, PartialEq)]
@@ -90,10 +36,8 @@ pub struct Mesh {
     /// The attributes its materials read by name (Attribute nodes); a host
     /// sends the ones some material names, not every attribute it has.
     pub attributes: Arc<[MeshAttribute]>,
-    /// Object to world.
-    pub transform: Matrix,
     /// Object to world across the shutter.
-    pub motion: Motion<Matrix>,
+    pub xform: Sampled<Xform>,
     /// Whether it is rendered.
     pub visible: bool,
     /// The object id the ObjectId output writes.
@@ -205,10 +149,8 @@ impl MeshAttribute {
 pub struct Instancer {
     /// The Mesh prim copied.
     pub prototype: PrimId,
-    /// Each copy's placement.
-    pub transforms: Copies,
     /// Each copy's placement across the shutter: all the copies a time.
-    pub motion: Motion<Copies>,
+    pub xforms: Sampled<Arc<[Xform]>>,
     /// Whether the copies are rendered.
     pub visible: bool,
 }
@@ -232,7 +174,8 @@ pub struct Camera {
     /// The lens's focal length, in mm.
     pub focal_length: f32,
     /// The film back's width, in mm; orthographic: the view's width, a
-    /// length in mm on the scene's scale.
+    /// length in mm on the scene's scale (the render settings'
+    /// [`units`](crate::RenderSettings::units) turn mm into scene units).
     pub horizontal_aperture: f32,
     /// The film back's height, in mm (orthographic: the view's height).
     pub vertical_aperture: f32,
@@ -246,16 +189,11 @@ pub struct Camera {
     pub f_stop: f32,
     /// The distance in focus, in scene units.
     pub focus_distance: f32,
-    /// Millimetres in one scene unit (1000 for metres): what turns the lens
-    /// and an orthographic film back into scene units.
-    pub mm_per_unit: f32,
     /// When the shutter opens and closes, in frames relative to the frame
     /// rendered (`shutter:open`, `shutter:close`); equal: no motion blur.
     pub shutter: [f32; 2],
-    /// Camera to world.
-    pub transform: Matrix,
     /// Camera to world across the shutter.
-    pub motion: Motion<Matrix>,
+    pub xform: Sampled<Xform>,
 }
 
 impl Camera {
@@ -277,10 +215,8 @@ impl Default for Camera {
             clipping_range: [0.1, 10_000.0],
             f_stop: 0.0,
             focus_distance: 5.0,
-            mm_per_unit: 1000.0,
             shutter: [0.0, 0.0],
-            transform: IDENTITY,
-            motion: Motion::none(),
+            xform: Sampled::still(Xform::IDENTITY),
         }
     }
 }
@@ -428,8 +364,7 @@ mod tests {
             material_slots: Arc::from(slots),
             materials: Arc::from(materials),
             attributes: Arc::from([]),
-            transform: IDENTITY,
-            motion: Motion::none(),
+            xform: Sampled::still(Xform::IDENTITY),
             visible: true,
             id: 1,
             path: Arc::from("/m"),

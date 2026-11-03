@@ -2,7 +2,8 @@
 //! and nodes, where the user is, one view as a package sees it, what a
 //! node's rows drawn by the host did, and the user's preferences.
 use crate::gizmo::TransformTool;
-use crate::{Modifiers, Pos, Projection, Ray, Rect, Response, Slot};
+use crate::{Modifiers, Pos, Projection, Rect, Response, Slot};
+use kinogaki_studio_api::geometry::Ray;
 use kinogaki_studio_api::{ContextId, Units, Vec3};
 pub use kinogaki_studio_api::{NodeRef, ObjectRef};
 
@@ -148,10 +149,7 @@ impl Default for HostPrefs {
     /// the Select tool.
     fn default() -> Self {
         HostPrefs {
-            units: Units {
-                up: kinogaki_studio_api::UpAxis::Y,
-                meters_per_unit: 0.001,
-            },
+            units: Units::MILLIMETERS,
             snapping: false,
             grid_spacing: 10.0,
             rotate_step: 15.0,

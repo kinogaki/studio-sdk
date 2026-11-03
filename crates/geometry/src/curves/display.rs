@@ -8,6 +8,7 @@ use crate::column::Column;
 use crate::kept::Kept;
 use crate::limits::MAX_DEGREE;
 use crate::spline::{self, homogeneous, rational};
+use crate::vec3::Vec3;
 use std::sync::Arc;
 
 /// Every curve of a value as a polyline: what the viewport draws.
@@ -137,16 +138,16 @@ impl Curves {
     /// The point of curve `curve` at parameter `t` (clamped to its
     /// [`domain`](Self::domain)): the one exact evaluation every display,
     /// engine and plugin shares.
-    pub fn point(&self, curve: usize, t: f64) -> [f64; 3] {
+    pub fn point(&self, curve: usize, t: f64) -> Vec3 {
         let [lo, hi] = self.domain(curve);
         let t = t.clamp(lo, hi);
         if self.basis == Basis::Nurbs {
             let (d, n) = (self.degree(curve) as usize, self.vertices(curve).len());
             let first = spline::span(self.knots_of(curve), d, n, t) - d;
-            return self.nurbs_at(curve, first, t);
+            return self.nurbs_at(curve, first, t).into();
         }
         let span = (t.floor() as usize).min(self.spans(curve).saturating_sub(1));
-        self.on_span(curve, span, t - span as f64)
+        self.on_span(curve, span, t - span as f64).into()
     }
 
     /// The point of span `span` of curve `curve` (not NURBS) at `u`, `0`

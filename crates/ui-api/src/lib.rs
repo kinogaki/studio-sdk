@@ -65,7 +65,6 @@ mod text;
 mod theme;
 mod ui;
 pub mod value_fields;
-mod vec3;
 mod widgets;
 
 pub use card::{CardResponse, CardSpec, Order, PopoverLook, PopoverSpec};
@@ -76,7 +75,7 @@ pub use input::{Event, Input, Key, KeyFilter, Modifiers, Pointer, PointerButton,
 pub use paint::{
     Circle, IconShape, Painter, RectShape, Segment, Shape, Slot, Stroke, StrokeKind, TextShape,
 };
-pub use projection::{ClipMatrix, Projection, Ray};
+pub use projection::Projection;
 pub use response::{InnerResponse, Response, Sense};
 pub use sheet::{Edits, FieldKey, SheetStyle};
 pub use text::{Font, FontRole, TextStyle};

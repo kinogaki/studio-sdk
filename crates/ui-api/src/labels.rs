@@ -5,8 +5,8 @@
 //! Only points in view are labelled, at most one per screen cell. Points
 //! are visited in a scattered order, and the walk stops once a long run of
 //! them lands in cells already taken (or every cell is taken).
-use crate::projection::ClipMatrix;
 use kinogaki_studio_api::Vec3;
+use kinogaki_studio_api::geometry::Projective;
 
 /// A label: where its point shows (pixels from the view's top left) and
 /// the point's number.
@@ -29,7 +29,7 @@ const PATIENCE: usize = 4096;
 pub fn point_labels(
     positions: &[Vec3],
     shown: impl Fn(u32) -> bool,
-    clip: &ClipMatrix,
+    clip: &Projective,
     size: [f64; 2],
     cell: [f64; 2],
 ) -> Vec<Label> {
@@ -52,7 +52,7 @@ pub fn point_labels(
             continue;
         }
         let p = positions[id];
-        let [x, y, z, w] = clip.mul_vec4([p.x, p.y, p.z, 1.0]);
+        let [x, y, z, w] = clip.apply([p.x, p.y, p.z, 1.0]);
         let placed = (w > 0.0)
             .then(|| (x / w, y / w, z / w))
             .filter(|&(_, _, z)| (0.0..=1.0).contains(&z))

@@ -269,7 +269,7 @@ impl NodeType for BoxNode {
                 .read(cx.parameters())
                 .ok_or_else(|| CookError::message(format!("the {name} is three numbers")))
         };
-        let (size, center) = (three("size")?, three("center")?);
+        let (size, center) = (three("size")?.to_array(), three("center")?.to_array());
         if size.iter().any(|&side| side <= 0.0) {
             return Err(CookError::message("every side must be longer than zero"));
         }

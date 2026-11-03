@@ -16,6 +16,8 @@
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
 //! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
 //! | [`Tolerances`] | the project's modeling tolerances |
+//! | [`Vec3`], [`Xform`], [`Bounds`], [`Ray`], [`Projective`] | the one vector, placement (affine, column vectors), box, ray and view matrix every crate exchanges; [`Frame`] is an orthonormal frame |
+//! | [`Units`], [`Time`], [`Rate`], [`Sampled`] | what a scene unit is; a moment on the tick grid and frames a second; a value across a frame's shutter |
 //! | [`parallel`] | the process's shared [`Workers`](parallel::Workers): every parallel step runs on what the host installed |
 //!
 //! **Validated values.** Every value's fields are private. It is made only
@@ -92,6 +94,7 @@
 //! assert_eq!(builds.load(Ordering::Relaxed), 1);
 //! ```
 mod attributes;
+mod bounds;
 pub mod brep;
 mod column;
 mod curves;
@@ -105,18 +108,24 @@ mod motion;
 pub mod parallel;
 mod polygons;
 mod positions;
+mod sampled;
 mod selection;
 mod shading;
 mod spline;
+mod time;
 mod tolerances;
 mod topology;
 mod triangulation;
+mod units;
+mod vec3;
 mod vector;
+mod xform;
 
 pub use attributes::names;
 pub use attributes::{
     Attribute, AttributeKind, AttributeValues, Attributes, Class, Group, Text, TypeInfo, check_name,
 };
+pub use bounds::Bounds;
 pub use column::Column;
 pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
 pub use detail::{Detail, DisplayQuality};
@@ -124,8 +133,13 @@ pub use error::{ErrorKind, GeometryError};
 pub use frame::Frame;
 pub use motion::{Axis, Mirror, Side, WeightedMove};
 pub use polygons::Polygons;
+pub use sampled::Sampled;
 pub use selection::{Selection, SelectionCounts};
 pub use shading::ShadingNormals;
+pub use time::{Rate, Time};
 pub use tolerances::Tolerances;
 pub use topology::{Adjacency, Edge, Index, Topology};
 pub use triangulation::{Triangle, Triangulation};
+pub use units::{Units, UpAxis};
+pub use vec3::{Ray, Vec3};
+pub use xform::{Projective, Xform};

@@ -4,22 +4,9 @@
 //! covers how it looks against the scene's [`Materials`].
 use crate::data::Data;
 use crate::facets::Drawn;
-use crate::math::Bounds;
+use kinogaki_geometry::{Bounds, Projective, Ray, Xform};
 use kinogaki_render_api::Tint;
 use std::sync::Arc;
-
-/// A column-major 4×4 matrix of `f64` (the viewport's precision): an
-/// object's world placement, or a view's world-to-clip.
-pub type Matrix = [[f64; 4]; 4];
-
-/// A world ray: from `origin` along `direction`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct WorldRay {
-    /// Where it starts.
-    pub origin: [f64; 3],
-    /// Where it goes (not necessarily of unit length).
-    pub direction: [f64; 3],
-}
 
 /// A marquee over a view: its box, running 0–1 across the view and down
 /// from its top. It takes whatever it touches, whichever way it was
@@ -38,7 +25,7 @@ pub struct Marquee {
 pub trait ObjectPicking: Send + Sync {
     /// The world distance along `ray` to the nearest surface of `data`
     /// (drawn as `drawn`, placed at `world`) that the ray meets.
-    fn ray(&self, data: &Data, drawn: &Drawn, world: &Matrix, ray: &WorldRay) -> Option<f64>;
+    fn ray(&self, data: &Data, drawn: &Drawn, world: &Xform, ray: &Ray) -> Option<f64>;
 
     /// Whether `marquee`, over the view whose world-to-clip is `view`,
     /// touches it: a point of it inside its box. A value with nothing
@@ -47,13 +34,13 @@ pub trait ObjectPicking: Send + Sync {
         &self,
         data: &Data,
         drawn: &Drawn,
-        view: &Matrix,
-        world: &Matrix,
+        view: &Projective,
+        world: &Xform,
         marquee: &Marquee,
     ) -> bool;
 
     /// Its world box.
-    fn bounds(&self, data: &Data, drawn: &Drawn, world: &Matrix) -> Option<Bounds>;
+    fn bounds(&self, data: &Data, drawn: &Drawn, world: &Xform) -> Option<Bounds>;
 
     /// The distance along `ray` to piece `piece` of `drawn` alone (a
     /// templated branch's packet), as [`ray`](Self::ray) measures the
@@ -64,8 +51,8 @@ pub trait ObjectPicking: Send + Sync {
         data: &Data,
         drawn: &Drawn,
         piece: usize,
-        world: &Matrix,
-        ray: &WorldRay,
+        world: &Xform,
+        ray: &Ray,
     ) -> Option<f64> {
         let _ = (data, drawn, piece, world, ray);
         None

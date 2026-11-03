@@ -1,6 +1,7 @@
 //! [`Scalar`] and [`Vector`]: the numbers a [`Handle`](super::Handle)
 //! reads and writes, each bound to a parameter or fixed.
 use crate::params::{Parameters, Value};
+use kinogaki_geometry::Vec3;
 
 /// One number a handle reads and writes: a number parameter, or a fixed
 /// value dragging leaves alone.
@@ -104,8 +105,8 @@ impl Vector {
     }
 
     /// The fixed `value`.
-    pub fn fixed(value: [f64; 3]) -> Self {
-        Self::Components(value.map(Scalar::Fixed))
+    pub fn fixed(value: Vec3) -> Self {
+        Self::Components(value.to_array().map(Scalar::Fixed))
     }
 
     /// The parameters it names, in order (none when fixed).
@@ -127,29 +128,29 @@ impl Vector {
 
     /// Its value in `parameters`; `None` when a parameter is missing or
     /// holds something else.
-    pub fn read(&self, parameters: &Parameters) -> Option<[f64; 3]> {
+    pub fn read(&self, parameters: &Parameters) -> Option<Vec3> {
         match self {
             Self::Parameter(name) => match parameters.get(name)?.numbers()? {
-                &[x, y, z] => Some([x, y, z]),
+                &[x, y, z] => Some(Vec3::new(x, y, z)),
                 _ => None,
             },
-            Self::Components([x, y, z]) => Some([
+            Self::Components([x, y, z]) => Some(Vec3::new(
                 x.read(parameters)?,
                 y.read(parameters)?,
                 z.read(parameters)?,
-            ]),
+            )),
         }
     }
 
     /// Writes `value` into `parameters`: each number a parameter holds
     /// (nothing when fixed).
-    pub fn write(&self, parameters: &mut Parameters, value: [f64; 3]) {
+    pub fn write(&self, parameters: &mut Parameters, value: Vec3) {
         match self {
             Self::Parameter(name) => {
-                parameters.insert(name.clone(), Value::Numbers(value.to_vec()));
+                parameters.insert(name.clone(), Value::Numbers(value.to_array().to_vec()));
             }
             Self::Components(scalars) => {
-                for (scalar, v) in scalars.iter().zip(value) {
+                for (scalar, v) in scalars.iter().zip(value.to_array()) {
                     scalar.write(parameters, v);
                 }
             }
@@ -167,14 +168,14 @@ mod tests {
         let one = Vector::parameter("center");
         let three = Vector::components("x", "y", "z");
         assert_eq!(one.read(&values), None);
-        one.write(&mut values, [1.0, 2.0, 3.0]);
-        three.write(&mut values, [4.0, 5.0, 6.0]);
-        assert_eq!(one.read(&values), Some([1.0, 2.0, 3.0]));
-        assert_eq!(three.read(&values), Some([4.0, 5.0, 6.0]));
+        one.write(&mut values, Vec3::new(1.0, 2.0, 3.0));
+        three.write(&mut values, Vec3::new(4.0, 5.0, 6.0));
+        assert_eq!(one.read(&values), Some(Vec3::new(1.0, 2.0, 3.0)));
+        assert_eq!(three.read(&values), Some(Vec3::new(4.0, 5.0, 6.0)));
         assert_eq!(values["y"], Value::Number(5.0));
-        let fixed = Vector::fixed([0.0; 3]);
-        fixed.write(&mut values, [9.0; 3]);
-        assert_eq!(fixed.read(&values), Some([0.0; 3]));
+        let fixed = Vector::fixed(Vec3::ZERO);
+        fixed.write(&mut values, Vec3::new(9.0, 9.0, 9.0));
+        assert_eq!(fixed.read(&values), Some(Vec3::ZERO));
         assert!(fixed.names().is_empty() && !fixed.writes(0));
         values.insert("center".into(), Value::Numbers(vec![1.0]));
         assert_eq!(one.read(&values), None, "a vector has three numbers");
@@ -187,12 +188,12 @@ mod tests {
         let top = Vector::components(0.0, "height", 0.0);
         let mut values = Parameters::new();
         values.insert("height".into(), Value::Number(2.0));
-        assert_eq!(top.read(&values), Some([0.0, 2.0, 0.0]));
+        assert_eq!(top.read(&values), Some(Vec3::new(0.0, 2.0, 0.0)));
         assert_eq!(top.names(), ["height"]);
         assert_eq!([0, 1, 2].map(|a| top.writes(a)), [false, true, false]);
-        top.write(&mut values, [7.0, 3.0, 7.0]);
+        top.write(&mut values, [7.0, 3.0, 7.0].into());
         assert_eq!(values.len(), 1);
-        assert_eq!(top.read(&values), Some([0.0, 3.0, 0.0]));
+        assert_eq!(top.read(&values), Some(Vec3::new(0.0, 3.0, 0.0)));
         assert_eq!(Scalar::from(1.5).read(&values), Some(1.5));
         assert_eq!(Scalar::from("height").name(), Some("height"));
     }

@@ -60,7 +60,7 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]], first: u32) -> BrepBuilde
     let mut names = first..;
     let vertices: Vec<VertexId> = points
         .iter()
-        .map(|&p| b.vertex(p, None, name(names.next().unwrap())))
+        .map(|&p| b.vertex(p.into(), None, name(names.next().unwrap())))
         .collect();
     let mut edges: Vec<((usize, usize), EdgeId, CurveId)> = Vec::new();
     let mut ids = Vec::new();
@@ -68,7 +68,7 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]], first: u32) -> BrepBuilde
         let (a, bb, c) = (points[corners[0]], points[corners[1]], points[corners[2]]);
         let z = unit(cross(sub(bb, a), sub(c, a)));
         let x = unit(sub(bb, a));
-        let frame = Frame::new(a, x, cross(z, x), z).unwrap();
+        let frame = Frame::new(a.into(), x.into(), cross(z, x).into(), z.into()).unwrap();
         let plane = b.surface(Surface::Plane(Plane::new(frame)));
         let chart = |p: [f64; 3]| [dot(sub(p, a), x), dot(sub(p, a), cross(z, x))];
         let mut loop_ = Vec::new();
@@ -81,7 +81,9 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]], first: u32) -> BrepBuilde
                 .map(|&(_, e, c)| (e, c));
             let (e, _) = found.unwrap_or_else(|| {
                 let (from, to) = (points[key.0], points[key.1]);
-                let curve = b.curve(Curve::Line(Line::new(from, unit(sub(to, from))).unwrap()));
+                let curve = b.curve(Curve::Line(
+                    Line::new(from.into(), unit(sub(to, from)).into()).unwrap(),
+                ));
                 let length = dot(sub(to, from), sub(to, from)).sqrt();
                 let e = b.edge(
                     edge(curve, [0.0, length], [vertices[key.0], vertices[key.1]]),
@@ -146,10 +148,10 @@ fn cuboid_faces(lo: [f64; 3], hi: [f64; 3], faces: &[&[usize]], first: u32) -> B
 fn cylinder(radius: f64, height: f64) -> BrepBuilder {
     let mut b = BrepBuilder::new(name(2000), P);
     let raised = Frame::new(
-        [0.0, 0.0, height],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
+        Vec3::from([0.0, 0.0, height]),
+        Vec3::from([1.0, 0.0, 0.0]),
+        Vec3::from([0.0, 1.0, 0.0]),
+        Vec3::from([0.0, 0.0, 1.0]),
     );
     let raised = raised.unwrap();
     let side = b.surface(Surface::Cylinder(
@@ -159,7 +161,7 @@ fn cylinder(radius: f64, height: f64) -> BrepBuilder {
     let top = b.surface(Surface::Plane(Plane::new(raised)));
     let rims =
         [Frame::WORLD, raised].map(|f| b.curve(Curve::Circle(Circle::new(f, radius).unwrap())));
-    let v = [0.0, height].map(|z| b.vertex([radius, 0.0, z], None, name(z as u32)));
+    let v = [0.0, height].map(|z| b.vertex(Vec3::from([radius, 0.0, z]), None, name(z as u32)));
     let e = [0, 1].map(|k| b.edge(edge(rims[k], [0.0, TAU], [v[k], v[k]]), name(10 + k as u32)));
     let along =
         [0.0, height].map(|h| b.pcurve(PCurve::Line(Line2::new([0.0, h], [1.0, 0.0]).unwrap())));
@@ -194,10 +196,10 @@ fn cone(half_angle: f64, height: f64) -> BrepBuilder {
     let mut b = BrepBuilder::new(name(3000), P);
     let radius = height * half_angle.tan();
     let raised = Frame::new(
-        [0.0, 0.0, height],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
+        Vec3::from([0.0, 0.0, height]),
+        Vec3::from([1.0, 0.0, 0.0]),
+        Vec3::from([0.0, 1.0, 0.0]),
+        Vec3::from([0.0, 0.0, 1.0]),
     );
     let raised = raised.unwrap();
     let side = b.surface(Surface::Cone(
@@ -205,8 +207,8 @@ fn cone(half_angle: f64, height: f64) -> BrepBuilder {
     ));
     let top = b.surface(Surface::Plane(Plane::new(raised)));
     let rim = b.curve(Curve::Circle(Circle::new(raised, radius).unwrap()));
-    let apex = b.vertex([0.0; 3], None, name(0));
-    let v = b.vertex([radius, 0.0, height], None, name(1));
+    let apex = b.vertex(Vec3::from([0.0; 3]), None, name(0));
+    let v = b.vertex(Vec3::from([radius, 0.0, height]), None, name(1));
     let pole = b.edge(
         EdgeSpec {
             curve: None,
@@ -342,7 +344,8 @@ fn translated(body: &Body, by: [f64; 3]) -> Body {
     let g = body.geometry();
     let names = body.names();
     let moved = |p: [f64; 3]| [p[0] + by[0], p[1] + by[1], p[2] + by[2]];
-    let frame = |f: &Frame| Frame::new(moved(f.origin()), f.x(), f.y(), f.z()).unwrap();
+    let frame =
+        |f: &Frame| Frame::new(moved(f.origin().into()).into(), f.x(), f.y(), f.z()).unwrap();
     let mut b = BrepBuilder::new(body.name().clone(), body.tolerance());
     for s in g.surfaces().iter() {
         b.surface(match s {
@@ -355,7 +358,9 @@ fn translated(body: &Body, by: [f64; 3]) -> Body {
     }
     for c in g.curves().iter() {
         b.curve(match c {
-            Curve::Line(l) => Curve::Line(Line::new(moved(l.origin()), l.direction()).unwrap()),
+            Curve::Line(l) => {
+                Curve::Line(Line::new(moved(l.origin().into()).into(), l.direction()).unwrap())
+            }
             Curve::Circle(c) => Curve::Circle(Circle::new(frame(c.frame()), c.radius()).unwrap()),
             other => panic!("the kernel doesn't move {other:?}"),
         });
@@ -365,7 +370,7 @@ fn translated(body: &Body, by: [f64; 3]) -> Body {
     }
     for v in t.vertex_ids() {
         b.vertex(
-            moved(g.point(v)),
+            moved(g.point(v).into()).into(),
             t.vertex(v).precision(),
             names.vertices[v.index()].clone(),
         );
@@ -432,11 +437,11 @@ fn polyhedral_volume(body: &Body) -> f64 {
         } else {
             -1.0
         };
-        let n = plane.frame().z().map(|c| c * sign);
+        let n = (plane.frame().z() * sign).to_array();
         for l in t.face_loops(f) {
             let corners: Vec<[f64; 3]> = t
                 .loop_coedges(l)
-                .map(|c| g.point(t.coedge_start(c)))
+                .map(|c| g.point(t.coedge_start(c)).to_array())
                 .collect();
             // Area vector of the loop, by its direction: material on the
             // left seen along the outward normal makes it point along it.

@@ -248,7 +248,7 @@ impl Curves {
 
     /// The smallest box holding every control point; `None` without
     /// points. Cached on the positions column.
-    pub fn bounds(&self) -> Option<[[f64; 3]; 2]> {
+    pub fn bounds(&self) -> Option<crate::Bounds> {
         positions::cached_bounds(&self.positions)
     }
 

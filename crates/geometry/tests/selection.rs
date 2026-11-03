@@ -1,7 +1,7 @@
 //! A selection over a polygons value: validity, its elements, the same
 //! selection as another class, its box and its counts.
 use kinogaki_geometry::{
-    Attributes, Class, ErrorKind, Polygons, Selection, SelectionCounts, Topology,
+    Attributes, Bounds, Class, ErrorKind, Polygons, Selection, SelectionCounts, Topology, Vec3,
 };
 
 /// A unit quad (0 1 2 3) and a triangle (1 4 2) sharing the edge 1–2, and
@@ -154,12 +154,12 @@ fn bounds_hold_the_touched_points() {
     let triangle = on(&p, Class::Primitive, &[1]);
     assert_eq!(
         triangle.bounds(&p),
-        Some([[1.0, 0.0, 0.0], [2.0, 1.0, 0.0]])
+        Bounds::of([Vec3::X, Vec3::new(2.0, 1.0, 0.0)])
     );
     let polyline_end = on(&p, Class::Vertex, &[9]);
     assert_eq!(
         polyline_end.bounds(&p),
-        Some([[-2.0, 3.0, 1.0], [-2.0, 3.0, 1.0]])
+        Some(Bounds::point(Vec3::new(-2.0, 3.0, 1.0)))
     );
     assert_eq!(Selection::none(Class::Point).bounds(&p), None);
     let stale = Selection::new(Class::Point, vec![0], None, Some([7; 32])).unwrap();

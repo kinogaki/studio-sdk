@@ -2,13 +2,13 @@
 //! alone builds (a box, a closed cylinder with no seam, a cone with its
 //! apex a pole edge, a whole sphere with no loops, a trimmed NURBS patch),
 //! and one value holding all of them with every part the type has.
-use kinogaki_geometry::Frame;
 use kinogaki_geometry::brep::{
     Brep, BrepBuilder, Circle, Circle2, CoedgeSpec, Cone, Curve, CurveId, Cylinder, Datum,
     DatumHint, DatumKind, EdgeId, EdgeSpec, FaceSpec, Line, Line2, Name, NurbsCurve, NurbsSurface,
-    OperationId, PCurve, PCurveId, Placement, Plane, Sense, Sphere, Surface, SurfaceId, VertexId,
+    OperationId, PCurve, PCurveId, Plane, Sense, Sphere, Surface, SurfaceId, VertexId,
 };
 use kinogaki_geometry::{Attribute, Attributes, Basis, Class, Column, Curves, Text, TypeInfo};
+use kinogaki_geometry::{Frame, Vec3, Xform};
 use std::f64::consts::TAU;
 use std::sync::Arc;
 
@@ -38,13 +38,8 @@ pub(super) fn breps() -> Vec<(String, Brep)> {
 /// Detail attributes.
 fn every_part() -> Brep {
     let mut b = cuboid([0.0; 3], [1.0; 3]);
-    let up = Placement::new([
-        [1.0, 0.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 3.0],
-    ])
-    .expect("a rigid placement");
-    b.placement(Placement::IDENTITY, vec![up]);
+    let up = Xform::translation(Vec3::new(0.0, 0.0, 3.0));
+    b.placement(Xform::IDENTITY, vec![up]);
     let attributes = Attributes::new()
         .with(Class::Object, "cad:output_by", Attribute::integer(vec![7]))
         .and_then(|a| a.with(Class::Instance, "instance", Attribute::integer(vec![0, 1])))
@@ -67,7 +62,7 @@ fn every_part() -> Brep {
     .build()
     .expect("a free curve");
     let hint = DatumHint {
-        center: [0.0; 3],
+        center: [0.0; 3].into(),
         size: 1.0,
     };
     let by = OperationId(42);
@@ -82,16 +77,16 @@ fn every_part() -> Brep {
         Datum {
             name: piece.clone(),
             kind: DatumKind::Axis {
-                origin: [0.0; 3],
-                direction: [0.0, 0.0, 1.0],
+                origin: [0.0; 3].into(),
+                direction: [0.0, 0.0, 1.0].into(),
             },
             hint,
         },
         Datum {
             name: Name::merged(&[piece, face]),
-            kind: DatumKind::Point([1.0, 2.0, 3.0]),
+            kind: DatumKind::Point([1.0, 2.0, 3.0].into()),
             hint: DatumHint {
-                center: [1.0, 2.0, 3.0],
+                center: [1.0, 2.0, 3.0].into(),
                 size: 0.0,
             },
         },
@@ -164,7 +159,7 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]]) -> BrepBuilder {
     let mut names = 0..;
     let vertices: Vec<VertexId> = points
         .iter()
-        .map(|&p| b.vertex(p, None, name(names.next().unwrap())))
+        .map(|&p| b.vertex(p.into(), None, name(names.next().unwrap())))
         .collect();
     let mut edges: Vec<((usize, usize), EdgeId, CurveId)> = Vec::new();
     let mut ids = Vec::new();
@@ -172,7 +167,7 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]]) -> BrepBuilder {
         let (a, bb, c) = (points[corners[0]], points[corners[1]], points[corners[2]]);
         let z = unit(cross(sub(bb, a), sub(c, a)));
         let x = unit(sub(bb, a));
-        let frame = Frame::new(a, x, cross(z, x), z).unwrap();
+        let frame = Frame::new(a.into(), x.into(), cross(z, x).into(), z.into()).unwrap();
         let plane = b.surface(Surface::Plane(Plane::new(frame)));
         let chart = |p: [f64; 3]| [dot(sub(p, a), x), dot(sub(p, a), cross(z, x))];
         let mut loop_ = Vec::new();
@@ -185,7 +180,9 @@ fn polyhedron(points: &[[f64; 3]], faces: &[&[usize]]) -> BrepBuilder {
                 .map(|&(_, e, c)| (e, c));
             let (e, _) = found.unwrap_or_else(|| {
                 let (from, to) = (points[key.0], points[key.1]);
-                let curve = b.curve(Curve::Line(Line::new(from, unit(sub(to, from))).unwrap()));
+                let curve = b.curve(Curve::Line(
+                    Line::new(from.into(), unit(sub(to, from)).into()).unwrap(),
+                ));
                 let length = dot(sub(to, from), sub(to, from)).sqrt();
                 let e = b.edge(
                     edge(curve, [0.0, length], [vertices[key.0], vertices[key.1]]),
@@ -244,10 +241,10 @@ fn cuboid(lo: [f64; 3], hi: [f64; 3]) -> BrepBuilder {
 fn cylinder(radius: f64, height: f64) -> BrepBuilder {
     let mut b = BrepBuilder::new(name(2000), P);
     let raised = Frame::new(
-        [0.0, 0.0, height],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
+        Vec3::from([0.0, 0.0, height]),
+        Vec3::from([1.0, 0.0, 0.0]),
+        Vec3::from([0.0, 1.0, 0.0]),
+        Vec3::from([0.0, 0.0, 1.0]),
     );
     let raised = raised.unwrap();
     let side = b.surface(Surface::Cylinder(
@@ -257,7 +254,7 @@ fn cylinder(radius: f64, height: f64) -> BrepBuilder {
     let top = b.surface(Surface::Plane(Plane::new(raised)));
     let rims =
         [Frame::WORLD, raised].map(|f| b.curve(Curve::Circle(Circle::new(f, radius).unwrap())));
-    let v = [0.0, height].map(|z| b.vertex([radius, 0.0, z], None, name(z as u32)));
+    let v = [0.0, height].map(|z| b.vertex(Vec3::from([radius, 0.0, z]), None, name(z as u32)));
     let e = [0, 1].map(|k| b.edge(edge(rims[k], [0.0, TAU], [v[k], v[k]]), name(10 + k as u32)));
     let along =
         [0.0, height].map(|h| b.pcurve(PCurve::Line(Line2::new([0.0, h], [1.0, 0.0]).unwrap())));
@@ -292,10 +289,10 @@ fn cone(half_angle: f64, height: f64) -> BrepBuilder {
     let mut b = BrepBuilder::new(name(3000), P);
     let radius = height * half_angle.tan();
     let raised = Frame::new(
-        [0.0, 0.0, height],
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
+        Vec3::from([0.0, 0.0, height]),
+        Vec3::from([1.0, 0.0, 0.0]),
+        Vec3::from([0.0, 1.0, 0.0]),
+        Vec3::from([0.0, 0.0, 1.0]),
     );
     let raised = raised.unwrap();
     let side = b.surface(Surface::Cone(
@@ -303,8 +300,8 @@ fn cone(half_angle: f64, height: f64) -> BrepBuilder {
     ));
     let top = b.surface(Surface::Plane(Plane::new(raised)));
     let rim = b.curve(Curve::Circle(Circle::new(raised, radius).unwrap()));
-    let apex = b.vertex([0.0; 3], None, name(0));
-    let v = b.vertex([radius, 0.0, height], None, name(1));
+    let apex = b.vertex(Vec3::from([0.0; 3]), None, name(0));
+    let v = b.vertex(Vec3::from([radius, 0.0, height]), None, name(1));
     let pole = b.edge(
         EdgeSpec {
             curve: None,

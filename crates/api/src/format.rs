@@ -21,8 +21,8 @@ use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::error::Error;
 use crate::id::{DataTypeId, FormatId};
-use crate::math::{Affine3, Units};
 use crate::params::{Parameters, Schema, Value};
+use kinogaki_geometry::{Rate, Units, Xform};
 use kinogaki_render_api::ColorService;
 use std::any::Any;
 use std::path::Path;
@@ -43,7 +43,7 @@ pub struct FileItem {
     /// the top.
     pub parent: Option<usize>,
     /// Its placement relative to its parent.
-    pub placement: Affine3,
+    pub placement: Xform,
     /// Whether it shows (a hidden prim's object starts hidden).
     pub visible: bool,
     /// Its value; `None` for a group, which only holds other items.
@@ -56,7 +56,7 @@ impl FileItem {
         Self {
             name: name.into(),
             parent: None,
-            placement: Affine3::IDENTITY,
+            placement: Xform::IDENTITY,
             visible: true,
             data: Some(data),
         }
@@ -321,7 +321,7 @@ impl<'a> Writing<'a> {
 /// frame to frame.
 pub trait Frames: Sync {
     /// Frames a second.
-    fn fps(&self) -> f64;
+    fn rate(&self) -> Rate;
     /// How many frames.
     fn len(&self) -> usize;
     /// Whether it holds no frame.
@@ -334,7 +334,7 @@ pub trait Frames: Sync {
 mod tests {
     use super::*;
     use crate::element::MemoryElement;
-    use crate::math::UpAxis;
+    use kinogaki_geometry::UpAxis;
     use kinogaki_render_api::color::{ColorService, ViewChoice, ViewTransform};
 
     /// A color service converting nothing (the readings here read no color).
@@ -435,10 +435,7 @@ mod tests {
         let lent: [&(dyn Any + Send + Sync); 1] = [&tolerance];
         let stop = CancelToken::default();
         stop.cancel();
-        let units = Units {
-            up: UpAxis::Z,
-            meters_per_unit: 0.001,
-        };
+        let units = Units::new(0.001, UpAxis::Z).unwrap();
         let reading = Reading {
             settings: &lent,
             cancel: stop,

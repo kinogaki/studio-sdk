@@ -172,7 +172,7 @@ fn withheld_and_wrong_parameters_fail_by_name() {
     // Without ports each input is its own port; no names, no selection.
     assert_eq!(cx.port(1), 1..2);
     assert!(cx.selection().is_none());
-    assert_eq!((cx.time(), cx.fps()), (Time::ZERO, 24.0));
+    assert_eq!((cx.time(), cx.rate().fps()), (Time::ZERO, 24.0));
     let error = Scale.cook(&mut cx, &[numbers(&[1.0])]).unwrap_err();
     assert!(error.to_string().contains("\"factor\" is not a number"));
     assert!(cx.toggle("missing").is_err());

@@ -1,5 +1,7 @@
 //! Selection, Detail, DisplayQuality and Tolerances: their rules.
-use kinogaki_geometry::{Class, Detail, DisplayQuality, ErrorKind, Selection, Tolerances};
+use kinogaki_geometry::{
+    Class, Detail, DisplayQuality, ErrorKind, Selection, Tolerances, Units, UpAxis,
+};
 
 #[test]
 fn selections_are_sorted_distinct_and_hold_their_active_element() {
@@ -52,38 +54,36 @@ fn tolerances_are_in_their_ranges() {
             d.fit_mm(),
             d.tangent_degrees(),
             d.curvature(),
-            d.millimeters_per_unit()
+            d.units().millimeters_per_unit()
         ),
         (0.01, 0.001, 0.1, 0.005, 1.0)
     );
-    let ok = |p, f, t, k, u| Tolerances::new(p, f, t, k, u).is_ok();
-    assert!(ok(1e-5, 1e-8, 0.001, 1e-4, 1.0) && ok(1.0, 10.0, 5.0, 0.1, 1000.0));
-    let message = |p, f, t, k, u| {
-        Tolerances::new(p, f, t, k, u)
+    let mm = d.units();
+    let ok = |p, f, t, k| Tolerances::new(p, f, t, k, mm).is_ok();
+    assert!(ok(1e-5, 1e-8, 0.001, 1e-4) && ok(1.0, 10.0, 5.0, 0.1));
+    let message = |p, f, t, k| {
+        Tolerances::new(p, f, t, k, mm)
             .unwrap_err()
             .message()
             .to_owned()
     };
     assert_eq!(
-        message(0.01, 0.001, 0.1, 0.005, 0.0),
-        "a model unit must be a finite, positive length"
-    );
-    assert_eq!(
-        message(2e-6, 1e-8, 0.1, 0.005, 1.0),
+        message(2e-6, 1e-8, 0.1, 0.005),
         "the positional tolerance must be between 0.00001 mm and 1 mm"
     );
     assert_eq!(
-        message(0.01, 0.2, 0.1, 0.005, 1.0),
+        message(0.01, 0.2, 0.1, 0.005),
         "the fit tolerance must be between a thousandth of the positional tolerance and ten times it"
     );
     assert_eq!(
-        message(0.01, 0.001, 6.0, 0.005, 1.0),
+        message(0.01, 0.001, 6.0, 0.005),
         "the tangent tolerance must be between 0.001° and 5°"
     );
     assert_eq!(
-        message(0.01, 0.001, 0.1, 0.5, 1.0),
+        message(0.01, 0.001, 0.1, 0.5),
         "the curvature tolerance must be between 0.01 % and 10 %"
     );
-    let inches = d.with_unit(25.4).unwrap();
+    let inches = d.with_units(Units::new(0.0254, UpAxis::Y).unwrap());
     assert!((inches.fit() - 0.001 / 25.4).abs() < 1e-18 && inches.positional_mm() == 0.01);
+    assert!(Units::new(0.0, UpAxis::Y).is_err() && Units::new(f64::NAN, UpAxis::Z).is_err());
 }

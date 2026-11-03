@@ -9,9 +9,9 @@
 //! parameters of its own on others' types ([`AppliedSchema`], like USD's
 //! API schemas: Pixel's gobo on distant lights and spots).
 
+use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
-use crate::prim::{IDENTITY, Matrix, Motion};
 use crate::settings::{
     SettingDescriptor, SettingGroup, SettingValue, SettingValues, defaults, value,
 };
@@ -78,10 +78,8 @@ pub struct Declared {
     /// Its values, by parameter name. A host sends every parameter the
     /// engine declares for the type; one missing takes its default.
     pub values: SettingValues,
-    /// Prim to world (unused by atmospheres).
-    pub transform: Matrix,
-    /// Prim to world across the shutter.
-    pub motion: Motion<Matrix>,
+    /// Prim to world across the shutter (unused by atmospheres).
+    pub xform: Sampled<Xform>,
     /// Whether the camera sees it itself (a light lights the scene either
     /// way).
     pub visible: bool,
@@ -93,8 +91,7 @@ impl Declared {
         Declared {
             type_id: Arc::from(type_id),
             values,
-            transform: IDENTITY,
-            motion: Motion::none(),
+            xform: Sampled::still(Xform::IDENTITY),
             visible: true,
         }
     }

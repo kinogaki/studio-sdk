@@ -5,6 +5,7 @@
 //! [`MotionMask`], with patches only for the faces that stretch between moved
 //! and fixed points.
 use crate::Vertex;
+use kinogaki_geometry::{Vec3, Xform};
 use std::sync::Arc;
 
 /// Values replacing `start..start + values.len()` of a column.
@@ -54,8 +55,8 @@ impl MotionMask {
 /// A rigid move of the points flagged in `mask`.
 #[derive(Clone, Debug)]
 pub struct PartMotion {
-    /// The move, column-major.
-    pub matrix: [[f64; 4]; 4],
+    /// The move.
+    pub xform: Xform,
     /// Which points it moves.
     pub mask: Arc<MotionMask>,
 }
@@ -123,15 +124,15 @@ impl PointWeights {
 #[derive(Clone, Debug)]
 pub struct WeightedMotion {
     /// Translation at full weight.
-    pub translate: [f64; 3],
+    pub translate: Vec3,
     /// Rotation axis, unit length.
-    pub axis: [f64; 3],
+    pub axis: Vec3,
     /// Rotation angle at full weight, radians.
     pub angle: f64,
     /// Scale at full weight, per axis of `frame`.
-    pub scale: [f64; 3],
+    pub scale: Vec3,
     /// The rotation and scale pivot.
-    pub pivot: [f64; 3],
+    pub pivot: Vec3,
     /// The frame the scale acts in (identity: the mesh's own axes).
     pub frame: [f64; 4],
     /// Mirrored points' plane: axis index and position along it.
@@ -146,7 +147,7 @@ pub struct PreviewUpdate {
     /// The topology it patches ([`SurfaceSource::topology_key`](crate::SurfaceSource::topology_key)).
     pub on: [u8; 32],
     /// Whole-surface transform, when the preview moves everything rigidly.
-    pub affine: Option<[[f64; 4]; 4]>,
+    pub affine: Option<Xform>,
     /// A rigid move of part of the surface; positions are then never patched.
     pub motion: Option<PartMotion>,
     /// A weighted (soft or symmetric) move; positions are then never patched.

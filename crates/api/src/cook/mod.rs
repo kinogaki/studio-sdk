@@ -17,17 +17,17 @@
 mod binding;
 mod context;
 mod description;
-mod frame;
 mod handle;
 mod incremental;
+mod placement;
 mod sheet;
 
 pub use binding::{Scalar, Vector};
 pub use context::CookCx;
 pub use description::{Category, Description, Listing, NodeRole, Port, Ports};
-pub use frame::Frame;
 pub use handle::{Constraint, Handle, HandleKind, Space};
 pub use incremental::{CookPlan, Incremental, Prepared};
+pub use placement::Placement;
 pub use sheet::{NewCx, PortsCx, RowsFor, SchemaCx};
 
 /// The prefix of the names a node's spares take ([`NodeType::spares`]): no
@@ -107,7 +107,7 @@ pub enum Resolved {
 #[derive(Clone, Copy, Debug)]
 pub struct Project<'a> {
     /// The project's units.
-    pub units: crate::math::Units,
+    pub units: kinogaki_geometry::Units,
     /// The host's color management, in the project's working space (a
     /// cook reading it cooks again when its revision moves).
     pub colors: &'a dyn kinogaki_render_api::ColorService,

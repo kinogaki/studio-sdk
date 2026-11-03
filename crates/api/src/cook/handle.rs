@@ -1,10 +1,11 @@
 //! [`Handle`]: a viewport handle a node type binds to its parameters.
 use super::binding::{Scalar, Vector};
-use super::frame::Frame;
+use super::placement::Placement;
 use crate::params::{ParameterKind, Parameters, Schema, Value};
+use kinogaki_geometry::Vec3;
 
 /// What a handle edits, and so how it looks and drags. Places and
-/// directions are in the handle's [`Frame`] when it has one, otherwise in
+/// directions are in the handle's [`Placement`] when it has one, otherwise in
 /// its [`Space`]; angles are in degrees. A shape's `center` names the
 /// point of it the handle's [`Handle::anchor`] says (its middle unless
 /// anchored).
@@ -92,14 +93,14 @@ pub enum HandleKind {
         /// Its diameters along x, y and z.
         size: Vector,
     },
-    /// The Rotate gizmo's rings at `frame`'s origin, along its axes: a
-    /// ring turns the frame about its axis, writing its up and turn
-    /// ([`Frame::orient`]), as Maya's rotate manipulator turns an object.
-    /// The frame is placed in the handle's [`Space`]; [`Handle::frame`]
+    /// The Rotate gizmo's rings at `placement`'s origin, along its axes: a
+    /// ring turns the placement about its axis, writing its up and turn
+    /// ([`Placement::orient`]), as Maya's rotate manipulator turns an object.
+    /// The placement is placed in the handle's [`Space`]; [`Handle::placement`]
     /// does not move it. With a fixed turn, the Y ring is not there.
     Orient {
-        /// The frame it turns.
-        frame: Frame,
+        /// The placement it turns.
+        placement: Placement,
     },
     /// A ring on the cone of half-angle `angle` (degrees) about `axis`
     /// from `origin`, `length` along it, with a dot on it: dragging the dot
@@ -170,7 +171,7 @@ impl HandleKind {
             Self::Radius { center, .. } => vec![center],
             Self::Direction { direction, origin } => vec![direction, origin],
             Self::Box { center, size } | Self::Sphere { center, size } => vec![center, size],
-            Self::Orient { frame } => vec![&frame.position, &frame.up],
+            Self::Orient { placement } => vec![&placement.position, &placement.up],
             Self::Angle { origin, axis, .. } => vec![origin, axis],
             Self::Turn {
                 center,
@@ -243,9 +244,9 @@ pub enum Constraint {
 /// The other kinds are dots and rings on the shape they edit, shown
 /// whatever the tool.
 ///
-/// A handle in a [`Frame`] ([`Handle::frame`]) has its places, directions
-/// and constraint axes in that frame: a primitive placed by Position, Up
-/// and Turn binds its size handles in its own frame, so they sit on it
+/// A handle in a [`Placement`] ([`Handle::placement`]) has its places, directions
+/// and constraint axes in that placement: a primitive placed by Position, Up
+/// and Turn binds its size handles in its own placement, so they sit on it
 /// however it is placed. Its [`Handle::anchor`] says which point of a
 /// shape its center names: a box built upward from its base is anchored
 /// at the base.
@@ -262,7 +263,7 @@ pub enum Constraint {
 ///
 /// ```
 /// use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
-/// use kinogaki_studio_api::Value;
+/// use kinogaki_studio_api::{Value, Vec3};
 /// let bounds = Handle::new(
 ///    "bounds",
 ///    HandleKind::Box {
@@ -276,18 +277,18 @@ pub enum Constraint {
 /// assert!(!bounds.shown(&values));
 /// assert_eq!(bounds.parameters(), ["center_x", "center_y", "center_z", "size"]);
 ///
-/// // A box built up from its base, in the frame of its placement.
-/// use kinogaki_studio_api::cook::Frame;
-/// let placed = Frame::new(Vector::parameter("position"), Vector::parameter("up"), "turn");
+/// // A box built up from its base, in its placement.
+/// use kinogaki_studio_api::cook::Placement;
+/// let placed = Placement::new(Vector::parameter("position"), Vector::parameter("up"), "turn");
 /// let size = Handle::new(
 ///    "size",
 ///    HandleKind::Box {
-///        center: Vector::fixed([0.0; 3]),
+///        center: Vector::fixed(Vec3::ZERO),
 ///        size: Vector::components("width", "height", "depth"),
 ///    },
 /// )
-/// .frame(placed)
-/// .anchor([0.0, -1.0, 0.0]);
+/// .placement(placed)
+/// .anchor(-Vec3::Y);
 /// assert_eq!(
 ///     size.parameters(),
 ///     ["width", "height", "depth", "position", "up", "turn"]
@@ -299,19 +300,19 @@ pub struct Handle {
     pub kind: HandleKind,
     /// What it is called in its drag's undo step ("Move bounds").
     pub label: String,
-    /// The space its places are in (and its frame's, if it has one).
+    /// The space its places are in (and its placement's, if it has one).
     pub space: Space,
-    /// The frame its places, directions and constraint axes are in,
+    /// The placement its places, directions and constraint axes are in,
     /// placed in its space; `None`: the space's own axes. Dragging never
-    /// writes the frame's parameters (an [`HandleKind::Orient`] turns its
-    /// own frame).
-    pub frame: Option<Frame>,
+    /// writes the placement's parameters (an [`HandleKind::Orient`] turns its
+    /// own placement).
+    pub placement: Option<Placement>,
     /// Which point of a [`HandleKind::Box`], [`HandleKind::Sphere`] or
     /// [`HandleKind::Radius`] its `center` names, in half sizes (radii)
     /// from the shape's middle along each axis: `[0, 0, 0]` the middle,
     /// `[0, -1, 0]` the bottom. The middle is `center − anchor × half
     /// size`. Other kinds ignore it.
-    pub anchor: [f64; 3],
+    pub anchor: Vec3,
     /// Which moves it keeps.
     pub constraint: Constraint,
     /// The smallest and largest value it writes to a number (a distance,
@@ -323,15 +324,15 @@ pub struct Handle {
 }
 
 impl Handle {
-    /// A `kind` handle called `label`, in object space with no frame,
+    /// A `kind` handle called `label`, in object space with no placement,
     /// anchored at its middle, free, shown always.
     pub fn new(label: impl Into<String>, kind: HandleKind) -> Self {
         Self {
             kind,
             label: label.into(),
             space: Space::Object,
-            frame: None,
-            anchor: [0.0; 3],
+            placement: None,
+            anchor: Vec3::ZERO,
             constraint: Constraint::Free,
             range: None,
             when: Vec::new(),
@@ -344,14 +345,14 @@ impl Handle {
         self
     }
 
-    /// In `frame`.
-    pub fn frame(mut self, frame: Frame) -> Self {
-        self.frame = Some(frame);
+    /// In `placement`.
+    pub fn placement(mut self, placement: Placement) -> Self {
+        self.placement = Some(placement);
         self
     }
 
     /// With its center naming point `anchor` of its shape.
-    pub fn anchor(mut self, anchor: [f64; 3]) -> Self {
+    pub fn anchor(mut self, anchor: Vec3) -> Self {
         self.anchor = anchor;
         self
     }
@@ -388,7 +389,7 @@ impl Handle {
             .all(|(name, value)| parameters.get(name) == Some(value))
     }
 
-    /// The parameters it reads and writes, in order, then its frame's.
+    /// The parameters it reads and writes, in order, then its placement's.
     pub fn parameters(&self) -> Vec<&str> {
         self.bindings()
             .into_iter()
@@ -441,10 +442,10 @@ impl Handle {
     /// What it binds, in the order [`Handle::parameters`] lists.
     fn bindings(&self) -> Vec<Binding<'_>> {
         let turn = match &self.kind {
-            HandleKind::Orient { frame } => Some(&frame.turn),
+            HandleKind::Orient { placement } => Some(&placement.turn),
             _ => None,
         };
-        let frame = self.frame.iter().flat_map(|f| {
+        let placement = self.placement.iter().flat_map(|f| {
             [
                 Binding::Vector(&f.position),
                 Binding::Vector(&f.up),
@@ -454,7 +455,7 @@ impl Handle {
         (self.kind.numbers().into_iter().map(Binding::Number))
             .chain(self.kind.vectors().into_iter().map(Binding::Vector))
             .chain(turn.map(Binding::Number))
-            .chain(frame)
+            .chain(placement)
             .collect()
     }
 }
@@ -480,7 +481,7 @@ mod tests {
             "radius",
             HandleKind::Radius {
                 radius: "radius".into(),
-                center: Vector::fixed([0.0; 3]),
+                center: Vector::fixed(Vec3::ZERO),
             },
         )
         .when("on", true)
@@ -507,8 +508,8 @@ mod tests {
                 angle,
                 HandleKind::Angle {
                     angle: angle.into(),
-                    origin: Vector::fixed([0.0; 3]),
-                    axis: Vector::fixed([0.0, 0.0, -1.0]),
+                    origin: Vector::fixed(Vec3::ZERO),
+                    axis: Vector::fixed([0.0, 0.0, -1.0].into()),
                     length: 1.0,
                     within: within.map(Into::into),
                 },
@@ -529,8 +530,8 @@ mod tests {
             HandleKind::Turn {
                 angle: "angle".into(),
                 center: Vector::parameter("center"),
-                axis: Vector::fixed([0.0, 1.0, 0.0]),
-                reference: Vector::fixed([1.0, 0.0, 0.0]),
+                axis: Vector::fixed([0.0, 1.0, 0.0].into()),
+                reference: Vector::fixed([1.0, 0.0, 0.0].into()),
                 radius: None,
             },
         );
@@ -564,8 +565,8 @@ mod tests {
                 "depth",
                 HandleKind::Distance {
                     distance: number,
-                    origin: Vector::fixed([0.0; 3]),
-                    direction: Vector::fixed([0.0, 0.0, 1.0]),
+                    origin: Vector::fixed(Vec3::ZERO),
+                    direction: Vector::fixed([0.0, 0.0, 1.0].into()),
                 },
             )
         };
@@ -591,11 +592,11 @@ mod tests {
         assert!(pivot.check(&schema).is_err(), "two numbers, not three");
     }
 
-    /// A handle in a frame reads the frame's parameters after its own; an
-    /// Orient reads its frame's position, up and turn.
+    /// A handle in a placement reads the placement's parameters after its own; an
+    /// Orient reads its placement's position, up and turn.
     #[test]
     fn frames_and_anchors_bind_with_the_handle() {
-        let frame = Frame::new(
+        let placement = Placement::new(
             Vector::components("px", "py", "pz"),
             Vector::components("ux", "uy", "uz"),
             "turn",
@@ -607,20 +608,20 @@ mod tests {
                 center: Vector::components(0.0, "height", 0.0),
             },
         )
-        .frame(frame.clone())
-        .anchor([0.0, -1.0, 0.0])
+        .placement(placement.clone())
+        .anchor([0.0, -1.0, 0.0].into())
         .plane(1);
         assert_eq!(
             top.parameters(),
             ["top", "height", "px", "py", "pz", "ux", "uy", "uz", "turn"]
         );
-        assert_eq!(top.anchor, [0.0, -1.0, 0.0]);
-        assert_eq!(top.frame.as_ref(), Some(&frame));
-        let orient = Handle::new("orientation", HandleKind::Orient { frame });
+        assert_eq!(top.anchor, [0.0, -1.0, 0.0].into());
+        assert_eq!(top.placement.as_ref(), Some(&placement));
+        let orient = Handle::new("orientation", HandleKind::Orient { placement });
         assert_eq!(
             orient.parameters(),
             ["px", "py", "pz", "ux", "uy", "uz", "turn"]
         );
-        assert_eq!((orient.frame, orient.anchor), (None, [0.0; 3]));
+        assert_eq!((orient.placement, orient.anchor), (None, Vec3::ZERO));
     }
 }

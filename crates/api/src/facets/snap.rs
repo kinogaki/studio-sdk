@@ -5,7 +5,8 @@
 //! across objects, the handle's axis or plane, and the feedback drawn.
 use crate::components::Components;
 use crate::data::Data;
-use crate::facets::{Drawn, Matrix, WorldRay};
+use crate::facets::Drawn;
+use kinogaki_geometry::{Projective, Ray, Vec3};
 
 /// What a snap may land on, as the user's snap targets say.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -67,13 +68,13 @@ impl SnapKind {
 pub struct SnapQuery<'a> {
     /// The object's space to clip space: the view's projection times the
     /// object's world placement.
-    pub clip_from_object: Matrix,
+    pub clip_from_object: Projective,
     /// The view's size in pixels.
     pub size: [f64; 2],
     /// The pointer in the view, in pixels from its top left.
     pub pointer: [f64; 2],
     /// The pointer's ray, in the object's space.
-    pub ray: WorldRay,
+    pub ray: Ray,
     /// How near the pointer a target must be on screen, in pixels.
     pub radius: f64,
     /// Components the move carries (the edited object's own, in a
@@ -89,12 +90,12 @@ pub struct SnapHit {
     /// What it landed on.
     pub kind: SnapKind,
     /// Where.
-    pub position: [f64; 3],
+    pub position: Vec3,
     /// The surface's shading normal there, unit length, for a hit on a
     /// surface ([`SnapKind::Face`]); `None` for points and edges. A type
     /// answers in the object's space; the host hands a tool's snap
     /// (`ViewCx::snap`) the world's.
-    pub normal: Option<[f64; 3]>,
+    pub normal: Option<Vec3>,
 }
 
 /// How a value is snapped to.
@@ -119,8 +120,8 @@ pub trait Snappable: Send + Sync {
         data: &Data,
         drawn: &Drawn,
         moving: Option<&Components>,
-        to: [f64; 3],
-    ) -> Option<[f64; 3]> {
+        to: Vec3,
+    ) -> Option<Vec3> {
         let _ = (data, drawn, moving, to);
         None
     }

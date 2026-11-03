@@ -107,7 +107,7 @@ fn an_item_is_placed_once_by_default() {
     } = &item;
     assert_eq!(
         (*part, &placements[..], label),
-        (3, &[Mat4::IDENTITY][..], &None)
+        (3, &[Xform::IDENTITY][..], &None)
     );
     assert_eq!(format!("{item:?}"), "Triangles(part 3, 1 × 1, None)");
 }

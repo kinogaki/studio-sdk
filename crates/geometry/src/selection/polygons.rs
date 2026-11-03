@@ -212,21 +212,15 @@ impl Selection {
 
     /// The box around the points the selected elements touch, in `on`'s
     /// space; `None` when it touches none or doesn't belong to `on`.
-    pub fn bounds(&self, on: &Polygons) -> Option<[[f64; 3]; 2]> {
+    pub fn bounds(&self, on: &Polygons) -> Option<crate::Bounds> {
         let mask = self.touched_points(on).ok()?;
         let positions = on.positions();
-        let mut points = mask
-            .iter()
-            .enumerate()
-            .filter(|(_, m)| **m)
-            .map(|(p, _)| positions[p]);
-        let first = points.next()?;
-        Some(points.fold([first, first], |[lo, hi], p| {
-            [
-                [lo[0].min(p[0]), lo[1].min(p[1]), lo[2].min(p[2])],
-                [hi[0].max(p[0]), hi[1].max(p[1]), hi[2].max(p[2])],
-            ]
-        }))
+        crate::Bounds::of(
+            mask.iter()
+                .enumerate()
+                .filter(|(_, m)| **m)
+                .map(|(p, _)| crate::Vec3::from(positions[p])),
+        )
     }
 
     /// The status bar's counts on `on`; all zero when the selection

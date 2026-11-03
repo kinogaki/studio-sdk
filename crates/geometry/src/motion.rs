@@ -13,6 +13,8 @@
 //! on the other side by its mirror image (reflect, transform, reflect
 //! back), and points on the plane by the transform then back onto the
 //! plane, so they never leave it.
+use crate::vec3::Vec3;
+use crate::xform::Xform;
 
 /// A coordinate axis.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -26,12 +28,23 @@ pub enum Axis {
 }
 
 impl Axis {
-    fn index(self) -> usize {
+    /// `v`'s coordinate along it.
+    fn of(self, v: Vec3) -> f64 {
         match self {
-            Axis::X => 0,
-            Axis::Y => 1,
-            Axis::Z => 2,
+            Axis::X => v.x,
+            Axis::Y => v.y,
+            Axis::Z => v.z,
         }
+    }
+
+    /// `v` with its coordinate along it set to `c`.
+    fn set(self, mut v: Vec3, c: f64) -> Vec3 {
+        match self {
+            Axis::X => v.x = c,
+            Axis::Y => v.y = c,
+            Axis::Z => v.z = c,
+        }
+        v
     }
 }
 
@@ -90,8 +103,8 @@ impl Mirror {
     }
 
     /// The side `p` lies on.
-    pub fn side(&self, p: [f64; 3]) -> Side {
-        let d = p[self.axis.index()] - self.offset;
+    pub fn side(&self, p: Vec3) -> Side {
+        let d = self.axis.of(p) - self.offset;
         if d.abs() <= self.tolerance {
             Side::On
         } else if d > 0.0 {
@@ -102,15 +115,13 @@ impl Mirror {
     }
 
     /// Whether `p` moves by the transform's mirror image.
-    pub fn mirrored(&self, p: [f64; 3]) -> bool {
+    pub fn mirrored(&self, p: Vec3) -> bool {
         let side = self.side(p);
         side != Side::On && self.primary != Side::On && side != self.primary
     }
 
-    fn reflect(&self, mut p: [f64; 3]) -> [f64; 3] {
-        let a = self.axis.index();
-        p[a] = 2.0 * self.offset - p[a];
-        p
+    fn reflect(&self, p: Vec3) -> Vec3 {
+        self.axis.set(p, 2.0 * self.offset - self.axis.of(p))
     }
 }
 
@@ -121,11 +132,11 @@ impl Mirror {
 /// and an angle in `[-π, π]`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WeightedMove {
-    translate: [f64; 3],
-    axis: [f64; 3],
+    translate: Vec3,
+    axis: Vec3,
     angle: f64,
-    scale: [f64; 3],
-    pivot: [f64; 3],
+    scale: Vec3,
+    pivot: Vec3,
     frame: [f64; 4],
     mirror: Option<Mirror>,
 }
@@ -134,14 +145,9 @@ impl WeightedMove {
     /// The move of `translate`, then `rotation` (a quaternion `[x, y, z,
     /// w]`, normalized here) and `scale` about `pivot`; `None` when any
     /// input isn't finite or the rotation is zero.
-    pub fn new(
-        translate: [f64; 3],
-        rotation: [f64; 4],
-        scale: [f64; 3],
-        pivot: [f64; 3],
-    ) -> Option<Self> {
-        let finite = |v: &[f64]| v.iter().all(|c| c.is_finite());
-        if !(finite(&translate) && finite(&rotation) && finite(&scale) && finite(&pivot)) {
+    pub fn new(translate: Vec3, rotation: [f64; 4], scale: Vec3, pivot: Vec3) -> Option<Self> {
+        let finite = rotation.iter().all(|c| c.is_finite());
+        if !(finite && translate.is_finite() && scale.is_finite() && pivot.is_finite()) {
             return None;
         }
         let q = normalized(rotation)?;
@@ -150,9 +156,9 @@ impl WeightedMove {
         let s = (1.0 - q[3] * q[3]).max(0.0).sqrt();
         let angle = 2.0 * q[3].clamp(-1.0, 1.0).acos();
         let (axis, angle) = if s < 1e-15 || angle.abs() < 1e-15 {
-            ([0.0, 0.0, 1.0], 0.0)
+            (Vec3::Z, 0.0)
         } else {
-            ([q[0] / s, q[1] / s, q[2] / s], angle)
+            (Vec3::new(q[0] / s, q[1] / s, q[2] / s), angle)
         };
         Some(Self {
             translate,
@@ -183,12 +189,12 @@ impl WeightedMove {
     }
 
     /// The translation at full weight.
-    pub fn translate(&self) -> [f64; 3] {
+    pub fn translate(&self) -> Vec3 {
         self.translate
     }
 
     /// The unit rotation axis.
-    pub fn axis(&self) -> [f64; 3] {
+    pub fn axis(&self) -> Vec3 {
         self.axis
     }
 
@@ -198,12 +204,12 @@ impl WeightedMove {
     }
 
     /// The scale at full weight, along the frame's axes.
-    pub fn scale(&self) -> [f64; 3] {
+    pub fn scale(&self) -> Vec3 {
         self.scale
     }
 
     /// The rotation and scale pivot.
-    pub fn pivot(&self) -> [f64; 3] {
+    pub fn pivot(&self) -> Vec3 {
         self.pivot
     }
 
@@ -217,79 +223,68 @@ impl WeightedMove {
         self.mirror
     }
 
-    /// The full move as a column-major matrix (weight 1, primary side).
-    pub fn matrix(&self) -> [[f64; 4]; 4] {
-        affine(|p| self.weighted(p, 1.0))
+    /// The full move as a placement (weight 1, primary side).
+    pub fn xform(&self) -> Xform {
+        let origin = self.weighted(Vec3::ZERO, 1.0);
+        let axis = |e: Vec3| self.weighted(e, 1.0) - origin;
+        Xform::from_axes(axis(Vec3::X), axis(Vec3::Y), axis(Vec3::Z), origin)
     }
 
     /// Where point `p` of weight `w` goes: identity at weight 0, and on the
     /// mirrored side the move's image (reflect, move, reflect back); on a
     /// mirror's plane, back onto the plane.
-    pub fn at(&self, p: [f64; 3], w: f64) -> [f64; 3] {
+    pub fn at(&self, p: Vec3, w: f64) -> Vec3 {
         if w <= 0.0 {
             return p;
         }
-        let mut q = self.image(p, w, self.mirrored(p));
-        if let Some(mirror) = self.mirror.filter(|m| m.side(p) == Side::On) {
-            q[mirror.axis.index()] = mirror.offset;
+        let q = self.image(p, w, self.mirrored(p));
+        match self.mirror.filter(|m| m.side(p) == Side::On) {
+            Some(mirror) => mirror.axis.set(q, mirror.offset),
+            None => q,
         }
-        q
     }
 
     /// Whether every point moves rigidly with its side: no scale, or a
     /// uniform one.
     pub fn uniform_scale(&self) -> bool {
         let s = self.scale;
-        (s[0] - s[1]).abs() <= s[0].abs() * 1e-12 && (s[0] - s[2]).abs() <= s[0].abs() * 1e-12
+        (s.x - s.y).abs() <= s.x.abs() * 1e-12 && (s.x - s.z).abs() <= s.x.abs() * 1e-12
     }
 
-    fn mirrored(&self, p: [f64; 3]) -> bool {
+    fn mirrored(&self, p: Vec3) -> bool {
         self.mirror.is_some_and(|m| m.mirrored(p))
     }
 
     /// `q` moved at weight `w` by the move, or by its mirror image.
-    fn image(&self, q: [f64; 3], w: f64, mirrored: bool) -> [f64; 3] {
+    fn image(&self, q: Vec3, w: f64, mirrored: bool) -> Vec3 {
         match self.mirror {
             Some(mirror) if mirrored => mirror.reflect(self.weighted(mirror.reflect(q), w)),
             _ => self.weighted(q, w),
         }
     }
 
-    fn weighted(&self, p: [f64; 3], w: f64) -> [f64; 3] {
-        let scale: [f64; 3] = std::array::from_fn(|i| 1.0 + (self.scale[i] - 1.0) * w);
-        let local = rotate(conjugate(self.frame), sub(p, self.pivot));
-        let scaled = rotate(self.frame, std::array::from_fn(|i| scale[i] * local[i]));
+    fn weighted(&self, p: Vec3, w: f64) -> Vec3 {
+        let s = self.scale;
+        let scale = Vec3::new(
+            1.0 + (s.x - 1.0) * w,
+            1.0 + (s.y - 1.0) * w,
+            1.0 + (s.z - 1.0) * w,
+        );
+        let local = rotate(conjugate(self.frame), p - self.pivot);
+        let stretched = Vec3::new(scale.x * local.x, scale.y * local.y, scale.z * local.z);
+        let scaled = rotate(self.frame, stretched);
         let turned = rotate(axis_angle(self.axis, self.angle * w), scaled);
-        std::array::from_fn(|i| self.pivot[i] + self.translate[i] * w + turned[i])
+        self.pivot + self.translate * w + turned
     }
 }
 
-/// The column-major matrix of the affine map `f`, read from the images of
-/// the origin and the unit axes.
-fn affine(f: impl Fn([f64; 3]) -> [f64; 3]) -> [[f64; 4]; 4] {
-    let origin = f([0.0; 3]);
-    let column = |e: [f64; 3]| {
-        let q = f(e);
-        [q[0] - origin[0], q[1] - origin[1], q[2] - origin[2], 0.0]
-    };
-    [
-        column([1.0, 0.0, 0.0]),
-        column([0.0, 1.0, 0.0]),
-        column([0.0, 0.0, 1.0]),
-        [origin[0], origin[1], origin[2], 1.0],
-    ]
-}
-
-fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    std::array::from_fn(|i| a[i] - b[i])
-}
-
-fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
+/// `a × b`, in this module's order of operations.
+fn cross(a: Vec3, b: Vec3) -> Vec3 {
+    Vec3::new(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x,
+    )
 }
 
 /// `q` of unit length; `None` for a zero quaternion.
@@ -302,82 +297,89 @@ fn conjugate(q: [f64; 4]) -> [f64; 4] {
     [-q[0], -q[1], -q[2], q[3]]
 }
 
-fn axis_angle(axis: [f64; 3], angle: f64) -> [f64; 4] {
+fn axis_angle(axis: Vec3, angle: f64) -> [f64; 4] {
     let (s, c) = (angle * 0.5).sin_cos();
-    [axis[0] * s, axis[1] * s, axis[2] * s, c]
+    [axis.x * s, axis.y * s, axis.z * s, c]
 }
 
 /// `v` turned by the unit quaternion `q`.
-fn rotate(q: [f64; 4], v: [f64; 3]) -> [f64; 3] {
-    let u = [q[0], q[1], q[2]];
-    let t = cross(u, v).map(|c| 2.0 * c);
+fn rotate(q: [f64; 4], v: Vec3) -> Vec3 {
+    let u = Vec3::new(q[0], q[1], q[2]);
+    let t = cross(u, v) * 2.0;
     let ut = cross(u, t);
-    std::array::from_fn(|i| v[i] + q[3] * t[i] + ut[i])
+    v + t * q[3] + ut
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn close(a: [f64; 3], b: [f64; 3]) -> bool {
-        (0..3).all(|i| (a[i] - b[i]).abs() < 1e-12)
+    fn close(a: Vec3, b: Vec3) -> bool {
+        (a - b).length() < 1e-12
     }
 
-    fn apply(m: [[f64; 4]; 4], p: [f64; 3]) -> [f64; 3] {
-        std::array::from_fn(|r| m[0][r] * p[0] + m[1][r] * p[1] + m[2][r] * p[2] + m[3][r])
+    fn v(x: f64, y: f64, z: f64) -> Vec3 {
+        Vec3::new(x, y, z)
     }
+
+    const ONES: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 
     /// A quarter turn about Z.
     fn quarter() -> [f64; 4] {
-        axis_angle([0.0, 0.0, 1.0], std::f64::consts::FRAC_PI_2)
+        axis_angle(Vec3::Z, std::f64::consts::FRAC_PI_2)
     }
 
     #[test]
     fn full_weight_is_the_matrix_and_none_is_still() {
-        let m = WeightedMove::new([1.0, 2.0, 3.0], quarter(), [2.0, 1.0, 1.0], [0.5, 0.0, 0.0])
-            .unwrap();
-        for p in [[0.0; 3], [1.0, 0.0, 0.0], [0.3, -2.0, 4.0]] {
-            assert!(close(m.at(p, 1.0), apply(m.matrix(), p)), "{p:?}");
+        let m = WeightedMove::new(
+            v(1.0, 2.0, 3.0),
+            quarter(),
+            v(2.0, 1.0, 1.0),
+            v(0.5, 0.0, 0.0),
+        )
+        .unwrap();
+        for p in [Vec3::ZERO, Vec3::X, v(0.3, -2.0, 4.0)] {
+            assert!(close(m.at(p, 1.0), m.xform().apply_point(p)), "{p:?}");
             assert_eq!(m.at(p, 0.0), p);
         }
         // A quarter turn about the pivot, then the translation.
-        assert!(close(m.at([1.5, 0.0, 0.0], 1.0), [1.5, 2.0 + 2.0, 3.0]));
+        assert!(close(m.at(v(1.5, 0.0, 0.0), 1.0), v(1.5, 2.0 + 2.0, 3.0)));
     }
 
     #[test]
     fn half_weight_goes_half_way() {
-        let m = WeightedMove::new([2.0, 0.0, 0.0], quarter(), [1.0; 3], [0.0; 3]).unwrap();
+        let m = WeightedMove::new(v(2.0, 0.0, 0.0), quarter(), ONES, Vec3::ZERO).unwrap();
         // Half the translation and an eighth turn.
         let eighth = std::f64::consts::FRAC_PI_4;
-        let q = m.at([1.0, 0.0, 0.0], 0.5);
-        assert!(close(q, [1.0 + eighth.cos(), eighth.sin(), 0.0]));
+        let q = m.at(Vec3::X, 0.5);
+        assert!(close(q, v(1.0 + eighth.cos(), eighth.sin(), 0.0)));
         assert!((m.angle() - std::f64::consts::FRAC_PI_2).abs() < 1e-12);
     }
 
     #[test]
     fn a_rotation_and_its_negation_move_alike() {
         let q = quarter();
-        let a = WeightedMove::new([0.0; 3], q, [1.0; 3], [0.0; 3]).unwrap();
-        let b = WeightedMove::new([0.0; 3], q.map(|c| -c), [1.0; 3], [0.0; 3]).unwrap();
+        let a = WeightedMove::new(Vec3::ZERO, q, ONES, Vec3::ZERO).unwrap();
+        let b = WeightedMove::new(Vec3::ZERO, q.map(|c| -c), ONES, Vec3::ZERO).unwrap();
         assert!(close(
-            a.at([1.0, 2.0, 3.0], 0.3),
-            b.at([1.0, 2.0, 3.0], 0.3)
+            a.at(v(1.0, 2.0, 3.0), 0.3),
+            b.at(v(1.0, 2.0, 3.0), 0.3)
         ));
-        assert!(WeightedMove::new([f64::NAN, 0.0, 0.0], q, [1.0; 3], [0.0; 3]).is_none());
-        assert!(WeightedMove::new([0.0; 3], [0.0; 4], [1.0; 3], [0.0; 3]).is_none());
+        assert!(WeightedMove::new(v(f64::NAN, 0.0, 0.0), q, ONES, Vec3::ZERO).is_none());
+        assert!(WeightedMove::new(Vec3::ZERO, [0.0; 4], ONES, Vec3::ZERO).is_none());
     }
 
     #[test]
     fn mirrored_sides_move_as_images_and_the_plane_holds() {
         let mirror = Mirror::new(Axis::X, 0.0, 1e-6, Side::Positive).unwrap();
-        let m = WeightedMove::new([1.0, 0.5, 0.0], [0.0, 0.0, 0.0, 1.0], [1.0; 3], [0.0; 3])
+        let m = WeightedMove::new(v(1.0, 0.5, 0.0), [0.0, 0.0, 0.0, 1.0], ONES, Vec3::ZERO)
             .unwrap()
             .with_mirror(Some(mirror));
         // The primary side moves by the transform, the other by its image.
-        assert_eq!(m.at([2.0, 0.0, 0.0], 1.0), [3.0, 0.5, 0.0]);
-        assert_eq!(m.at([-2.0, 0.0, 0.0], 1.0), [-3.0, 0.5, 0.0]);
+        assert_eq!(m.at(v(2.0, 0.0, 0.0), 1.0), v(3.0, 0.5, 0.0));
+        assert_eq!(m.at(v(-2.0, 0.0, 0.0), 1.0), v(-3.0, 0.5, 0.0));
         // On the plane: moved, then back onto it.
-        assert_eq!(m.at([0.0, 0.0, 0.0], 1.0), [0.0, 0.5, 0.0]);
+        assert_eq!(m.at(Vec3::ZERO, 1.0), v(0.0, 0.5, 0.0));
         assert!(Mirror::new(Axis::Y, f64::INFINITY, 0.0, Side::On).is_none());
         assert!(Mirror::new(Axis::Y, 0.0, -1.0, Side::On).is_none());
     }
@@ -386,12 +388,17 @@ mod tests {
     fn scale_acts_along_the_frame() {
         // Stretch 2× along the frame's X, the frame turned a quarter about Z:
         // the value's Y.
-        let m = WeightedMove::new([0.0; 3], [0.0, 0.0, 0.0, 1.0], [2.0, 1.0, 1.0], [0.0; 3])
-            .unwrap()
-            .with_frame(quarter())
-            .unwrap();
-        assert!(close(m.at([0.0, 1.0, 0.0], 1.0), [0.0, 2.0, 0.0]));
-        assert!(close(m.at([1.0, 0.0, 0.0], 1.0), [1.0, 0.0, 0.0]));
+        let m = WeightedMove::new(
+            Vec3::ZERO,
+            [0.0, 0.0, 0.0, 1.0],
+            v(2.0, 1.0, 1.0),
+            Vec3::ZERO,
+        )
+        .unwrap()
+        .with_frame(quarter())
+        .unwrap();
+        assert!(close(m.at(Vec3::Y, 1.0), v(0.0, 2.0, 0.0)));
+        assert!(close(m.at(Vec3::X, 1.0), Vec3::X));
         assert!(!m.uniform_scale());
     }
 }

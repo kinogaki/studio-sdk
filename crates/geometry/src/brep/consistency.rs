@@ -6,7 +6,7 @@ use super::geometry::{Geometry, Surface};
 use super::topology::{BrepTopology, Sense};
 use super::{CoedgeId, Entity, SurfaceId};
 use crate::error::GeometryError;
-use crate::vector::{length, sub};
+use crate::vec3::Vec3;
 
 /// The tolerance of a decision involving entities with these precisions:
 /// the body's P, or the largest precision when larger (within P, two
@@ -18,13 +18,13 @@ fn within(tolerance: f64, precisions: &[Option<f64>]) -> f64 {
         .fold(tolerance, |t, &p| t.max(p))
 }
 
-fn apart(a: [f64; 3], b: [f64; 3]) -> f64 {
-    length(sub(a, b))
+fn apart(a: Vec3, b: Vec3) -> f64 {
+    (a - b).length()
 }
 
 /// Whether `a` and `b` are one point at `tolerance` (never, when either
 /// isn't finite).
-fn one_point(a: [f64; 3], b: [f64; 3], tolerance: f64) -> bool {
+fn one_point(a: Vec3, b: Vec3, tolerance: f64) -> bool {
     apart(a, b) <= tolerance
 }
 
@@ -229,10 +229,14 @@ fn closed_rows_meet(surface: &Surface, tolerance: f64) -> bool {
             let rows_meet = |k: usize| {
                 n.closed()[k].is_none()
                     || match k {
-                        0 => (0..nv)
-                            .all(|j| apart(n.point_at(0, j), n.point_at(nu - 1, j)) <= tolerance),
-                        _ => (0..nu)
-                            .all(|i| apart(n.point_at(i, 0), n.point_at(i, nv - 1)) <= tolerance),
+                        0 => (0..nv).all(|j| {
+                            apart(n.point_at(0, j).into(), n.point_at(nu - 1, j).into())
+                                <= tolerance
+                        }),
+                        _ => (0..nu).all(|i| {
+                            apart(n.point_at(i, 0).into(), n.point_at(i, nv - 1).into())
+                                <= tolerance
+                        }),
                     }
             };
             rows_meet(0) && rows_meet(1)

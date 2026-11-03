@@ -7,7 +7,7 @@ use crate::error::Error;
 use crate::id::NodeTypeId;
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
-use crate::time::Time;
+use kinogaki_geometry::Time;
 
 /// A network a package edits through the host, inside one undo step. Each
 /// call refuses what doesn't fit (an unknown node, a wire into a port the

@@ -3,7 +3,7 @@ use crate::cancel::CancelToken;
 use crate::data::Data;
 use crate::error::Error;
 use crate::render::{Detail, RenderItem};
-use crate::time::Time;
+use kinogaki_geometry::Time;
 use kinogaki_geometry::Tolerances;
 use std::any::Any;
 use std::sync::Arc;
@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(cx.tolerances, Tolerances::default());
         let cx = cx.with_detail(fine);
         assert_eq!((cx.detail, cx.time), (fine, Time::ZERO));
-        let inches = Tolerances::default().with_unit(25.4).unwrap();
+        let inches = Tolerances::default().with_units(kinogaki_geometry::Units::METERS);
         let cx = cx.with_tolerances(inches);
         assert_eq!((cx.tolerances, cx.detail), (inches, fine));
     }

@@ -2,7 +2,6 @@
 use super::TransformTool;
 use super::geometry::{GizmoFrame, Handle, MANIPULATOR_CUBE, MANIPULATOR_RING, distance, inside};
 use crate::geom::Pos;
-use crate::vec3::{add, scale};
 
 /// Every axis of a gizmo (the 3D one).
 pub(crate) const ALL_AXES: [bool; 3] = [true; 3];
@@ -115,10 +114,7 @@ fn hit_manipulator(frame: &GizmoFrame, p: Pos) -> Option<Handle> {
 /// The point `fraction` handle lengths out along `axis` (as Studio
 /// computes it: the axis times the length, times the fraction).
 fn along(frame: &GizmoFrame, axis: usize, fraction: f64) -> kinogaki_studio_api::Vec3 {
-    add(
-        frame.center,
-        scale(scale(frame.axes[axis], frame.length), fraction),
-    )
+    frame.center + frame.axes[axis] * frame.length * fraction
 }
 
 #[cfg(test)]
@@ -136,16 +132,13 @@ mod tests {
         for axis in 0..3 {
             let a = frame.axes[axis];
             assert_eq!(
-                hit(&frame, tool, at(scale(a, MANIPULATOR_CUBE))),
+                hit(&frame, tool, at(a * MANIPULATOR_CUBE)),
                 Some(Handle::Stretch(axis))
             );
-            assert_eq!(
-                hit(&frame, tool, at(scale(a, 0.92))),
-                Some(Handle::Axis(axis))
-            );
+            assert_eq!(hit(&frame, tool, at(a * 0.92)), Some(Handle::Axis(axis)));
         }
         // A point on the X ring away from the other rings: (0, cos, sin) · R.
-        let on_x = scale(Vec3::new(0.0, 0.6, 0.8), MANIPULATOR_RING);
+        let on_x = Vec3::new(0.0, 0.6, 0.8) * MANIPULATOR_RING;
         assert_eq!(hit(&frame, tool, at(on_x)), Some(Handle::Ring(0)));
         assert_eq!(
             tool.resolve(Handle::Ring(1)),

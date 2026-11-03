@@ -7,6 +7,7 @@
 //! index points. Columns may be paged, so they are read through callbacks at
 //! column granularity rather than per element.
 use crate::{DrawUpdate, UpdateRanges};
+use kinogaki_geometry::{Bounds, Vec3};
 use std::{
     any::Any,
     collections::BTreeSet,
@@ -234,8 +235,8 @@ impl ColorLayout {
 pub trait SurfaceSource: Any + Send + Sync {
     /// The point the f32 positions are offsets from, in the value's space
     /// (the host folds it into the model): far from the origin, positions
-    /// stay precise. `[0.0; 3]` for a packet of absolute positions.
-    fn origin(&self) -> [f64; 3];
+    /// stay precise. [`Vec3::ZERO`] for a packet of absolute positions.
+    fn origin(&self) -> Vec3;
     /// Number of elements in a column.
     fn column_len(&self, column: Column) -> usize;
     /// Calls `write(bytes_range, bytes)` for consecutive pieces of the
@@ -270,8 +271,8 @@ pub trait SurfaceSource: Any + Send + Sync {
     /// [`indices`](Self::indices) (three indices each): what fills it.
     /// Empty for a face out of range or with no triangles.
     fn face_triangles(&self, face: u32) -> Range<usize>;
-    /// Bounds of the positions, `(min, max)`; none when empty.
-    fn bounds(&self) -> Option<([f64; 3], [f64; 3])>;
+    /// Bounds of the positions; none when empty.
+    fn bounds(&self) -> Option<Bounds>;
     /// Equal keys mean equal connectivity: GPU allocations can be reused.
     fn topology_key(&self) -> [u8; 32];
     /// Exact-parent identity token of this packet.
@@ -346,8 +347,8 @@ mod tests {
     /// An empty packet; `N` makes distinct types of one shape.
     struct Empty<const N: u8>(Arc<()>);
     impl<const N: u8> SurfaceSource for Empty<N> {
-        fn origin(&self) -> [f64; 3] {
-            [0.0; 3]
+        fn origin(&self) -> Vec3 {
+            Vec3::ZERO
         }
         fn face_triangles(&self, _: u32) -> Range<usize> {
             0..0
@@ -372,7 +373,7 @@ mod tests {
         fn face_count(&self) -> usize {
             0
         }
-        fn bounds(&self) -> Option<([f64; 3], [f64; 3])> {
+        fn bounds(&self) -> Option<Bounds> {
             None
         }
         fn topology_key(&self) -> [u8; 32] {
