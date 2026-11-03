@@ -1,9 +1,10 @@
 //! [`MemoryElement`]: the element traits over a plain in-memory tree, for
-//! package tests (a codec's round trip without Studio).
+//! package tests (a codec's round trip without Studio). Its reads are as
+//! strict as Studio's: what a read leaves unread is refused.
 use super::{ElementReader, ElementWriter, Field, FieldRef, ReadShared, SharedValue, check_name};
 use crate::error::Error;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The metadata key a reference to a shared child is kept under (never an
 /// [`is_name`](super::is_name), so no codec's key can collide with it).
@@ -51,16 +52,28 @@ impl MemoryElement {
     }
 
     /// Runs `read` with a reader of this element, as one load (each shared
-    /// value is read once).
-    pub fn read<R>(&self, read: impl FnOnce(&dyn ElementReader) -> R) -> R {
+    /// value is read once), strictly as Studio reads a project: a field,
+    /// metadata entry or child below this element that `read` didn't read
+    /// is an error naming it, as anything missing is.
+    pub fn read<R>(
+        &self,
+        read: impl FnOnce(&dyn ElementReader) -> Result<R, Error>,
+    ) -> Result<R, Error> {
         let cache = RefCell::new(BTreeMap::new());
+        let taken = RefCell::new(BTreeMap::new());
         let reader = Reader {
             root: self,
             element: self,
             path: String::new(),
             cache: &cache,
+            taken: &taken,
         };
-        read(&reader)
+        reader.visit();
+        let value = read(&reader)?;
+        match leftover(self, &taken.borrow(), &cache.borrow()) {
+            Some(left) => Err(Error::invalid(left)),
+            None => Ok(value),
+        }
     }
 
     /// The element's kind.
@@ -158,6 +171,13 @@ impl ElementWriter for Writer<'_> {
     }
 }
 
+/// What a read took of one element: its fields and metadata keys.
+#[derive(Default)]
+struct Taken {
+    fields: BTreeSet<String>,
+    metadata: BTreeSet<String>,
+}
+
 /// Reads one [`MemoryElement`].
 struct Reader<'a> {
     root: &'a MemoryElement,
@@ -165,17 +185,67 @@ struct Reader<'a> {
     path: String,
     /// Shared values read in this load, by path.
     cache: &'a RefCell<BTreeMap<String, SharedValue>>,
+    /// What was read of each element visited, by path.
+    taken: &'a RefCell<BTreeMap<String, Taken>>,
 }
 
 impl<'a> Reader<'a> {
     fn at(&self, element: &'a MemoryElement, path: String) -> Reader<'a> {
-        Reader {
+        let reader = Reader {
             root: self.root,
             element,
             path,
             cache: self.cache,
+            taken: self.taken,
+        };
+        reader.visit();
+        reader
+    }
+
+    fn visit(&self) {
+        self.taken
+            .borrow_mut()
+            .entry(self.path.clone())
+            .or_default();
+    }
+
+    fn take(&self, mark: impl FnOnce(&mut Taken)) {
+        mark(
+            self.taken
+                .borrow_mut()
+                .entry(self.path.clone())
+                .or_default(),
+        );
+    }
+}
+
+/// The first thing of an element below `root` a read visited that it
+/// didn't take, as `<element>: <what>` (Studio's rule and wording); a
+/// child already read as a shared value counts as taken.
+fn leftover(
+    root: &MemoryElement,
+    taken: &BTreeMap<String, Taken>,
+    shared: &BTreeMap<String, SharedValue>,
+) -> Option<String> {
+    for (path, marks) in taken {
+        let Some(e) = root.at(path) else {
+            continue;
+        };
+        let at = if path.is_empty() { "/" } else { path };
+        if let Some(name) = e.fields.keys().find(|n| !marks.fields.contains(*n)) {
+            return Some(format!("{at}: unknown field {name:?}"));
+        }
+        if let Some(key) = e.metadata.keys().find(|k| !marks.metadata.contains(*k)) {
+            return Some(format!("{at}: unknown metadata {key:?}"));
+        }
+        for (name, child) in &e.children {
+            let below = format!("{path}/{name}");
+            if !taken.contains_key(&below) && !shared.contains_key(&below) {
+                return Some(format!("{at}: unknown element {:?} {name:?}", child.kind));
+            }
         }
     }
+    None
 }
 
 impl ElementReader for Reader<'_> {
@@ -184,7 +254,9 @@ impl ElementReader for Reader<'_> {
     }
 
     fn field(&self, name: &str) -> Option<FieldRef<'_>> {
-        self.element.fields.get(name).map(Field::as_ref)
+        let field = self.element.fields.get(name)?;
+        self.take(|t| _ = t.fields.insert(name.to_owned()));
+        Some(field.as_ref())
     }
 
     fn fields(&self) -> Vec<String> {
@@ -192,7 +264,9 @@ impl ElementReader for Reader<'_> {
     }
 
     fn metadata(&self, key: &str) -> Option<&str> {
-        self.element.metadata.get(key).map(String::as_str)
+        let value = self.element.metadata.get(key)?;
+        self.take(|t| _ = t.metadata.insert(key.to_owned()));
+        Some(value)
     }
 
     fn children(&self) -> Vec<String> {
@@ -209,8 +283,8 @@ impl ElementReader for Reader<'_> {
     }
 
     fn shared_any(&self, name: &str, read: &mut ReadShared<'_>) -> Result<SharedValue, Error> {
-        let path = match self.element.metadata.get(&format!("{SHARED}{name}")) {
-            Some(at) => at.clone(),
+        let path = match self.metadata(&format!("{SHARED}{name}")) {
+            Some(at) => at.to_owned(),
             None => format!("{}/{name}", self.path),
         };
         if let Some(value) = self.cache.borrow().get(&path) {
@@ -260,7 +334,27 @@ mod tests {
             // Strict: a missing or mistyped field names itself.
             assert!(r.text("points").unwrap_err().to_string().contains("points"));
             assert!(r.int("nothing").is_err() && r.child("nothing").is_none());
-        });
+            Ok(())
+        })
+        .unwrap();
+        // Strict: what a read leaves unread is refused, named.
+        let left = |read: fn(&dyn ElementReader) -> Result<(), Error>| {
+            root.read(read).unwrap_err().to_string()
+        };
+        assert!(left(|_| Ok(())).contains("/: unknown field \"points\""));
+        let no_metadata = |r: &dyn ElementReader| r.f64s("points").map(drop);
+        assert!(left(no_metadata).contains("/: unknown metadata \"source\""));
+        fn no_child(r: &dyn ElementReader) -> Result<(), Error> {
+            r.f64s("points")?;
+            r.metadata("source");
+            Ok(())
+        }
+        assert!(left(no_child).contains("/: unknown element \"group\" \"part\""));
+        let no_name = |r: &dyn ElementReader| {
+            no_child(r)?;
+            r.required_child("part").map(drop)
+        };
+        assert!(left(no_name).contains("/part: unknown field \"name\""));
     }
 
     #[test]
@@ -293,16 +387,18 @@ mod tests {
         .unwrap();
         assert_eq!(writes, 1);
         let mut reads = 0;
-        let (a, b) = root.read(|r| {
-            let mut read = |name: &str| {
-                let holder = r.required_child(name)?;
-                holder.read_shared("mesh", |m| {
-                    reads += 1;
-                    m.int("count")
-                })
-            };
-            (read("a").unwrap(), read("b").unwrap())
-        });
+        let (a, b) = root
+            .read(|r| {
+                let mut read = |name: &str| {
+                    let holder = r.required_child(name)?;
+                    holder.read_shared("mesh", |m| {
+                        reads += 1;
+                        m.int("count")
+                    })
+                };
+                Ok((read("a")?, read("b")?))
+            })
+            .unwrap();
         assert!(Arc::ptr_eq(&a, &b) && *a == 4 && reads == 1);
     }
 }

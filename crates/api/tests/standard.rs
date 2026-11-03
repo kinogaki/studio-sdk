@@ -69,14 +69,16 @@ fn values_sharing_a_topology_share_it_once_read() {
             PolygonsCodec.write(&b, None, &mut *w.child("b", "result")?)
         })
         .unwrap();
-    let (ra, rb) = saved.read(|r| {
-        let read = |n| {
-            PolygonsCodec
-                .read(&*r.required_child(n).unwrap(), None)
-                .unwrap()
-        };
-        (read("a"), read("b"))
-    });
+    let (ra, rb) = saved
+        .read(|r| {
+            let read = |n| {
+                PolygonsCodec
+                    .read(&*r.required_child(n).unwrap(), None)
+                    .unwrap()
+            };
+            Ok((read("a"), read("b")))
+        })
+        .unwrap();
     let (ra, rb) = (
         standard::polygons().get(&ra).unwrap(),
         standard::polygons().get(&rb).unwrap(),

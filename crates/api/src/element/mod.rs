@@ -21,9 +21,10 @@
 //!
 //! **Strictness.** Readers fail on anything missing or of the wrong type,
 //! naming the field and the element ([`ElementReader::location`]); there
-//! are no defaults for missing values and no version fields. Studio also
-//! refuses what a codec's read leaves unread (a field, metadata, a child),
-//! so a codec writes only what it reads back.
+//! are no defaults for missing values and no version fields. Studio and
+//! [`MemoryElement`] also refuse what a codec's read leaves unread (a
+//! field, metadata, a child), so a codec writes only what it reads back,
+//! and a package's round-trip test finds one that doesn't.
 mod memory;
 
 pub use memory::MemoryElement;
