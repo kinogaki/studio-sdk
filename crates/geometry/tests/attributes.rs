@@ -118,7 +118,6 @@ fn tuples_adopt_without_copying_and_read_back_typed() {
     assert!(n.as_tuples::<[f64; 3]>().is_none());
     assert!(n.as_tuples::<[f32; 4]>().is_none());
     assert!(n.as_tuples::<f32>().is_none());
-    assert!(n.as_text().is_none());
     // Every width a tuple has: matrices and quaternions included.
     let m = Attribute::tuples(vec![[1.0f64; 16]; 2], Meaning::Transform).unwrap();
     assert_eq!((m.ty().width, m.elements()), (16, 2));
@@ -142,10 +141,7 @@ fn arrays_index_items_through_offsets() {
     // Three elements: one item, none, two.
     let a = Attribute::arrays(ty, vec![0, 1, 1, 3].into(), items()).unwrap();
     assert_eq!((a.elements(), a.items()), (3, 3));
-    assert_eq!(
-        (a.items_of(0), a.items_of(1), a.items_of(2)),
-        (0..1, 1..1, 1..3)
-    );
+    assert_eq!(a.offsets().map(|o| o.to_vec()), Some(vec![0, 1, 1, 3]));
     assert_eq!(a.as_tuples::<[i32; 2]>().unwrap()[2], [5, 6]);
     // Empty arrays, and no elements, are allowed.
     let none = Values::I32(Column::default());

@@ -257,7 +257,10 @@ fn attributes_read_by_storage_width_and_meaning_strictly() {
     lists.push(("offsets", Field::U32s(vec![0, 0, 1, 1, 3])));
     let read = read_quad_with(&lists).unwrap();
     let w = read.attributes().get(Domain::Point, "w").unwrap();
-    assert_eq!((w.ty().array, w.items_of(3)), (true, 1..3));
+    assert_eq!(
+        (w.ty().array, w.offsets().map(|o| o.to_vec())),
+        (true, Some(vec![0, 0, 1, 1, 3]))
+    );
     // Refused, naming the element.
     let refused = [
         (

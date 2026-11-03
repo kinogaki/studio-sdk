@@ -247,20 +247,6 @@ impl Attribute {
         self.offsets.as_ref()
     }
 
-    /// The items of element `e`: `e..e + 1`, or its array's.
-    ///
-    /// # Panics
-    /// When `e` is past the elements.
-    pub fn items_of(&self, e: usize) -> Range<usize> {
-        match &self.offsets {
-            Some(o) => o[e] as usize..o[e + 1] as usize,
-            None => {
-                assert!(e < self.items(), "element {e} of {}", self.items());
-                e..e + 1
-            }
-        }
-    }
-
     /// The items as `T`, without copying: one an element, or every
     /// array's items in order. `None` when `T` isn't the storage and width.
     pub fn as_tuples<T: Tuple>(&self) -> Option<&[T]> {
@@ -272,7 +258,7 @@ impl Attribute {
     }
 
     /// The text, when it holds text.
-    pub fn as_text(&self) -> Option<&Text> {
+    pub(crate) fn as_text(&self) -> Option<&Text> {
         match &self.values {
             Values::Text(t) => Some(t),
             _ => None,
