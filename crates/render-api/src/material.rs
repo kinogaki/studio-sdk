@@ -5,8 +5,9 @@
 //! nodes mean. An engine handed another engine's material renders it flat
 //! in that material's tint ([`crate::EngineDescription::adopt`]).
 //!
-//! Colors are linear ACEScg, the render's space: a host working in another
-//! space converts them ([`MaterialNetwork::map_colors`]).
+//! Colors are linear: authored in the working space, ACEScg in a network
+//! an engine receives (the host converts them as it sends the network,
+//! [`MaterialNetwork::map_colors`]; [`crate::color`]).
 
 use std::sync::Arc;
 

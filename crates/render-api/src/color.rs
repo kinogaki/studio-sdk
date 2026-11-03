@@ -1,7 +1,15 @@
 //! Color management, the host's: one [`ColorService`] for every package.
-//! Scene colors (parameters, attributes, lights, materials) are linear in
-//! the project's working space; engines take and output linear ACEScg
-//! ([`RENDER_SPACE`]); files carry colors in spaces of their own. The host
+//!
+//! **One rule.** Authored colors (parameters, attributes, lights' and
+//! settings' values, material constants) are linear in the project's
+//! working space, wherever they are held: objects, render setups, a
+//! [`SettingValue::Color`](crate::SettingValue::Color) in a body. Colors
+//! reaching an engine (prims, materials, render settings) are linear
+//! ACEScg ([`RENDER_SPACE`]), and engines output it: the host converts
+//! each at that one boundary, as it sends it, through this service, and
+//! sends them again when the working space or the configuration changes.
+//! The same types carry both, so an adapter between authored kinds copies
+//! channels as they are. Files carry colors in spaces of their own. The host
 //! holds the color maths (its configuration's conversions and view
 //! transforms) and lends the service to formats (`Reading`, `Writing`),
 //! cooks (the project they read) and runners; a package never carries a

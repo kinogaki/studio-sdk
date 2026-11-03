@@ -141,7 +141,8 @@ pub struct MeshAttribute {
     pub domain: AttributeDomain,
     /// Floats a value, 1 to 4.
     pub components: u32,
-    /// Whether it holds colors (linear ACEScg; an Attribute node's float
+    /// Whether it holds colors (linear ACEScg, the host converted them
+    /// from the working space; an Attribute node's float
     /// output is then the luminance).
     pub color: bool,
     /// Whether it holds integers (ids, exact below 2^24): point and corner

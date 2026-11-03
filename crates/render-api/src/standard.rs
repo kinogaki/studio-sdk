@@ -505,7 +505,8 @@ pub struct Light {
     pub shape: Shape,
     /// Where the spectrum comes from.
     pub emission: Emission,
-    /// Its color, linear ACEScg: the spectrum's in [`Emission::Color`].
+    /// Its color, linear (ACEScg in a prim an engine receives,
+    /// [`crate::color`]): the spectrum's in [`Emission::Color`].
     pub color: [f32; 3],
     /// `inputs:intensity`.
     pub intensity: f32,
@@ -665,8 +666,8 @@ pub fn cone_falloff(cos_axis: f32, cone_angle: f32, cone_softness: f32) -> f32 {
 pub struct Fog {
     /// Extinction a scene unit at `height` (0: no fog).
     pub density: f32,
-    /// Its color, linear ACEScg: what it fades toward, or, lit, its
-    /// scattering color.
+    /// Its color, linear (ACEScg as an engine receives it): what it fades
+    /// toward, or, lit, its scattering color.
     pub color: [f32; 3],
     /// How far from the camera it begins, scene units.
     pub start: f32,

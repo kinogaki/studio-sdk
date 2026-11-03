@@ -22,7 +22,8 @@ pub enum SettingValue {
     Float(f64),
     /// One of a descriptor's choices, by name.
     Choice(Arc<str>),
-    /// A color, linear ACEScg.
+    /// A color, linear: in the working space as authored, ACEScg as an
+    /// engine receives it ([`crate::color`]).
     Color([f64; 3]),
     /// A color ramp's keys, by ascending position (each key's value its
     /// color).
@@ -243,7 +244,8 @@ pub enum SettingKind {
         /// A dropdown rather than segments.
         menu: bool,
     },
-    /// A color (linear ACEScg, channels not negative).
+    /// A color (linear, as [`SettingValue::Color`]; channels not
+    /// negative).
     Color {
         /// Its default.
         default: [f64; 3],

@@ -20,7 +20,8 @@ use crate::id::{EngineId, TextureId};
 pub enum SocketKind {
     /// One number.
     Float,
-    /// A color (linear, the render's working space: ACEScg).
+    /// A color (linear: authored in the working space, ACEScg in the
+    /// network an engine receives, [`crate::color`]).
     Color,
     /// A vector: a position, direction or normal.
     Vector,

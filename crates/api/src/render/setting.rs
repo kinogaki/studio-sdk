@@ -78,7 +78,9 @@ fn unit(unit: &kinogaki_render_api::Unit) -> Unit {
     }
 }
 
-/// Setting value `v` of setting `d` as a parameter's value; `None` for a
+/// Setting value `v` of setting `d` as a parameter's value (a color's
+/// channels as they are: both are authored, in the working space,
+/// [`kinogaki_render_api::color`]); `None` for a
 /// sent texture, or a value of another kind than `d`'s (a choice it
 /// lacks).
 pub fn setting_to_value(v: &SettingValue, d: &SettingDescriptor) -> Option<Value> {
