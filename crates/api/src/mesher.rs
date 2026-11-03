@@ -9,7 +9,7 @@
 //! grey, without faces.
 use crate::cancel::CancelToken;
 use crate::error::Error;
-use crate::id::MesherId;
+use crate::id::{DataTypeId, MesherId};
 use kinogaki_geometry::brep::{Body, FaceId};
 use kinogaki_geometry::{Detail, Polygons, Tolerances};
 
@@ -66,6 +66,14 @@ pub trait Mesher: Send + Sync {
 
     /// What a UI calls it ("CAD").
     fn label(&self) -> &str;
+
+    /// The data type whose values it takes: what the host shows meshed at
+    /// a display quality while it is installed. A mesher meshes B-rep
+    /// bodies ([`mesh`](Self::mesh)), so it is the standard B-rep's
+    /// ([`standard::brep`](crate::standard::brep)).
+    fn takes(&self) -> DataTypeId {
+        crate::standard::brep().id()
+    }
 
     /// `body` as polygons and edge polylines at `detail`. Long meshing
     /// polls `cancel` and stops with [`Error::Cancelled`].
