@@ -159,9 +159,6 @@ pub enum Flag {
 }
 
 impl Flag {
-    /// Every flag, in the order menus and files list them.
-    pub const ALL: [Flag; 3] = [Flag::Bypass, Flag::Template, Flag::Frozen];
-
     fn bit(self) -> u8 {
         1 << self as u8
     }
@@ -194,11 +191,6 @@ impl Flags {
             true => Flags(self.0 | flag.bit()),
             false => Flags(self.0 & !flag.bit()),
         }
-    }
-
-    /// Its flags, in [`Flag::ALL`]'s order.
-    pub fn iter(self) -> impl Iterator<Item = Flag> {
-        Flag::ALL.into_iter().filter(move |f| self.contains(*f))
     }
 }
 

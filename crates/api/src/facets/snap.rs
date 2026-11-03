@@ -8,27 +8,38 @@ use crate::data::Data;
 use crate::facets::Drawn;
 use kinogaki_geometry::{Projective, Ray, Vec3};
 
-/// What a snap may land on, as the user's snap targets say.
+/// What a snap may land on, as the user's snap targets say: a set of
+/// [`SnapKind`]s.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct SnapTargets {
-    /// Points.
-    pub points: bool,
-    /// Edges' middles.
-    pub middles: bool,
-    /// Faces' centers.
-    pub face_centers: bool,
-    /// Where two edges cross on screen.
-    pub crossings: bool,
-    /// The nearest place on an edge.
-    pub edges: bool,
-    /// The place on a surface under the pointer.
-    pub faces: bool,
-}
+pub struct SnapTargets(u8);
 
 impl SnapTargets {
-    /// Whether any target is on.
-    pub fn any(self) -> bool {
-        self != Self::default()
+    /// Nothing.
+    pub const NONE: SnapTargets = SnapTargets(0);
+    /// Every kind.
+    pub const ALL: SnapTargets = SnapTargets(0b11_1111);
+
+    /// `kinds`, and nothing else.
+    pub const fn of(kinds: &[SnapKind]) -> Self {
+        let (mut bits, mut i) = (0, 0);
+        while i < kinds.len() {
+            bits |= kinds[i].bit();
+            i += 1;
+        }
+        SnapTargets(bits)
+    }
+
+    /// Whether it holds `kind`.
+    pub fn contains(self, kind: SnapKind) -> bool {
+        self.0 & kind.bit() != 0
+    }
+
+    /// It with `kind` on or off.
+    pub fn with(self, kind: SnapKind, on: bool) -> Self {
+        match on {
+            true => SnapTargets(self.0 | kind.bit()),
+            false => SnapTargets(self.0 & !kind.bit()),
+        }
     }
 }
 
@@ -50,6 +61,20 @@ pub enum SnapKind {
 }
 
 impl SnapKind {
+    /// Every kind, in the order the Snap menu lists them.
+    pub const ALL: [SnapKind; 6] = [
+        SnapKind::Point,
+        SnapKind::Middle,
+        SnapKind::Edge,
+        SnapKind::Face,
+        SnapKind::Crossing,
+        SnapKind::FaceCenter,
+    ];
+
+    const fn bit(self) -> u8 {
+        1 << self as u8
+    }
+
     /// What the snap marker calls it.
     pub fn label(self) -> &'static str {
         match self {
