@@ -69,7 +69,7 @@ pub use material::{
 };
 pub use prim::{
     AttributeDomain, Camera, Copies, IDENTITY, Instancer, Material, Matrix, Mesh, MeshAttribute,
-    Motion, Prim, PrimKind, Projection, TexelFormat, Texture, TextureColorSpace,
+    Motion, Numbers, Prim, PrimKind, Projection, TexelFormat, Texture, TextureColorSpace,
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};

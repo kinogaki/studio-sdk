@@ -242,8 +242,7 @@ fn mesh_attributes_hold_one_value_an_element_of_their_domain() {
         domain,
         components,
         color: true,
-        integer: false,
-        values: Arc::from(vec![0.5f32; values]),
+        values: Numbers::Floats(Arc::from(vec![0.5f32; values])),
     };
     // Four points, two triangles.
     assert!(attribute(AttributeDomain::Point, 3, 12).is_consistent(4, 2));

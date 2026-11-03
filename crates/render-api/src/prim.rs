@@ -117,7 +117,7 @@ impl Mesh {
 }
 
 /// Where a mesh attribute's values sit, and how a hit reads them (an
-/// integer one never blends: [`MeshAttribute::integer`]).
+/// integer one never blends: [`Numbers::Integers`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AttributeDomain {
     /// One value a point, interpolated across each triangle by its
@@ -132,25 +132,48 @@ pub enum AttributeDomain {
     Constant,
 }
 
-/// A named attribute of a mesh: `components` floats a value (1 to 4).
+/// A mesh attribute's values, `components` a value, interleaved.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Numbers {
+    /// Real numbers, blended across a triangle.
+    Floats(Arc<[f32]>),
+    /// Whole numbers (ids), exact: point and corner values take the
+    /// nearest corner's (the largest barycentric weight) rather than a
+    /// blend, so an id stays an id. An engine whose storage holds fewer
+    /// bits refuses the attribute (it reports it) rather than rounding.
+    Integers(Arc<[i64]>),
+}
+
+impl Numbers {
+    /// How many numbers it holds.
+    pub fn len(&self) -> usize {
+        match self {
+            Numbers::Floats(v) => v.len(),
+            Numbers::Integers(v) => v.len(),
+        }
+    }
+
+    /// Whether it holds none.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// A named attribute of a mesh: `components` numbers a value (1 to 4).
 #[derive(Clone, Debug, PartialEq)]
 pub struct MeshAttribute {
     /// Its name, as Attribute nodes name it (`Cd`, `roughness`).
     pub name: Arc<str>,
     /// Where its values sit.
     pub domain: AttributeDomain,
-    /// Floats a value, 1 to 4.
+    /// Numbers a value, 1 to 4.
     pub components: u32,
     /// Whether it holds colors (linear ACEScg, the host converted them
     /// from the working space; an Attribute node's float
-    /// output is then the luminance).
+    /// output is then the luminance). Colors are floats.
     pub color: bool,
-    /// Whether it holds integers (ids, exact below 2^24): point and corner
-    /// values take the nearest corner's (the largest barycentric weight)
-    /// rather than a blend, so an id stays an id.
-    pub integer: bool,
-    /// The values, `components` floats each, interleaved.
-    pub values: Arc<[f32]>,
+    /// The values.
+    pub values: Numbers,
 }
 
 impl MeshAttribute {
