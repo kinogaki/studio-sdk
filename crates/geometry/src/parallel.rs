@@ -228,15 +228,6 @@ pub(crate) fn chunks<T: Send>(
     }));
 }
 
-/// `work` on each of `blocks`, prepared by the caller.
-#[track_caller]
-pub(crate) fn each_block<T: Send>(blocks: Vec<T>, work: impl Fn(T) + Sync) {
-    let mut blocks: Vec<Option<T>> = blocks.into_iter().map(Some).collect();
-    chunks(&mut blocks, 1, |_, taken| {
-        taken.iter_mut().filter_map(Option::take).for_each(&work);
-    });
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,11 +303,6 @@ mod tests {
             }
         });
         assert!(values.iter().enumerate().all(|(i, &v)| i == v));
-        let seen: Vec<AtomicBool> = (0..50).map(|_| AtomicBool::new(false)).collect();
-        each_block((0..50).collect(), |i: usize| {
-            assert!(!seen[i].swap(true, Ordering::Relaxed));
-        });
-        assert!(seen.iter().all(|s| s.load(Ordering::Relaxed)));
     }
 
     #[test]

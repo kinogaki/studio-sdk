@@ -84,7 +84,7 @@
 //! let valence = |p: &Geometry| {
 //!     p.primitives().derived(|t| {
 //!         builds.fetch_add(1, Ordering::Relaxed);
-//!         Valence((0..t.points()).map(|i| t.index().point_faces()[i].len() as u32).collect())
+//!         Valence((0..t.points()).map(|i| t.index().point_faces(i).len() as u32).collect())
 //!     })
 //! };
 //! assert_eq!(valence(&a).0, [2, 1, 2, 1]);
@@ -141,8 +141,7 @@ pub use geometry::Geometry;
 pub use incidence::Incidence;
 pub use instancing::placements;
 pub use primitives::{
-    Adjacency, Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, TableWriter,
-    Walk,
+    Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, TableWriter, Walk,
 };
 pub use sampled::Sampled;
 pub use selection::Selection;

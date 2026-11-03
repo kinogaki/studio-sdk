@@ -35,7 +35,7 @@ fn band(around: u32, m: u32) -> Primitives {
 fn pairs(t: &Primitives, walk: &Walk) -> Vec<[u32; 2]> {
     walk.edges
         .iter()
-        .map(|&e| t.edges()[e as usize].points)
+        .map(|&e| t.edge(e as usize).points)
         .collect()
 }
 
@@ -54,20 +54,25 @@ fn rows_agree(t: &Primitives, index: &Index) {
         sorted.sort_unstable();
         assert_eq!(sorted, want, "the primitives through {p}");
         for e in index.point_every_edge(p) {
-            assert!(t.edges()[e as usize].points.contains(&(p as u32)));
+            assert!(t.edge(e as usize).points.contains(&(p as u32)));
         }
         let mut near: Vec<u32> = index.point_neighbours(p).collect();
         near.sort_unstable();
-        let mut want: Vec<u32> = (t.edges().iter())
+        let mut want: Vec<u32> = t
+            .edges()
             .filter(|e| e.points.contains(&(p as u32)))
             .map(|e| e.points[usize::from(e.points[0] == p as u32)])
             .collect();
         want.sort_unstable();
         assert_eq!(near, want, "the neighbours of {p}");
     }
-    for e in 0..t.edges().len() {
+    for e in 0..t.edge_count() {
         for f in index.edge_primitives(e) {
-            assert!(index.primitive_edges(f as usize).contains(&(e as u32)));
+            assert!(
+                index
+                    .primitive_edges(f as usize)
+                    .any(|side| side == e as u32)
+            );
         }
     }
 }

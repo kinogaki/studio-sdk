@@ -203,11 +203,11 @@ fn refreshed(
 ) -> ShadingNormals {
     let topology = value.primitives();
     let positions = value.positions();
-    let point_faces = topology.index().point_faces();
+    let index = topology.index();
     let mut changed: Vec<u32> = moved
         .iter()
         .filter(|&&p| (p as usize) < topology.points())
-        .flat_map(|&p| point_faces[p as usize].iter().copied())
+        .flat_map(|&p| index.point_faces(p as usize).iter().copied())
         .collect();
     changed.sort_unstable();
     changed.dedup();
@@ -268,7 +268,7 @@ impl Fan {
         let topology = value.primitives();
         let positions = value.positions();
         let index = topology.index();
-        let incident = &index.point_faces()[point];
+        let incident = index.point_faces(point);
         let here = positions[point];
         for &f in incident {
             let ids = topology.primitive(f as usize);
@@ -289,21 +289,23 @@ impl Fan {
             };
             local.push((f, at, faces[f as usize], angle));
         }
-        let set = |group: &Option<Arc<Elements>>, e: usize| {
-            group.as_ref().is_some_and(|g| g.contains(e as u32))
+        let set = |group: &Option<Arc<Elements>>, e: &dyn Fn() -> usize| {
+            group.as_ref().is_some_and(|g| g.contains(e() as u32))
         };
         links.clear();
         let flooded = inputs.authored.is_none().then_some(local.iter());
         links.extend(flooded.into_iter().flatten().map(|&(f, at, _, _)| {
-            let edges = index.primitive_edges(f as usize);
-            [edges[at], edges[(at + edges.len() - 1) % edges.len()]].map(|edge| {
-                let faces = &index.edge_faces()[edge as usize];
-                if set(&inputs.sharp, edge as usize) || faces.len() != 2 {
+            let ids = topology.primitive(f as usize);
+            let n = ids.len();
+            [ids[(at + 1) % n], ids[(at + n - 1) % n]].map(|other| {
+                let faces = index.faces_between(point as u32, other);
+                let id = || index.edge_of(point as u32, other).map_or(0, |e| e as usize);
+                if faces.len() != 2 || set(&inputs.sharp, &id) {
                     return None;
                 }
-                let other = if faces[0] == f { faces[1] } else { faces[0] };
-                let next = incident.iter().position(|&g| g == other)?;
-                Some((next, set(&inputs.smooth, edge as usize)))
+                let across = if faces[0] == f { faces[1] } else { faces[0] };
+                let next = incident.iter().position(|&g| g == across)?;
+                Some((next, set(&inputs.smooth, &id)))
             })
         }));
         visited.clear();

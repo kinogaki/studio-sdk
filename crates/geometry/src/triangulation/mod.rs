@@ -275,11 +275,11 @@ fn build(value: &Geometry) -> Triangulation {
 /// triangle column.
 fn rebuilt(value: &Geometry, previous: &Triangulation, moved: &[u32]) -> Triangulation {
     let topology = value.primitives();
-    let point_faces = topology.index().point_faces();
+    let index = topology.index();
     let mut polygons: Vec<u32> = moved
         .iter()
         .filter(|&&p| (p as usize) < topology.points())
-        .flat_map(|&p| point_faces[p as usize].iter().copied())
+        .flat_map(|&p| index.point_faces(p as usize).iter().copied())
         .collect();
     polygons.sort_unstable();
     polygons.dedup();

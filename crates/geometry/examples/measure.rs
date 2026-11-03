@@ -107,11 +107,11 @@ fn main() {
         "Primitives::index (edges and adjacency)",
         best(
             || Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
-            |t| t.index().edges().len(),
+            |t| t.index().edge_count(),
         ),
     );
     report(
-        "Primitives::edge_count (no index)",
+        "Primitives::edge_count",
         best(
             || Primitives::of_polygons(points, offsets.clone(), vertices.clone()).unwrap(),
             |t| t.edge_count(),

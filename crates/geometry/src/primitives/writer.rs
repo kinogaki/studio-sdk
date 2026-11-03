@@ -2,12 +2,15 @@
 //! their cells and aren't checked again, so what an edit costs is what it
 //! wrote.
 use super::fingerprint::Digests;
-use super::{CurveData, Kind, Kinds, Primitives, validate};
+use super::{CurveData, Kind, Kinds, Primitives, index, validate};
 use crate::Error;
 use crate::column::{Column, Writer};
 use crate::limits;
 use crate::primitives::Basis;
 use std::ops::Range;
+
+/// Changed rows that always patch the index, however small the table.
+const LOCAL: usize = 256;
 
 /// The rows of a new table, in order: [kept](Self::keep) rows of the table it
 /// came from and [written](Self::write) ones, which alone are checked
@@ -20,6 +23,9 @@ pub struct TableWriter<'a> {
     /// All one kind while `kinds` stays empty.
     uniform: Option<Kind>,
     kinds: Writer<Kind>,
+    /// The rows written, by number, while the index would patch: `None`
+    /// once too many are, or a kept row took another number.
+    written: Option<Vec<u32>>,
 }
 
 impl Primitives {
@@ -33,6 +39,7 @@ impl Primitives {
             vertices: Writer::new(),
             uniform: self.uniform().or(self.is_empty().then_some(Kind::POLYGON)),
             kinds: Writer::new(),
+            written: Some(Vec::new()),
         }
     }
 }
@@ -64,6 +71,9 @@ impl TableWriter<'_> {
         }
         assert!(self.points >= self.base.points, "a kept row names a point");
         let base = self.base;
+        if rows.start != self.len() {
+            self.written = None;
+        }
         match &base.kinds {
             Kinds::All(kind) if self.uniform == Some(*kind) => {}
             Kinds::All(kind) => {
@@ -102,6 +112,13 @@ impl TableWriter<'_> {
     /// The first rule the row breaks.
     pub fn write(&mut self, kind: Kind, corners: &[u32]) -> Result<(), Error> {
         let row = self.len();
+        self.written = self
+            .written
+            .take()
+            .filter(|written| written.len() < LOCAL.max(self.base.len() / 8));
+        if let Some(written) = &mut self.written {
+            written.push(row as u32);
+        }
         if let Some(&p) = corners.iter().find(|&&p| p as usize >= self.points) {
             return Err(
                 Error::invalid(format!("primitive {row} references a missing point {p}"))
@@ -141,7 +158,9 @@ impl TableWriter<'_> {
     }
 
     /// The new table, `curves` being its curve data when a row is a curve:
-    /// only then is every row checked again.
+    /// only then is every row checked again. Its index, when the base's is
+    /// built and few rows changed, is that index's with those rows' points
+    /// made again; its fingerprint likewise, by the cells it doesn't share.
     ///
     /// # Errors
     /// A count past the limits, or the rule a table with curves breaks.
@@ -150,28 +169,37 @@ impl TableWriter<'_> {
             self.offsets.push(0);
         }
         let (offsets, vertices) = (self.offsets.finish(), self.vertices.finish());
-        let kinds = self
-            .uniform
-            .map_or_else(|| self.kinds.finish(), |_| Column::default());
         let base = self.base;
         limits::check(self.points, limits::MAX_POINTS, "points")?;
         limits::check(offsets.len() - 1, limits::MAX_PRIMITIVES, "primitives")?;
         limits::check(vertices.len(), limits::MAX_VERTICES, "vertices")?;
-        if curves.is_some() || base.curves.is_some() {
+        let rows = offsets.len() - 1;
+        let table = if curves.is_some() || base.curves.is_some() {
             let kinds = match self.uniform {
-                Some(kind) => Column::new(vec![kind; offsets.len() - 1]),
-                None => kinds,
+                Some(kind) => Column::new(vec![kind; rows]),
+                None => self.kinds.finish(),
             };
-            return Primitives::new(self.points, offsets, vertices, kinds, curves);
-        }
-        let kinds = match (self.uniform, kinds.first()) {
-            (Some(kind), _) => Kinds::All(kind),
-            (None, Some(&first)) if kinds.iter().all(|&k| k == first) => Kinds::All(first),
-            (None, _) => Kinds::Each(kinds),
+            Primitives::new(self.points, offsets, vertices, kinds, curves)?
+        } else {
+            let kinds = self
+                .uniform
+                .map_or_else(|| self.kinds.finish(), |_| Column::default());
+            let kinds = match (self.uniform, kinds.first()) {
+                (Some(kind), _) => Kinds::All(kind),
+                (None, Some(&first)) if kinds.iter().all(|&k| k == first) => Kinds::All(first),
+                (None, _) => Kinds::Each(kinds),
+            };
+            Primitives::unchecked(self.points, offsets, vertices, kinds, None)
         };
-        let table = Primitives::unchecked(self.points, offsets, vertices, kinds, None);
         if let Some(digests) = base.digests.get() {
             let _ = table.digests.set(Digests::after(&table, base, digests));
+        }
+        // Rows past the new table's are gone: their points' rows change.
+        if let (Some(index), Some(mut changed)) = (base.index.get(), self.written) {
+            changed.extend(rows as u32..base.len() as u32);
+            let _ = table
+                .index
+                .set(index::patched(index, base, &table, &changed));
         }
         Ok(table)
     }

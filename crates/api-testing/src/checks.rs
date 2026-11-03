@@ -171,14 +171,14 @@ fn geometry(p: &Geometry) -> Result<(), String> {
     if again.primitives().fingerprint() != t.fingerprint() {
         return Err("an equal table has another fingerprint".into());
     }
-    let edges = t.edges();
+    let edges: Vec<_> = t.edges().collect();
     if edges.windows(2).any(|w| w[0] >= w[1]) || edges.iter().any(|e| e.points[0] >= e.points[1]) {
         return Err("the edges are not in canonical order".into());
     }
     let index = t.index();
     for prim in 0..t.len() {
         let ids = t.primitive(prim);
-        for (i, &e) in index.primitive_edges(prim).iter().enumerate() {
+        for (i, e) in index.primitive_edges(prim).enumerate() {
             let next = ids[(i + 1) % ids.len()];
             if t.edge_of(ids[i], next) != Some(e) {
                 return Err(format!("primitive {prim}'s edge {i} is misnumbered"));

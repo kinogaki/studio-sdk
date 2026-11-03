@@ -231,7 +231,7 @@ pub fn expand(s: &Selection, on: &Geometry, how: &Expand) -> Selection {
             let point = |i: u32| match s.domain() {
                 Domain::Point => i,
                 Domain::Vertex => table.vertices()[i as usize],
-                Domain::Edge => table.edges()[i as usize].points[0],
+                Domain::Edge => table.edge(i as usize).points[0],
                 _ => table.primitive(i as usize)[0],
             };
             let pieces = pieces(on);
@@ -329,7 +329,7 @@ fn around(on: &Geometry, domain: Domain, i: u32, near: &mut dyn FnMut(u32)) {
     match domain {
         Domain::Point => index.point_neighbours(i as usize).for_each(near),
         Domain::Edge => {
-            for p in table.edges()[i as usize].points {
+            for p in table.edge(i as usize).points {
                 index.point_every_edge(p as usize).for_each(&mut *near);
             }
         }
@@ -385,15 +385,15 @@ pub fn boundary(s: &Selection, on: &Geometry) -> Result<Selection, Error> {
     }
     let table = on.primitives();
     let index = table.index();
-    let count = table.edges().len();
+    let count = table.edge_count();
     let outline = |edges: Vec<u32>| Elements::from_indices(count, edges);
     let members = if s.members().is_all() {
         outline(index.boundary_edges().to_vec())?
     } else {
         let mut edges = Vec::new();
         for p in s.members().iter() {
-            for &e in index.primitive_edges(p as usize) {
-                let polygons = &index.edge_faces()[e as usize];
+            for e in index.primitive_edges(p as usize) {
+                let polygons = index.edge_faces(e as usize);
                 if polygons.iter().filter(|&&f| s.contains(f)).count() == 1 {
                     edges.push(e);
                 }

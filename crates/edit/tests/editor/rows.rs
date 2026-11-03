@@ -69,7 +69,7 @@ fn a_new_primitive_brings_its_vertices_and_leaves_the_point_columns_shared() {
     let before = column::<f32>(&value, Domain::Edge, "crease");
     let sharp = members(&out, Domain::Edge, "sharp");
     let was_sharp = members(&value, Domain::Edge, "sharp");
-    for (e, edge) in out.primitives().edges().iter().enumerate() {
+    for (e, edge) in out.primitives().edges().enumerate() {
         let [a, b] = edge.points;
         match value.primitives().edge_of(a, b) {
             Some(old) => {

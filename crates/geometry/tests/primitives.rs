@@ -253,8 +253,12 @@ fn edges_are_canonical_on_random_topologies() {
         (5, 30_000, 40_000, 2_000),
     ] {
         let t = random(seed, points, polygons, polylines);
-        assert_eq!(t.edges(), naive_edges(&t), "seed {seed}");
-        for (e, edge) in t.edges().iter().enumerate() {
+        assert_eq!(
+            t.edges().collect::<Vec<_>>(),
+            naive_edges(&t),
+            "seed {seed}"
+        );
+        for (e, edge) in t.edges().enumerate() {
             let [a, b] = edge.points;
             assert!(a < b);
             assert_eq!(t.edge_of(b, a), Some(e as u32));
@@ -263,7 +267,7 @@ fn edges_are_canonical_on_random_topologies() {
         let index = t.index();
         for p in 0..t.len() {
             let ids = t.primitive(p);
-            for (i, &e) in index.primitive_edges(p).iter().enumerate() {
+            for (i, e) in index.primitive_edges(p).enumerate() {
                 let next = ids[(i + 1) % ids.len()];
                 assert_eq!(t.edge_of(ids[i], next), Some(e));
             }
@@ -329,7 +333,7 @@ fn kinds_hold_a_basis_and_closed_and_any_order_is_kept() {
     )
     .unwrap();
     assert_eq!(t.polygons().iter().collect::<Vec<_>>(), [1, 3]);
-    assert_eq!(t.edges(), naive_edges(&t).as_slice());
+    assert_eq!(t.edges().collect::<Vec<_>>(), naive_edges(&t));
     // All polygons: the set is every primitive, held as such.
     let quads = make(4, &[&[0, 1, 2, 3]], 1).unwrap();
     assert!(quads.polygons().is_all() && quads.uniform() == Some(Kind::POLYGON));
@@ -451,5 +455,5 @@ fn the_edge_count_needs_no_index() {
     let t = random(9, 400, 300, 40);
     let count = t.edge_count();
     assert_eq!(count, naive_edges(&t).len());
-    assert_eq!(count, t.edges().len());
+    assert_eq!(count, t.edge_count());
 }

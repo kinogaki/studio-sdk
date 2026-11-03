@@ -48,7 +48,7 @@ impl Incidence for Geometry {
             (from, to),
             (Domain::Point, Domain::Edge) | (Domain::Edge, Domain::Point)
         ) {
-            for (edge, e) in topology.edges().iter().enumerate() {
+            for (edge, e) in topology.edges().enumerate() {
                 for point in e.points {
                     match from {
                         Domain::Point => pair(point, edge as u32),
@@ -61,16 +61,14 @@ impl Incidence for Geometry {
         let index = (from == Domain::Edge || to == Domain::Edge).then(|| topology.index());
         for p in 0..topology.len() {
             let start = topology.offsets()[p] as usize;
+            let edges: Vec<u32> = index.map_or(Vec::new(), |i| i.primitive_edges(p).collect());
             for (corner, &point) in topology.primitive(p).iter().enumerate() {
                 let element = |d: Domain| match d {
                     Domain::Point => Some(point),
                     Domain::Primitive => Some(p as u32),
                     Domain::Vertex => Some((start + corner) as u32),
                     Domain::Detail => Some(0),
-                    Domain::Edge => {
-                        let index = index.expect("an edge pair builds the index");
-                        index.primitive_edges(p).get(corner).copied()
-                    }
+                    Domain::Edge => edges.get(corner).copied(),
                     _ => None,
                 };
                 if let (Some(a), Some(b)) = (element(from), element(to)) {

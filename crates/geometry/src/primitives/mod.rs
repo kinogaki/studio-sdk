@@ -13,7 +13,7 @@ mod writer;
 
 pub use components::Components;
 pub use curves::{CurveData, Knots};
-pub use index::{Adjacency, Index, Walk};
+pub use index::{Index, Walk};
 pub use kind::{Basis, Kind};
 pub use writer::TableWriter;
 
@@ -91,7 +91,6 @@ pub struct Primitives {
     curves: Option<Arc<CurveData>>,
     polygons: OnceLock<Elements>,
     index: OnceLock<Index>,
-    edge_count: OnceLock<usize>,
     fingerprint: OnceLock<[u8; 32]>,
     /// Its cells' digests, once its fingerprint is asked for.
     digests: OnceLock<fingerprint::Digests>,
@@ -112,7 +111,7 @@ impl Primitives {
     /// // A polyline from a quad's corner, then the quad.
     /// let kinds = vec![Kind::POLYLINE, Kind::POLYGON];
     /// let t = Primitives::new(5, vec![0, 2, 6].into(), vec![2, 4, 0, 1, 2, 3].into(), kinds.into(), None).unwrap();
-    /// assert_eq!((t.len(), t.polygons().len(), t.edges().len()), (2, 1, 5));
+    /// assert_eq!((t.len(), t.polygons().len(), t.edge_count()), (2, 1, 5));
     /// assert_eq!(t.polygons().iter().collect::<Vec<_>>(), [1]);
     /// let bad = Primitives::of_polygons(4, vec![0, 3].into(), vec![0, 1, 1].into()).unwrap_err();
     /// assert_eq!(bad.message(), "polygon 0 repeats a point");
@@ -194,7 +193,6 @@ impl Primitives {
             curves,
             polygons: OnceLock::new(),
             index: OnceLock::new(),
-            edge_count: OnceLock::new(),
             fingerprint: OnceLock::new(),
             digests: OnceLock::new(),
             stitches: OnceLock::new(),
@@ -204,8 +202,9 @@ impl Primitives {
 
     /// These primitives over `points` points: the same rows, sharing their
     /// columns, so only the count is checked. What adding points no
-    /// primitive names yet makes of a table. Its index, fingerprint and
-    /// caches are its own (they speak of the points).
+    /// primitive names yet makes of a table. Its fingerprint and caches are
+    /// its own (they speak of the points); its index shares what the first
+    /// one built.
     ///
     /// # Errors
     /// Fewer points than now, or past the limit.
@@ -217,13 +216,20 @@ impl Primitives {
                 self.points
             )));
         }
-        Ok(Self::unchecked(
+        let table = Self::unchecked(
             points,
             self.offsets.clone(),
             self.vertices.clone(),
             self.kinds.clone(),
             self.curves.clone(),
-        ))
+        );
+        if let Some(index) = self.index.get() {
+            let _ = table.index.set(index::with_points(index, &table));
+        }
+        if let Some(digests) = self.digests.get() {
+            let _ = table.digests.set(digests.clone());
+        }
+        Ok(table)
     }
 
     /// No primitives over no points.
@@ -349,7 +355,8 @@ impl Primitives {
 
     /// The canonical index of edges and adjacency, built the first time it
     /// is asked for (in parallel on large tables) and kept as long as the
-    /// table.
+    /// table. A table an edit made has it from its source's when that was
+    /// built, at the cost of the rows the edit changed.
     pub fn index(&self) -> &Index {
         self.index.get_or_init(|| index::build(self))
     }
@@ -358,18 +365,22 @@ impl Primitives {
     /// vertex pairs (wrapping when it is closed), once each, ascending by
     /// `(low point, high point)`. An edge's position here is its id, and
     /// [`Domain::Edge`](crate::Domain::Edge) attributes follow this order.
-    pub fn edges(&self) -> &[Edge] {
+    pub fn edges(&self) -> impl Iterator<Item = Edge> + '_ {
         self.index().edges()
     }
 
-    /// How many unique edges, counted without building the
-    /// [`index`](Self::index) (its edges' count once it is built): what a
-    /// value's Edge domain checks its columns and groups against.
+    /// Edge `e`.
+    ///
+    /// # Panics
+    /// When `e` is not an edge.
+    pub fn edge(&self, e: usize) -> Edge {
+        self.index().edge(e)
+    }
+
+    /// How many unique edges: what a value's Edge domain checks its columns
+    /// and groups against.
     pub fn edge_count(&self) -> usize {
-        if let Some(index) = self.index.get() {
-            return index.edges().len();
-        }
-        *self.edge_count.get_or_init(|| index::count(self))
+        self.index().edge_count()
     }
 
     /// The id of the edge joining points `a` and `b`, either way round.

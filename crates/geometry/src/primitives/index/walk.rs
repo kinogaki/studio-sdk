@@ -46,7 +46,7 @@ impl Index {
     /// assert_eq!((rung.edges.len(), rung.closed), (1, false));
     /// ```
     pub fn edge_loop(&self, e: u32) -> Walk {
-        let [low, high] = self.edges[e as usize].points;
+        let [low, high] = self.edge(e as usize).points;
         self.walk(e, [high, low], |edge, point| {
             let next = self.straight_on(edge, point)?;
             let mutual = self.straight_on(next, point) == Some(edge);
@@ -74,14 +74,14 @@ impl Index {
     pub fn edge_ring(&self, e: u32) -> Walk {
         // A walk's state is the polygon it goes on through; the start goes
         // both ways, one through each of its polygons.
-        let ways = match self.edge_faces[e as usize] {
+        let ways = match *self.edge_faces(e as usize) {
             [first, second] => [second, first],
             [only] => [only, NOWHERE],
             _ => [NOWHERE; 2],
         };
         self.walk(e, ways, |edge, through| {
             let next = self.across(edge, through)?;
-            let on = match self.edge_faces[next as usize] {
+            let on = match *self.edge_faces(next as usize) {
                 [a, b] if a == through => b,
                 [a, _] => a,
                 _ => NOWHERE,
@@ -123,7 +123,7 @@ impl Index {
 
     /// The other point of edge `e`.
     fn other_end(&self, e: u32, point: u32) -> u32 {
-        let [a, b] = self.edges[e as usize].points;
+        let [a, b] = self.edge(e as usize).points;
         if a == point { b } else { a }
     }
 
@@ -131,34 +131,35 @@ impl Index {
     /// of [`edge_loop`](Self::edge_loop).
     fn straight_on(&self, edge: u32, point: u32) -> Option<u32> {
         let at = point as usize;
-        let faces = &self.edge_faces[edge as usize];
+        let faces = self.edge_faces(edge as usize);
         match faces.len() {
             0 => {
                 let mut others = self.point_every_edge(at).filter(|&o| o != edge);
                 let next = others.next()?;
-                let only = others.next().is_none() && self.edge_faces[next as usize].is_empty();
+                let only = others.next().is_none() && self.edge_faces(next as usize).is_empty();
                 only.then_some(next)
             }
             1 => {
-                let mut others = (self.point_edges[at].iter().copied())
-                    .filter(|&o| o != edge && self.is_boundary(o as usize));
+                let mut others =
+                    (self.point_edges(at)).filter(|&o| o != edge && self.is_boundary(o as usize));
                 let next = others.next()?;
                 others.next().is_none().then_some(next)
             }
             2 => {
-                let (edges, polygons) = (&self.point_edges[at], &self.point_faces[at]);
-                if edges.len() != 4 || polygons.len() != 4 {
+                let edges: Vec<u32> = self.point_edges(at).collect();
+                if edges.len() != 4 || self.point_faces(at).len() != 4 {
                     return None;
                 }
-                let facing = |o: &&u32| {
-                    **o != edge
-                        && self.edge_faces[**o as usize].len() == 2
-                        && !self.edge_faces[**o as usize]
+                let facing = |o: &u32| {
+                    *o != edge
+                        && self.edge_faces(*o as usize).len() == 2
+                        && !self
+                            .edge_faces(*o as usize)
                             .iter()
                             .any(|f| faces.contains(f))
                 };
-                let mut opposite = edges.iter().filter(facing);
-                let next = *opposite.next()?;
+                let mut opposite = edges.into_iter().filter(facing);
+                let next = opposite.next()?;
                 opposite.next().is_none().then_some(next)
             }
             _ => None,
@@ -171,7 +172,7 @@ impl Index {
         if through == NOWHERE {
             return None;
         }
-        let sides = self.primitive_edges(through as usize);
+        let sides: Vec<u32> = self.primitive_edges(through as usize).collect();
         let at = sides.iter().position(|&s| s == edge)?;
         (sides.len() == 4).then(|| sides[(at + 2) % 4])
     }

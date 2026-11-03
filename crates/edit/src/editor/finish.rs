@@ -417,7 +417,7 @@ impl Editor {
             }
             if base.has(Domain::Edge) {
                 let edges = self.edges_layout(primitives, points);
-                if !edges.is_whole(table.edges().len()) {
+                if !edges.is_whole(table.edge_count()) {
                     carry(Domain::Edge, &edges, &Blends::default())?;
                 }
             }
@@ -429,21 +429,38 @@ impl Editor {
     /// an edge that stays, or one [`carry_edge`](Editor::carry_edge) names.
     fn edges_layout(&self, new: &Primitives, points: &Points) -> Layout {
         let table = self.base.primitives();
+        let declared = |to: &[u32; 2]| {
+            let [a, b] = self.edge_from.get(to)?;
+            let in_base = |p: u32| p < self.base_points();
+            (in_base(*a) && in_base(*b)).then(|| table.edge_of(*a, *b))?
+        };
+        let mut layout = Layout::default();
+        // Numbers that stay, and no declaration over an edge that stays: the
+        // indexes compare by block.
+        let numbers_stay = points.renumber.is_none();
+        let plain = |to: &[u32; 2]| table.edge_of(to[0], to[1]).is_none();
+        if numbers_stay && self.edge_from.keys().all(plain) {
+            new.index().compare_edges(table.index(), |edge| match edge {
+                Ok(kept) => layout.keep(kept),
+                Err(edge) => match declared(&edge.points) {
+                    Some(e) => layout.keep(e..e + 1),
+                    None => layout.add(Span::default()),
+                },
+            });
+            return layout;
+        }
         let number = |p: u32| points.number(p);
         let pair = |a: u32, b: u32| [a.min(b), a.max(b)];
-        let mut from: HashMap<[u32; 2], u32> = HashMap::with_capacity(table.edges().len());
-        for (e, edge) in table.edges().iter().enumerate() {
+        let mut from: HashMap<[u32; 2], u32> = HashMap::with_capacity(table.edge_count());
+        for (e, edge) in table.edges().enumerate() {
             let [a, b] = edge.points.map(number);
             if a != GONE && b != GONE && a != b {
                 from.entry(pair(a, b)).or_insert(e as u32);
             }
         }
-        for (&to, &source) in &self.edge_from {
-            let edge = (source[0] < self.base_points() && source[1] < self.base_points())
-                .then(|| table.edge_of(source[0], source[1]))
-                .flatten();
+        for to in self.edge_from.keys() {
             let [a, b] = to.map(number);
-            if let Some(edge) = edge
+            if let Some(edge) = declared(to)
                 && a != GONE
                 && b != GONE
                 && a != b
@@ -451,7 +468,6 @@ impl Editor {
                 from.insert(pair(a, b), edge);
             }
         }
-        let mut layout = Layout::default();
         for edge in new.edges() {
             match from.get(&edge.points) {
                 Some(&e) => layout.keep(e..e + 1),
