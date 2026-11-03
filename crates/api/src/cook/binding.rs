@@ -29,18 +29,26 @@ impl Scalar {
     /// holds something else.
     pub fn read(&self, parameters: &Parameters) -> Option<f64> {
         match self {
-            Self::Parameter(name) => parameters.get(name)?.number(),
+            Self::Parameter(name) => match parameters.get(name)? {
+                Value::Integer(v) => Some(*v as f64),
+                v => v.number(),
+            },
             Self::Component(name, index) => parameters.get(name)?.numbers()?.get(*index).copied(),
             Self::Fixed(value) => Some(*value),
         }
     }
 
-    /// Writes `value` into `parameters` (nothing when fixed, or when a
-    /// component's vector is missing or too short).
+    /// Writes `value` into `parameters`, rounded into an integer
+    /// parameter (nothing when fixed, or when a component's vector is
+    /// missing or too short).
     pub fn write(&self, parameters: &mut Parameters, value: f64) {
         match self {
             Self::Parameter(name) => {
-                parameters.insert(name.clone(), Value::Number(value));
+                let value = match parameters.get(name) {
+                    Some(Value::Integer(_)) => Value::Integer(value.round() as i64),
+                    _ => Value::Number(value),
+                };
+                parameters.insert(name.clone(), value);
             }
             Self::Component(name, index) => {
                 if let Some(Value::Numbers(numbers)) = parameters.get_mut(name)
@@ -85,7 +93,7 @@ impl From<f64> for Scalar {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Vector {
     /// One parameter of three numbers ([`Value::Numbers`], a
-    /// [`ParameterKind::Vector`](crate::params::ParameterKind::Vector)).
+    /// [`ValueKind::Vector`](crate::params::ValueKind::Vector)).
     Parameter(String),
     /// Three [`Scalar`]s, x, y and z, each a number parameter or fixed: a
     /// cylinder's top ring sits at (0, `height`, 0); a shape always

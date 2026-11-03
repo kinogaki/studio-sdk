@@ -219,9 +219,14 @@ impl<'a> CookCx<'a> {
         self.typed(name, "a toggle", Value::bool)
     }
 
-    /// Parameter `name` as a choice's index, or a failure naming it.
-    pub fn choice(&self, name: &str) -> Result<usize, CookError> {
-        self.typed(name, "a choice", Value::index)
+    /// Parameter `name` as a whole number, or a failure naming it.
+    pub fn integer(&self, name: &str) -> Result<i64, CookError> {
+        self.typed(name, "a whole number", Value::integer)
+    }
+
+    /// Parameter `name` as a choice's key, or a failure naming it.
+    pub fn choice(&self, name: &str) -> Result<&str, CookError> {
+        self.typed(name, "a choice", Value::choice)
     }
 
     /// Parameter `name` as text, or a failure naming it.

@@ -1,17 +1,18 @@
 //! [`Kind`]: what a field holds and how it is presented, with the
-//! pieces some kinds carry ([`PathChoice`], [`Chip`], [`CurveChannel`],
-//! [`FileDialog`]), a material input's connection button ([`Socket`]) and
+//! pieces some kinds carry ([`PathChoice`], [`Chip`], [`FileDialog`]), a material input's connection button ([`Socket`]) and
 //! the slot at a field's right edge ([`Trailing`]).
 use super::{Number, Text};
-use kinogaki_studio_api::params::Diagnostic;
+use kinogaki_studio_api::params::{Choice, CurveChannel, Diagnostic};
+use std::sync::Arc;
 
 /// The type of a field and how it is presented. Each kind says which
 /// [`Value`](kinogaki_studio_api::Value) variant its field holds; a kind
 /// that holds none (a button) has no value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
-    /// `Value::Number`: a length, angle, percentage, plain number, slider
-    /// or stepper.
+    /// `Value::Number`: a length, angle, percentage, plain number or
+    /// slider; a stepper ([`NumberStyle::Stepper`](super::NumberStyle::Stepper))
+    /// edits a whole number, and its edits are `Value::Integer`.
     Number(Number),
     /// `Value::Numbers` (2–4) lettered X, Y, Z, W; `lock` shows the uniform
     /// lock in that state (its click is [`Action::Lock`](super::Action::Lock)).
@@ -23,8 +24,7 @@ pub enum Kind {
     },
     /// `Value::Numbers` in equal fields without letters (a crop).
     Fields(Number),
-    /// `Value::Numbers` (3 or 4): working-space RGB(A), a swatch and
-    /// channel fields.
+    /// `Value::Color`: working-space RGB, a swatch and channel fields.
     Color,
     /// `Value::Numbers` (4): R, G, B, A. Linked, one slider (the value of
     /// R) sets all four; unlinked, four fields lettered R, G, B, A. The
@@ -36,9 +36,16 @@ pub enum Kind {
         /// One value sets all four channels.
         linked: bool,
     },
-    /// `Value::Index` as segments.
-    Choice(Vec<Text>),
-    /// `Value::Index` in a menu.
+    /// `Value::Choice`: one of `choices` by key, as segments when they
+    /// are few and short ([`segments`]), else in a menu.
+    Choice {
+        /// The entries, in order.
+        choices: Vec<Choice>,
+        /// The keys of entries that can't apply now: greyed.
+        unavailable: Vec<Arc<str>>,
+    },
+    /// `Value::Integer`: an entry's position in a menu of `items` (a wire,
+    /// a format, a list the owner keeps).
     Dropdown {
         /// The entries.
         items: Vec<Text>,
@@ -129,10 +136,8 @@ pub enum Kind {
     /// from: rows that drag to reorder ([`Action::Reorder`](super::Action::Reorder))
     /// and remove ([`Action::Remove`](super::Action::Remove)); no value.
     Wires(Vec<Text>),
-    /// `Value::Numbers`: a float or color ramp, as
-    /// [`ramp::encode`](super::ramp::encode) writes it (its length fixes
-    /// how many keys it holds); drawn as the ramp's curve or gradient with
-    /// its keys, the selected key's fields below.
+    /// `Value::Ramp`: a float or color ramp, drawn as its curve or
+    /// gradient with its keys, the selected key's fields below.
     Ramp {
         /// A color ramp rather than a float ramp.
         color: bool,
@@ -140,26 +145,21 @@ pub enum Kind {
         /// choice (a renderer's linear ramps); `None`: each key chooses.
         interpolation: Option<super::ramp::Interpolation>,
     },
-    /// `Value::Numbers`: tone curves, one a channel, as
-    /// [`tone_curve::encode`](super::tone_curve::encode) writes them with
-    /// `capacity` keys a curve; drawn as a curve editor with a tab a
-    /// channel.
+    /// `Value::ToneCurves`: one a channel, drawn as a curve editor with a
+    /// tab a channel.
     ToneCurves {
         /// The channels, in curve order: each one's tab.
         channels: Vec<CurveChannel>,
-        /// The most keys a curve holds.
-        capacity: usize,
     },
 }
 
-/// One channel of [`Kind::ToneCurves`]: its tab's text and its curve's
-/// tint.
-#[derive(Clone, Debug, PartialEq)]
-pub struct CurveChannel {
-    /// The tab's text.
-    pub label: Text,
-    /// The curve's tint, linear RGB; `None` draws it in the text color.
-    pub tint: Option<[f64; 3]>,
+/// Whether a choice of `choices`, those keyed in `unavailable` greyed,
+/// shows as segments: three at most, 18 characters together at most and
+/// none unavailable. Otherwise it shows as a menu.
+pub fn segments(choices: &[Choice], unavailable: &[Arc<str>]) -> bool {
+    choices.len() <= 3
+        && choices.iter().map(|c| c.label.len()).sum::<usize>() <= 18
+        && unavailable.is_empty()
 }
 
 /// The file dialog of a [`Kind::Path`] field's folder button.

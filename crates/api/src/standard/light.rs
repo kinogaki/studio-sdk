@@ -19,7 +19,7 @@ use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
 use kinogaki_geometry::{Sampled, Xform};
-use kinogaki_render_api::standard::{Emission, ImageRef, Light, Shape};
+use kinogaki_render_api::standard::{Emission, Light, Shape};
 
 /// The largest size, intensity or temperature a light takes.
 const MAX_VALUE: f32 = 1e12;
@@ -43,11 +43,7 @@ pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
         Shape::Disk { radius } => positive(*radius),
         Shape::Dome { image, ground } => {
             ground.is_none_or(|g| g.into_iter().all(within))
-                && match image {
-                    None => true,
-                    Some(ImageRef::File(path)) => !path.trim().is_empty(),
-                    Some(ImageRef::Prim(_)) => false,
-                }
+                && image.as_ref().is_none_or(|path| !path.trim().is_empty())
         }
         Shape::Distant { angle } => at_least_0(*angle) && *angle <= 180.0,
         Shape::Spot {
@@ -100,14 +96,8 @@ impl LightCodec {
                 if let Some(g) = ground {
                     out.set("groundColor", Field::F32s(g.to_vec()))?;
                 }
-                match image {
-                    Some(ImageRef::File(path)) => {
-                        out.set("texture", Field::Text(path.to_string()))?
-                    }
-                    Some(ImageRef::Prim(_)) => {
-                        return Err(Error::invalid("a light value names its image by file"));
-                    }
-                    None => {}
+                if let Some(path) = image {
+                    out.set("texture", Field::Text(path.to_string()))?;
                 }
                 "DomeLight"
             }
@@ -162,7 +152,7 @@ impl LightCodec {
             },
             "DomeLight" => Shape::Dome {
                 image: match e.field("texture") {
-                    Some(_) => Some(ImageRef::File(e.text("texture")?.into())),
+                    Some(_) => Some(e.text("texture")?.into()),
                     None => None,
                 },
                 ground: match e.field("groundColor") {
@@ -226,7 +216,6 @@ impl DataCodec for LightCodec {
 mod tests {
     use super::*;
     use crate::element::MemoryElement;
-    use kinogaki_render_api::TextureId;
     use std::sync::Arc;
 
     /// One light of each shape, with values off their defaults.
@@ -242,7 +231,7 @@ mod tests {
                 ground: Some([0.2, 0.1, 0.05]),
             },
             Shape::Dome {
-                image: Some(ImageRef::File(Arc::from("sky/noon.exr"))),
+                image: Some(Arc::from("sky/noon.exr")),
                 ground: None,
             },
             Shape::Distant { angle: 0.53 },
@@ -308,7 +297,7 @@ mod tests {
                 ground: Some([f32::NAN, 0.0, 0.0]),
             },
             Shape::Dome {
-                image: Some(ImageRef::File(Arc::from(" "))),
+                image: Some(Arc::from(" ")),
                 ground: None,
             },
         ];
@@ -339,9 +328,9 @@ mod tests {
     }
 
     #[test]
-    fn a_value_is_unplaced_and_names_its_image_by_file() {
+    fn a_value_is_unplaced_and_keeps_its_image_file() {
         let sky = Shape::Dome {
-            image: Some(ImageRef::File(Arc::from("sky/noon.exr"))),
+            image: Some(Arc::from("sky/noon.exr")),
             ground: None,
         };
         let placed = Light {
@@ -356,20 +345,6 @@ mod tests {
             (&value.xform, &value.shape),
             (&Sampled::still(Xform::IDENTITY), &sky)
         );
-        // A Texture prim is one scene's.
-        let sent = Light {
-            shape: Shape::Dome {
-                image: Some(ImageRef::Prim(TextureId {
-                    slot: 7,
-                    generation: 0,
-                })),
-                ground: None,
-            },
-            ..Light::default()
-        };
-        assert!(light_value(sent.clone()).is_err());
-        let mut e = MemoryElement::new("light");
-        assert!(e.write(|w| LightCodec::write_light(&sent, w)).is_err());
     }
 
     #[test]

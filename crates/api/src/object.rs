@@ -16,9 +16,7 @@ use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::refs::{NodeRef, ObjectRef};
-use kinogaki_render_api::{
-    Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface, SettingValues,
-};
+use kinogaki_render_api::{Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface};
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -438,7 +436,7 @@ pub struct RenderSetup {
     /// engine's ids (`EngineDescription::aovs`).
     pub outputs: Vec<Aov>,
     /// The engine's own settings, by its descriptors' names.
-    pub values: SettingValues,
+    pub values: crate::Parameters,
     /// What its render shows: a Comp network's result, or the raw render.
     pub processing: Processing,
     /// How many placements across the shutter a moving prim sends an

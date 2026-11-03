@@ -16,8 +16,8 @@
 //! Hosts make mesh prims from [`TriangleSource`]s: plain triangles, from a
 //! polygon mesh, a CAD tessellation or a CAM preview alike.
 //! [`RecordingEngine`] stores what it is sent, for hosts' tests.
-//! [`ramp`] is every ramp's encoding and maths: a node's ramp parameter,
-//! the inspector's ramp widget and an engine's color ramps evaluate alike.
+//! Every value a setting, a declared prim or a material port holds is the
+//! SDK's one value model ([`value`]: `Value`, `ValueKind`).
 //!
 //! The `wgpu` feature adds the `display` module: how a wgpu host
 //! shows an engine's frames as textures on its own device and makes
@@ -37,7 +37,6 @@ pub mod exchange;
 pub mod id;
 pub mod material;
 pub mod prim;
-pub mod ramp;
 pub mod ranges;
 pub mod recording;
 pub mod settings;
@@ -64,9 +63,8 @@ pub use id::{EngineId, IdAllocator, MaterialId, PrimId, TextureId};
 pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.
 pub use kinogaki_geometry::Detail;
-pub use material::{
-    Constant, ImageUse, Link, MaterialNetwork, NetworkError, NodeIndex, ShaderNode,
-};
+pub use kinogaki_value as value;
+pub use material::{ImageUse, Link, MaterialNetwork, NetworkError, NodeIndex, ShaderNode};
 pub use prim::{
     AttributeDomain, Camera, Instancer, Material, Mesh, MeshAttribute, Numbers, Prim, PrimKind,
     Projection, TexelFormat, Texture, TextureColorSpace,
@@ -74,15 +72,11 @@ pub use prim::{
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
 pub use settings::{
-    RenderSettings, SettingDescriptor, SettingError, SettingGroup, SettingKind, SettingValue,
-    SettingValues, Trailing, Unit,
+    RenderSettings, SettingDescriptor, SettingError, SettingGroup, Textures, Trailing,
 };
 pub use source::{Look, PlainTriangles, TriangleSource};
 pub use update::{Change, SceneUpdate};
-pub use vocabulary::{
-    Choice, InputEdit, Layout, NodeLayout, NodeType, ParamKind, ParamSpec, ParamValue, Params,
-    SocketKind, SocketSpec,
-};
+pub use vocabulary::{Layout, NodeLayout, NodeType, ParamSpec, SocketKind, SocketSpec};
 
 #[cfg(test)]
 mod tests;

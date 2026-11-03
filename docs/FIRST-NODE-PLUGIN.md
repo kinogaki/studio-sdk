@@ -51,7 +51,7 @@ Replace `src/lib.rs` with the box and its typed handle. `BOX` wraps a `BoxShape`
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::network::FlagSet;
-use kinogaki_studio_api::params::{Number, Parameter, ParameterKind};
+use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
@@ -237,7 +237,7 @@ impl NodeType for BoxNode {
         NodeTypeId::declared("acme.boxes.box_node")
     }
     fn description(&self) -> Description {
-        let vector = |number: Number| ParameterKind::Vector { components: 3, number };
+        let vector = |number: Number| ValueKind::Vector { components: 3, number };
         let sides = vector(Number::length().range(0.001, f64::INFINITY));
         let center = vector(Number::length());
         Description::new("Box")

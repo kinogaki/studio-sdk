@@ -1,7 +1,7 @@
 //! [`Schema`]: sections, headings and fields, top to bottom.
-use super::tone_curve::{self, ToneCurve};
+use super::tone_curve::ToneCurve;
 use super::{CurveChannel, FileDialog, Kind, Number, Socket, Text, Trailing};
-use kinogaki_studio_api::params::Value;
+use kinogaki_studio_api::params::{Choice, Value};
 
 /// What a property sheet shows, top to bottom. `K` is the owner's key for
 /// a field (an enum naming its slots, a parameter's name).
@@ -134,9 +134,9 @@ impl<K> Field<K> {
         )
     }
 
-    /// A working-space color field (RGB or RGBA).
-    pub fn color(key: K, label: impl Into<Text>, rgb: &[f64]) -> Self {
-        Self::new(key, label, Kind::Color, Some(Value::Numbers(rgb.to_vec())))
+    /// A working-space color field.
+    pub fn color(key: K, label: impl Into<Text>, rgb: [f64; 3]) -> Self {
+        Self::new(key, label, Kind::Color, Some(Value::Color(rgb)))
     }
 
     /// Linked RGBA channels (see [`Kind::Channels`]).
@@ -155,20 +155,18 @@ impl<K> Field<K> {
         )
     }
 
-    /// Tone curves, one a channel of `channels`, with room for `capacity`
-    /// keys a curve.
+    /// Tone curves, one a channel of `channels`.
     pub fn tone_curves(
         key: K,
         label: impl Into<Text>,
-        curves: &[ToneCurve],
+        curves: Vec<ToneCurve>,
         channels: Vec<CurveChannel>,
-        capacity: usize,
     ) -> Self {
         Self::new(
             key,
             label,
-            Kind::ToneCurves { channels, capacity },
-            Some(Value::Numbers(tone_curve::encode(curves, capacity))),
+            Kind::ToneCurves { channels },
+            Some(Value::ToneCurves(curves)),
         )
     }
 
@@ -177,12 +175,16 @@ impl<K> Field<K> {
         Self::new(key, label, Kind::Toggle, Some(Value::Bool(on)))
     }
 
-    /// Segmented choices, at `at`.
-    pub fn choice(key: K, label: impl Into<Text>, at: usize, items: Vec<Text>) -> Self {
-        Self::new(key, label, Kind::Choice(items), Some(Value::Index(at)))
+    /// A choice of `choices`, at the one keyed `chosen`.
+    pub fn choice(key: K, label: impl Into<Text>, chosen: &str, choices: Vec<Choice>) -> Self {
+        let kind = Kind::Choice {
+            choices,
+            unavailable: Vec::new(),
+        };
+        Self::new(key, label, kind, Some(Value::Choice(chosen.into())))
     }
 
-    /// A dropdown of `items`, at `at`.
+    /// A dropdown of `items`, at the one at `at`.
     pub fn dropdown(key: K, label: impl Into<Text>, at: usize, items: Vec<Text>) -> Self {
         Self::new(
             key,
@@ -192,7 +194,7 @@ impl<K> Field<K> {
                 available: Vec::new(),
                 info: None,
             },
-            Some(Value::Index(at)),
+            Some(Value::Integer(at as i64)),
         )
     }
 
@@ -448,21 +450,31 @@ impl<K: PartialEq> Schema<K> {
         self.field(key).and_then(|f| f.value.as_ref())
     }
 
-    /// The number at `key` (a number, slider or angle field).
+    /// The number at `key` (a number, slider or angle field; a stepper's
+    /// whole number as one).
     pub fn number(&self, key: &K) -> Option<f64> {
-        self.value(key).and_then(Value::number)
+        match self.value(key)? {
+            Value::Integer(n) => Some(*n as f64),
+            v => v.number(),
+        }
     }
 
-    /// The numbers at `key` (a vector or color field).
+    /// The numbers at `key` (a vector or channels field).
     pub fn numbers(&self, key: &K) -> Option<Vec<f64>> {
         self.value(key)
             .and_then(Value::numbers)
             .map(<[f64]>::to_vec)
     }
 
-    /// The chosen item at `key` (a dropdown or segmented field).
+    /// The chosen item's position at `key` (a dropdown field).
     pub fn index(&self, key: &K) -> Option<usize> {
-        self.value(key).and_then(Value::index)
+        let at = self.value(key).and_then(Value::integer)?;
+        usize::try_from(at).ok()
+    }
+
+    /// The chosen choice's key at `key` (a choice field).
+    pub fn choice(&self, key: &K) -> Option<&str> {
+        self.value(key).and_then(Value::choice)
     }
 
     /// Whether the toggle at `key` is on.

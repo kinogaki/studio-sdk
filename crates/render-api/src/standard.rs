@@ -22,11 +22,8 @@ use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
 use crate::declared::{Declared, PrimType, Role};
-use crate::id::TextureId;
-use crate::settings::{
-    SettingDescriptor, SettingGroup, SettingKind, SettingValue, Trailing, Unit, set_value,
-};
-use crate::vocabulary::Choice;
+use crate::settings::{SettingDescriptor, SettingGroup, Trailing};
+use kinogaki_value::{Choice, Condition, Number, Unit, Value, ValueKind};
 
 /// The area light's id.
 pub const AREA_LIGHT: &str = "kinogaki.render.area_light";
@@ -109,117 +106,78 @@ pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
     .into_iter()
     .chain(ILLUMINANTS.iter().map(|(n, l)| Choice::new(n, l)))
     .collect();
-    let number = |default, min, max, unit, step, decimals| SettingKind::Float {
-        default,
-        min,
-        max,
-        soft: (min, max),
-        decimals,
-        unit,
-        slider: false,
-        step,
+    let number = |min, max, unit, speed, decimals| {
+        ValueKind::Number(
+            Number::new(unit)
+                .range(min, max)
+                .speed(speed)
+                .decimals(decimals),
+        )
     };
+    let emission = |key| Condition::when("emission", choice(key));
     vec![
         SettingDescriptor::new(
             "emission",
             "Emission",
             LIGHT_GROUP,
-            SettingKind::Choice {
-                choices,
-                default: Arc::from("color"),
-                menu: true,
-            },
+            ValueKind::choice(choices),
+            choice("color"),
         )
         .trailing(Trailing::EmissionSwatch),
-        SettingDescriptor::new(
-            "color",
-            "Color",
-            LIGHT_GROUP,
-            SettingKind::Color { default: [1.0; 3] },
-        )
-        .shown_when("emission", choice("color")),
+        SettingDescriptor::new("color", "Color", LIGHT_GROUP, ValueKind::Color, [1.0; 3])
+            .shown_when(emission("color")),
         SettingDescriptor::new(
             "colorTemperature",
             "Temperature",
             LIGHT_GROUP,
-            number(
-                6500.0,
-                1000.0,
-                40_000.0,
-                Unit::Suffix(Arc::from(" K")),
-                10.0,
-                0,
-            ),
+            number(1000.0, 40_000.0, Unit::Suffix(Arc::from(" K")), 10.0, 0),
+            6500.0,
         )
         .requires(
-            "emission",
-            choice("temperature"),
+            emission("temperature"),
             "Used by the Color Temperature emission",
         ),
         SettingDescriptor::new(
             "intensity",
             "Intensity",
             LIGHT_GROUP,
-            number(intensity, 0.0, 1e12, Unit::None, 0.05, 2),
+            number(0.0, 1e12, Unit::Plain, 0.05, 2),
+            intensity,
         ),
         SettingDescriptor::new(
             "exposure",
             "Exposure",
             LIGHT_GROUP,
-            number(0.0, -100.0, 100.0, Unit::Suffix(Arc::from(" EV")), 0.05, 2),
+            number(-100.0, 100.0, Unit::Suffix(Arc::from(" EV")), 0.05, 2),
+            0.0,
         ),
     ]
 }
 
-/// A choice value.
-pub fn choice(name: &str) -> SettingValue {
-    SettingValue::Choice(Arc::from(name))
+/// A choice's value.
+pub fn choice(key: &str) -> Value {
+    Value::Choice(Arc::from(key))
 }
 
 /// A length in scene units, `min..=1e12`, dragged 0.01 a pixel.
-fn length(default: f64, min: f64) -> SettingKind {
-    SettingKind::Float {
-        default,
-        min,
-        max: 1e12,
-        soft: (min, 1e12),
-        decimals: 3,
-        unit: Unit::Length,
-        slider: false,
-        step: 0.01,
-    }
+fn length(min: f64) -> ValueKind {
+    ValueKind::Number(Number::length().range(min, 1e12).decimals(3).speed(0.01))
 }
 
 /// An angle in degrees, 0 to 180, its drag over `soft`.
-fn angle(default: f64, soft: (f64, f64)) -> SettingKind {
-    SettingKind::Float {
-        default,
-        min: 0.0,
-        max: 180.0,
-        soft,
-        decimals: 4,
-        unit: Unit::Angle,
-        slider: false,
-        step: 0.5,
-    }
+fn angle(soft: (f64, f64)) -> ValueKind {
+    let number = Number::angle().range(0.0, 180.0).soft(soft.0, soft.1);
+    ValueKind::Number(number.decimals(4).speed(0.5))
 }
 
-/// A slider over `min..=max` with three decimals unless `decimals`.
-pub fn slider(default: f64, min: f64, max: f64, soft: (f64, f64), decimals: u8) -> SettingKind {
-    SettingKind::Float {
-        default,
-        min,
-        max,
-        soft,
-        decimals,
-        unit: Unit::None,
-        slider: true,
-        step: 0.01,
-    }
+/// A slider over `min..=max`, its span `soft`, with `decimals`.
+pub fn slider(min: f64, max: f64, soft: (f64, f64), decimals: u8) -> ValueKind {
+    let number = Number::plain().range(min, max).soft(soft.0, soft.1);
+    ValueKind::Number(number.slider().decimals(decimals).speed(0.01))
 }
 
 fn toggle(name: &str, label: &str, group: &str, default: bool) -> SettingDescriptor {
-    SettingDescriptor::new(name, label, group, SettingKind::Bool { default })
+    SettingDescriptor::new(name, label, group, ValueKind::Toggle, default)
 }
 
 /// A standard light type: its `shape` parameters, then the emission's,
@@ -249,31 +207,29 @@ fn light_type(
 /// a disk (`radius`) in its XY plane, shining down its -Z; a 1 × 1
 /// rectangle of intensity 1 by default.
 pub(crate) fn area_light() -> PrimType {
+    let shapes = vec![
+        Choice::new("rectangle", "Rectangle"),
+        Choice::new("disk", "Disk"),
+    ];
     let shape = SettingDescriptor::new(
         "shape",
         "Shape",
         LIGHT_GROUP,
-        SettingKind::Choice {
-            choices: vec![
-                Choice::new("rectangle", "Rectangle"),
-                Choice::new("disk", "Disk"),
-            ],
-            default: Arc::from("rectangle"),
-            menu: true,
-        },
+        ValueKind::choice(shapes),
+        choice("rectangle"),
     );
-    let rectangle = || choice("rectangle");
+    let shaped = |key| Condition::when("shape", choice(key));
+    let size = |name, label, default| {
+        SettingDescriptor::new(name, label, LIGHT_GROUP, length(0.0), default)
+    };
     light_type(
         AREA_LIGHT,
         "Area Light",
         vec![
             shape,
-            SettingDescriptor::new("width", "Width", LIGHT_GROUP, length(1.0, 0.0))
-                .shown_when("shape", rectangle()),
-            SettingDescriptor::new("height", "Height", LIGHT_GROUP, length(1.0, 0.0))
-                .shown_when("shape", rectangle()),
-            SettingDescriptor::new("radius", "Radius", LIGHT_GROUP, length(0.5, 0.0))
-                .shown_when("shape", choice("disk")),
+            size("width", "Width", 1.0).shown_when(shaped("rectangle")),
+            size("height", "Height", 1.0).shown_when(shaped("rectangle")),
+            size("radius", "Radius", 0.5).shown_when(shaped("disk")),
         ],
         1.0,
         false,
@@ -287,6 +243,7 @@ pub(crate) fn area_light() -> PrimType {
 /// horizon it may shine `groundColor` instead (`ground`: a hemisphere
 /// gradient, the image's row hidden while it is on).
 pub(crate) fn dome_light() -> PrimType {
+    let ground = |on: bool| Condition::when("ground", on);
     light_type(
         DOME_LIGHT,
         "Dome Light",
@@ -299,13 +256,12 @@ pub(crate) fn dome_light() -> PrimType {
                 "groundColor",
                 "Ground Color",
                 LIGHT_GROUP,
-                SettingKind::Color {
-                    default: [0.1, 0.09, 0.07],
-                },
+                ValueKind::Color,
+                [0.1, 0.09, 0.07],
             )
-            .requires("ground", SettingValue::Bool(true), "Used with Ground on"),
-            SettingDescriptor::new("texture", "Image", LIGHT_GROUP, SettingKind::Image)
-                .shown_when("ground", SettingValue::Bool(false)),
+            .requires(ground(true), "Used with Ground on"),
+            SettingDescriptor::new("texture", "Image", LIGHT_GROUP, ValueKind::File, "")
+                .shown_when(ground(false)),
         ],
     )
 }
@@ -321,7 +277,8 @@ pub(crate) fn distant_light() -> PrimType {
             "angle",
             "Angle",
             LIGHT_GROUP,
-            angle(0.53, (0.0, 10.0)),
+            angle((0.0, 10.0)),
+            0.53,
         )],
         50_000.0,
         false,
@@ -338,18 +295,20 @@ pub(crate) fn spot_light() -> PrimType {
         SPOT_LIGHT,
         "Spot Light",
         vec![
-            SettingDescriptor::new("radius", "Radius", LIGHT_GROUP, length(0.1, 1e-6)),
+            SettingDescriptor::new("radius", "Radius", LIGHT_GROUP, length(1e-6), 0.1),
             SettingDescriptor::new(
                 "coneAngle",
                 "Cone Angle",
                 LIGHT_GROUP,
-                angle(30.0, (0.0, 90.0)),
+                angle((0.0, 90.0)),
+                30.0,
             ),
             SettingDescriptor::new(
                 "coneSoftness",
                 "Cone Softness",
                 LIGHT_GROUP,
-                slider(0.2, 0.0, 1.0, (0.0, 1.0), 2),
+                slider(0.0, 1.0, (0.0, 1.0), 2),
+                0.2,
             ),
         ],
         100.0,
@@ -369,90 +328,32 @@ pub fn lights() -> Vec<PrimType> {
 /// has at most one.
 pub(crate) fn fog() -> PrimType {
     const GROUP: &str = "fog";
-    let along = |default, min| SettingKind::Float {
-        default,
-        min,
-        max: 1e6,
-        soft: (min, 1e6),
-        decimals: 3,
-        unit: Unit::Length,
-        slider: false,
-        step: 0.01,
-    };
+    let along = |min| ValueKind::Number(Number::length().range(min, 1e6).decimals(3).speed(0.01));
+    let fog =
+        |name, label, kind, default: f64| SettingDescriptor::new(name, label, GROUP, kind, default);
     PrimType {
         id: Arc::from(FOG),
         label: Arc::from("Fog"),
         role: Role::Atmosphere,
         groups: vec![SettingGroup::new(GROUP, "Fog", true)],
         params: vec![
-            SettingDescriptor::new(
-                "density",
-                "Density",
-                GROUP,
-                slider(0.1, 0.0, 1e6, (0.0, 1.0), 3),
-            ),
-            SettingDescriptor::new(
-                "color",
-                "Color",
-                GROUP,
-                SettingKind::Color {
-                    default: [0.3, 0.34, 0.42],
-                },
-            ),
-            SettingDescriptor::new("start", "Start", GROUP, along(0.0, 0.0)),
-            SettingDescriptor::new("height", "Height", GROUP, along(0.0, -1e6)),
-            SettingDescriptor::new(
-                "falloff",
-                "Falloff",
-                GROUP,
-                slider(0.5, 0.0, 1e6, (0.0, 4.0), 3),
-            ),
+            fog("density", "Density", slider(0.0, 1e6, (0.0, 1.0), 3), 0.1),
+            SettingDescriptor::new("color", "Color", GROUP, ValueKind::Color, [0.3, 0.34, 0.42]),
+            fog("start", "Start", along(0.0), 0.0),
+            fog("height", "Height", along(-1e6), 0.0),
+            fog("falloff", "Falloff", slider(0.0, 1e6, (0.0, 4.0), 3), 0.5),
             toggle("inscatter", "In-scatter", GROUP, false),
-            SettingDescriptor::new(
+            fog(
                 "anisotropy",
                 "Anisotropy",
-                GROUP,
-                slider(0.3, -0.9, 0.9, (-0.9, 0.9), 3),
+                slider(-0.9, 0.9, (-0.9, 0.9), 3),
+                0.3,
             )
             .requires(
-                "inscatter",
-                SettingValue::Bool(true),
+                Condition::when("inscatter", true),
                 "Used with In-scatter on",
             ),
         ],
-    }
-}
-
-/// A dome's image: its file in a light value, the Texture prim the host
-/// decoded it to in a prim an engine receives.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ImageRef {
-    /// An image file's path, as typed (never empty).
-    File(Arc<str>),
-    /// The Texture prim its file was decoded to.
-    Prim(TextureId),
-}
-
-impl ImageRef {
-    /// A dome's image as setting `value` holds it (none: no image, or one
-    /// not read yet).
-    pub(crate) fn of_value(value: &SettingValue) -> Option<ImageRef> {
-        match value {
-            SettingValue::File(path) if !path.trim().is_empty() => {
-                Some(ImageRef::File(path.clone()))
-            }
-            SettingValue::Texture(Some(id)) => Some(ImageRef::Prim(*id)),
-            _ => None,
-        }
-    }
-
-    /// It as a setting's value (none: an empty file).
-    pub(crate) fn value(image: Option<&ImageRef>) -> SettingValue {
-        match image {
-            Some(ImageRef::File(path)) => SettingValue::File(path.clone()),
-            Some(ImageRef::Prim(id)) => SettingValue::Texture(Some(*id)),
-            None => SettingValue::File(Arc::from("")),
-        }
     }
 }
 
@@ -473,8 +374,10 @@ pub enum Shape {
     },
     /// A DomeLight.
     Dome {
-        /// The image (none: its color, evenly).
-        image: Option<ImageRef>,
+        /// The image's file, as typed (none: its color, evenly); an engine
+        /// reads the Texture prim the host decoded it to from its prim's
+        /// [`textures`](Declared::textures).
+        image: Option<Arc<str>>,
         /// An imageless dome's hemisphere gradient: below the horizon it
         /// shines this color, linear ACEScg, times its intensity and
         /// exposure; above it, its emission. None: one color all round.
@@ -553,7 +456,9 @@ impl Light {
                 height: prim.float("height"),
             },
             DOME_LIGHT => Shape::Dome {
-                image: prim.value("texture").and_then(ImageRef::of_value),
+                image: (prim.value("texture").and_then(Value::text))
+                    .filter(|path| !path.trim().is_empty())
+                    .map(Arc::from),
                 ground: prim.bool("ground").then(|| prim.color("groundColor")),
             },
             DISTANT_LIGHT => Shape::Distant {
@@ -593,9 +498,9 @@ impl Light {
     pub fn declared(&self) -> Declared {
         let ty = self.prim_type();
         let mut values = ty.defaults();
-        let mut set = |name: &str, v: SettingValue| set_value(&mut values, name, v);
-        let float = |v: f32| SettingValue::Float(f64::from(v));
-        let color = |c: [f32; 3]| SettingValue::Color(c.map(f64::from));
+        let mut set = |name: &str, v: Value| _ = values.insert(name.to_owned(), v);
+        let float = |v: f32| Value::Number(f64::from(v));
+        let color = |c: [f32; 3]| Value::Color(c.map(f64::from));
         match &self.shape {
             Shape::Rect { width, height } => {
                 set("shape", choice("rectangle"));
@@ -607,8 +512,8 @@ impl Light {
                 set("radius", float(*radius));
             }
             Shape::Dome { image, ground } => {
-                set("texture", ImageRef::value(image.as_ref()));
-                set("ground", SettingValue::Bool(ground.is_some()));
+                set("texture", Value::from(image.as_deref().unwrap_or("")));
+                set("ground", Value::Bool(ground.is_some()));
                 if let Some(g) = ground {
                     set("groundColor", color(*g));
                 }
@@ -628,11 +533,12 @@ impl Light {
         set("color", color(self.color));
         set("intensity", float(self.intensity));
         set("exposure", float(self.exposure));
-        set("normalize", SettingValue::Bool(self.normalize));
+        set("normalize", Value::Bool(self.normalize));
         set("colorTemperature", float(self.color_temperature));
         Declared {
             type_id: ty.id,
             values,
+            textures: Default::default(),
             xform: self.xform.clone(),
             visible: self.visible,
         }

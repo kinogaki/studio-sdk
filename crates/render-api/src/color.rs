@@ -3,7 +3,7 @@
 //! **One rule.** Authored colors (parameters, attributes, lights' and
 //! settings' values, material constants) are linear in the project's
 //! working space, wherever they are held: objects, render setups, a
-//! [`SettingValue::Color`](crate::SettingValue::Color) in a body. Colors
+//! `Value::Color` in a body. Colors
 //! reaching an engine (prims, materials, render settings) are linear
 //! ACEScg ([`RENDER_SPACE`]), and engines output it: the host converts
 //! each at that one boundary, as it sends it, through this service, and

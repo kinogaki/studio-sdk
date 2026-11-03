@@ -1,0 +1,12 @@
+[package]
+name = "kinogaki-value"
+description = "Kinogaki Studio's value model: declared ids, data values, and the one Value/ValueKind every parameter, render setting, declared prim value and material port holds"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

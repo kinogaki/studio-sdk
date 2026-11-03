@@ -12,9 +12,8 @@
 use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
-use crate::settings::{
-    SettingDescriptor, SettingGroup, SettingValue, SettingValues, defaults, value,
-};
+use crate::settings::{SettingDescriptor, SettingGroup, Textures, defaults};
+use kinogaki_value::{Parameters, Value};
 
 /// What a declared type is to a host: where it sits and how a viewport
 /// shows it.
@@ -44,7 +43,7 @@ pub struct PrimType {
 
 impl PrimType {
     /// Every parameter's default.
-    pub fn defaults(&self) -> SettingValues {
+    pub fn defaults(&self) -> Parameters {
         defaults(&self.params)
     }
 }
@@ -76,8 +75,12 @@ pub struct Declared {
     /// Its type's id.
     pub type_id: Arc<str>,
     /// Its values, by parameter name. A host sends every parameter the
-    /// engine declares for the type; one missing takes its default.
-    pub values: SettingValues,
+    /// engine declares for the type; one missing takes its default. An
+    /// image value is its file's path; an engine reads its texture.
+    pub values: Parameters,
+    /// Its image values' Texture prims (filled by the host as it sends the
+    /// prim).
+    pub textures: Textures,
     /// Prim to world across the shutter (unused by atmospheres).
     pub xform: Sampled<Xform>,
     /// Whether the camera sees it itself (a light lights the scene either
@@ -87,45 +90,40 @@ pub struct Declared {
 
 impl Declared {
     /// A prim of type `type_id` holding `values`, at the origin, visible.
-    pub fn new(type_id: &str, values: SettingValues) -> Declared {
+    pub fn new(type_id: &str, values: Parameters) -> Declared {
         Declared {
             type_id: Arc::from(type_id),
             values,
+            textures: Textures::new(),
             xform: Sampled::still(Xform::IDENTITY),
             visible: true,
         }
     }
 
     /// Value `name`.
-    pub fn value(&self, name: &str) -> Option<&SettingValue> {
-        value(&self.values, name)
+    pub fn value(&self, name: &str) -> Option<&Value> {
+        self.values.get(name)
     }
 
     /// Number `name`, as `f32` (0 when missing or not a number).
     pub fn float(&self, name: &str) -> f32 {
-        self.value(name)
-            .and_then(SettingValue::as_float)
-            .unwrap_or(0.0) as f32
+        self.value(name).and_then(Value::number).unwrap_or(0.0) as f32
     }
 
     /// Toggle `name` (off when missing).
     pub fn bool(&self, name: &str) -> bool {
-        self.value(name)
-            .and_then(SettingValue::as_bool)
-            .unwrap_or(false)
+        self.value(name).and_then(Value::bool).unwrap_or(false)
     }
 
-    /// Choice `name`'s name (empty when missing).
+    /// Choice `name`'s key (empty when missing).
     pub fn choice(&self, name: &str) -> &str {
-        self.value(name)
-            .and_then(SettingValue::as_choice)
-            .unwrap_or("")
+        self.value(name).and_then(Value::choice).unwrap_or("")
     }
 
     /// Color `name`, as `f32` (black when missing).
     pub fn color(&self, name: &str) -> [f32; 3] {
         self.value(name)
-            .and_then(SettingValue::as_color)
+            .and_then(Value::color)
             .unwrap_or([0.0; 3])
             .map(|c| c as f32)
     }

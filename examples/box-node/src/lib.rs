@@ -19,7 +19,7 @@
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::network::FlagSet;
-use kinogaki_studio_api::params::{Number, Parameter, ParameterKind};
+use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
@@ -235,7 +235,7 @@ impl NodeType for BoxNode {
     /// and one in the middle, and dragging them writes the size and the
     /// center. It is offered in Boxes networks, listed in Tab under Create.
     fn description(&self) -> Description {
-        let vector = |number: Number| ParameterKind::Vector {
+        let vector = |number: Number| ValueKind::Vector {
             components: 3,
             number,
         };

@@ -2,106 +2,26 @@
 //! values an engine describes itself ([`SettingDescriptor`]s, kept by
 //! name). The same descriptors describe the parameters of the prim types an
 //! engine declares ([`crate::PrimType`]): a light's size, a fog's density.
-//! A descriptor says what a value holds, how a UI edits it, and when it is
-//! shown or applies, so a host draws any engine's rows without knowing it.
+//! A descriptor says what a value holds ([`ValueKind`], the SDK's one
+//! value model), and when it is shown or applies, so a host draws any
+//! engine's rows without knowing it.
+//!
+//! Values are authored [`Value`]s by name ([`Parameters`]). An image value
+//! of a declared prim or a material node ([`ValueKind::File`]) is authored
+//! as its file's path; an engine receives the Texture prim the host decoded
+//! it to, in the prim's or node's [`Textures`].
 
 use kinogaki_geometry::Units;
+use kinogaki_value::{Condition, Parameters, Value, ValueKind};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::id::{PrimId, TextureId};
-use crate::ramp;
-use crate::vocabulary::Choice;
 
-/// A setting's value.
-#[derive(Clone, Debug, PartialEq)]
-pub enum SettingValue {
-    /// On or off.
-    Bool(bool),
-    /// A whole number.
-    Int(i64),
-    /// A number.
-    Float(f64),
-    /// One of a descriptor's choices, by name.
-    Choice(Arc<str>),
-    /// A color, linear: in the working space as authored, ACEScg as an
-    /// engine receives it ([`crate::color`]).
-    Color([f64; 3]),
-    /// A color ramp's keys, by ascending position (each key's value its
-    /// color).
-    ColorRamp(Arc<[ramp::Key]>),
-    /// Two numbers (an offset across a plane).
-    Vector2([f64; 2]),
-    /// An image file's path, as typed (empty: no image): what values and
-    /// projects hold.
-    File(Arc<str>),
-    /// The Texture prim the host decoded a file to (none: no image, or
-    /// one not read yet): what an engine receives.
-    Texture(Option<TextureId>),
-}
-
-impl SettingValue {
-    /// A toggle's state.
-    pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            SettingValue::Bool(on) => Some(*on),
-            _ => None,
-        }
-    }
-
-    /// A number.
-    pub fn as_float(&self) -> Option<f64> {
-        match self {
-            SettingValue::Float(v) => Some(*v),
-            _ => None,
-        }
-    }
-
-    /// A choice's name.
-    pub(crate) fn as_choice(&self) -> Option<&str> {
-        match self {
-            SettingValue::Choice(name) => Some(name),
-            _ => None,
-        }
-    }
-
-    /// A color.
-    pub fn as_color(&self) -> Option<[f64; 3]> {
-        match self {
-            SettingValue::Color(c) => Some(*c),
-            _ => None,
-        }
-    }
-}
-
-/// Whether `keys` make a color ramp of at most `most` keys: at least
-/// one, positions ascending in 0..=1, colors finite and not negative.
-fn is_ramp(keys: &[ramp::Key], most: usize) -> bool {
-    (1..=most).contains(&keys.len())
-        && keys.windows(2).all(|p| p[0].position <= p[1].position)
-        && keys
-            .iter()
-            .all(|k| (0.0..=1.0).contains(&k.position) && is_color(&k.value))
-}
-
-fn is_color(c: &[f64; 3]) -> bool {
-    c.iter().all(|v| v.is_finite() && *v >= 0.0)
-}
-
-/// Engine setting values, by descriptor name.
-pub type SettingValues = Vec<(Arc<str>, SettingValue)>;
-
-/// Value `name` in `values`.
-pub fn value<'a>(values: &'a SettingValues, name: &str) -> Option<&'a SettingValue> {
-    values.iter().find(|(n, _)| &**n == name).map(|(_, v)| v)
-}
-
-/// Set value `name` in `values`.
-pub fn set_value(values: &mut SettingValues, name: &str, new: SettingValue) {
-    match values.iter_mut().find(|(n, _)| &**n == name) {
-        Some((_, v)) => *v = new,
-        None => values.push((Arc::from(name), new)),
-    }
-}
+/// The Texture prims the host decoded image values to, by the value's
+/// name: what an engine reads for each [`ValueKind::File`] value (one
+/// missing: no image, or one not read yet).
+pub type Textures = BTreeMap<String, TextureId>;
 
 /// What a render reads: the fields every engine needs, and the engine's
 /// own values by name.
@@ -117,7 +37,7 @@ pub struct RenderSettings {
     pub units: Units,
     /// The engine's settings, by its descriptors' names; one missing takes
     /// its descriptor's default.
-    pub values: SettingValues,
+    pub values: Parameters,
 }
 
 impl Default for RenderSettings {
@@ -126,160 +46,9 @@ impl Default for RenderSettings {
             resolution: [1920, 1080],
             camera: None,
             units: Units::METERS,
-            values: Vec::new(),
+            values: Parameters::new(),
         }
     }
-}
-
-impl RenderSettings {
-    /// Value `name`, as set.
-    pub fn value(&self, name: &str) -> Option<&SettingValue> {
-        value(&self.values, name)
-    }
-
-    /// Set value `name`.
-    pub fn set(&mut self, name: &str, value: SettingValue) {
-        set_value(&mut self.values, name, value);
-    }
-}
-
-/// The type, default and range of a setting.
-#[derive(Clone, Debug, PartialEq)]
-pub enum SettingKind {
-    /// On or off.
-    Bool {
-        /// Its default.
-        default: bool,
-    },
-    /// A whole number in `min..=max`.
-    Int {
-        /// Its default.
-        default: i64,
-        /// The smallest.
-        min: i64,
-        /// The largest.
-        max: i64,
-    },
-    /// A number in `min..=max`: a slider over `soft`, or a field dragged
-    /// `step` a pixel.
-    Float {
-        /// Its default.
-        default: f64,
-        /// The smallest.
-        min: f64,
-        /// The largest.
-        max: f64,
-        /// The range a slider (or an angle's drag) covers.
-        soft: (f64, f64),
-        /// Decimals shown.
-        decimals: u8,
-        /// What it measures.
-        unit: Unit,
-        /// A slider rather than a dragged field.
-        slider: bool,
-        /// How much a dragged field changes a pixel.
-        step: f64,
-    },
-    /// Two numbers, each in `min..=max`, dragged `step` a pixel.
-    Vector2 {
-        /// Its default.
-        default: [f64; 2],
-        /// The smallest.
-        min: f64,
-        /// The largest.
-        max: f64,
-        /// What they measure.
-        unit: Unit,
-        /// How much a drag changes them a pixel.
-        step: f64,
-    },
-    /// An image file read as color: values hold its path
-    /// ([`SettingValue::File`], none by default), and the host decodes it
-    /// and sends its Texture prim ([`SettingValue::Texture`]).
-    Image,
-    /// One of named choices; `menu` shows them as a dropdown (else as
-    /// segments).
-    Choice {
-        /// The choices.
-        choices: Vec<Choice>,
-        /// The default's name.
-        default: Arc<str>,
-        /// A dropdown rather than segments.
-        menu: bool,
-    },
-    /// A color (linear, as [`SettingValue::Color`]; channels not
-    /// negative).
-    Color {
-        /// Its default.
-        default: [f64; 3],
-    },
-    /// A color ramp: keys from 0 to 1, each with its interpolation
-    /// (`ramp::color_at` reads it).
-    ColorRamp {
-        /// Its default keys.
-        default: Arc<[ramp::Key]>,
-        /// The most keys the engine takes: a ramp with more is refused
-        /// ([`SettingDescriptor::accepts`]), never cut short.
-        most: usize,
-    },
-}
-
-impl SettingKind {
-    /// Whether a setting of this kind can be keyed over time unless its
-    /// engine says otherwise: every kind but an image.
-    pub fn animatable(&self) -> bool {
-        !matches!(self, SettingKind::Image)
-    }
-}
-
-/// What a number measures, for how a UI shows it.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub enum Unit {
-    /// A plain number.
-    #[default]
-    None,
-    /// A length in scene units: hosts show it in their length unit, with
-    /// that unit's decimals.
-    Length,
-    /// An angle in degrees.
-    Angle,
-    /// A number shown with this text after it (" K", " EV").
-    Suffix(Arc<str>),
-}
-
-/// A setting holding a value: what [`Visibility::When`] and a group's
-/// [`SettingGroup::open_with`] test.
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Condition {
-    /// The setting tested.
-    pub(crate) setting: Arc<str>,
-    /// The value it holds.
-    pub(crate) value: SettingValue,
-}
-
-impl Condition {
-    /// Setting `setting` holding `value`.
-    pub(crate) fn new(setting: &str, value: SettingValue) -> Condition {
-        Condition {
-            setting: Arc::from(setting),
-            value,
-        }
-    }
-
-    /// Whether `values` meet it (a setting missing from them does not).
-    pub(crate) fn met(&self, values: &SettingValues) -> bool {
-        value(values, &self.setting) == Some(&self.value)
-    }
-}
-
-/// When a UI shows a setting's row.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) enum Visibility {
-    /// Always.
-    #[default]
-    Always,
-    /// While a setting holds a value (a rectangle's width).
-    When(Condition),
 }
 
 /// What a UI shows after a setting's row.
@@ -292,18 +61,6 @@ pub enum Trailing {
     EmissionSwatch,
 }
 
-/// When a setting applies: while setting `setting` holds `value` (else a UI
-/// shows it disabled, saying `reason`).
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Requirement {
-    /// The setting it depends on.
-    pub(crate) setting: Arc<str>,
-    /// The value it needs.
-    pub(crate) value: SettingValue,
-    /// Why it does not apply otherwise.
-    pub(crate) reason: Arc<str>,
-}
-
 /// A group of settings: a section of the inspector.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SettingGroup {
@@ -313,9 +70,9 @@ pub struct SettingGroup {
     pub label: Arc<str>,
     /// Whether it starts open.
     pub open: bool,
-    /// A toggle that opens it when on, whatever `open` says (a gobo's
-    /// section).
-    pub open_with: Option<Arc<str>>,
+    /// Open whatever `open` says while this holds (a gobo's section while
+    /// its toggle is on).
+    pub(crate) open_when: Option<Condition>,
 }
 
 impl SettingGroup {
@@ -325,17 +82,13 @@ impl SettingGroup {
             name: Arc::from(name),
             label: Arc::from(label),
             open,
-            open_with: None,
+            open_when: None,
         }
     }
 
     /// Whether it starts open, its settings holding `values`.
-    pub fn is_open(&self, values: &SettingValues) -> bool {
-        self.open
-            || self
-                .open_with
-                .as_ref()
-                .is_some_and(|t| value(values, t) == Some(&SettingValue::Bool(true)))
+    pub fn is_open(&self, values: &Parameters) -> bool {
+        self.open || self.open_when.as_ref().is_some_and(|c| c.met(values))
     }
 }
 
@@ -346,38 +99,48 @@ pub struct SettingDescriptor {
     pub name: Arc<str>,
     /// What a UI labels it.
     pub label: Arc<str>,
-    /// Its type, default and range.
-    pub kind: SettingKind,
+    /// What it holds.
+    pub kind: ValueKind,
+    /// Its default, a value its kind takes.
+    pub default: Value,
     /// The group it sits in (a [`SettingGroup::name`]).
     pub group: Arc<str>,
     /// What it means, where its label alone does not say.
     pub tooltip: Option<Arc<str>>,
-    /// When it applies (none: always).
-    pub(crate) requires: Option<Requirement>,
-    /// When its row is shown.
-    pub(crate) visible: Visibility,
+    /// When it applies, and why it doesn't otherwise (a UI shows it
+    /// disabled, saying so); none: always.
+    pub(crate) requires: Option<(Condition, Arc<str>)>,
+    /// When its row is shown; none: always.
+    pub(crate) shown_when: Option<Condition>,
     /// What its row shows after it.
     pub trailing: Option<Trailing>,
     /// Whether a host may key it over time. Its kind gives the default
-    /// ([`SettingKind::animatable`]); an engine turns it off for a value
+    /// ([`ValueKind::animatable`]); an engine turns it off for a value
     /// whose change should be one deliberate edit (a sample cap).
     pub animatable: bool,
 }
 
 impl SettingDescriptor {
-    /// Setting `name`, labelled `label`, of `kind`, in group `group`:
-    /// always shown and applying, without a tooltip.
-    pub fn new(name: &str, label: &str, group: &str, kind: SettingKind) -> SettingDescriptor {
+    /// Setting `name`, labelled `label`, of `kind` at `default`, in group
+    /// `group`: always shown and applying, without a tooltip.
+    pub fn new(
+        name: &str,
+        label: &str,
+        group: &str,
+        kind: ValueKind,
+        default: impl Into<Value>,
+    ) -> SettingDescriptor {
         SettingDescriptor {
             name: Arc::from(name),
             label: Arc::from(label),
             group: Arc::from(group),
             tooltip: None,
             requires: None,
-            visible: Visibility::Always,
+            shown_when: None,
             trailing: None,
             animatable: kind.animatable(),
             kind,
+            default: default.into(),
         }
     }
 
@@ -393,25 +156,15 @@ impl SettingDescriptor {
         self
     }
 
-    /// It, applying while `setting` holds `value` (else disabled, saying
-    /// `reason`).
-    pub(crate) fn requires(
-        mut self,
-        setting: &str,
-        value: SettingValue,
-        reason: &str,
-    ) -> SettingDescriptor {
-        self.requires = Some(Requirement {
-            setting: Arc::from(setting),
-            value,
-            reason: Arc::from(reason),
-        });
+    /// It, applying while `when` holds (else disabled, saying `reason`).
+    pub(crate) fn requires(mut self, when: Condition, reason: &str) -> SettingDescriptor {
+        self.requires = Some((when, Arc::from(reason)));
         self
     }
 
-    /// It, shown while `setting` holds `value`.
-    pub(crate) fn shown_when(mut self, setting: &str, value: SettingValue) -> SettingDescriptor {
-        self.visible = Visibility::When(Condition::new(setting, value));
+    /// It, shown while `when` holds.
+    pub(crate) fn shown_when(mut self, when: Condition) -> SettingDescriptor {
+        self.shown_when = Some(when);
         self
     }
 
@@ -422,55 +175,18 @@ impl SettingDescriptor {
     }
 
     /// Whether its row shows while the settings hold `values`.
-    pub fn is_shown(&self, values: &SettingValues) -> bool {
-        match &self.visible {
-            Visibility::Always => true,
-            Visibility::When(c) => c.met(values),
-        }
+    pub fn is_shown(&self, values: &Parameters) -> bool {
+        self.shown_when.as_ref().is_none_or(|c| c.met(values))
     }
 
     /// Whether it applies while the settings hold `values`.
-    pub fn applies(&self, values: &SettingValues) -> bool {
-        self.requires
-            .as_ref()
-            .is_none_or(|r| value(values, &r.setting) == Some(&r.value))
+    pub fn applies(&self, values: &Parameters) -> bool {
+        self.requires.as_ref().is_none_or(|(c, _)| c.met(values))
     }
 
-    /// Its default value.
-    pub fn default_value(&self) -> SettingValue {
-        match &self.kind {
-            SettingKind::Bool { default } => SettingValue::Bool(*default),
-            SettingKind::Int { default, .. } => SettingValue::Int(*default),
-            SettingKind::Float { default, .. } => SettingValue::Float(*default),
-            SettingKind::Choice { default, .. } => SettingValue::Choice(default.clone()),
-            SettingKind::Color { default } => SettingValue::Color(*default),
-            SettingKind::ColorRamp { default, .. } => SettingValue::ColorRamp(default.clone()),
-            SettingKind::Vector2 { default, .. } => SettingValue::Vector2(*default),
-            SettingKind::Image => SettingValue::File(Arc::from("")),
-        }
-    }
-
-    /// Whether `value` is of its type and in its range.
-    pub fn accepts(&self, value: &SettingValue) -> bool {
-        match (&self.kind, value) {
-            (SettingKind::Bool { .. }, SettingValue::Bool(_)) => true,
-            (SettingKind::Int { min, max, .. }, SettingValue::Int(v)) => (min..=max).contains(&v),
-            (SettingKind::Float { min, max, .. }, SettingValue::Float(v)) => {
-                v.is_finite() && (min..=max).contains(&v)
-            }
-            (SettingKind::Choice { choices, .. }, SettingValue::Choice(name)) => {
-                choices.iter().any(|c| c.name == *name)
-            }
-            (SettingKind::Color { .. }, SettingValue::Color(c)) => is_color(c),
-            (SettingKind::ColorRamp { most, .. }, SettingValue::ColorRamp(keys)) => {
-                is_ramp(keys, *most)
-            }
-            (SettingKind::Vector2 { min, max, .. }, SettingValue::Vector2(v)) => {
-                v.iter().all(|c| c.is_finite() && (min..=max).contains(&c))
-            }
-            (SettingKind::Image, SettingValue::File(_) | SettingValue::Texture(_)) => true,
-            _ => false,
-        }
+    /// Whether `value` is of its kind and within its limits.
+    pub fn accepts(&self, value: &Value) -> bool {
+        self.kind.check(value).is_ok()
     }
 }
 
@@ -479,7 +195,7 @@ impl SettingDescriptor {
 pub enum SettingError {
     /// No descriptor has this name.
     Unknown(Arc<str>),
-    /// The value is of another type or out of range.
+    /// The value is of another kind or out of range.
     Invalid(Arc<str>),
 }
 
@@ -492,26 +208,23 @@ impl std::fmt::Display for SettingError {
     }
 }
 
-/// Every descriptor's default, in their order.
-pub fn defaults(descriptors: &[SettingDescriptor]) -> SettingValues {
-    descriptors
-        .iter()
-        .map(|d| (d.name.clone(), d.default_value()))
+/// Every descriptor's default.
+pub fn defaults(descriptors: &[SettingDescriptor]) -> Parameters {
+    (descriptors.iter())
+        .map(|d| (d.name.to_string(), d.default.clone()))
         .collect()
 }
 
 /// `values` made to fit `descriptors`: each descriptor's value from
-/// `values` when it fits, else its default, in the descriptors' order.
-/// Values no descriptor names are dropped.
-pub fn fit(descriptors: &[SettingDescriptor], values: &SettingValues) -> SettingValues {
-    descriptors
-        .iter()
+/// `values` when it fits, else its default. Values no descriptor names are
+/// dropped.
+pub fn fit(descriptors: &[SettingDescriptor], values: &Parameters) -> Parameters {
+    (descriptors.iter())
         .map(|d| {
-            let v = value(values, &d.name)
+            let v = (values.get(&*d.name))
                 .filter(|v| d.accepts(v))
-                .cloned()
-                .unwrap_or_else(|| d.default_value());
-            (d.name.clone(), v)
+                .unwrap_or(&d.default);
+            (d.name.to_string(), v.clone())
         })
         .collect()
 }
@@ -519,15 +232,14 @@ pub fn fit(descriptors: &[SettingDescriptor], values: &SettingValues) -> Setting
 /// Check `values` against `descriptors`: each names one and fits it.
 pub fn validate(
     descriptors: &[SettingDescriptor],
-    values: &SettingValues,
+    values: &Parameters,
 ) -> Result<(), SettingError> {
     for (name, value) in values {
-        let d = descriptors
-            .iter()
-            .find(|d| d.name == *name)
-            .ok_or_else(|| SettingError::Unknown(name.clone()))?;
+        let d = (descriptors.iter())
+            .find(|d| *d.name == **name)
+            .ok_or_else(|| SettingError::Unknown(Arc::from(name.as_str())))?;
         if !d.accepts(value) {
-            return Err(SettingError::Invalid(name.clone()));
+            return Err(SettingError::Invalid(d.name.clone()));
         }
     }
     Ok(())

@@ -605,14 +605,14 @@ impl HostSettings for FakeHost {
 
 /// Lengths in millimetres with two places; angles in degrees.
 impl UnitsService for FakeHost {
-    fn parse(&self, text: &str, current: f64, _unit: Unit) -> Option<f64> {
+    fn parse(&self, text: &str, current: f64, _unit: &Unit) -> Option<f64> {
         let text = text.trim();
         match text.strip_prefix("+=") {
             Some(by) => by.trim().parse::<f64>().ok().map(|by| current + by),
             None => text.trim_end_matches("mm").trim().parse().ok(),
         }
     }
-    fn format(&self, stored: f64, unit: Unit, decimals: usize) -> String {
+    fn format(&self, stored: f64, unit: &Unit, decimals: usize) -> String {
         match unit {
             Unit::Length | Unit::Millimeters => format!("{stored:.decimals$} mm"),
             Unit::Angle => format!("{stored:.decimals$}°"),

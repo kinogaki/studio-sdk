@@ -5,7 +5,7 @@ use kinogaki_studio_api::cook::{Handle, HandleKind, NodeType, Port, Vector};
 use kinogaki_studio_api::network::{
     Flag, FlagSet, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, Place, Wire,
 };
-use kinogaki_studio_api::params::{Number, Parameter, ParameterKind, Value};
+use kinogaki_studio_api::params::{Number, Parameter, Value, ValueKind};
 use kinogaki_studio_api::{
     ContextId, CookCx, CookError, Data, DataTypeId, Description, NodeRef, NodeTypeId, ObjectRef,
     Outputs, Package, PackageId, Schema, Typed,
@@ -25,7 +25,7 @@ const SOURCE: &str = "acme.numbers.source";
 const ADD: &str = "acme.numbers.add";
 
 fn value_parameter(name: &str, label: &str, default: f64) -> Parameter {
-    Parameter::new(name, label, ParameterKind::Number(Number::plain()), default)
+    Parameter::new(name, label, ValueKind::Number(Number::plain()), default)
 }
 
 /// Makes its `value`.

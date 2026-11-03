@@ -37,8 +37,9 @@ pub use code::{CodeLanguage, Completion, Completions, PlainText, Token, TokenCla
 pub use edits::{Action, Edits};
 pub use keyed::{FieldKey, Keyed};
 pub use kind::{
-    Chip, CurveChannel, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing,
+    Chip, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing, segments,
 };
+pub use kinogaki_studio_api::params::{Choice, CurveChannel};
 pub use number::{Number, NumberStyle};
 pub use schema::{Animation, Field, Item, Schema, Section};
 

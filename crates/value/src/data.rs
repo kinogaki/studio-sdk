@@ -3,7 +3,7 @@
 //! for wrapping and reading its own values.
 //!
 //! The environment never looks inside a [`Data`]: it reaches it only
-//! through the [`DataType`](crate::DataType) registered for its id. A
+//! through the `DataType` registered for its id. A
 //! kernel and the node packages over it read the value directly, through
 //! the kernel's [`Typed`] handle. Downcasts work across packages because
 //! the whole program holds one copy of each kernel crate, so a kernel
@@ -71,7 +71,7 @@ impl Data {
 /// ([`ptr_eq`](Data::ptr_eq)). Values are immutable, so an edit always
 /// makes a new allocation and identity is exact; content equality, where
 /// something needs it across allocations (a value read back from a file),
-/// is the data type's [`stamp`](crate::DataType::stamp).
+/// is the data type's `stamp`.
 impl PartialEq for Data {
     fn eq(&self, other: &Self) -> bool {
         self.ty == other.ty && self.ptr_eq(other)
@@ -88,7 +88,7 @@ impl fmt::Debug for Data {
 /// type its values are, so wrapping and reading can't mix them up.
 ///
 /// ```
-/// use kinogaki_studio_api::{DataTypeId, Typed};
+/// use kinogaki_value::{DataTypeId, Typed};
 ///
 /// struct Points(Vec<[f64; 3]>);
 /// let points = Typed::<Points>::new(DataTypeId::declared("acme.points.cloud"));

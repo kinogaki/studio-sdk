@@ -3,10 +3,7 @@
 //! engine declares (and as nothing for an engine that declares none), a
 //! render setup names its engine, size, camera and settings, and a kind
 //! without either answers neither.
-use kinogaki_render_api::{
-    EngineDescription, EngineId, RecordingEngine, RenderEngine, SettingValue, SettingValues,
-    settings, standard,
-};
+use kinogaki_render_api::{EngineDescription, EngineId, RecordingEngine, RenderEngine, standard};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::*;
 use std::sync::Arc;
@@ -59,11 +56,7 @@ impl RenderedKind for LampPrims {
             return Vec::new();
         };
         let mut values = area_light().defaults();
-        settings::set_value(
-            &mut values,
-            "intensity",
-            SettingValue::Float(lamp.intensity),
-        );
+        values.insert("intensity".into(), Value::Number(lamp.intensity));
         vec![kinogaki_render_api::Declared::new(
             standard::AREA_LIGHT,
             values,
@@ -78,7 +71,7 @@ impl RenderedKind for LampPrims {
         let [spot] = declared else {
             return None;
         };
-        let intensity = spot.value("intensity")?.as_float()?;
+        let intensity = spot.value("intensity")?.number()?;
         Some(Arc::new(Lamp { intensity }))
     }
 }
@@ -93,7 +86,7 @@ impl RenderSetupKind for Setups {
             camera: setup.camera,
             output: "render.exr".into(),
             outputs: Vec::new(),
-            values: SettingValues::default(),
+            values: Parameters::new(),
             processing: Processing::Network { source: None },
             motion_samples: kinogaki_studio_api::MOTION_SAMPLES.1,
         })
@@ -170,16 +163,11 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     let mut declared = rendered.declared(&lamp);
     assert_eq!(declared.len(), 1);
     assert_eq!(&*declared[0].type_id, standard::AREA_LIGHT);
-    assert_eq!(
-        declared[0].value("intensity"),
-        Some(&SettingValue::Float(4.0))
-    );
+    assert_eq!(declared[0].value("intensity"), Some(&Value::Number(4.0)));
     // An edit comes back as a new body.
-    settings::set_value(
-        &mut declared[0].values,
-        "intensity",
-        SettingValue::Float(9.0),
-    );
+    declared[0]
+        .values
+        .insert("intensity".into(), Value::Number(9.0));
     let edited = rendered.with_declared(&lamp, &declared).unwrap();
     assert_eq!(edited.downcast_ref::<Lamp>().unwrap().intensity, 9.0);
     // Two prims don't fit a lamp; another kind's body is none of its.

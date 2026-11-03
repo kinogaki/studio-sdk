@@ -62,8 +62,8 @@ pub struct Reads {
     pub selection: bool,
     /// What its path parameters name ([`CookCx::object`],
     /// [`CookCx::path`]): core resolves each of its
-    /// [`Path`](crate::params::ParameterKind::Path) and
-    /// [`Reference`](crate::params::ParameterKind::Reference) parameters,
+    /// [`Path`](crate::params::ValueKind::Path) and
+    /// [`Reference`](crate::params::ValueKind::Reference) parameters,
     /// cooks what they name first, and recooks the node when what they
     /// resolve to changes.
     pub objects: bool,

@@ -128,11 +128,12 @@ fn a_held_node_type_names_a_registered_delta() {
 #[test]
 fn a_port_required_while_a_parameter_holds_a_value() {
     let tools = Port::new("tools", "Tools", DataTypeId::declared("acme.trees.wood"))
-        .required_when("operation", Value::Index(1));
+        .required_when("operation", Value::Choice("subtract".into()));
     assert!(tools.optional);
-    let mut parameters = Parameters::from([("operation".to_owned(), Value::Index(0))]);
+    let mut parameters =
+        Parameters::from([("operation".to_owned(), Value::Choice("union".into()))]);
     assert!(!tools.required(&parameters));
-    parameters.insert("operation".into(), Value::Index(1));
+    parameters.insert("operation".into(), Value::Choice("subtract".into()));
     assert!(tools.required(&parameters));
     assert!(
         Port::new("trunk", "Trunk", DataTypeId::declared("acme.trees.wood")).required(&parameters)

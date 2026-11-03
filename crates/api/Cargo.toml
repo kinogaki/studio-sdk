@@ -10,6 +10,8 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+# The value model: ids, data, values and their kinds.
+kinogaki-value.workspace = true
 # The standard geometry values: the standard data types.
 kinogaki-geometry.workspace = true
 # The edit contracts kernels and core share: selection rules and modes,

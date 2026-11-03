@@ -15,7 +15,8 @@ fn engines_declare_types_and_apply_schemas_to_them() {
             "gobo",
             "Gobo",
             "gobo",
-            SettingKind::Bool { default: false },
+            kinogaki_value::ValueKind::Toggle,
+            false,
         )],
     };
     d.applied.push(gobo);
@@ -78,7 +79,7 @@ impl MaterialRules for Rules {
         let Tint::Color(c) = tint else { unreachable!() };
         MaterialNetwork::single(
             self.engine.clone(),
-            ShaderNode::new("flat").with("color", Constant::Color(*c)),
+            ShaderNode::new("flat").with("color", c.map(f64::from)),
         )
     }
     fn default_material(&self) -> MaterialNetwork {
@@ -115,8 +116,10 @@ fn another_engines_material_is_adopted_flat_in_its_tint() {
     let adopted = here.adopt(flat_of("there"), &there);
     assert_eq!(adopted.engine.as_str(), "here");
     assert_eq!(
-        adopted.nodes[0].value("color"),
-        Some(Constant::Color([0.1, 0.2, 0.3]))
+        adopted.nodes[0].values.get("color"),
+        Some(&kinogaki_value::Value::Color(
+            [0.1_f32, 0.2, 0.3].map(f64::from)
+        ))
     );
     // No one tint: the default material.
     there.materials = Arc::new(Rules {

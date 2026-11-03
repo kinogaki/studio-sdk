@@ -22,13 +22,13 @@ use std::sync::Mutex;
 
 /// Whether `text` is a well-formed id: three dot-separated segments, each
 /// a lowercase ASCII letter followed by lowercase letters, digits and `_`.
-pub(crate) const fn well_formed(text: &str) -> bool {
+const fn well_formed(text: &str) -> bool {
     segments_well_formed(text, 3)
 }
 
 /// Whether `text` is a well-formed package id: two segments of the form
 /// [`well_formed`] describes (`kinogaki.mesh`).
-pub(crate) const fn package_well_formed(text: &str) -> bool {
+const fn package_well_formed(text: &str) -> bool {
     segments_well_formed(text, 2)
 }
 
@@ -59,9 +59,15 @@ const fn segments_well_formed(text: &str, segments: usize) -> bool {
     !start && count == segments
 }
 
+/// `text` interned, when it is a well-formed id: an id another crate
+/// keeps as text (a render engine's) checked by the same rule.
+pub fn parse_text(text: &str) -> Option<&'static str> {
+    well_formed(text).then(|| intern(text))
+}
+
 /// The one table of every id's text: each distinct text is leaked once and
 /// shared by every id type that names it.
-pub(crate) fn intern(text: &str) -> &'static str {
+fn intern(text: &str) -> &'static str {
     static TEXTS: Mutex<BTreeSet<&'static str>> = Mutex::new(BTreeSet::new());
     // A panic while holding the lock can't leave the set inconsistent
     // (insertion is the only write), so a poisoned lock is still usable.
@@ -133,14 +139,14 @@ macro_rules! declare_id {
 declare_id!(
     /// A data type: what a wire carries and what an object's result is
     /// (`kinogaki.mesh.geometry`, `kinogaki.cad.body`). Registered by a
-    /// kernel package's [`DataType`](crate::DataType).
+    /// kernel package's `DataType`.
     DataTypeId,
     "data type"
 );
 declare_id!(
     /// A kind of scene object (`kinogaki.core.part`,
     /// `kinogaki.mesh.object`). Registered by an
-    /// [`ObjectKindSpec`](crate::ObjectKindSpec).
+    /// `ObjectKindSpec`.
     ObjectKindId,
     "object kind"
 );
@@ -153,7 +159,7 @@ declare_id!(
 );
 declare_id!(
     /// A file format (`kinogaki.format.obj`). Registered by a
-    /// [`FileFormat`](crate::FileFormat).
+    /// `FileFormat`.
     FormatId,
     "format"
 );
@@ -165,27 +171,27 @@ declare_id!(
 );
 declare_id!(
     /// A package's session slot (`kinogaki.mesh.selection`). Registered
-    /// by a [`SessionSlot`](crate::SessionSlot).
+    /// by a `SessionSlot`.
     SlotId,
     "session slot"
 );
 declare_id!(
     /// A package's stored value (`kinogaki.core.tolerances`): what names
     /// it in the project and the user's settings. Registered by a
-    /// [`StoredValue`](crate::StoredValue).
+    /// `StoredValue`.
     StoredId,
     "stored value"
 );
 declare_id!(
     /// A B-rep mesher (`kinogaki.cad.mesher`). Registered by a
-    /// [`Mesher`](crate::mesher::Mesher).
+    /// `Mesher`.
     MesherId,
     "mesher"
 );
 declare_id!(
     /// A creation: one way menus, keys and shelves make a node
-    /// ([`NodeCreation`](crate::network::NodeCreation)) or an object
-    /// ([`KindCreation`](crate::KindCreation)), under its package's vendor
+    /// (`NodeCreation`) or an object
+    /// (`KindCreation`), under its package's vendor
     /// (`kinogaki.render.spot_light`).
     CreationId,
     "creation"
@@ -219,7 +225,7 @@ impl PackageId {
     }
 
     /// The vendor, the first segment (`kinogaki`).
-    pub(crate) fn vendor(self) -> &'static str {
+    pub fn vendor(self) -> &'static str {
         self.0.split_once('.').map_or(self.0, |(vendor, _)| vendor)
     }
 }

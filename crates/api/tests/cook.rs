@@ -50,7 +50,7 @@ impl NodeType for Scale {
             .parameters(Schema::default().parameter(params::Parameter::new(
                 "factor",
                 "Factor",
-                params::ParameterKind::Number(params::Number::plain()),
+                params::ValueKind::Number(params::Number::plain()),
                 1.0,
             )))
     }
@@ -351,7 +351,7 @@ fn a_parameter_named_as_spares_are_is_refused() {
         }
         fn description(&self) -> Description {
             Description::new("Spare").parameters(Schema::default().parameter(
-                params::Parameter::new("spare-1", "One", params::ParameterKind::Toggle, false),
+                params::Parameter::new("spare-1", "One", params::ValueKind::Toggle, false),
             ))
         }
         fn cook(&self, _cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {

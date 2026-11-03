@@ -1,7 +1,9 @@
 //! A node's or format's parameter [`params::Schema`] as a sheet, keyed by
-//! parameter name: what the host shows for a node's parameters.
-use super::{CurveChannel, Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
-use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
+//! parameter name: what the host shows for a node's parameters. A field
+//! holds its parameter's value as it is, so an edit is the parameter's new
+//! value.
+use super::{Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
+use kinogaki_studio_api::params::{self, SchemaItem, Unit, Value, ValueKind};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
 /// each parameter a field keyed by its name, with its help as the tooltip
@@ -9,10 +11,9 @@ use kinogaki_studio_api::params::{self, ParameterKind, SchemaItem, Unit};
 /// schema adds rows of its own.
 impl From<&params::Schema> for Schema<String> {
     fn from(schema: &params::Schema) -> Self {
-        let items = schema
-            .items
-            .iter()
-            .filter(|item| !matches!(item, SchemaItem::Parameter(p) if matches!(p.kind, ParameterKind::Data(_))))
+        let data = |p: &params::Parameter| matches!(p.kind, ValueKind::Data(_));
+        let items = (schema.items.iter())
+            .filter(|item| !matches!(item, SchemaItem::Parameter(p) if data(p)))
             .map(|item| match item {
                 SchemaItem::Section(s) => Item::Section(Section {
                     key: s.key.clone().into(),
@@ -41,20 +42,20 @@ impl From<&params::Schema> for Schema<String> {
     }
 }
 
-/// Parameter `p`'s field: its kind as [`kind`] shapes it, its help as
-/// the tooltip (or its problem, shown as an error), its keywords for
-/// search.
+/// Parameter `p`'s field: its kind's, its help as the tooltip (or its
+/// problem, shown as an error), its keywords for search.
 fn field(p: &params::Parameter) -> Field<String> {
-    let value = match (&p.value, &p.kind) {
+    let value = match &p.value {
         // Texts show as one read-only line of their names.
-        (params::Value::Texts(names), _) => params::Value::Text(names.join(", ")),
-        // A wire chosen from a menu shows as the menu's index.
-        (params::Value::Number(at), ParameterKind::Integer { .. }) if !p.menu.is_empty() => {
-            params::Value::Index((at.max(0.0) as usize).min(p.menu.len() - 1))
-        }
-        (other, _) => other.clone(),
+        Value::Texts(names) => Value::Text(names.join(", ")),
+        other => other.clone(),
     };
-    let mut field = Field::new(p.name.clone(), p.label.clone(), kind(p), Some(value));
+    let mut field = Field::new(
+        p.name.clone(),
+        p.label.clone(),
+        Kind::from(&p.kind),
+        Some(value),
+    );
     field.enabled = p.enabled;
     field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
     field.keywords = p.keywords.clone().into();
@@ -66,51 +67,15 @@ fn field(p: &params::Parameter) -> Field<String> {
     field
 }
 
-/// Parameter `p`'s field kind: its kind's, with what its schema filled
-/// in (an attribute row's menu, a wire menu, unavailable choices).
-fn kind(p: &params::Parameter) -> Kind {
-    match &p.kind {
-        ParameterKind::Choice(items) => choice(items, &p.unavailable),
-        ParameterKind::Integer { .. } if !p.menu.is_empty() => Kind::Dropdown {
-            items: p.menu.iter().map(|n| n.clone().into()).collect(),
-            available: vec![true; p.menu.len()],
-            info: None,
-        },
-        ParameterKind::Attribute => Kind::Name {
-            names: p.menu.clone(),
-            list: p.list,
-            tooltip: "The input's attributes".into(),
-        },
-        other => Kind::from(other),
-    }
-}
-
-/// A choice of `items`, those at `unavailable` greyed: segments or a menu
-/// ([`params::segments`]).
-fn choice(items: &[String], unavailable: &[usize]) -> Kind {
-    let names = items.iter().map(|i| i.clone().into()).collect();
-    if params::segments(items, unavailable) {
-        return Kind::Choice(names);
-    }
-    Kind::Dropdown {
-        items: names,
-        available: (0..items.len())
-            .map(|i| !unavailable.contains(&i))
-            .collect(),
-        info: None,
-    }
-}
-
 /// How a parameter number shows: its unit's defaults, its limits and look.
 impl From<&params::Number> for Number {
     fn from(number: &params::Number) -> Self {
         let base = match number.unit {
             Unit::Plain => Number::new(),
             Unit::Length => Number::length(),
-            Unit::Millimeters => Number::new().unit(Unit::Millimeters),
             Unit::Angle => Number::angle(),
             Unit::Percent => Number::percent(),
-            Unit::Suffix(_) => Number::new().unit(number.unit),
+            Unit::Millimeters | Unit::Suffix(_) => Number::new().unit(number.unit.clone()),
         };
         let mut out = base.range(number.min..=number.max);
         if let Some((min, max)) = number.soft {
@@ -129,65 +94,71 @@ impl From<&params::Number> for Number {
     }
 }
 
-/// The field kind a parameter kind shows as.
-impl From<&ParameterKind> for Kind {
-    fn from(kind: &ParameterKind) -> Self {
+/// The field kind a value kind shows as, with its options: a choice's
+/// entries, an attribute row's names, an integer's menu over its values
+/// from 0.
+impl From<&ValueKind> for Kind {
+    fn from(kind: &ValueKind) -> Self {
         match kind {
-            ParameterKind::Number(n) => Kind::Number(n.into()),
-            ParameterKind::Integer { min, max } => {
+            ValueKind::Number(n) => Kind::Number(n.into()),
+            ValueKind::Integer { menu, .. } if !menu.is_empty() => Kind::Dropdown {
+                items: menu.iter().map(|n| n.clone().into()).collect(),
+                available: vec![true; menu.len()],
+                info: None,
+            },
+            ValueKind::Integer { min, max, .. } => {
                 Kind::Number(Number::integer(*min as f64..=*max as f64))
             }
-            ParameterKind::Toggle => Kind::Toggle,
-            ParameterKind::Choice(items) => choice(items, &[]),
-            ParameterKind::Text => Kind::Text,
-            ParameterKind::Code => Kind::Code {
+            ValueKind::Toggle => Kind::Toggle,
+            ValueKind::Choice {
+                choices,
+                unavailable,
+            } => Kind::Choice {
+                choices: choices.clone(),
+                unavailable: unavailable.clone(),
+            },
+            ValueKind::Text => Kind::Text,
+            ValueKind::Code { .. } => Kind::Code {
                 diagnostics: Vec::new(),
                 fill: false,
                 lines: None,
             },
-            ParameterKind::File => Kind::Path(FileDialog::open()),
+            ValueKind::File => Kind::Path(FileDialog::open()),
             // The host fills the pickers and menus from the scene and the
             // node's input.
-            ParameterKind::Reference(filter) => Kind::Reference(filter.clone()),
-            ParameterKind::Path => Kind::TreePath {
+            ValueKind::Reference(filter) => Kind::Reference(filter.clone()),
+            ValueKind::Path => Kind::TreePath {
                 choices: Vec::new(),
                 relative: false,
                 tooltip: "Choose a node or object".into(),
             },
-            ParameterKind::Attribute => Kind::Name {
-                names: Vec::new(),
-                list: false,
+            ValueKind::Attribute { menu, list } => Kind::Name {
+                names: menu.clone(),
+                list: *list,
                 tooltip: "The input's attributes".into(),
             },
-            ParameterKind::Group => Kind::Expression { pick: None },
-            ParameterKind::Color => Kind::Color,
-            ParameterKind::Vector { number, .. } => Kind::Vector {
+            ValueKind::Group => Kind::Expression { pick: None },
+            ValueKind::Color => Kind::Color,
+            ValueKind::Vector { number, .. } => Kind::Vector {
                 number: number.into(),
                 lock: None,
             },
-            ParameterKind::Ramp { color } => Kind::Ramp {
+            ValueKind::Ramp { color, .. } => Kind::Ramp {
                 color: *color,
                 interpolation: None,
             },
-            ParameterKind::ToneCurves { channels, capacity } => Kind::ToneCurves {
-                channels: channels
-                    .iter()
-                    .map(|c| CurveChannel {
-                        label: c.label.clone().into(),
-                        tint: c.tint,
-                    })
-                    .collect(),
-                capacity: *capacity,
+            ValueKind::ToneCurves { channels } => Kind::ToneCurves {
+                channels: channels.clone(),
             },
             // Apart until the host says the node keeps them linked (its
             // view, not the value).
-            ParameterKind::Channels(number) => Kind::Channels {
+            ValueKind::Channels(number) => Kind::Channels {
                 number: number.into(),
                 linked: false,
             },
             // Never a field (see the schema's sheet); read-only text if
             // one is made of it alone.
-            ParameterKind::Texts | ParameterKind::Data(_) => Kind::Info,
+            ValueKind::Texts | ValueKind::Data(_) => Kind::Info,
         }
     }
 }
@@ -196,7 +167,7 @@ impl From<&ParameterKind> for Kind {
 mod tests {
     use super::*;
     use crate::sheet::ramp;
-    use kinogaki_studio_api::params::{Parameter, RefFilter, Value};
+    use kinogaki_studio_api::params::{Choice, Parameter, RefFilter};
 
     #[test]
     fn parameters_become_fields_keyed_by_name() {
@@ -206,7 +177,7 @@ mod tests {
                 Parameter::new(
                     "distance",
                     "Distance",
-                    ParameterKind::Number(params::Number::length().range(0.0, 10.0).soft(0.0, 2.0)),
+                    ValueKind::Number(params::Number::length().range(0.0, 10.0).soft(0.0, 2.0)),
                     1.5,
                 )
                 .help("How far"),
@@ -214,28 +185,31 @@ mod tests {
             .parameter(Parameter::new(
                 "count",
                 "Count",
-                ParameterKind::Integer { min: 1, max: 64 },
-                4.0,
+                ValueKind::integer(1, 64),
+                4_i64,
             ))
             .parameter(
                 Parameter::new(
                     "mode",
                     "Mode",
-                    ParameterKind::Choice(vec!["A".into(), "B".into()]),
-                    Value::Index(1),
+                    ValueKind::choice(vec![Choice::new("a", "A"), Choice::new("b", "B")]),
+                    Value::Choice("b".into()),
                 )
                 .enabled(false),
             )
             .parameter(Parameter::new(
                 "falloff",
                 "Falloff",
-                ParameterKind::Ramp { color: false },
-                ramp::encode(&ramp::Ramp::default_of(false), 4).unwrap(),
+                ValueKind::Ramp {
+                    color: false,
+                    most: None,
+                },
+                ramp::Ramp::default_of(false),
             ))
             .parameter(Parameter::new(
                 "source",
                 "Source",
-                ParameterKind::Reference(RefFilter::material()),
+                ValueKind::Reference(RefFilter::material()),
                 Value::Text("/Materials/Red".into()),
             ))
             .parameter(Parameter::data(
@@ -259,10 +233,12 @@ mod tests {
             panic!("{:?}", distance.kind)
         };
         assert_eq!(
-            (n.unit, n.range.clone(), n.soft.clone()),
+            (n.unit.clone(), n.range.clone(), n.soft.clone()),
             (Unit::Length, 0.0..=10.0, Some(0.0..=2.0))
         );
-        let Kind::Number(count) = &sheet.field(&"count".to_owned()).unwrap().kind else {
+        let count = sheet.field(&"count".to_owned()).unwrap();
+        assert_eq!(count.value, Some(Value::Integer(4)));
+        let Kind::Number(count) = &count.kind else {
             panic!()
         };
         assert_eq!(
@@ -271,7 +247,7 @@ mod tests {
         );
         let mode = sheet.field(&"mode".to_owned()).unwrap();
         assert!(!mode.enabled && mode.tooltip.is_none());
-        assert_eq!(sheet.index(&"mode".to_owned()), Some(1));
+        assert_eq!(sheet.choice(&"mode".to_owned()), Some("b"));
         assert_eq!(
             sheet.field(&"falloff".to_owned()).unwrap().kind,
             Kind::Ramp {
@@ -288,7 +264,7 @@ mod tests {
     #[test]
     fn curves_channels_and_texts_become_their_fields() {
         use kinogaki_studio_api::params::{CurveChannel as Channel, tone_curve};
-        let curves = tone_curve::encode(&vec![tone_curve::ToneCurve::identity(); 2], 8);
+        let curves = vec![tone_curve::ToneCurve::identity(); 2];
         let channels = vec![
             Channel {
                 label: "Master".into(),
@@ -303,22 +279,19 @@ mod tests {
             .parameter(Parameter::new(
                 "curves",
                 "Curves",
-                ParameterKind::ToneCurves {
-                    channels,
-                    capacity: 8,
-                },
-                curves.clone(),
+                ValueKind::ToneCurves { channels },
+                Value::ToneCurves(curves.clone()),
             ))
             .parameter(Parameter::new(
                 "gain",
                 "Gain",
-                ParameterKind::Channels(params::Number::plain().range(0.0, 4.0)),
+                ValueKind::Channels(params::Number::plain().range(0.0, 4.0)),
                 vec![1.0; 4],
             ))
             .parameter(Parameter::new(
                 "outputs",
                 "Outputs",
-                ParameterKind::Texts,
+                ValueKind::Texts,
                 vec!["beauty".to_owned(), "depth".to_owned()],
             ));
         for item in &schema.items {
@@ -330,11 +303,11 @@ mod tests {
         let sheet = Schema::<String>::from(&schema);
         let field = |name: &str| sheet.field(&name.to_owned()).unwrap();
         let curves_field = field("curves");
-        assert_eq!(curves_field.value, Some(Value::Numbers(curves)));
-        let Kind::ToneCurves { channels, capacity } = &curves_field.kind else {
+        assert_eq!(curves_field.value, Some(Value::ToneCurves(curves)));
+        let Kind::ToneCurves { channels } = &curves_field.kind else {
             panic!("{:?}", curves_field.kind)
         };
-        assert_eq!((channels.len(), *capacity), (2, 8));
+        assert_eq!(channels.len(), 2);
         assert_eq!(channels[1].tint, Some([1.0, 0.0, 0.0]));
         assert!(matches!(
             field("gain").kind,
@@ -343,43 +316,45 @@ mod tests {
         let outputs = field("outputs");
         assert!(matches!(outputs.kind, Kind::Info));
         assert_eq!(outputs.value, Some(Value::Text("beauty, depth".into())));
-        // Three channels aren't accepted.
-        assert!(
-            !ParameterKind::Channels(params::Number::plain())
-                .accepts(&Value::Numbers(vec![0.0; 3]))
-        );
     }
 
     /// What a node type's `schema` fills in shows: an attribute menu, a
-    /// wire menu over the indices, greyed choices as a menu, a problem as
-    /// an error, and a button.
+    /// wire menu over the integers, greyed choices, a problem as an error,
+    /// and a button.
     #[test]
     fn shaped_rows_show_their_menus_problems_and_buttons() {
+        let abc = vec![Choice::new("a", "A"), Choice::new("b", "B")];
         let schema = params::Schema::default()
+            .parameter(Parameter::new(
+                "attr",
+                "Attribute",
+                ValueKind::Attribute {
+                    menu: vec!["P".into(), "N".into()],
+                    list: true,
+                },
+                "P",
+            ))
+            .parameter(Parameter::new(
+                "index",
+                "Index",
+                ValueKind::Integer {
+                    min: 0,
+                    max: 1,
+                    menu: vec!["Box 1".into(), "Tube 1".into()],
+                },
+                1_i64,
+            ))
+            .parameter(Parameter::new(
+                "mode",
+                "Mode",
+                ValueKind::Choice {
+                    choices: abc,
+                    unavailable: vec!["b".into()],
+                },
+                Value::Choice("a".into()),
+            ))
             .parameter(
-                Parameter::new("attr", "Attribute", ParameterKind::Attribute, "P")
-                    .menu(vec!["P".into(), "N".into()], true),
-            )
-            .parameter(
-                Parameter::new(
-                    "index",
-                    "Index",
-                    ParameterKind::Integer { min: 0, max: 9 },
-                    5.0,
-                )
-                .menu(vec!["Box 1".into(), "Tube 1".into()], false),
-            )
-            .parameter(
-                Parameter::new(
-                    "mode",
-                    "Mode",
-                    ParameterKind::Choice(vec!["A".into(), "B".into()]),
-                    params::Value::Index(0),
-                )
-                .unavailable(vec![1]),
-            )
-            .parameter(
-                Parameter::new("group", "Group", ParameterKind::Group, "0-")
+                Parameter::new("group", "Group", ValueKind::Group, "0-")
                     .problem("expected a number"),
             )
             .button(params::Button::new("fit", "Fit").enabled(false));
@@ -389,9 +364,17 @@ mod tests {
             matches!(&field("attr").kind, Kind::Name { names, list: true, .. } if names.len() == 2)
         );
         assert!(matches!(&field("index").kind, Kind::Dropdown { items, .. } if items.len() == 2));
-        assert_eq!(field("index").value, Some(Value::Index(1)));
+        assert_eq!(sheet.index(&"index".to_owned()), Some(1));
+        let Kind::Choice {
+            choices,
+            unavailable,
+        } = &field("mode").kind
+        else {
+            panic!()
+        };
         assert!(
-            matches!(&field("mode").kind, Kind::Dropdown { available, .. } if available == &[true, false])
+            !crate::sheet::segments(choices, unavailable),
+            "a menu, one greyed"
         );
         assert!(field("group").error);
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
@@ -403,14 +386,13 @@ mod tests {
     fn read_only_rows_show_without_editing() {
         let schema = params::Schema::default()
             .parameter(
-                Parameter::new("tint", "Tint", ParameterKind::Color, vec![0.1, 0.2, 0.3])
-                    .read_only(true),
+                Parameter::new("tint", "Tint", ValueKind::Color, [0.1, 0.2, 0.3]).read_only(true),
             )
             .parameter(
                 Parameter::new(
                     "amount",
                     "Amount",
-                    ParameterKind::Number(params::Number::plain()),
+                    ValueKind::Number(params::Number::plain()),
                     1.0,
                 )
                 .read_only(true),

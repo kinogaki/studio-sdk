@@ -11,7 +11,7 @@ use crate::params::{Schema, Value};
 ///
 /// ```
 /// use kinogaki_studio_api::cook::{Description, Port};
-/// use kinogaki_studio_api::params::{Number, Parameter, ParameterKind, Schema};
+/// use kinogaki_studio_api::params::{Number, Parameter, ValueKind, Schema};
 /// use kinogaki_studio_api::DataTypeId;
 /// let points = DataTypeId::declared("acme.points.cloud");
 /// let jitter = Description::new("Jitter")
@@ -20,7 +20,7 @@ use crate::params::{Schema, Value};
 ///     .parameters(Schema::default().parameter(Parameter::new(
 ///         "amount",
 ///         "Amount",
-///         ParameterKind::Number(Number::length().range(0.0, f64::INFINITY)),
+///         ValueKind::Number(Number::length().range(0.0, f64::INFINITY)),
 ///         0.1,
 ///     )));
 /// assert_eq!(jitter.parameters.values()["amount"].number(), Some(0.1));

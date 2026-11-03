@@ -15,8 +15,9 @@ use crate::exchange::PreviewSurface;
 use crate::id::EngineId;
 use crate::material::MaterialNetwork;
 use crate::prim::PrimKind;
-use crate::settings::{SettingDescriptor, SettingGroup, SettingValues};
-use crate::vocabulary::{NodeType, Params};
+use crate::settings::{SettingDescriptor, SettingGroup};
+use crate::vocabulary::NodeType;
+use kinogaki_value::Parameters;
 
 /// The one look a raster view and other engines give a material: a color
 /// (linear ACEScg) or the mesh attribute its base color reads.
@@ -56,9 +57,10 @@ pub struct MaterialPreset {
     /// Its surface node type's name.
     pub surface: Arc<str>,
     /// The surface's settings.
-    pub params: Params,
-    /// The surface's inputs set, by socket name (a number fills all three).
-    pub values: Vec<(Arc<str>, [f64; 3])>,
+    pub params: Parameters,
+    /// The surface's inputs set, by socket name, each a value its socket
+    /// takes.
+    pub values: Parameters,
 }
 
 /// How an engine renders material previews: its settings for them and the
@@ -66,7 +68,7 @@ pub struct MaterialPreset {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreviewSetup {
     /// Settings over the defaults.
-    pub settings: SettingValues,
+    pub settings: Parameters,
     /// The floor's material.
     pub floor: MaterialNetwork,
 }

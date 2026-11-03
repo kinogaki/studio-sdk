@@ -9,10 +9,11 @@
 //! (`kinogaki-render-api`), the crate engines build on; they are re-exported
 //! here, so a source a data type makes is what engines' hosts consume.
 //!
-//! An engine's settings and its declared prims' values are parameters to
-//! a host keying them over time ([`setting_parameter`]). Shader node types
-//! (an engine's material vocabulary as nodes of a Material's network) are
-//! the render package's, not the SDK's.
+//! An engine's settings and its declared prims' values are parameters of
+//! the one value model ([`Parameter::setting`](crate::params::Parameter::setting)),
+//! keyed over time as node parameters are. Shader node types (an engine's
+//! material vocabulary as nodes of a Material's network) are the render
+//! package's, not the SDK's.
 use kinogaki_geometry::Xform;
 use std::fmt;
 use std::sync::Arc;
@@ -21,9 +22,6 @@ pub use kinogaki_render_api::{
     AttributeDomain, ColorService, Detail, Extra, ImportedMaterial, Look, MeshAttribute,
     PlainTriangles, PreviewSurface, Ranges, TriangleSource,
 };
-pub use setting::{setting_from_value, setting_parameter, setting_to_value};
-
-mod setting;
 
 /// What a value renders as.
 #[derive(Clone)]

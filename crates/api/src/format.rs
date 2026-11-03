@@ -163,9 +163,10 @@ pub trait FileFormat: Send + Sync {
     }
 
     /// Writes `options` into the element `out` fills. By default each
-    /// option is a field named as it: a number a real, a toggle a boolean,
-    /// a choice its index, text as text, numbers and texts arrays (an
-    /// option holds no data).
+    /// option is a field named as it: a number a real, an integer an
+    /// integer, a toggle a boolean, a choice its key, text as text, a
+    /// color, numbers and texts arrays (an option holds no ramp, tone
+    /// curves or data).
     fn write_options(
         &self,
         options: &FormatOptions,
@@ -176,12 +177,14 @@ pub trait FileFormat: Send + Sync {
                 Value::Number(v) => Field::Float(*v),
                 Value::Numbers(v) => Field::F64s(v.clone()),
                 Value::Bool(v) => Field::Bool(*v),
-                Value::Index(v) => Field::Int(*v as i64),
+                Value::Integer(v) => Field::Int(*v),
+                Value::Color(c) => Field::F64s(c.to_vec()),
+                Value::Choice(v) => Field::Text(v.to_string()),
                 Value::Text(v) => Field::Text(v.clone()),
                 Value::Texts(v) => Field::Texts(v.clone()),
-                Value::Data(_) => {
+                Value::Ramp(_) | Value::ToneCurves(_) | Value::Data(_) => {
                     return Err(Error::invalid(format_args!(
-                        "option {name}: a format's options hold no data"
+                        "option {name}: a format's options hold no ramps, curves or data"
                     )));
                 }
             };
@@ -205,9 +208,9 @@ pub trait FileFormat: Send + Sync {
                 (Value::Number(_), FieldRef::Float(v)) => Value::Number(v),
                 (Value::Numbers(_), FieldRef::F64s(v)) => Value::Numbers(v.to_vec()),
                 (Value::Bool(_), FieldRef::Bool(v)) => Value::Bool(v),
-                (Value::Index(_), FieldRef::Int(v)) => {
-                    Value::Index(usize::try_from(v).map_err(|_| wrong())?)
-                }
+                (Value::Integer(_), FieldRef::Int(v)) => Value::Integer(v),
+                (Value::Color(_), FieldRef::F64s(&[r, g, b])) => Value::Color([r, g, b]),
+                (Value::Choice(_), FieldRef::Text(v)) => Value::Choice(v.into()),
                 (Value::Text(_), FieldRef::Text(v)) => Value::Text(v.to_owned()),
                 (Value::Texts(_), FieldRef::Texts(v)) => Value::Texts(v.to_vec()),
                 _ => return Err(wrong()),
@@ -368,9 +371,10 @@ mod tests {
             [
                 ("scale".to_owned(), Value::Number(1.0)),
                 ("normals".to_owned(), Value::Bool(true)),
-                ("up".to_owned(), Value::Index(1)),
+                ("up".to_owned(), Value::Choice("y".into())),
                 ("prims".to_owned(), Value::Text(String::new())),
-                ("color".to_owned(), Value::Numbers(vec![0.5; 3])),
+                ("color".to_owned(), Value::Color([0.5; 3])),
+                ("count".to_owned(), Value::Integer(3)),
             ]
             .into()
         }

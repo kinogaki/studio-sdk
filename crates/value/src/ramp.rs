@@ -1,22 +1,17 @@
 //! Ramps: a value along 0–1 through keys, a number (a float ramp: a
 //! profile, a falloff) or a color (a color ramp: a gradient), as Houdini's
-//! ramp parameters have them: their maths and their encoding in a list of
-//! numbers. This is the one definition: a node's ramp parameter (the
-//! API's `params::ramp`, a `Value::Numbers` of `ParameterKind::Ramp`),
-//! Studio's ramp widget (`sheet::ramp`) and a render engine's color ramps
-//! (a `SettingValue::ColorRamp`'s keys, `color_at`) evaluate a ramp with
-//! [`Ramp::evaluate`] or [`Keys::evaluate_channel`] and get the same
+//! ramp parameters have them. This is the one definition: a node's ramp
+//! parameter, Studio's ramp widget and a render engine's color ramps hold
+//! a [`Ramp`] ([`Value::Ramp`](crate::Value::Ramp)) and evaluate it with
+//! [`Ramp::evaluate`] or [`Ramp::evaluate_channel`], getting the same
 //! values.
 //!
 //! Keys sit at positions in 0–1, sorted. Each key's [`Interpolation`] says
 //! how the ramp runs from it to the next key; before the first key and past
 //! the last the ramp holds their values. A color ramp interpolates each
-//! channel the same way.
-//!
-//! The encoding is the key count, then each key's position, value (one
-//! number, or r, g, b) and interpolation code, up to a fixed capacity: the
-//! keys past the count are zeros. [`encode`] writes it, [`decode`] reads
-//! it back, and [`Keys`] evaluates it in place (a kernel reading a slot).
+//! channel the same way. A ramp holds any number of keys; an engine that
+//! takes fewer says so in its kind ([`ValueKind::Ramp`](crate::ValueKind::Ramp)'s
+//! `most`), and a longer ramp is refused, never cut short.
 
 /// How a ramp runs from a key to the next.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -56,15 +51,20 @@ impl Interpolation {
         }
     }
 
-    /// Its code in an encoding.
-    pub fn code(self) -> f64 {
-        Self::ALL.iter().position(|&i| i == self).unwrap_or(1) as f64
+    /// Its key in files (`catmull_rom`).
+    pub fn key(self) -> &'static str {
+        match self {
+            Interpolation::Constant => "constant",
+            Interpolation::Linear => "linear",
+            Interpolation::CatmullRom => "catmull_rom",
+            Interpolation::Monotone => "monotone",
+            Interpolation::BSpline => "bspline",
+        }
     }
 
-    /// The interpolation with `code`; `None` for a code no interpolation
-    /// has.
-    pub fn from_code(code: f64) -> Option<Interpolation> {
-        (code.fract() == 0.0 && (0.0..5.0).contains(&code)).then(|| Self::ALL[code as usize])
+    /// The interpolation whose [`key`](Self::key) is `key`.
+    pub fn of_key(key: &str) -> Option<Interpolation> {
+        Self::ALL.into_iter().find(|i| i.key() == key)
     }
 }
 
@@ -130,7 +130,7 @@ impl Ramp {
 
     /// The channels a key's value uses: 1 or 3.
     pub fn channels(&self) -> usize {
-        channels(self.color)
+        if self.color { 3 } else { 1 }
     }
 
     /// The ramp at `t`: each channel (a float ramp's in the first, the
@@ -174,164 +174,48 @@ impl Ramp {
     }
 }
 
-impl Keys for Ramp {
-    fn count(&self) -> usize {
-        self.keys.len()
-    }
-    fn position(&self, k: usize) -> f64 {
-        self.keys[k].position
-    }
-    fn value(&self, k: usize, channel: usize) -> f64 {
-        self.keys[k].value[channel]
-    }
-    fn interpolation(&self, k: usize) -> Interpolation {
-        self.keys[k].interpolation
-    }
-}
-
-impl Keys for [Key] {
-    fn count(&self) -> usize {
-        self.len()
-    }
-    fn position(&self, k: usize) -> f64 {
-        self[k].position
-    }
-    fn value(&self, k: usize, channel: usize) -> f64 {
-        self[k].value[channel]
-    }
-    fn interpolation(&self, k: usize) -> Interpolation {
-        self[k].interpolation
-    }
-}
-
-/// The channels a key of a color (3) or float (1) ramp holds.
-pub fn channels(color: bool) -> usize {
-    if color { 3 } else { 1 }
-}
-
-/// The numbers one key takes in an encoding: position, value, code.
-pub fn stride(color: bool) -> usize {
-    channels(color) + 2
-}
-
-/// The numbers an encoding of `capacity` keys takes.
-pub fn width(color: bool, capacity: usize) -> usize {
-    1 + capacity * stride(color)
-}
-
-/// The most keys an encoding `len` numbers long holds.
-pub fn capacity(color: bool, len: usize) -> usize {
-    len.saturating_sub(1) / stride(color)
-}
-
-/// `ramp` as numbers holding `capacity` keys: the count, then position,
-/// value and interpolation code a key, the keys past the count zeros (a
-/// fixed width, so two ramps of one capacity blend number by number).
-/// `None` when the ramp holds more keys than `capacity`: no key is ever
-/// left out.
-pub fn encode(ramp: &Ramp, capacity: usize) -> Option<Vec<f64>> {
-    let count = ramp.keys.len();
-    if count > capacity {
-        return None;
-    }
-    let channels = ramp.channels();
-    let mut out = Vec::with_capacity(width(ramp.color, capacity));
-    out.push(count as f64);
-    for key in &ramp.keys[..count] {
-        out.push(key.position);
-        out.extend_from_slice(&key.value[..channels]);
-        out.push(key.interpolation.code());
-    }
-    out.resize(width(ramp.color, capacity), 0.0);
-    Some(out)
-}
-
-/// The ramp [`encode`] wrote. The count is clamped to what the numbers
-/// hold; keys that are not finite are dropped, positions clamped to 0–1
-/// and sorted, unknown interpolation codes read as Linear; a ramp left
-/// without keys is [`Ramp::default_of`].
-pub fn decode(numbers: &[f64], color: bool) -> Ramp {
-    let stride = stride(color);
-    let held = capacity(color, numbers.len());
-    let count = match numbers.first() {
-        Some(c) if c.is_finite() => (c.max(0.0).round() as usize).min(held),
-        _ => 0,
-    };
-    let mut keys: Vec<Key> = numbers
-        .get(1..1 + count * stride)
-        .unwrap_or_default()
-        .chunks_exact(stride)
-        .filter(|k| k.iter().all(|v| v.is_finite()))
-        .map(|k| {
-            let mut value = [0.0; 3];
-            value[..stride - 2].copy_from_slice(&k[1..stride - 1]);
-            Key {
-                position: k[0].clamp(0.0, 1.0),
-                value,
-                interpolation: Interpolation::from_code(k[stride - 1]).unwrap_or_default(),
-            }
-        })
-        .collect();
-    if keys.is_empty() {
-        return Ramp::default_of(color);
-    }
-    keys.sort_by(|a, b| a.position.total_cmp(&b.position));
-    Ramp { color, keys }
-}
-
-/// A ramp's keys, however they are held ([`Ramp`], or an encoding read in
-/// place), and the ramp they make. Keys are sorted by position; there is
-/// at least one.
-pub trait Keys {
-    /// How many keys.
-    fn count(&self) -> usize;
-    /// Key `k`'s position.
-    fn position(&self, k: usize) -> f64;
-    /// Key `k`'s value in `channel`.
-    fn value(&self, k: usize, channel: usize) -> f64;
-    /// How the ramp runs from key `k` to the next.
-    fn interpolation(&self, k: usize) -> Interpolation;
-
+impl Ramp {
     /// The ramp's `channel` at `t`: the first key's value at and before
     /// its position (and for a `t` that is NaN), the last key's at and
     /// past its position, and between two keys as the first one's
     /// interpolation runs. Keys at one position after the first make a
     /// step there: the ramp takes the last of them from that position on.
-    fn evaluate_channel(&self, t: f64, channel: usize) -> f64 {
-        let count = self.count();
+    pub fn evaluate_channel(&self, t: f64, channel: usize) -> f64 {
+        let keys = &self.keys[..];
+        let count = keys.len();
         if count == 0 {
             return 0.0;
         }
-        if t.is_nan() || t <= self.position(0) {
-            return self.value(0, channel);
+        if t.is_nan() || t <= position(keys, 0) {
+            return value(keys, 0, channel);
         }
         let last = count - 1;
-        if t >= self.position(last) {
-            return self.value(last, channel);
+        if t >= position(keys, last) {
+            return value(keys, last, channel);
         }
         // The span [lo, lo + 1] holding t.
         let (mut lo, mut hi) = (0, last);
         while hi - lo > 1 {
             let m = lo + (hi - lo) / 2;
-            if self.position(m) <= t {
+            if position(keys, m) <= t {
                 lo = m;
             } else {
                 hi = m;
             }
         }
-        let span = self.position(lo + 1) - self.position(lo);
-        let u = (t - self.position(lo)) / span;
-        let start = self.value(lo, channel);
-        let end = self.value(lo + 1, channel);
-        match self.interpolation(lo) {
+        let span = position(keys, lo + 1) - position(keys, lo);
+        let u = (t - position(keys, lo)) / span;
+        let start = value(keys, lo, channel);
+        let end = value(keys, lo + 1, channel);
+        match keys[lo].interpolation {
             Interpolation::Constant => start,
             Interpolation::Linear => start + (end - start) * u,
             i @ (Interpolation::CatmullRom | Interpolation::Monotone) => {
                 let slope = |p| {
                     if i == Interpolation::Monotone {
-                        monotone_slope(self, p, channel)
+                        monotone_slope(keys, p, channel)
                     } else {
-                        smooth_slope(self, p, channel)
+                        smooth_slope(keys, p, channel)
                     }
                 };
                 let u2 = u * u;
@@ -343,13 +227,13 @@ pub trait Keys {
             }
             Interpolation::BSpline => {
                 // The ends are mirrored, so the curve meets the end keys.
-                let a = if before(self, lo) {
-                    self.value(lo - 1, channel)
+                let a = if before(keys, lo) {
+                    value(keys, lo - 1, channel)
                 } else {
                     2.0 * start - end
                 };
-                let d = if after(self, lo + 1) {
-                    self.value(lo + 2, channel)
+                let d = if after(keys, lo + 1) {
+                    value(keys, lo + 2, channel)
                 } else {
                     2.0 * end - start
                 };
@@ -366,35 +250,43 @@ pub trait Keys {
     }
 }
 
+fn position(keys: &[Key], k: usize) -> f64 {
+    keys[k].position
+}
+
+fn value(keys: &[Key], k: usize, channel: usize) -> f64 {
+    keys[k].value[channel]
+}
+
 /// Whether key `p` has a distinct key before it.
-fn before<K: Keys + ?Sized>(keys: &K, p: usize) -> bool {
-    p > 0 && keys.position(p - 1) < keys.position(p)
+fn before(keys: &[Key], p: usize) -> bool {
+    p > 0 && position(keys, p - 1) < position(keys, p)
 }
 
 /// Whether key `p` has a distinct key after it.
-fn after<K: Keys + ?Sized>(keys: &K, p: usize) -> bool {
-    p + 1 < keys.count() && keys.position(p + 1) > keys.position(p)
+fn after(keys: &[Key], p: usize) -> bool {
+    p + 1 < keys.len() && position(keys, p + 1) > position(keys, p)
 }
 
 /// The slope of the line from key `p` to the next.
-fn secant<K: Keys + ?Sized>(keys: &K, p: usize, c: usize) -> f64 {
-    (keys.value(p + 1, c) - keys.value(p, c)) / (keys.position(p + 1) - keys.position(p))
+fn secant(keys: &[Key], p: usize, c: usize) -> f64 {
+    (value(keys, p + 1, c) - value(keys, p, c)) / (position(keys, p + 1) - position(keys, p))
 }
 
 /// Catmull-Rom's tangent at key `p`: along its neighbours, flat at an end.
-fn smooth_slope<K: Keys + ?Sized>(keys: &K, p: usize, c: usize) -> f64 {
+fn smooth_slope(keys: &[Key], p: usize, c: usize) -> f64 {
     if !before(keys, p) || !after(keys, p) {
         0.0
     } else {
-        (keys.value(p + 1, c) - keys.value(p - 1, c))
-            / (keys.position(p + 1) - keys.position(p - 1))
+        (value(keys, p + 1, c) - value(keys, p - 1, c))
+            / (position(keys, p + 1) - position(keys, p - 1))
     }
 }
 
 /// The monotone cubic's tangent at key `p` (Fritsch–Butland inside, a
 /// shape-preserving three-point estimate at the ends).
-fn monotone_slope<K: Keys + ?Sized>(keys: &K, p: usize, c: usize) -> f64 {
-    let pos = |k| keys.position(k);
+fn monotone_slope(keys: &[Key], p: usize, c: usize) -> f64 {
+    let pos = |k| position(keys, k);
     match (before(keys, p), after(keys, p)) {
         (true, true) => {
             let left = secant(keys, p - 1, c);
@@ -463,55 +355,9 @@ mod tests {
     }
 
     #[test]
-    fn encoding_round_trips_and_tolerates_garbage() {
-        let ramp = Ramp {
-            color: true,
-            keys: vec![
-                Key::color(0.0, [0.1, 0.2, 0.3], Interpolation::Constant),
-                Key::color(0.4, [1.0, 0.5, 0.0], Interpolation::BSpline),
-                Key::color(1.0, [0.0, 0.0, 1.0], Interpolation::Linear),
-            ],
-        };
-        let numbers = encode(&ramp, 4).unwrap();
-        assert_eq!(numbers.len(), width(true, 4));
-        assert_eq!(numbers[0], 3.0);
-        assert!(numbers[1 + 3 * 5..].iter().all(|&v| v == 0.0));
-        assert_eq!(decode(&numbers, true), ramp);
-        // A ramp past the capacity is refused, never cut short.
-        assert_eq!(encode(&ramp, 2), None);
-        // A wild count is clamped, NaN keys dropped, keys sorted, unknown
-        // codes linear.
-        let mut bad = numbers.clone();
-        bad[0] = 99.0;
-        bad[1 + 5] = f64::NAN;
-        bad[1 + 2 * 5] = -1.0;
-        bad[1 + 2 * 5 + 4] = 7.5;
-        let read = decode(&bad, true);
-        assert_eq!(
-            read.keys.len(),
-            3,
-            "the fourth zero key counts once clamped"
-        );
-        assert!(read.keys.windows(2).all(|k| k[0].position <= k[1].position));
-        assert!(
-            read.keys
-                .iter()
-                .all(|k| k.value.iter().all(|v| v.is_finite()))
-        );
-        assert!(
-            read.keys
-                .iter()
-                .any(|k| k.position == 0.0 && k.interpolation == Interpolation::Linear)
-        );
-        // Nothing usable: the default ramp.
-        assert_eq!(decode(&[f64::NAN], false), Ramp::default_of(false));
-        assert_eq!(decode(&[], true), Ramp::default_of(true));
-    }
-
-    #[test]
     fn interpolations_meet_the_keys_and_hold_past_the_ends() {
         for i in Interpolation::ALL {
-            assert_eq!(Interpolation::from_code(i.code()), Some(i));
+            assert_eq!(Interpolation::of_key(i.key()), Some(i));
             let r = float(&[(0.2, 0.0, i), (0.6, 1.0, i), (0.9, 0.5, i)]);
             assert_eq!(r.evaluate(0.0)[0], 0.0, "{i:?} holds before the first key");
             assert_eq!(r.evaluate(1.0)[0], 0.5, "{i:?} holds past the last key");
@@ -522,7 +368,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!(Interpolation::from_code(2.5), None);
+        assert_eq!(Interpolation::of_key("cubic"), None);
         let r = float(&[
             (0.0, 0.0, Interpolation::Constant),
             (1.0, 1.0, Interpolation::Linear),
@@ -671,30 +517,5 @@ mod tests {
             ],
         };
         assert_eq!(c.evaluate(0.25), [0.25, 1.0, 1.5]);
-        // The encoding read in place evaluates as the decoded ramp.
-        struct Encoded<'a>(&'a [f64]);
-        impl Keys for Encoded<'_> {
-            fn count(&self) -> usize {
-                self.0[0] as usize
-            }
-            fn position(&self, k: usize) -> f64 {
-                self.0[1 + k * 3]
-            }
-            fn value(&self, k: usize, _: usize) -> f64 {
-                self.0[2 + k * 3]
-            }
-            fn interpolation(&self, k: usize) -> Interpolation {
-                Interpolation::from_code(self.0[3 + k * 3]).unwrap()
-            }
-        }
-        let numbers = encode(&line(Interpolation::BSpline), 6).unwrap();
-        let read = decode(&numbers, false);
-        for k in 0..=20 {
-            let t = f64::from(k) / 20.0;
-            assert_eq!(
-                Encoded(&numbers).evaluate_channel(t, 0),
-                read.evaluate(t)[0]
-            );
-        }
     }
 }

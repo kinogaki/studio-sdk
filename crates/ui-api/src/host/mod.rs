@@ -174,8 +174,8 @@ pub trait UnitsService {
     /// The value `text` means for a number measuring `unit` (arithmetic,
     /// unit suffixes, `+=` relative to `current`), in stored units; `None`
     /// when it does not read.
-    fn parse(&self, text: &str, current: f64, unit: Unit) -> Option<f64>;
+    fn parse(&self, text: &str, current: f64, unit: &Unit) -> Option<f64>;
     /// `stored`, measuring `unit`, as text with `decimals` places and the
     /// unit's suffix.
-    fn format(&self, stored: f64, unit: Unit, decimals: usize) -> String;
+    fn format(&self, stored: f64, unit: &Unit, decimals: usize) -> String;
 }

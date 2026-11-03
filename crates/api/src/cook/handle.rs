@@ -1,8 +1,9 @@
 //! [`Handle`]: a viewport handle a node type binds to its parameters.
 use super::binding::{Scalar, Vector};
 use super::placement::Placement;
-use crate::params::{ParameterKind, Parameters, Schema, Value};
+use crate::params::{Parameters, Schema, Value, ValueKind};
 use kinogaki_geometry::Vec3;
+use kinogaki_value::Condition;
 
 /// What a handle edits, and so how it looks and drags. Places and
 /// directions are in the handle's [`Placement`] when it has one, otherwise in
@@ -318,9 +319,9 @@ pub struct Handle {
     /// The smallest and largest value it writes to a number (a distance,
     /// a radius, a size, a factor), within the parameter's own range.
     pub range: Option<[f64; 2]>,
-    /// Parameter values it shows for, all of them (a bounding box handle
-    /// while Bounding Type is Box); empty: always.
-    pub when: Vec<(String, Value)>,
+    /// When it shows (a bounding box handle while Bounding Type is Box);
+    /// with no values, always.
+    pub when: Condition,
 }
 
 impl Handle {
@@ -335,7 +336,7 @@ impl Handle {
             anchor: Vec3::ZERO,
             constraint: Constraint::Free,
             range: None,
-            when: Vec::new(),
+            when: Condition::default(),
         }
     }
 
@@ -378,15 +379,13 @@ impl Handle {
     /// Shown only while parameter `name` holds `value` (and every other
     /// such condition holds).
     pub fn when(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
-        self.when.push((name.into(), value.into()));
+        self.when = self.when.and(name, value);
         self
     }
 
     /// Whether it shows for `parameters`.
     pub fn shown(&self, parameters: &Parameters) -> bool {
-        self.when
-            .iter()
-            .all(|(name, value)| parameters.get(name) == Some(value))
+        self.when.met(parameters)
     }
 
     /// The parameters it reads and writes, in order, then its placement's.
@@ -414,7 +413,7 @@ impl Handle {
         let wrong = |name: &str, what: &str| Err(format!("{name} is not {what}"));
         let number = |scalar: &Scalar| match scalar {
             Scalar::Parameter(name) => match kind(name)? {
-                ParameterKind::Number(_) | ParameterKind::Integer { .. } => Ok(()),
+                ValueKind::Number(_) | ValueKind::Integer { .. } => Ok(()),
                 _ => wrong(name, "a number"),
             },
             Scalar::Component(name, index) => match numbers(kind(name)?) {
@@ -462,11 +461,10 @@ impl Handle {
 
 /// How many numbers a parameter of `kind` holds, when it holds a fixed
 /// count of them.
-fn numbers(kind: &ParameterKind) -> Option<usize> {
+fn numbers(kind: &ValueKind) -> Option<usize> {
     match kind {
-        ParameterKind::Vector { components, .. } => Some(usize::from(*components)),
-        ParameterKind::Color => Some(3),
-        ParameterKind::Channels(_) => Some(4),
+        ValueKind::Vector { components, .. } => Some(usize::from(*components)),
+        ValueKind::Channels(_) => Some(4),
         _ => None,
     }
 }
@@ -485,14 +483,14 @@ mod tests {
             },
         )
         .when("on", true)
-        .when("shape", Value::Index(1))
+        .when("shape", Value::Choice("box".into()))
         .range(0.0, 10.0)
         .plane(2);
         let mut values = Parameters::new();
         values.insert("on".into(), Value::Bool(true));
-        values.insert("shape".into(), Value::Index(0));
+        values.insert("shape".into(), Value::Choice("sphere".into()));
         assert!(!handle.shown(&values));
-        values.insert("shape".into(), Value::Index(1));
+        values.insert("shape".into(), Value::Choice("box".into()));
         assert!(handle.shown(&values));
         assert_eq!(handle.parameters(), ["radius"]);
         assert_eq!(handle.constraint, Constraint::Plane(2));
@@ -547,19 +545,19 @@ mod tests {
             .parameter(Parameter::new(
                 "depth",
                 "Depth",
-                ParameterKind::Number(Number::length()),
+                ValueKind::Number(Number::length()),
                 1.0,
             ))
             .parameter(Parameter::new(
                 "size",
                 "Size",
-                ParameterKind::Vector {
+                ValueKind::Vector {
                     components: 2,
                     number: Number::length(),
                 },
                 Value::Numbers(vec![1.0, 1.0]),
             ))
-            .parameter(Parameter::new("on", "On", ParameterKind::Toggle, true));
+            .parameter(Parameter::new("on", "On", ValueKind::Toggle, true));
         let distance = |number: Scalar| {
             Handle::new(
                 "depth",

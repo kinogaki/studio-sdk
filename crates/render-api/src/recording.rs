@@ -127,7 +127,7 @@ fn description() -> EngineDescription {
             velocities: false,
         },
         preview: PreviewSetup {
-            settings: Vec::new(),
+            settings: Default::default(),
             floor: empty(),
         },
         materials: Arc::new(Rules),

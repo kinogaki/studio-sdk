@@ -12,7 +12,8 @@
 use std::sync::Arc;
 
 use crate::id::EngineId;
-use crate::vocabulary::{ParamValue, Params};
+use crate::settings::Textures;
+use kinogaki_value::{Parameters, Value};
 
 /// A node's index in its network.
 pub type NodeIndex = u32;
@@ -27,8 +28,8 @@ pub enum ImageUse {
 }
 
 impl ImageUse {
-    /// Its name as a choice (`color`, `data`): what a
-    /// [`crate::ParamKind::File`]'s usage setting holds.
+    /// Its key as a choice (`color`, `data`): what a
+    /// [`crate::ParamSpec::usage`] setting holds.
     pub fn name(self) -> &'static str {
         match self {
             ImageUse::Color => "color",
@@ -44,37 +45,21 @@ impl ImageUse {
     }
 }
 
-/// An unwired input's constant.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Constant {
-    /// One number.
-    Number(f32),
-    /// A color (ACEScg once it reaches the engine).
-    Color([f32; 3]),
-    /// Three numbers that are not a color.
-    Vector([f32; 3]),
-}
-
-impl Constant {
-    /// As three numbers (a number spread to three).
-    pub fn triple(self) -> [f32; 3] {
-        match self {
-            Constant::Number(v) => [v; 3],
-            Constant::Color(c) | Constant::Vector(c) => c,
-        }
-    }
-}
-
-/// A node: its type's name, its settings, and the constants of its unwired
-/// inputs that differ from their defaults.
+/// A node: its type's name, its settings, the values of its unwired
+/// inputs that differ from their defaults, and, as an engine receives it,
+/// the textures its image settings were decoded to.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ShaderNode {
     /// Its type's name in the engine's vocabulary.
     pub kind: Arc<str>,
     /// Its settings, by name.
-    pub params: Params,
-    /// Set inputs, by socket name; inputs not listed take their defaults.
-    pub values: Vec<(Arc<str>, Constant)>,
+    pub params: Parameters,
+    /// Set inputs' values, by socket name; inputs not listed take their
+    /// defaults.
+    pub values: Parameters,
+    /// Its image settings' Texture prims (filled by the host as it sends
+    /// the network).
+    pub textures: Textures,
 }
 
 impl ShaderNode {
@@ -82,34 +67,22 @@ impl ShaderNode {
     pub fn new(kind: &str) -> ShaderNode {
         ShaderNode {
             kind: Arc::from(kind),
-            params: Vec::new(),
-            values: Vec::new(),
+            params: Parameters::new(),
+            values: Parameters::new(),
+            textures: Textures::new(),
         }
     }
 
     /// The node with setting `name` set to `value`.
-    pub fn with_param(mut self, name: &str, value: ParamValue) -> ShaderNode {
-        self.params.push((Arc::from(name), value));
+    pub fn with_param(mut self, name: &str, value: impl Into<Value>) -> ShaderNode {
+        self.params.insert(name.to_owned(), value.into());
         self
     }
 
     /// The node with input `name` set to `value`.
-    pub fn with(mut self, name: &str, value: Constant) -> ShaderNode {
-        self.values.push((Arc::from(name), value));
+    pub fn with(mut self, name: &str, value: impl Into<Value>) -> ShaderNode {
+        self.values.insert(name.to_owned(), value.into());
         self
-    }
-
-    /// Setting `name`'s value.
-    pub fn param(&self, name: &str) -> Option<&ParamValue> {
-        crate::vocabulary::param(&self.params, name)
-    }
-
-    /// Input `name`'s set constant.
-    pub fn value(&self, name: &str) -> Option<Constant> {
-        self.values
-            .iter()
-            .find(|(n, _)| &**n == name)
-            .map(|(_, v)| *v)
     }
 }
 
@@ -166,10 +139,10 @@ impl MaterialNetwork {
 
     /// Every color constant replaced by `f` of it (a host's working space
     /// to ACEScg).
-    pub fn map_colors(&mut self, f: impl Fn([f32; 3]) -> [f32; 3]) {
+    pub fn map_colors(&mut self, f: impl Fn([f64; 3]) -> [f64; 3]) {
         for node in &mut self.nodes {
-            for (_, value) in &mut node.values {
-                if let Constant::Color(c) = value {
+            for value in node.values.values_mut() {
+                if let Value::Color(c) = value {
                     *c = f(*c);
                 }
             }

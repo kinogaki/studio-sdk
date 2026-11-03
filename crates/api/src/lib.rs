@@ -9,6 +9,8 @@
 //! - **Ids** ([`id`]): declared, interned, one type per kind of thing.
 //! - **Data** ([`Data`], [`Typed`]): type-erased shared values on wires
 //!   and in object results, read by their kernel through a typed handle.
+//!   Both are the value model's ([`value`]), which every parameter, render
+//!   setting and material port holds its [`Value`] in.
 //! - **Standard data types** ([`standard`], [`geometry`]): the geometry
 //!   values every package shares (polygons, curves, attributes,
 //!   selections), which core registers, displays and saves; kernels
@@ -50,8 +52,8 @@
 //! time).
 //!
 //! **Self-contained.** The crate depends on the standard library and the
-//! SDK's leaf crates alone (the standard geometry values, the render
-//! interface, the viewport packet contract), never on Studio, a kernel or any other Kinogaki library:
+//! SDK's leaf crates alone (the value model, the standard geometry values,
+//! the render interface, the viewport packet contract), never on Studio, a kernel or any other Kinogaki library:
 //! every type it exposes is the SDK's own, and Studio converts between
 //! these types and its own libraries' at the boundary. So the SDK builds
 //! from a plain clone, and a package written against it compiles against
@@ -65,7 +67,6 @@ pub mod cancel;
 pub mod codec;
 pub mod components;
 pub mod cook;
-pub mod data;
 pub mod data_type;
 pub mod element;
 pub mod entry;
@@ -74,7 +75,6 @@ pub mod facets;
 pub mod format;
 pub mod held;
 pub mod icon;
-pub mod id;
 pub mod mesher;
 pub mod network;
 pub mod object;
@@ -96,6 +96,11 @@ pub use kinogaki_geometry as geometry;
 /// The SDK's one vocabulary of vectors, placements, boxes, units and time,
 /// which every crate exchanges: the standard geometry values' own.
 pub use kinogaki_geometry::{Bounds, Rate, Time, Units, UpAxis, Vec3, Xform};
+/// The value model: declared ids, data values, and the one [`Value`] and
+/// [`ValueKind`](params::ValueKind) parameters, render settings and
+/// material ports hold.
+pub use kinogaki_value as value;
+pub use kinogaki_value::{data, id};
 
 pub use anim::{Interp, Key};
 pub use cancel::CancelToken;

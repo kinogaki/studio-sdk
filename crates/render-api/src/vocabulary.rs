@@ -11,7 +11,8 @@
 
 use std::sync::Arc;
 
-use crate::id::{EngineId, TextureId};
+use crate::id::EngineId;
+use kinogaki_value::{Parameters, Value, ValueKind};
 
 /// What a socket carries, for linking and drawing. Every output drives
 /// every input: a Float spreads to three, three-wide values pass as they
@@ -39,32 +40,6 @@ impl SocketKind {
     }
 }
 
-/// How an unwired input is edited.
-#[derive(Clone, Debug, PartialEq)]
-pub enum InputEdit {
-    /// A number in `range`, dragged over `soft` (a slider when `range` is
-    /// 0 to 1), shown with `suffix` and `decimals`.
-    Number {
-        /// The values accepted.
-        range: (f64, f64),
-        /// The values a drag covers.
-        soft: (f64, f64),
-        /// The unit shown after the number (" K", " µm"; empty: none).
-        suffix: Arc<str>,
-        /// Decimals shown.
-        decimals: u8,
-    },
-    /// A color.
-    Color,
-    /// Three numbers (an axis).
-    Vector,
-    /// On or off, stored as 1 or 0.
-    Toggle,
-    /// Not edited: unwired, it means what the text says (the point's
-    /// texture coordinates, its shading normal).
-    Implicit(Arc<str>),
-}
-
 /// One socket of a node.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SocketSpec {
@@ -74,10 +49,10 @@ pub struct SocketSpec {
     pub label: Arc<str>,
     /// What it carries.
     pub kind: SocketKind,
-    /// An unwired input's value (outputs: zero).
-    pub default: [f32; 3],
-    /// How an unwired input is edited.
-    pub edit: InputEdit,
+    /// An unwired input's value (a [`Value::Number`] for a Float, a
+    /// [`Value::Color`] for a Color, three [`Value::Numbers`] for a
+    /// Vector or Uv); an output's is its kind's zero.
+    pub default: Value,
     /// The inspector section it sits in (none: the node's own rows).
     pub section: Option<Arc<str>>,
     /// What it means, where its label alone does not say.
@@ -88,111 +63,17 @@ pub struct SocketSpec {
 }
 
 impl SocketSpec {
-    /// A socket named `name`, labelled `label`, of `kind` with `default`;
-    /// edited as its kind suggests, shown, in no section.
-    pub fn new(name: &str, label: &str, kind: SocketKind, default: [f32; 3]) -> SocketSpec {
+    /// A socket named `name`, labelled `label`, of `kind` with `default`
+    /// (an unwired input is edited as its kind is), shown, in no section.
+    pub fn new(name: &str, label: &str, kind: SocketKind, default: impl Into<Value>) -> SocketSpec {
         SocketSpec {
             name: Arc::from(name),
             label: Arc::from(label),
             kind,
-            default,
-            edit: match kind {
-                SocketKind::Float => InputEdit::Number {
-                    range: (0.0, 1.0),
-                    soft: (0.0, 1.0),
-                    suffix: Arc::from(""),
-                    decimals: 3,
-                },
-                SocketKind::Color => InputEdit::Color,
-                SocketKind::Vector | SocketKind::Uv => InputEdit::Vector,
-            },
+            default: default.into(),
             section: None,
             tooltip: None,
             shown: true,
-        }
-    }
-}
-
-/// A named choice: its name in files, its label in a UI.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Choice {
-    /// Its name in files (`bead_blasted`).
-    pub name: Arc<str>,
-    /// What a UI shows (`Bead Blasted`).
-    pub label: Arc<str>,
-}
-
-impl Choice {
-    /// The choice `name` labelled `label`.
-    pub fn new(name: &str, label: &str) -> Choice {
-        Choice {
-            name: Arc::from(name),
-            label: Arc::from(label),
-        }
-    }
-}
-
-/// What a node setting holds.
-#[derive(Clone, Debug, PartialEq)]
-pub enum ParamKind {
-    /// One of named choices; `menu` shows them as a dropdown (else as
-    /// segments).
-    Choice {
-        /// The choices.
-        choices: Vec<Choice>,
-        /// A dropdown rather than segments.
-        menu: bool,
-    },
-    /// A whole number in `min..=max`.
-    Count {
-        /// The smallest.
-        min: u32,
-        /// The largest.
-        max: u32,
-    },
-    /// The name of a mesh attribute read at the shaded point. A node whose
-    /// name is empty reads nothing: the host leaves it out, or, for a
-    /// surface (a material's terminal), sends the name empty.
-    Attribute,
-    /// An image file, read as color or data by the choice setting `usage`
-    /// (its choices named `color` and `data`). The host decodes it and
-    /// sends a Texture prim; a node whose image is not available is left
-    /// out.
-    File {
-        /// The setting that says how its texels are read.
-        usage: Arc<str>,
-    },
-}
-
-/// A node setting's value.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum ParamValue {
-    /// A choice, by name.
-    Choice(Arc<str>),
-    /// A whole number.
-    Count(u32),
-    /// A mesh attribute's name.
-    Attribute(Arc<str>),
-    /// An image file's path, as typed.
-    File(Arc<str>),
-    /// The Texture prim a file was decoded to (what an engine receives).
-    Texture(TextureId),
-}
-
-impl ParamValue {
-    /// A choice's name.
-    pub fn choice(&self) -> Option<&str> {
-        match self {
-            ParamValue::Choice(name) => Some(name),
-            _ => None,
-        }
-    }
-
-    /// A count.
-    pub fn count(&self) -> Option<u32> {
-        match self {
-            ParamValue::Count(n) => Some(*n),
-            _ => None,
         }
     }
 }
@@ -204,10 +85,17 @@ pub struct ParamSpec {
     pub name: Arc<str>,
     /// What a UI labels it.
     pub label: Arc<str>,
-    /// What it holds.
-    pub kind: ParamKind,
+    /// What it holds: a choice, an integer, an attribute's name (read at
+    /// the shaded point; empty reads nothing: the host leaves the node out,
+    /// or, for a surface, sends the name empty), or an image file (the host
+    /// decodes it and sends its Texture prim; a node whose image is not
+    /// available is left out).
+    pub kind: ValueKind,
     /// A new node's value.
-    pub default: ParamValue,
+    pub default: Value,
+    /// For an image file: the choice setting that says how its texels are
+    /// read (its choices keyed `color` and `data`, [`crate::ImageUse`]).
+    pub usage: Option<Arc<str>>,
     /// What it means, where its label alone does not say.
     pub tooltip: Option<Arc<str>>,
     /// Whether the inspector shows it for the node's other settings.
@@ -216,25 +104,9 @@ pub struct ParamSpec {
 
 impl ParamSpec {
     /// Whether `value` fits it (a choice it offers, a count in range).
-    pub fn accepts(&self, value: &ParamValue) -> bool {
-        match (&self.kind, value) {
-            (ParamKind::Choice { choices, .. }, ParamValue::Choice(name)) => {
-                choices.iter().any(|c| c.name == *name)
-            }
-            (ParamKind::Count { min, max }, ParamValue::Count(n)) => (*min..=*max).contains(n),
-            (ParamKind::Attribute, ParamValue::Attribute(_)) => true,
-            (ParamKind::File { .. }, ParamValue::File(_) | ParamValue::Texture(_)) => true,
-            _ => false,
-        }
+    pub fn accepts(&self, value: &Value) -> bool {
+        self.kind.check(value).is_ok()
     }
-}
-
-/// A node's settings, by name.
-pub type Params = Vec<(Arc<str>, ParamValue)>;
-
-/// The value of setting `name` in `params`.
-pub fn param<'a>(params: &'a Params, name: &str) -> Option<&'a ParamValue> {
-    params.iter().find(|(n, _)| &**n == name).map(|(_, v)| v)
 }
 
 /// A node's settings and sockets, for the settings it holds.
@@ -262,7 +134,7 @@ impl NodeLayout {
 
 /// A node type's settings and sockets for the settings a node holds,
 /// given the type's name (settings missing take their defaults).
-pub type Layout = Arc<dyn Fn(&str, &Params) -> NodeLayout + Send + Sync>;
+pub type Layout = Arc<dyn Fn(&str, &Parameters) -> NodeLayout + Send + Sync>;
 
 /// A node type of an engine's vocabulary.
 #[derive(Clone)]
@@ -281,7 +153,7 @@ pub struct NodeType {
     /// (`OpenPBR`); none for every other node.
     pub surface: Option<Arc<str>>,
     /// A new node's settings.
-    pub defaults: Params,
+    pub defaults: Parameters,
     /// Its settings and sockets for `params`.
     pub layout: Layout,
 }
@@ -301,34 +173,34 @@ impl PartialEq for NodeType {
 
 impl NodeType {
     /// Its settings and sockets for `params`.
-    pub fn layout(&self, params: &Params) -> NodeLayout {
+    pub fn layout(&self, params: &Parameters) -> NodeLayout {
         (self.layout)(&self.name, params)
     }
 
     /// `params` made to fit the type: each setting its layout offers, with
     /// its value from `params` when that fits, else its default. A setting
     /// can change which others there are (a Convert's types and its
-    /// channel), so this repeats until the layout stands.
-    pub fn fit(&self, params: &Params) -> Params {
+    /// channel), so this repeats until the layout stands: a layout settles
+    /// once each setting it offers fits, so the most rounds are one more
+    /// than its settings. A layout that never settles is the type's error,
+    /// reported as `None`.
+    pub fn fit(&self, params: &Parameters) -> Option<Parameters> {
         let mut current = params.clone();
-        for _ in 0..4 {
+        for _ in 0..=current.len().max(self.defaults.len()) + 1 {
             let layout = self.layout(&current);
-            let fitted: Params = layout
-                .params
-                .iter()
+            let fitted: Parameters = (layout.params.iter())
                 .map(|spec| {
-                    let value = param(&current, &spec.name)
+                    let value = (current.get(&*spec.name))
                         .filter(|v| spec.accepts(v))
-                        .cloned()
-                        .unwrap_or_else(|| spec.default.clone());
-                    (spec.name.clone(), value)
+                        .unwrap_or(&spec.default);
+                    (spec.name.to_string(), value.clone())
                 })
                 .collect();
             if fitted == current {
-                break;
+                return Some(current);
             }
             current = fitted;
         }
-        current
+        None
     }
 }

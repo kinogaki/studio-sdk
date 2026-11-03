@@ -12,14 +12,10 @@ use std::collections::BTreeSet;
 /// Id `text` `package` declares as an id's text, when well formed (a
 /// creation's name, an engine's id: text, not yet an id type).
 fn declared_id(package: PackageId, text: &str) -> Result<&'static str, RegistryError> {
-    if crate::id::well_formed(text) {
-        Ok(crate::id::intern(text))
-    } else {
-        Err(RegistryError::MalformedId {
-            package,
-            id: text.to_owned(),
-        })
-    }
+    crate::id::parse_text(text).ok_or_else(|| RegistryError::MalformedId {
+        package,
+        id: text.to_owned(),
+    })
 }
 
 impl Registry {
