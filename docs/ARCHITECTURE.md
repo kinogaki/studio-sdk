@@ -47,7 +47,9 @@ Each kind of thing has its own id type:
 - `FormatId`
 - `NodeTypeId`
 - `SlotId`
+- `StoredId`
 - `ConversionId`
+- `MesherId`
 - `PackageId` (two segments only)
 
 Every id is interned in one table and is a `Copy` pointer to its text. Packages are never unloaded, so the table never needs to free anything.
@@ -263,7 +265,7 @@ Session state is never saved in the project.
 ## Stored values
 
 Some values belong to a package and to the project rather than to an object: CAD's tolerances for the project, its rows for each view; and some to the user, across projects, read by cooks: CAM's printers and filaments. A package declares each as a value type implementing `Stored` and registers it (`StoredValue::of::<T>()`, `Package::with_stored`):
-- `id`, the name of its element in the project;
+- `id`, a `StoredId` (`kinogaki.cad.tolerances`) naming its element in the project, under the package's vendor and declared once among the installed packages (the registry refuses a second);
 - `scope`: one value for the project (`Scope::Project`), one per view (`Scope::View`), or one for the user (`Scope::User`, kept in the user's settings folder, never in a project);
 - `defaults`, what a new project or view starts with;
 - `write` and `read`, its codec; reading is strict, as codecs' is.

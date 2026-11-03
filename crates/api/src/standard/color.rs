@@ -1,6 +1,7 @@
 //! The project's color configuration as a stored project value.
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
+use crate::id::StoredId;
 use crate::stored::{Scope, Stored};
 
 /// Which OpenColorIO config manages a project's colors and the working
@@ -33,8 +34,8 @@ pub struct ColorConfiguration {
 }
 
 impl Stored for ColorConfiguration {
-    fn id() -> &'static str {
-        "color"
+    fn id() -> StoredId {
+        StoredId::declared("kinogaki.core.color")
     }
     fn scope() -> Scope {
         Scope::Project

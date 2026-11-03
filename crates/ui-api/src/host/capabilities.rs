@@ -12,6 +12,7 @@ use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
 use kinogaki_studio_api::geometry::Frame;
 use kinogaki_studio_api::geometry::Polygons;
+use kinogaki_studio_api::id::StoredId;
 use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
@@ -157,7 +158,7 @@ pub trait HostDoc {
     /// Stored value `id` (a package's [`Stored`]): the project's or the
     /// user's (`view` `None`), or view `view`'s. `None` when no package
     /// registered it in that scope.
-    fn stored_any(&self, id: &str, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)>;
+    fn stored_any(&self, id: StoredId, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)>;
     /// Sets stored value `id` (the project's or the user's, or view
     /// `view`'s) to `value`: a project's value is a change to the project,
     /// saved with it; a view's is not undone; a user's is saved with the
@@ -165,7 +166,7 @@ pub trait HostDoc {
     /// not of its type.
     fn set_stored_any(
         &mut self,
-        id: &str,
+        id: StoredId,
         view: Option<usize>,
         value: Arc<dyn Any + Send + Sync>,
     ) -> bool;

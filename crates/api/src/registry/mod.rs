@@ -20,6 +20,7 @@ use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::id::{
     ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
+    StoredId,
 };
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
@@ -48,7 +49,8 @@ fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
 }
 
 /// Every package's registered data types, held edits, node types, network
-/// contexts, conversions, B-rep meshers, object kinds, formats and session slots.
+/// contexts, conversions, B-rep meshers, object kinds, formats, session slots
+/// and stored values.
 #[derive(Default)]
 pub struct Registry {
     packages: Vec<(PackageId, String)>,
@@ -75,6 +77,8 @@ pub struct Registry {
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
     formats: BTreeMap<FormatId, Entry<dyn FileFormat>>,
     slots: BTreeMap<SlotId, Entry<SessionSlot>>,
+    /// The package declaring each stored value.
+    stored: BTreeMap<StoredId, PackageId>,
     /// The contexts packages' UIs give parts to (with whether it is the
     /// context's mode), and the package giving them.
     ui_contexts: BTreeMap<(ContextId, bool), PackageId>,
@@ -142,6 +146,9 @@ impl Registry {
         }
         for slot in package.slots {
             self.slots.insert(slot.id(), Entry::new(id, Arc::new(slot)));
+        }
+        for stored in package.stored {
+            self.stored.insert(stored.id(), id);
         }
         for engine in package.engines {
             self.engines.insert(engine.id.clone(), id);
@@ -293,6 +300,7 @@ impl fmt::Debug for Registry {
             )
             .field("formats", &self.formats.keys().collect::<Vec<_>>())
             .field("slots", &self.slots.keys().collect::<Vec<_>>())
+            .field("stored", &self.stored.keys().collect::<Vec<_>>())
             .finish()
     }
 }

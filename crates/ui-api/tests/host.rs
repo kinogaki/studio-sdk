@@ -307,8 +307,8 @@ impl Section for Density {
 struct Spacing(f64);
 
 impl kinogaki_studio_api::Stored for Spacing {
-    fn id() -> &'static str {
-        "trees_spacing"
+    fn id() -> kinogaki_studio_api::StoredId {
+        kinogaki_studio_api::StoredId::declared("toy.trees.spacing")
     }
     fn scope() -> kinogaki_studio_api::Scope {
         kinogaki_studio_api::Scope::Project
@@ -617,7 +617,8 @@ fn a_project_section_edits_the_project_values_it_is_lent() {
     let mut trees = hosted(&host);
     let section = trees.registered().project_sections[0];
     assert_eq!(section.label(), "Trees");
-    let mut project = StoredValues::new([kinogaki_studio_api::StoredValue::of::<Spacing>()]);
+    let mut project =
+        StoredValues::new([kinogaki_studio_api::StoredValue::of::<Spacing>()]).unwrap();
     let drawn = trees.with(|_, s| section.rows(&project, s, &mut host));
     assert_eq!(drawn.number(&0), Some(2.0));
     assert_eq!(trees.state::<Forest>().pages, 1);

@@ -2,6 +2,7 @@
 use super::invalid;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
+use crate::id::StoredId;
 use crate::stored::{Scope, Stored};
 use kinogaki_geometry::Tolerances;
 
@@ -13,8 +14,8 @@ use kinogaki_geometry::Tolerances;
 /// the two never disagree. A value read back holds 1 mm a unit until then.
 /// Core registers it; every kernel reads the same value.
 impl Stored for Tolerances {
-    fn id() -> &'static str {
-        "tolerances"
+    fn id() -> StoredId {
+        StoredId::declared("kinogaki.core.tolerances")
     }
     fn scope() -> Scope {
         Scope::Project

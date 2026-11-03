@@ -121,7 +121,7 @@ pub use held::HeldEdit;
 pub use icon::{Icon, IconError};
 pub use id::{
     ContextId, ConversionId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
-    SlotId,
+    SlotId, StoredId,
 };
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
 pub use mesher::{Failed, Meshed, Mesher};

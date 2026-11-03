@@ -11,8 +11,8 @@
 //! registered value in a [`StoredValues`] table (the project's, and one
 //! per view), saves each into the project and reads it back.
 //!
-//! **In the project.** A [`Scope::Project`] value is the element named
-//! with its [`Stored::id`] among the project's settings; a [`Scope::View`]
+//! **In the project.** A [`Scope::Project`] value is the element of its
+//! [`Stored::id`] among the project's settings; a [`Scope::View`]
 //! value is that element in each view's. Each element names its package
 //! (the `package` metadata), so a project holding a value of a package
 //! that isn't installed skips it. Reading is strict: a project without an
@@ -28,8 +28,9 @@
 //! the table shares each value.
 //!
 //! [`Package::with_stored`]: crate::Package::with_stored
-use crate::element::{ElementReader, ElementWriter, check_name};
+use crate::element::{ElementReader, ElementWriter};
 use crate::error::Error;
+use crate::id::StoredId;
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -51,11 +52,10 @@ pub enum Scope {
 /// The host calls these on its UI thread or a project I/O worker; none
 /// may block.
 pub trait Stored: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
-    /// Its element's name in the project ("cad"): an
-    /// [`is_name`](crate::element::is_name), unique among the installed
-    /// packages' stored values of its scope (project and user values
-    /// share one set of names).
-    fn id() -> &'static str;
+    /// Its id (`kinogaki.cad.tolerances`), under its package's vendor and
+    /// unique among every installed package's stored values: the
+    /// registry refuses a package declaring one already declared.
+    fn id() -> StoredId;
     /// Where it belongs.
     fn scope() -> Scope;
     /// The value a new project (or a new view) starts with.
@@ -75,7 +75,7 @@ type Value = Arc<dyn Any + Send + Sync>;
 /// type with [`StoredValue::of`]; cheap to copy.
 #[derive(Clone, Copy)]
 pub struct StoredValue {
-    id: &'static str,
+    id: StoredId,
     scope: Scope,
     type_name: &'static str,
     defaults: fn() -> Value,
@@ -93,11 +93,7 @@ fn typed<T: Stored>(v: &dyn Any) -> &T {
 
 impl StoredValue {
     /// The stored value `T` is.
-    ///
-    /// # Panics
-    /// When `T::id()` is not a valid element name (a packaging error).
     pub fn of<T: Stored>() -> Self {
-        check_name(T::id()).expect("a stored value's id is an element name");
         StoredValue {
             id: T::id(),
             scope: T::scope(),
@@ -111,8 +107,8 @@ impl StoredValue {
         }
     }
 
-    /// Its element's name.
-    pub fn id(&self) -> &'static str {
+    /// Its id.
+    pub fn id(&self) -> StoredId {
         self.id
     }
 
@@ -158,25 +154,27 @@ struct Entry {
 /// Cloning shares every value; two tables are equal when they hold the
 /// same values.
 #[derive(Clone, Default)]
-pub struct StoredValues(BTreeMap<&'static str, Entry>);
+pub struct StoredValues(BTreeMap<StoredId, Entry>);
 
 impl StoredValues {
-    /// Each of `stored` at its defaults.
-    pub fn new(stored: impl IntoIterator<Item = StoredValue>) -> Self {
-        Self(
-            stored
-                .into_iter()
-                .map(|s| {
-                    (
-                        s.id,
-                        Entry {
-                            stored: s,
-                            value: (s.defaults)(),
-                        },
-                    )
-                })
-                .collect(),
-        )
+    /// Each of `stored` at its defaults; an error naming the id when two
+    /// of them share one (the registry admits no such packages, so a host
+    /// table made from what it admitted never fails).
+    pub fn new(stored: impl IntoIterator<Item = StoredValue>) -> Result<Self, Error> {
+        let mut table = BTreeMap::new();
+        for s in stored {
+            let entry = Entry {
+                stored: s,
+                value: (s.defaults)(),
+            };
+            if table.insert(s.id, entry).is_some() {
+                return Err(Error::invalid(format_args!(
+                    "stored value {} is registered twice",
+                    s.id
+                )));
+            }
+        }
+        Ok(Self(table))
     }
 
     /// The registrations held, in id order.
@@ -186,13 +184,13 @@ impl StoredValues {
 
     /// Value `T`, when it is one of these.
     pub fn get<T: Stored>(&self) -> Option<&T> {
-        self.0.get(T::id())?.value.downcast_ref()
+        self.0.get(&T::id())?.value.downcast_ref()
     }
 
     /// Value `T` to change, copied first while something else shares it;
     /// `None` when it isn't one of these.
     pub fn get_mut<T: Stored>(&mut self) -> Option<&mut T> {
-        let entry = self.0.get_mut(T::id())?;
+        let entry = self.0.get_mut(&T::id())?;
         if Arc::get_mut(&mut entry.value).is_none() {
             entry.value = (entry.stored.copy)(&*entry.value);
         }
@@ -200,14 +198,14 @@ impl StoredValues {
     }
 
     /// Value `id`, untyped.
-    pub fn get_any(&self, id: &str) -> Option<&(dyn Any + Send + Sync)> {
-        self.0.get(id).map(|e| &*e.value)
+    pub fn get_any(&self, id: StoredId) -> Option<&(dyn Any + Send + Sync)> {
+        self.0.get(&id).map(|e| &*e.value)
     }
 
     /// Replaces value `id` with `value`; `false` (and nothing stored) when
     /// it isn't one of these or `value` is not of its type.
-    pub fn set_any(&mut self, id: &str, value: Arc<dyn Any + Send + Sync>) -> bool {
-        match self.0.get_mut(id) {
+    pub fn set_any(&mut self, id: StoredId, value: Arc<dyn Any + Send + Sync>) -> bool {
+        match self.0.get_mut(&id) {
             Some(entry) if (*entry.value).type_id() == (*value).type_id() => {
                 entry.value = value;
                 true

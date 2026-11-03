@@ -9,8 +9,8 @@
 //! the first two segments.
 //!
 //! Each kind of id is its own type ([`DataTypeId`], [`ObjectKindId`],
-//! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`],
-//! [`ConversionId`]), so a node type id can't be passed where a data type
+//! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`], [`StoredId`],
+//! [`ConversionId`], [`MesherId`]), so a node type id can't be passed where a data type
 //! is meant. All of them are interned in one table: each distinct text is
 //! kept once for the program's life (packages are never unloaded), so an
 //! id is a `Copy` pointer-sized value and reading its text never allocates.
@@ -159,6 +159,13 @@ declare_id!(
     /// by a [`SessionSlot`](crate::SessionSlot).
     SlotId,
     "session slot"
+);
+declare_id!(
+    /// A package's stored value (`kinogaki.core.tolerances`): what names
+    /// it in the project and the user's settings. Registered by a
+    /// [`StoredValue`](crate::StoredValue).
+    StoredId,
+    "stored value"
 );
 declare_id!(
     /// A conversion between two data types (`kinogaki.cad.tessellate`).

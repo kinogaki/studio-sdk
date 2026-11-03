@@ -22,7 +22,7 @@ use kinogaki_studio_api::params::{Severity, Unit};
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
     Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, ObjectBody, ObjectKindId,
-    Package, RowsFor, SessionSlot, SessionSlots, SlotId, Time,
+    Package, RowsFor, SessionSlot, SessionSlots, SlotId, StoredId, Time,
 };
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
@@ -422,7 +422,7 @@ impl HostDoc for FakeHost {
             .map(|(&id, _)| id)
             .collect()
     }
-    fn stored_any(&self, id: &str, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)> {
+    fn stored_any(&self, id: StoredId, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)> {
         match view {
             None => (self.stored.get_any(id)).or_else(|| self.user_stored.get_any(id)),
             Some(v) => self.view_stored.get(v)?.get_any(id),
@@ -430,7 +430,7 @@ impl HostDoc for FakeHost {
     }
     fn set_stored_any(
         &mut self,
-        id: &str,
+        id: StoredId,
         view: Option<usize>,
         value: Arc<dyn Any + Send + Sync>,
     ) -> bool {

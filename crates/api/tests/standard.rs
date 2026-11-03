@@ -121,7 +121,7 @@ fn components_hold_a_standard_selection() {
 #[test]
 fn the_tolerances_save_as_a_project_value() {
     let value = StoredValue::of::<Tolerances>();
-    assert_eq!(value.id(), "tolerances");
+    assert_eq!(value.id().as_str(), "kinogaki.core.tolerances");
     let inches = Tolerances::default().with_unit(25.4).unwrap();
     let mut saved = MemoryElement::new("tolerances");
     saved.write(|w| value.write(&inches, w)).unwrap();
@@ -146,8 +146,8 @@ fn the_display_quality_saves_as_a_project_value_by_its_label() {
     use kinogaki_studio_api::geometry::DisplayQuality;
     let value = StoredValue::of::<DisplayQuality>();
     assert_eq!(
-        (value.id(), value.scope()),
-        ("display_quality", Scope::Project)
+        (value.id().as_str(), value.scope()),
+        ("kinogaki.core.display_quality", Scope::Project)
     );
     for q in DisplayQuality::ALL {
         let mut saved = MemoryElement::new("display_quality");

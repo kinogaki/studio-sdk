@@ -128,6 +128,13 @@ impl Registry {
                 owner(self.slots.get(&s.id())),
             )?;
         }
+        for s in &package.stored {
+            declare(
+                "stored value",
+                s.id().as_str(),
+                self.stored.get(&s.id()).copied(),
+            )?;
+        }
         for &(context, mode) in package.ui.iter().flat_map(|ui| ui.contexts()) {
             let what = if mode { "mode's UI" } else { "context's UI" };
             declare(
