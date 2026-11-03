@@ -173,7 +173,7 @@ fn the_recording_engine_counts_what_it_was_sent() {
     assert_eq!((counts.updates, counts.added, counts.changed), (3, 1, 2));
     assert_eq!(counts.triangles, 1, "moves and drags send no triangles");
     assert_eq!(counts.points, 4);
-    assert_eq!(counts.dirty[5], 1);
+    assert_eq!(counts.dirty[4], 1);
     engine.view(
         ViewId(1),
         ViewDesc {
@@ -196,21 +196,99 @@ fn the_recording_engine_counts_what_it_was_sent() {
 }
 
 #[test]
-fn mesh_attributes_hold_one_value_an_element_of_their_domain() {
-    let attribute = |domain, components, values: usize| MeshAttribute {
-        name: Arc::from("Cd"),
-        domain,
-        components,
-        color: true,
-        values: Numbers::Floats(Arc::from(vec![0.5f32; values])),
+fn a_shape_is_refused_unless_whole() {
+    use crate::geometry::{Attribute, Domain, Kind, Meaning, Primitives, Sampled, Xform};
+    let points = || -> crate::geometry::Column<[f32; 3]> { vec![[0.0f32; 3]; 4].into() };
+    let triangles = || Topology::Triangles(vec![[0u32, 1, 2], [0, 2, 3]].into());
+    let shape = || Shape::builder(points(), triangles());
+    let floats = |n: usize| Attribute::tuples(vec![0.5f32; n], Meaning::None).unwrap();
+    // Four points, two triangles: every domain's size.
+    let whole = shape()
+        .primvar(Domain::Point, "a", floats(4))
+        .primvar(Domain::Vertex, "b", floats(6))
+        .primvar(Domain::Primitive, "c", floats(2))
+        .primvar(Domain::Detail, "d", floats(1))
+        .build()
+        .unwrap();
+    assert_eq!(whole.primvar("b").map(|(d, _)| d), Some(Domain::Vertex));
+    assert!(whole.primvar("nothing").is_none());
+    let refused = |b: ShapeBuilder| b.build().unwrap_err().message().to_owned();
+    assert!(refused(shape().primvar(Domain::Point, "a", floats(3))).contains("a has 3 values"));
+    assert!(refused(shape().primvar(Domain::Vertex, "a", floats(2))).contains("a has 2 values"));
+    assert!(refused(shape().primvar(Domain::Primitive, "a", floats(4))).contains("a has 4"));
+    assert!(refused(shape().primvar(Domain::Detail, "a", floats(2))).contains("a has 2"));
+    assert!(refused(shape().primvar(Domain::Edge, "a", floats(5))).contains("edge"));
+    assert!(refused(shape().primvar(Domain::Point, "N", floats(4))).contains("N is"));
+    assert!(refused(shape().primvar(Domain::Point, "not a name", floats(4))).contains("name"));
+    // Connectivity within the points, slots within the materials, finite
+    // points; a rebuild is checked as a build is.
+    let past = Topology::Triangles(vec![[0u32, 1, 9]].into());
+    assert!(refused(Shape::builder(points(), past)).contains("point 9"));
+    let far: crate::geometry::Column<[f32; 3]> = vec![[f32::NAN; 3]; 4].into();
+    assert!(refused(Shape::builder(far, triangles())).contains("finite"));
+    let slots = Subsets::new(vec![0u16, 0].into(), Vec::new());
+    assert!(refused(shape().subsets(slots)).contains("slot 0"));
+    let short = Subsets::new(vec![0u16].into(), vec![Id::of(id(1))]);
+    assert!(refused(shape().subsets(short)).contains("1 material slots"));
+    let fine = Subsets::new(vec![Subsets::DEFAULT, 0].into(), vec![Id::of(id(1))]);
+    let dressed = shape().subsets(fine).build().unwrap();
+    assert_eq!(dressed.subsets().of(0), None);
+    assert_eq!(dressed.subsets().of(1), Some(Id::of(id(1))));
+    assert!(refused(whole.rebuilt().points(vec![[0.0f32; 3]; 2].into())).contains("point"));
+    // Curves hold no polygons and number their own points.
+    let kinds = vec![Kind::POLYLINE].into();
+    let line = Primitives::new(4, vec![0, 4].into(), vec![0, 1, 2, 3].into(), kinds, None).unwrap();
+    let curves = Shape::builder(points(), Topology::Curves(Arc::new(line)))
+        .primvar(Domain::Vertex, "w", floats(4))
+        .primvar(Domain::Primitive, "u", floats(1))
+        .build()
+        .unwrap();
+    assert_eq!(Prim::Shape(curves).kind(), PrimKind::Curves);
+    let quad = Primitives::of_polygons(4, vec![0, 4].into(), vec![0, 1, 2, 3].into()).unwrap();
+    let polygons = Topology::Curves(Arc::new(quad));
+    assert!(refused(Shape::builder(points(), polygons)).contains("polygons"));
+    let few = Primitives::new(
+        3,
+        vec![0, 3].into(),
+        vec![0, 1, 2].into(),
+        vec![Kind::POLYLINE].into(),
+        None,
+    )
+    .unwrap();
+    let few = Topology::Curves(Arc::new(few));
+    assert!(refused(Shape::builder(points(), few)).contains("over 3 points"));
+    assert_eq!(format!("{:?}", Dirty::PRIMVARS), "Dirty(PRIMVARS)");
+    // A placement across the shutter stays sorted: Sampled refuses otherwise.
+    let moved = Sampled::new(vec![0.0, 1.0], vec![Xform::IDENTITY; 2]).unwrap();
+    assert_eq!(
+        shape().xform(moved.clone()).build().unwrap().xform(),
+        &moved
+    );
+}
+
+#[test]
+fn an_instancer_is_refused_unless_whole() {
+    use crate::geometry::{Attribute, Domain, Meaning, Xform};
+    let xforms = || vec![Xform::IDENTITY; 3].into();
+    let many = || Instancer::builder(vec![id(1), id(2)], xforms());
+    let floats = |n: usize| Attribute::tuples(vec![0.5f32; n], Meaning::None).unwrap();
+    let table = |d, n| {
+        crate::geometry::Attributes::new()
+            .with(d, "a", floats(n))
+            .unwrap()
     };
-    // Four points, two triangles.
-    assert!(attribute(AttributeDomain::Point, 3, 12).is_consistent(4, 2));
-    assert!(attribute(AttributeDomain::Corner, 1, 6).is_consistent(4, 2));
-    assert!(attribute(AttributeDomain::Triangle, 4, 8).is_consistent(4, 2));
-    assert!(attribute(AttributeDomain::Constant, 2, 2).is_consistent(4, 2));
-    assert!(!attribute(AttributeDomain::Point, 3, 9).is_consistent(4, 2));
-    assert!(!attribute(AttributeDomain::Constant, 5, 5).is_consistent(4, 2));
-    assert!(!attribute(AttributeDomain::Constant, 0, 0).is_consistent(4, 2));
-    assert_eq!(format!("{:?}", Dirty::ATTRIBUTES), "Dirty(ATTRIBUTES)");
+    let whole = many()
+        .which(Some(vec![1, 0, 1].into()))
+        .primvars(table(Domain::Instance, 3))
+        .build()
+        .unwrap();
+    assert_eq!(whole.prototype_of(0), id(2));
+    assert_eq!(whole.prototype_of(1), id(1));
+    let refused = |b: InstancerBuilder| b.build().unwrap_err().message().to_owned();
+    assert!(refused(many().which(Some(vec![0].into()))).contains("1 prototype indices"));
+    assert!(refused(many().which(Some(vec![0, 2, 0].into()))).contains("past the 2"));
+    assert!(refused(many().primvars(table(Domain::Instance, 2))).contains("a has 2"));
+    assert!(refused(many().primvars(table(Domain::Point, 3))).contains("point"));
+    let none: Vec<PrimId> = Vec::new();
+    assert!(refused(Instancer::builder(none, xforms())).contains("no prototype"));
 }

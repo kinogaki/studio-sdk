@@ -425,7 +425,7 @@ pub struct RenderSetup {
     /// default.
     pub values: crate::Parameters,
     /// The outputs a final render writes beside the beauty, by the
-    /// engine's ids (`EngineDescription::aovs`).
+    /// engine's ids (`Capabilities::aovs`).
     pub outputs: Vec<Aov>,
     /// What its render shows: a Comp network's result, or the raw render.
     pub processing: Processing,

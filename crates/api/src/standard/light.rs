@@ -123,7 +123,7 @@ impl LightCodec {
         out.set("exposure", float(light.exposure))?;
         out.set("normalize", Field::Bool(light.normalize))?;
         out.set("colorTemperature", float(light.color_temperature))?;
-        out.set("visible", Field::Bool(light.visible))
+        out.set("visible", Field::Bool(light.camera))
     }
 
     /// Reads the light [`write_light`](Self::write_light) wrote, strictly:
@@ -188,7 +188,7 @@ impl LightCodec {
             normalize: e.bool("normalize")?,
             color_temperature: scalar("colorTemperature")?,
             xform: Sampled::still(Xform::IDENTITY),
-            visible: e.bool("visible")?,
+            camera: e.bool("visible")?,
         };
         light_value(light).map_err(|_| Error::invalid(format_args!("{}: invalid light", at())))
     }
@@ -255,7 +255,7 @@ mod tests {
                 exposure: -1.0,
                 normalize: i % 2 == 0,
                 color_temperature: 3200.0,
-                visible: i % 2 == 1,
+                camera: i % 2 == 1,
                 ..Light::default()
             })
             .collect()

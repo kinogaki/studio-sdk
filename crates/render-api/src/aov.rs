@@ -1,5 +1,5 @@
 //! Outputs (AOVs) a final frame can carry, known by id. An engine lists
-//! the ones it writes ([`crate::EngineDescription::aovs`]); the standard
+//! the ones it writes ([`crate::Capabilities::aovs`]); the standard
 //! ones ([`standard`]) are the contract hosts and compositing read by.
 //! Colors (the beauty, albedo and the light passes) are linear ACEScg
 //! whatever the engine.

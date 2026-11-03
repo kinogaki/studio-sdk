@@ -5,7 +5,7 @@ use kinogaki_geometry::{Sampled, Xform};
 #[test]
 fn engines_declare_types_and_apply_schemas_to_them() {
     let (wake, _) = counter();
-    let mut d = RecordingEngine::new(wake).description().as_ref().clone();
+    let d = RecordingEngine::new(wake).description().as_ref().clone();
     assert!(d.prim_type(standard::AREA_LIGHT).is_some());
     assert!(d.prim_type("kinogaki.other.rim_light").is_none());
     let gobo = AppliedSchema {
@@ -19,7 +19,9 @@ fn engines_declare_types_and_apply_schemas_to_them() {
             false,
         )],
     };
-    d.applied.push(gobo);
+    let mut capabilities = d.capabilities().clone();
+    capabilities.applied.push(gobo);
+    let d = d.rebuilt().capabilities(capabilities).build();
     let (groups, params) = d.schema(standard::SPOT_LIGHT).unwrap();
     assert_eq!(params.last().unwrap().name.as_ref(), "gobo");
     assert_eq!(groups.len(), 2);
@@ -96,21 +98,21 @@ impl MaterialRules for Rules {
 #[test]
 fn another_engines_material_is_adopted_flat_in_its_tint() {
     let flat_of = |engine: &str| MaterialNetwork::new(EngineId::new(engine));
-    let mut here: EngineDescription = RecordingEngine::new(Arc::new(|| {}))
+    let here: EngineDescription = RecordingEngine::new(Arc::new(|| {}))
         .description()
-        .as_ref()
-        .clone();
-    here.id = EngineId::new("here");
-    here.materials = Arc::new(Rules {
-        engine: EngineId::new("here"),
-        tint: None,
-    });
-    let mut there = here.clone();
-    there.id = EngineId::new("there");
-    there.materials = Arc::new(Rules {
-        engine: EngineId::new("there"),
-        tint: Some(Tint::Color([0.1, 0.2, 0.3])),
-    });
+        .rebuilt()
+        .id(EngineId::new("here"))
+        .materials(Arc::new(Rules {
+            engine: EngineId::new("here"),
+            tint: None,
+        }))
+        .build();
+    let there = (here.rebuilt().id(EngineId::new("there")))
+        .materials(Arc::new(Rules {
+            engine: EngineId::new("there"),
+            tint: Some(Tint::Color([0.1, 0.2, 0.3])),
+        }))
+        .build();
     let own = flat_of("here");
     assert_eq!(here.adopt(own.clone(), &there), own, "its own: as it is");
     let adopted = here.adopt(flat_of("there"), &there);
@@ -122,16 +124,18 @@ fn another_engines_material_is_adopted_flat_in_its_tint() {
         ))
     );
     // No one tint: the default material.
-    there.materials = Arc::new(Rules {
-        engine: EngineId::new("there"),
-        tint: None,
-    });
+    let there = (there.rebuilt())
+        .materials(Arc::new(Rules {
+            engine: EngineId::new("there"),
+            tint: None,
+        }))
+        .build();
     assert_eq!(
         here.adopt(flat_of("there"), &there),
         here.default_material()
     );
     let engines = Engines::new(vec![here.clone(), there]);
-    assert_eq!(engines.default_engine().unwrap().id.as_str(), "here");
+    assert_eq!(engines.default_engine().unwrap().id().as_str(), "here");
     assert!(engines.get(&EngineId::new("there")).is_some());
     assert!(engines.get(&EngineId::new("nope")).is_none());
     // A host with no engine installed has none to default to.

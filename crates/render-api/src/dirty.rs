@@ -6,53 +6,49 @@ use std::ops::{BitOr, BitOrAssign};
 
 /// Changed parts of a prim. Bits OR together when updates coalesce.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct Dirty(u32);
+pub struct Dirty(u16);
 
 impl Dirty {
     /// Nothing changed.
     pub const NONE: Dirty = Dirty(0);
-    /// Mesh point positions (the triangles stand).
+    /// A shape's point positions (its connectivity stands), at the
+    /// [`Change`](crate::Change)'s ranges.
     pub const POINTS: Dirty = Dirty(1 << 0);
-    /// Mesh triangles, and with them every per-triangle and per-corner array.
+    /// A shape's connectivity, and with it every array sized by it.
     pub const TOPOLOGY: Dirty = Dirty(1 << 1);
-    /// Mesh corner normals.
-    pub const NORMALS: Dirty = Dirty(1 << 2);
-    /// Mesh corner texture coordinates.
-    pub const UVS: Dirty = Dirty(1 << 3);
-    /// Mesh per-triangle material slots or the slots' materials.
-    pub const MATERIAL_SLOTS: Dirty = Dirty(1 << 4);
-    /// A Mesh, Instancer, Camera or Light placement, or its samples across
-    /// the shutter.
-    pub const TRANSFORM: Dirty = Dirty(1 << 5);
-    /// Whether a Mesh or Light is rendered.
-    pub const VISIBILITY: Dirty = Dirty(1 << 6);
-    /// Values of a Material, Light or Camera (a slider).
-    pub const PARAMS: Dirty = Dirty(1 << 7);
+    /// A shape's or Instancer's primvars. Compare by name and column
+    /// ([`Column::ptr_eq`](crate::geometry::Column::ptr_eq)): an unchanged
+    /// primvar is the same column.
+    pub const PRIMVARS: Dirty = Dirty(1 << 2);
+    /// Which materials a shape's primitives render with.
+    pub const MATERIALS: Dirty = Dirty(1 << 3);
+    /// A placement (a shape's, a Camera's or a Light's, an Instancer's or its
+    /// instances'), or its samples across the shutter.
+    pub const TRANSFORM: Dirty = Dirty(1 << 4);
+    /// Whether a prim is rendered, and what sees it.
+    pub const VISIBILITY: Dirty = Dirty(1 << 5);
+    /// Values of a Material, Light or Camera (a slider), or a prim's name.
+    pub const PARAMS: Dirty = Dirty(1 << 6);
     /// A Material's nodes or links.
-    pub const NETWORK: Dirty = Dirty(1 << 8);
-    /// Mesh attributes the materials read (names, layout or values).
-    pub const ATTRIBUTES: Dirty = Dirty(1 << 10);
+    pub const NETWORK: Dirty = Dirty(1 << 7);
     /// How many bits there are.
-    pub(crate) const COUNT: usize = 11;
+    pub(crate) const COUNT: usize = 8;
     /// Every bit.
     pub const ALL: Dirty = Dirty((1 << Dirty::COUNT) - 1);
 
     const NAMES: [&'static str; Dirty::COUNT] = [
         "POINTS",
         "TOPOLOGY",
-        "NORMALS",
-        "UVS",
-        "MATERIAL_SLOTS",
+        "PRIMVARS",
+        "MATERIALS",
         "TRANSFORM",
         "VISIBILITY",
         "PARAMS",
         "NETWORK",
-        "PIXELS",
-        "ATTRIBUTES",
     ];
 
     /// The raw bits.
-    pub const fn bits(self) -> u32 {
+    pub const fn bits(self) -> u16 {
         self.0
     }
 

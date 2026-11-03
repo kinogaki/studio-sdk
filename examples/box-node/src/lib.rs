@@ -18,6 +18,7 @@
 //!   and the object kind show by.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
+use kinogaki_studio_api::geometry::Column;
 use kinogaki_studio_api::network::Flags;
 use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
 use kinogaki_studio_api::*;
@@ -171,15 +172,17 @@ impl Renderable for BoxType {
         _: Option<&Rendered>,
         _: &RenderCx<'_>,
     ) -> Result<Rendered, Error> {
-        let triangles: Vec<[u32; 3]> = FACES
-            .iter()
-            .flat_map(|&[a, b, c, d]| [[a, b, c], [a, c, d]])
-            .collect();
-        let source = PlainTriangles::new(box_of(data)?.points(), triangles, TOPOLOGY);
-        Ok(Rendered::new(vec![RenderItem::triangles(
-            0,
-            Arc::new(source),
-        )]))
+        // Every box has these triangles: one column, so a resized box is a
+        // points update, not a rebuild.
+        static TRIANGLES: LazyLock<Column<[u32; 3]>> = LazyLock::new(|| {
+            FACES
+                .iter()
+                .flat_map(|&[a, b, c, d]| [[a, b, c], [a, c, d]])
+                .collect()
+        });
+        let points = box_of(data)?.points();
+        let source = PlainTriangles::new(points.to_vec().into(), TRIANGLES.clone());
+        Ok(Rendered::new(vec![RenderItem::shape(0, Arc::new(source))]))
     }
 }
 

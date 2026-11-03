@@ -1,6 +1,7 @@
 //! Prim ids: a slot and a generation, so an id that was removed never names
 //! the prim that later reuses its slot; and engine ids.
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 /// A render engine's id (`kinogaki.pixel.engine`), what files and render
@@ -45,10 +46,62 @@ pub struct PrimId {
     pub generation: u32,
 }
 
-/// A Material prim's id (materials are referenced by id, never by path).
-pub type MaterialId = PrimId;
-/// A Texture prim's id.
-pub type TextureId = PrimId;
+/// A prim of type `T`, as what names it holds it: a shape's materials
+/// (`Id<Material>`), a node's textures (`Id<Texture>`), a view's camera
+/// (`Id<Camera>`).
+pub struct Id<T>(PrimId, PhantomData<fn() -> T>);
+
+impl<T> Id<T> {
+    /// Prim `prim`, which is a `T`.
+    pub const fn of(prim: PrimId) -> Id<T> {
+        Id(prim, PhantomData)
+    }
+
+    /// The prim.
+    pub const fn prim(self) -> PrimId {
+        self.0
+    }
+}
+
+impl<T> Clone for Id<T> {
+    fn clone(&self) -> Id<T> {
+        *self
+    }
+}
+
+impl<T> Copy for Id<T> {}
+
+impl<T> PartialEq for Id<T> {
+    fn eq(&self, other: &Id<T>) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<T> Eq for Id<T> {}
+
+impl<T> PartialOrd for Id<T> {
+    fn partial_cmp(&self, other: &Id<T>) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T> Ord for Id<T> {
+    fn cmp(&self, other: &Id<T>) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<T> std::hash::Hash for Id<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl<T> fmt::Debug for Id<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// Gives out [`PrimId`]s. A released slot is reused, always with the next
 /// generation.
@@ -66,6 +119,11 @@ impl IdAllocator {
     /// An allocator with no ids given out.
     pub fn new() -> IdAllocator {
         IdAllocator::default()
+    }
+
+    /// A new id for a prim of type `T`.
+    pub fn allocate_as<T>(&mut self) -> Id<T> {
+        Id::of(self.allocate())
     }
 
     /// A new id: a released slot at its next generation, or a new slot.

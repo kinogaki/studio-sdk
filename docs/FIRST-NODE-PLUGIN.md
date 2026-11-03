@@ -181,17 +181,27 @@ impl Displayable for BoxType {
 }
 ```
 
-**In renders**, engines never see a plugin's types: a type answers render items over a `TriangleSource`.
+**In renders**, engines never see a plugin's types: a type answers render items over a `ShapeSource`.
 
 ```rust
 impl Renderable for BoxType {
-    fn items(&self, data: &Data, _: &RenderCx<'_>) -> Result<Vec<RenderItem>, Error> {
-        let triangles: Vec<[u32; 3]> = FACES
-            .iter()
-            .flat_map(|&[a, b, c, d]| [[a, b, c], [a, c, d]])
-            .collect();
-        let source = PlainTriangles::new(box_of(data)?.points(), triangles, TOPOLOGY);
-        Ok(vec![RenderItem::triangles(0, Arc::new(source))])
+    fn items(
+        &self,
+        data: &Data,
+        _: Option<&Rendered>,
+        _: &RenderCx<'_>,
+    ) -> Result<Rendered, Error> {
+        // Every box has these triangles: one column, so a resized box is a
+        // points update, not a rebuild.
+        static TRIANGLES: LazyLock<Column<[u32; 3]>> = LazyLock::new(|| {
+            FACES
+                .iter()
+                .flat_map(|&[a, b, c, d]| [[a, b, c], [a, c, d]])
+                .collect()
+        });
+        let points = box_of(data)?.points();
+        let source = PlainTriangles::new(points.to_vec().into(), TRIANGLES.clone());
+        Ok(Rendered::new(vec![RenderItem::shape(0, Arc::new(source))]))
     }
 }
 ```

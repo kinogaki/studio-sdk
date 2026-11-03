@@ -6,6 +6,7 @@ use super::*;
 use kinogaki_studio_api::cook::{Constraint, Space};
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
+use kinogaki_studio_api::render::Topology;
 use kinogaki_studio_api::{ErrorKind, Vec3};
 use studio_ui_api::host::{HostNetwork, HostUndo};
 use studio_ui_api_testing::{FakeHost, FakeNetwork};
@@ -140,15 +141,16 @@ fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
         .items(&data, None, &RenderCx::new(Time::ZERO, &cancel))
         .unwrap();
     let items = &rendered.items;
-    let RenderItem::Triangles { source, .. } = &items[0];
-    assert_eq!((items.len(), source.triangle_count()), (1, 12));
+    let RenderItem::Shape { source, .. } = &items[0] else {
+        panic!("a box renders as a shape");
+    };
+    let Topology::Triangles(triangles) = source.topology() else {
+        panic!("a box renders as triangles");
+    };
+    assert_eq!((items.len(), triangles.len()), (1, 12));
     // Every triangle faces away from the center.
     let points = source.points();
-    for [a, b, c] in source
-        .triangles()
-        .iter()
-        .map(|t| t.map(|i| points[i as usize]))
-    {
+    for [a, b, c] in triangles.iter().map(|t| t.map(|i| points[i as usize])) {
         let (u, v) = (sub(b, a), sub(c, a));
         let normal = [
             u[1] * v[2] - u[2] * v[1],

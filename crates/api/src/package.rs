@@ -311,7 +311,7 @@ impl fmt::Debug for Package {
             )
             .field(
                 "engines",
-                &self.engines.iter().map(|e| &e.id).collect::<Vec<_>>(),
+                &self.engines.iter().map(|e| e.id()).collect::<Vec<_>>(),
             )
             .field("ui", &self.ui);
         out.finish()

@@ -11,8 +11,8 @@ use std::sync::Arc;
 /// How a data type renders: as neutral [`RenderItem`]s every engine draws,
 /// whatever kernel made the value.
 pub trait Renderable: Send + Sync {
-    /// `data` as render items at `cx`'s time and detail, placed relative
-    /// to its object (the host places the object in the world), given
+    /// `data` as render items at `cx`'s time and detail, relative to its
+    /// object (the host places the object in the world), given
     /// what this facet answered for the value the object rendered before,
     /// when there was one (as [`Displayable::prepare`] is): a type whose
     /// values change a little at a time (a drag's next state) builds on
@@ -22,7 +22,7 @@ pub trait Renderable: Send + Sync {
     /// [`moved_since`]) for a dragged one.
     ///
     /// [`Displayable::prepare`]: crate::facets::Displayable::prepare
-    /// [`moved_since`]: crate::render::TriangleSource::moved_since
+    /// [`moved_since`]: crate::render::ShapeSource::moved_since
     fn items(
         &self,
         data: &Data,

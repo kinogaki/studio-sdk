@@ -47,22 +47,6 @@ impl Tint {
     }
 }
 
-/// A material to start from: a surface with settings and inputs set.
-#[derive(Clone, Debug, PartialEq)]
-pub struct MaterialPreset {
-    /// Its name, and the new material's.
-    pub name: Arc<str>,
-    /// Words search accepts for it.
-    pub aliases: Vec<Arc<str>>,
-    /// Its surface node type's name.
-    pub surface: Arc<str>,
-    /// The surface's settings.
-    pub params: Parameters,
-    /// The surface's inputs set, by socket name, each a value its socket
-    /// takes.
-    pub values: Parameters,
-}
-
 /// How an engine renders material previews: its settings for them and the
 /// floor the preview sphere stands on.
 #[derive(Clone, Debug, PartialEq)]
@@ -96,55 +80,62 @@ pub trait MaterialRules: Send + Sync {
 
 /// The motion an engine blurs while a camera's shutter is open.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MotionSupport {
+pub struct Motion {
     /// Placed prims moving: their placements across the shutter
     /// ([`Sampled`](crate::geometry::Sampled) with more than one sample).
     pub transforms: bool,
-    /// Points moving by their velocities (the `v` attribute).
-    pub(crate) velocities: bool,
+    /// Points and instances moving by their velocities (the `v` primvar,
+    /// scene units a second; [`crate::RenderSettings::rate`] says how long
+    /// a frame is).
+    pub velocities: bool,
 }
 
-impl MotionSupport {
+impl Motion {
     /// Whether it blurs anything.
     pub fn any(self) -> bool {
         self.transforms || self.velocities
     }
 }
 
-/// An engine, as a host sees it before making one.
-#[derive(Clone)]
-pub struct EngineDescription {
-    /// Its id in files (`kinogaki.pixel.engine`).
-    pub id: EngineId,
-    /// What a UI calls it (`Pixel`).
-    pub label: Arc<str>,
-    /// The structural prims it renders (hosts send no others).
+/// What an engine renders: hosts send it nothing else.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Capabilities {
+    /// The structural prims it renders.
     pub prims: Vec<PrimKind>,
     /// The prim types it declares (lights, fog), the standard ones as
-    /// [`crate::standard`] declares them; hosts send prims of no others.
+    /// [`crate::standard`] declares them.
     pub types: Vec<PrimType>,
     /// The parameters it adds to types (a gobo on distant lights).
     pub applied: Vec<AppliedSchema>,
-    /// Its settings' groups, in order.
-    pub setting_groups: Vec<SettingGroup>,
-    /// Its settings beyond [`crate::RenderSettings`]'s own fields.
-    pub settings: Vec<SettingDescriptor>,
-    /// Its material vocabulary, in the order a UI lists it (by category).
-    pub material_nodes: Vec<Arc<NodeType>>,
-    /// Materials to start from.
-    pub material_presets: Vec<MaterialPreset>,
     /// The outputs it can write, in the order a UI and a file list them
     /// (the beauty first).
     pub aovs: Vec<AovSpec>,
     /// Whether each pass is a whole frame, fast enough to follow a moving
     /// camera at full size: hosts then never shrink a moving view's film.
     pub realtime: bool,
-    /// The motion it blurs (none: hosts send no motion samples).
-    pub motion: MotionSupport,
-    /// How it renders material previews.
-    pub preview: PreviewSetup,
-    /// What its materials are to others.
-    pub materials: Arc<dyn MaterialRules>,
+    /// The motion it blurs (none: hosts send still placements).
+    pub motion: Motion,
+}
+
+impl Capabilities {
+    /// Whether it renders prims of `kind`.
+    pub fn renders(&self, kind: PrimKind) -> bool {
+        self.prims.contains(&kind)
+    }
+}
+
+/// An engine, as a host sees it before making one. Made by
+/// [`EngineDescription::builder`].
+#[derive(Clone)]
+pub struct EngineDescription {
+    id: EngineId,
+    label: Arc<str>,
+    capabilities: Capabilities,
+    setting_groups: Vec<SettingGroup>,
+    settings: Vec<SettingDescriptor>,
+    material_nodes: Vec<Arc<NodeType>>,
+    preview: PreviewSetup,
+    materials: Arc<dyn MaterialRules>,
 }
 
 impl std::fmt::Debug for EngineDescription {
@@ -160,7 +151,116 @@ impl PartialEq for EngineDescription {
     }
 }
 
+/// Makes an [`EngineDescription`].
+#[derive(Clone)]
+pub struct EngineBuilder(EngineDescription);
+
+impl EngineBuilder {
+    /// Rendering what `capabilities` say.
+    pub fn capabilities(mut self, capabilities: Capabilities) -> Self {
+        self.0.capabilities = capabilities;
+        self
+    }
+
+    /// Its settings beyond [`crate::RenderSettings`]'s own fields, and their
+    /// groups in order.
+    pub fn settings(mut self, groups: Vec<SettingGroup>, settings: Vec<SettingDescriptor>) -> Self {
+        self.0.setting_groups = groups;
+        self.0.settings = settings;
+        self
+    }
+
+    /// Its material vocabulary, in the order a UI lists it (by category).
+    pub fn material_nodes(mut self, nodes: Vec<Arc<NodeType>>) -> Self {
+        self.0.material_nodes = nodes;
+        self
+    }
+
+    /// How it renders material previews.
+    pub fn preview(mut self, preview: PreviewSetup) -> Self {
+        self.0.preview = preview;
+        self
+    }
+
+    /// What its materials are to others.
+    pub fn materials(mut self, rules: Arc<dyn MaterialRules>) -> Self {
+        self.0.materials = rules;
+        self
+    }
+
+    /// With the id `id`.
+    pub fn id(mut self, id: EngineId) -> Self {
+        self.0.id = id;
+        self
+    }
+
+    /// The description.
+    pub fn build(self) -> EngineDescription {
+        self.0
+    }
+}
+
 impl EngineDescription {
+    /// Engine `id` (`kinogaki.pixel.engine`, what files name it by) that a UI
+    /// calls `label` (`Pixel`), `rules` saying what its materials are to
+    /// others: rendering nothing yet.
+    pub fn builder(id: EngineId, label: &str, rules: Arc<dyn MaterialRules>) -> EngineBuilder {
+        let floor = MaterialNetwork::new(id.clone());
+        EngineBuilder(EngineDescription {
+            id,
+            label: Arc::from(label),
+            capabilities: Capabilities::default(),
+            setting_groups: Vec::new(),
+            settings: Vec::new(),
+            material_nodes: Vec::new(),
+            preview: PreviewSetup {
+                settings: Parameters::new(),
+                floor,
+            },
+            materials: rules,
+        })
+    }
+
+    /// A builder starting from this description.
+    pub fn rebuilt(&self) -> EngineBuilder {
+        EngineBuilder(self.clone())
+    }
+
+    /// Its id in files.
+    pub fn id(&self) -> &EngineId {
+        &self.id
+    }
+
+    /// What a UI calls it.
+    pub fn label(&self) -> &Arc<str> {
+        &self.label
+    }
+
+    /// What it renders.
+    pub fn capabilities(&self) -> &Capabilities {
+        &self.capabilities
+    }
+
+    /// Its settings' groups, in order.
+    pub fn setting_groups(&self) -> &[SettingGroup] {
+        &self.setting_groups
+    }
+
+    /// Its settings beyond [`crate::RenderSettings`]'s own fields.
+    pub fn settings(&self) -> &[SettingDescriptor] {
+        &self.settings
+    }
+
+    /// Its material vocabulary.
+    pub fn material_nodes(&self) -> &[Arc<NodeType>] {
+        &self.material_nodes
+    }
+
+    /// How it renders material previews.
+    pub fn preview(&self) -> &PreviewSetup {
+        &self.preview
+    }
+
     /// Its node type `name`.
     pub fn node_type(&self, name: &str) -> Option<&Arc<NodeType>> {
         self.material_nodes.iter().find(|t| &*t.name == name)
@@ -173,17 +273,18 @@ impl EngineDescription {
 
     /// Its output `id` ([`Aov::id`]).
     pub fn aov(&self, id: &str) -> Option<&Aov> {
-        self.aovs.iter().map(|a| &a.aov).find(|a| &*a.id == id)
+        let aovs = self.capabilities.aovs.iter();
+        aovs.map(|a| &a.aov).find(|a| &*a.id == id)
     }
 
     /// Its prim type `id`, when it declares it.
     pub fn prim_type(&self, id: &str) -> Option<&PrimType> {
-        self.types.iter().find(|t| &*t.id == id)
+        self.capabilities.types.iter().find(|t| &*t.id == id)
     }
 
     /// The schemas it applies to type `id`.
     pub(crate) fn applied_to<'a>(&'a self, id: &'a str) -> impl Iterator<Item = &'a AppliedSchema> {
-        self.applied.iter().filter(move |a| a.applies(id))
+        (self.capabilities.applied.iter()).filter(move |a| a.applies(id))
     }
 
     /// Type `id`'s groups and parameters as it renders them: the type's,
@@ -258,7 +359,7 @@ impl Engines {
 
     /// Engine `id`.
     pub fn get(&self, id: &EngineId) -> Option<&Arc<EngineDescription>> {
-        self.0.iter().find(|e| e.id == *id)
+        self.0.iter().find(|e| e.id() == id)
     }
 
     /// The default engine: the first, when there is one.

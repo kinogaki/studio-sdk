@@ -22,6 +22,7 @@ use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
 use crate::declared::{Declared, PrimType, Role};
+use crate::prim::Visibility;
 use crate::settings::{SettingDescriptor, SettingGroup, Trailing};
 use kinogaki_value::{Choice, Condition, Number, Unit, Value, ValueKind};
 
@@ -420,8 +421,9 @@ pub struct Light {
     pub color_temperature: f32,
     /// Light to world across the shutter.
     pub xform: Sampled<Xform>,
-    /// Whether the camera sees the light itself.
-    pub visible: bool,
+    /// Whether the camera sees the light itself (it lights the scene either
+    /// way).
+    pub camera: bool,
 }
 
 impl Default for Light {
@@ -439,7 +441,7 @@ impl Default for Light {
             normalize: false,
             color_temperature: 6500.0,
             xform: Sampled::still(Xform::IDENTITY),
-            visible: true,
+            camera: true,
         }
     }
 }
@@ -480,7 +482,7 @@ impl Light {
             normalize: prim.bool("normalize"),
             color_temperature: prim.float("colorTemperature"),
             xform: prim.xform.clone(),
-            visible: prim.visible,
+            camera: prim.visibility.camera,
         })
     }
 
@@ -540,7 +542,10 @@ impl Light {
             values,
             textures: Default::default(),
             xform: self.xform.clone(),
-            visible: self.visible,
+            visibility: Visibility {
+                visible: true,
+                camera: self.camera,
+            },
         }
     }
 }

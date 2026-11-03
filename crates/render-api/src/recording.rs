@@ -6,13 +6,13 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::aov::{AovDesc, AovSpec, standard as aov};
-use crate::description::{EngineDescription, MaterialRules, MotionSupport, PreviewSetup, Tint};
+use crate::description::{Capabilities, EngineDescription, MaterialRules, Motion, Tint};
 use crate::dirty::Dirty;
 use crate::engine::{Outputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
 use crate::exchange::PreviewSurface;
 use crate::id::{EngineId, PrimId};
 use crate::material::MaterialNetwork;
-use crate::prim::{Prim, PrimKind};
+use crate::prim::{Prim, PrimKind, Topology};
 use crate::settings::RenderSettings;
 use crate::update::SceneUpdate;
 
@@ -29,9 +29,9 @@ pub struct Counts {
     pub changed: u64,
     /// Per dirty bit, the changes that carried it.
     pub dirty: [u64; Dirty::COUNT],
-    /// Triangles that arrived in added meshes or TOPOLOGY changes.
+    /// Triangles that arrived in added shapes or TOPOLOGY changes.
     pub triangles: u64,
-    /// Points that arrived: whole meshes on add or TOPOLOGY, else the
+    /// Points that arrived: whole shapes on add or TOPOLOGY, else the
     /// POINTS ranges' lengths (a whole-ranges change counts every point).
     pub points: u64,
     /// Settled batches.
@@ -65,10 +65,12 @@ impl RecordingEngine {
         }
     }
 
-    fn count_mesh(&mut self, prim: &Prim) {
-        if let Prim::Mesh(mesh) = prim {
-            self.counts.triangles += mesh.triangles.len() as u64;
-            self.counts.points += mesh.points.len() as u64;
+    fn count_shape(&mut self, prim: &Prim) {
+        if let Prim::Shape(shape) = prim {
+            if let Topology::Triangles(triangles) = shape.topology() {
+                self.counts.triangles += triangles.len() as u64;
+            }
+            self.counts.points += shape.points().len() as u64;
         }
     }
 }
@@ -110,28 +112,18 @@ impl MaterialRules for Rules {
 fn description() -> EngineDescription {
     let mut types = crate::standard::lights();
     types.push(crate::standard::fog());
-    EngineDescription {
-        id: EngineId::new(ID),
-        label: Arc::from("Recording"),
-        prims: PrimKind::STRUCTURAL.to_vec(),
-        types,
-        applied: Vec::new(),
-        setting_groups: Vec::new(),
-        settings: Vec::new(),
-        material_nodes: Vec::new(),
-        material_presets: Vec::new(),
-        aovs: vec![AovSpec::new(aov::beauty(), true)],
-        realtime: false,
-        motion: MotionSupport {
-            transforms: true,
-            velocities: false,
-        },
-        preview: PreviewSetup {
-            settings: Default::default(),
-            floor: empty(),
-        },
-        materials: Arc::new(Rules),
-    }
+    EngineDescription::builder(EngineId::new(ID), "Recording", Arc::new(Rules))
+        .capabilities(Capabilities {
+            prims: PrimKind::STRUCTURAL.to_vec(),
+            types,
+            aovs: vec![AovSpec::new(aov::beauty(), true)],
+            motion: Motion {
+                transforms: true,
+                velocities: true,
+            },
+            ..Capabilities::default()
+        })
+        .build()
 }
 
 impl RenderEngine for RecordingEngine {
@@ -148,21 +140,21 @@ impl RenderEngine for RecordingEngine {
         }
         for (id, prim) in update.added {
             self.counts.added += 1;
-            self.count_mesh(&prim);
+            self.count_shape(&prim);
             self.prims.insert(id, prim);
         }
         for change in update.changed {
             self.counts.changed += 1;
             for bit in 0..Dirty::COUNT {
-                if change.dirty.bits() & (1 << bit) != 0 {
+                if change.dirty.bits() & (1u16 << bit) != 0 {
                     self.counts.dirty[bit] += 1;
                 }
             }
             if change.dirty.contains(Dirty::TOPOLOGY) {
-                self.count_mesh(&change.prim);
+                self.count_shape(&change.prim);
             } else if change.dirty.contains(Dirty::POINTS) {
                 self.counts.points += match &change.prim {
-                    Prim::Mesh(mesh) if change.points.is_whole() => mesh.points.len() as u64,
+                    Prim::Shape(shape) if change.points.is_whole() => shape.points().len() as u64,
                     _ => change.points.len(),
                 };
             }

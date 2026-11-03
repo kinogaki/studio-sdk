@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::aov::AovDesc;
 use crate::description::EngineDescription;
-use crate::id::PrimId;
+use crate::id::Id;
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::{Error, ErrorKind};
@@ -27,7 +27,7 @@ pub struct ViewId(pub u32);
 #[derive(Clone, Debug, PartialEq)]
 pub enum ViewCamera {
     /// Through a Camera prim.
-    Prim(PrimId),
+    Prim(Id<Camera>),
     /// Through a camera the host places (a viewport's own).
     Free(Camera),
 }

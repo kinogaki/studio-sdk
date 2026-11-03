@@ -141,7 +141,7 @@ impl Registry {
             self.stored.insert(stored.id(), id);
         }
         for engine in package.engines {
-            self.engines.insert(engine.id.clone(), id);
+            self.engines.insert(engine.id().clone(), id);
         }
         let icons = package.icons.into_iter().map(|i| i.name).collect();
         self.icons.insert(id, icons);

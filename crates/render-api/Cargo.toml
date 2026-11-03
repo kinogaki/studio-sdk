@@ -1,6 +1,6 @@
 [package]
 name = "kinogaki-render-api"
-description = "The engine-neutral render interface: prims, declared prim types, dirty bits, coalesced scene updates, material networks, settings, outputs, the triangle source contract and the RenderEngine trait"
+description = "The engine-neutral render interface: prims, declared prim types, dirty bits, coalesced scene updates, material networks, settings, outputs, the shape source contract and the RenderEngine trait"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

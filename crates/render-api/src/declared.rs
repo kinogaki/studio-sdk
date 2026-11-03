@@ -12,6 +12,7 @@
 use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
+use crate::prim::Visibility;
 use crate::settings::{SettingDescriptor, SettingGroup, Textures, defaults};
 use kinogaki_value::{Parameters, Value};
 
@@ -83,9 +84,9 @@ pub struct Declared {
     pub textures: Textures,
     /// Prim to world across the shutter (unused by atmospheres).
     pub xform: Sampled<Xform>,
-    /// Whether the camera sees it itself (a light lights the scene either
-    /// way).
-    pub visible: bool,
+    /// Whether it is in the render, and whether the camera sees it itself (a
+    /// light lights the scene either way).
+    pub visibility: Visibility,
 }
 
 impl Declared {
@@ -96,7 +97,7 @@ impl Declared {
             values,
             textures: Textures::new(),
             xform: Sampled::still(Xform::IDENTITY),
-            visible: true,
+            visibility: Visibility::SHOWN,
         }
     }
 

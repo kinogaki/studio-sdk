@@ -9,19 +9,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::*;
 
 pub(super) fn mesh(points: usize) -> Prim {
-    Prim::Mesh(Mesh {
-        points: Arc::from(vec![[0.0f32; 3]; points]),
-        triangles: Arc::from(vec![[0u32, 1, 2]]),
-        normals: None,
-        uvs: None,
-        material_slots: Arc::from(vec![0u16]),
-        attributes: Arc::from([]),
-        materials: Arc::from(Vec::new()),
-        xform: kinogaki_geometry::Sampled::still(kinogaki_geometry::Xform::IDENTITY),
-        visible: true,
-        id: 1,
-        path: Arc::from("/mesh"),
-    })
+    let at = vec![[0.0f32; 3]; points].into();
+    let triangles = vec![[0u32, 1, 2]].into();
+    let shape = Shape::builder(at, Topology::Triangles(triangles))
+        .path("/mesh")
+        .build()
+        .expect("a triangle");
+    Prim::Shape(shape)
 }
 
 pub(super) fn id(slot: u32) -> PrimId {

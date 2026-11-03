@@ -136,16 +136,14 @@ impl ObjectKindSpec for Kind {
 
 /// An engine declaring the standard spot, or nothing.
 fn engine(spots: bool) -> EngineDescription {
-    let mut e = RecordingEngine::new(Arc::new(|| {}))
-        .description()
-        .as_ref()
-        .clone();
-    e.types = if spots {
+    let e = RecordingEngine::new(Arc::new(|| {})).description().clone();
+    let mut capabilities = e.capabilities().clone();
+    capabilities.types = if spots {
         vec![area_light()]
     } else {
         Vec::new()
     };
-    e
+    e.rebuilt().capabilities(capabilities).build()
 }
 
 #[test]

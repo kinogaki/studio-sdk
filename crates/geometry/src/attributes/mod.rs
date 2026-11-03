@@ -126,6 +126,41 @@ impl Attributes {
         self.with_shared(domain, name, Arc::new(attribute))
     }
 
+    /// The table with `attribute`, read from an attribute of a checked table
+    /// (a render's domain over a value's), set as `name` of `domain`: its
+    /// type and domain are checked as [`with`](Self::with) checks them, but
+    /// its elements may repeat a value (the triangles of one polygon share
+    /// its `id`).
+    ///
+    /// # Errors
+    /// A bad name, or a standard name of another type or domain.
+    pub fn with_read(
+        &self,
+        domain: Domain,
+        name: &str,
+        attribute: Attribute,
+    ) -> Result<Attributes, Error> {
+        check_name(name)?;
+        check_standard_type(domain, name, &attribute)?;
+        let mut out = self.clone();
+        out.values
+            .entry(domain)
+            .or_default()
+            .insert(name.into(), Arc::new(attribute));
+        Ok(out)
+    }
+
+    /// Whether `other` holds the same attributes in the same columns:
+    /// nothing a reader of its values could tell apart, read in O(names).
+    pub fn same_columns(&self, other: &Attributes) -> bool {
+        let keyed = |a: &'_ Attributes| -> Vec<(Domain, Arc<str>, u64)> {
+            (a.values.iter())
+                .flat_map(|(&d, m)| m.iter().map(move |(n, a)| (d, n.clone(), a.values().key())))
+                .collect()
+        };
+        keyed(self) == keyed(other)
+    }
+
     /// [`with`](Self::with) for an attribute shared with another table:
     /// both hold the same one.
     ///
@@ -207,7 +242,10 @@ impl Attributes {
     /// have, which no entry may use). `what` names the value in messages.
     /// So an edit replacing one column checks that column alone. Returns
     /// how many entries it checked.
-    pub(crate) fn check(
+    ///
+    /// # Errors
+    /// An entry on a domain the value doesn't have, or of another count.
+    pub fn check(
         &self,
         what: &str,
         previous: Option<&Attributes>,
@@ -271,6 +309,26 @@ fn check_standard_attribute(
     attribute: &Attribute,
     replacing: Option<&Attribute>,
 ) -> Result<(), Error> {
+    check_standard_type(domain, name, attribute)?;
+    if name != names::ID {
+        return Ok(());
+    }
+    let repeated = match (attribute.values(), replacing.map(Attribute::values)) {
+        (Values::I64(new), Some(Values::I64(old))) if ids::kept_or_above(new, old) => None,
+        (Values::I64(ids), _) => ids::repeated(ids.as_slice()),
+        _ => None,
+    };
+    match repeated {
+        Some(id) => Err(refused(format!(
+            "{} id {id} names two elements",
+            domain.name()
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// A standard name's type and domains.
+fn check_standard_type(domain: Domain, name: &str, attribute: &Attribute) -> Result<(), Error> {
     match names::standard(name) {
         Some(Standard::Group(on)) => Err(refused(format!(
             "{name} is a standard group of the {} domain",
@@ -295,20 +353,6 @@ fn check_standard_attribute(
             ty.describe(),
             attribute.ty().describe()
         ))),
-        Some(Standard::Attribute(..)) if name == names::ID => {
-            let repeated = match (attribute.values(), replacing.map(Attribute::values)) {
-                (Values::I64(new), Some(Values::I64(old))) if ids::kept_or_above(new, old) => None,
-                (Values::I64(ids), _) => ids::repeated(ids.as_slice()),
-                _ => None,
-            };
-            match repeated {
-                Some(id) => Err(refused(format!(
-                    "{} id {id} names two elements",
-                    domain.name()
-                ))),
-                None => Ok(()),
-            }
-        }
         _ => Ok(()),
     }
 }

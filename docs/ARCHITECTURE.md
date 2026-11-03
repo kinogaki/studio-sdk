@@ -146,7 +146,7 @@ Facets are optional:
 | `Look` (`look`) | shading | the pieces' colors while shaded and whether the value renders as a volume; without it the value shows as clay |
 | `Snappable` (`snapping`) | gizmo moves | what a move may land on in the value, for the user's `SnapTargets` (a set of `SnapKind`s: points, edges' middles, faces' centers, crossings, edges, surfaces): a `SnapQuery` answered with `SnapHit`s, a surface's with its normal there; the host keeps the rest of snapping (the master switch, the grid, ranking across objects, feedback) |
 | `Tabular` | the spreadsheet | tables, columns, and cells read a range of rows at a time |
-| `Renderable` | render sync | `RenderItem::Triangles` over a `TriangleSource`, placed once or many times |
+| `Renderable` | render sync | `RenderItem::Shape` over a `ShapeSource` (triangles or curves), or `RenderItem::Instances` of other items |
 
 If a type does not provide a facet, the surface that needs it simply leaves the type's values out.
 
@@ -311,15 +311,13 @@ Long work polls a `CancelToken`: preparing a display, converting, reading a file
 
 ## Rendering
 
-Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport(DisplayQuality)`, the object's, or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, a standard value that render-api re-exports, the project's `Tolerances` an approximate value is made to, and a cancel token), and returns `RenderItem::Triangles { part, source, placements, label }`:
-- `part` is a key stable across recooks (a CAD body's index), so the host matches the items of successive values;
-- `source` is a `TriangleSource`, an immutable snapshot with shared arrays;
-- `placements` are relative to the object: the first is the item, the rest are copies sharing its acceleration structure;
-- `label` is the name Cryptomatte gives the object.
+Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport(DisplayQuality)`, the object's, or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, a standard value that render-api re-exports, the project's `Tolerances` an approximate value is made to, and a cancel token), and returns `RenderItem`s:
+- `RenderItem::Shape { part, source, label }`: `part` is a key stable across recooks (a CAD body's index), so the host matches the items of successive values; `source` is a `ShapeSource`, an immutable snapshot with shared columns; `label` is the name Cryptomatte gives the object.
+- `RenderItem::Instances { part, prototypes, which, xforms, primvars, label }`: placements of other items, which an engine instances: what it made of each prototype is shared however many instances place it.
 
-The source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`, `AttributeDomain`) is `kinogaki-render-api`'s, the render interface engines build on, and `render` re-exports it; so a source a data type makes is what a host hands its engines, with no conversion. `RenderItem` stays here.
+The source contract (`ShapeSource`, `Topology`, `Ranges`) is `kinogaki-render-api`'s, the render interface engines build on, and `render` re-exports it; so a source a data type makes is what a host hands its engines, with no conversion. `RenderItem` stays here.
 
-The host keeps engine scenes in step cheaply: a source with the last identity is skipped; one with the same topology is a points update narrowed by `moved_since`; looks, coordinates and attributes are resent only when their identities change. Normals are asked for lazily, after a drag ends.
+The host keeps engine scenes in step cheaply: a source with the last identity is skipped; one with the same topology is a points update narrowed by `moved_since`; primvars and subsets are resent only when their columns change. Shading normals (`N`) are asked for lazily, after a drag ends.
 
 ## The viewport
 

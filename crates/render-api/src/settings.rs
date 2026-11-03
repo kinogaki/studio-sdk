@@ -11,17 +11,18 @@
 //! as its file's path; an engine receives the Texture prim the host decoded
 //! it to, in the prim's or node's [`Textures`].
 
-use kinogaki_geometry::{Error, Units};
+use kinogaki_geometry::{Error, Rate, Units};
 use kinogaki_value::{Condition, Parameters, Value, ValueKind};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::id::{PrimId, TextureId};
+use crate::id::Id;
+use crate::prim::{Camera, Texture};
 
 /// The Texture prims the host decoded image values to, by the value's
 /// name: what an engine reads for each [`ValueKind::File`] value (one
 /// missing: no image, or one not read yet).
-pub type Textures = BTreeMap<String, TextureId>;
+pub type Textures = BTreeMap<String, Id<Texture>>;
 
 /// What a render reads: the fields every engine needs, and the engine's
 /// own values by name.
@@ -30,11 +31,14 @@ pub struct RenderSettings {
     /// Final-frame width and height, in pixels.
     pub resolution: [u32; 2],
     /// The Camera prim final frames render through (none: the view's camera).
-    pub camera: Option<PrimId>,
+    pub camera: Option<Id<Camera>>,
     /// The scene's units: what real sizes (a lens's millimetres, an
     /// anodized part's grain) are measured against, and the axis that is
     /// up to sky light and height fog.
     pub units: Units,
+    /// The scene's frames a second: how long a frame is, which sample times
+    /// (in frames) and velocities (in scene units a second) meet at.
+    pub rate: Rate,
     /// The engine's settings, by its descriptors' names; one missing takes
     /// its descriptor's default.
     pub values: Parameters,
@@ -46,6 +50,7 @@ impl Default for RenderSettings {
             resolution: [1920, 1080],
             camera: None,
             units: Units::METERS,
+            rate: Rate::FILM,
             values: Parameters::new(),
         }
     }

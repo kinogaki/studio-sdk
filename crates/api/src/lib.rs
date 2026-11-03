@@ -141,7 +141,7 @@ pub use package::{Package, PackageUi};
 pub use params::{Parameters, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::Registry;
-pub use render::{PlainTriangles, RenderItem, TriangleSource};
+pub use render::{PlainTriangles, RenderItem, ShapeSource};
 pub use session::{GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
 pub use viewport::{ElementKind, ElementSet, Hit, Surface, SurfaceSource};

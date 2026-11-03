@@ -400,21 +400,21 @@ fn nodes_hold_networks_of_declared_contexts_without_loops() {
 fn engine(id: &str) -> kinogaki_render_api::EngineDescription {
     let wake: kinogaki_render_api::Wake = Arc::new(|| {});
     use kinogaki_render_api::RenderEngine;
-    let mut d = kinogaki_render_api::RecordingEngine::new(wake)
+    (kinogaki_render_api::RecordingEngine::new(wake)
         .description()
-        .as_ref()
-        .clone();
-    d.id = kinogaki_render_api::EngineId::new(id);
-    d
+        .rebuilt())
+    .id(kinogaki_render_api::EngineId::new(id))
+    .build()
 }
 
 #[test]
 fn an_engine_setting_is_never_named_as_a_setups_own() {
     use kinogaki_render_api::SettingDescriptor;
     use kinogaki_studio_api::params::ValueKind;
-    let mut d = engine("acme.lights.engine");
     let own = SettingDescriptor::new("output", "Output", "main", ValueKind::File, "a.exr");
-    d.settings.push(own);
+    let d = (engine("acme.lights.engine").rebuilt())
+        .settings(Vec::new(), vec![own])
+        .build();
     let package =
         Package::new(PackageId::declared("acme.lights"), "Lights").with_engine_description(d);
     assert_refused(Registry::new().register(package), &["a render setup's own"]);
