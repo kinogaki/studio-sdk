@@ -335,6 +335,25 @@ mod tests {
     use super::*;
     use crate::element::MemoryElement;
     use crate::math::UpAxis;
+    use kinogaki_render_api::color::{ColorService, ViewChoice, ViewTransform};
+
+    /// A color service converting nothing (the readings here read no color).
+    #[derive(Debug)]
+    struct Unconverted;
+    impl ColorService for Unconverted {
+        fn working(&self) -> &str {
+            kinogaki_render_api::RENDER_SPACE
+        }
+        fn convert(&self, _: &str, _: &str, _: &mut [[f64; 3]]) -> Result<(), String> {
+            Ok(())
+        }
+        fn view_transform(&self, _: &ViewChoice, _: &str, _: u32, _: u32) -> Option<ViewTransform> {
+            None
+        }
+        fn revision(&self) -> u64 {
+            0
+        }
+    }
 
     struct Plain;
     impl FileFormat for Plain {
@@ -423,15 +442,11 @@ mod tests {
         let reading = Reading {
             settings: &lent,
             cancel: stop,
-            ..Reading::new(Purpose::Node, units, &crate::conformance::Unconverted)
+            ..Reading::new(Purpose::Node, units, &Unconverted)
         };
         let read = Plain.read(Path::new("a.plain"), &Plain.options(), &reading);
         assert_eq!(read.unwrap_err(), Error::Cancelled);
-        let fine = Reading::new(
-            Purpose::Objects,
-            Units::default(),
-            &crate::conformance::Unconverted,
-        );
+        let fine = Reading::new(Purpose::Objects, Units::default(), &Unconverted);
         assert!(
             Plain
                 .read(Path::new("a.plain"), &Plain.options(), &fine)

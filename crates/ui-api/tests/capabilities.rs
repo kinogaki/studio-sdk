@@ -19,7 +19,7 @@ use studio_ui_api::package::{
     ContextPart, Inspector, Invoked, Library, RowAction, UiPackage, ViewportSpec, Vocabulary,
     WithUi,
 };
-use studio_ui_api::testing::{FakeHost, FakeNetwork, HostCall, Hosting};
+use studio_ui_api_testing::{FakeHost, FakeNetwork, HostCall, Hosting};
 
 fn context() -> ContextId {
     ContextId::declared("acme.counts.network")

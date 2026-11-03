@@ -2,11 +2,11 @@
 //! return values, a sheet keyed by the plugin's own type, menus, overlays
 //! and value fields.
 use studio_ui_api::sheet::{Action, Field, Number, Schema};
-use studio_ui_api::testing::{Call, RecordingUi};
 use studio_ui_api::{
     Align2, ButtonSpec, Color, Font, Id, KeyFilter, MenuItem, Pos, Rect, Shape, SheetStyle, Stroke,
     TextStyle, Ui, UiExt, ValueFields, pos, vec2,
 };
+use studio_ui_api_testing::{Call, RecordingUi};
 
 /// The plugin's own field keys.
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]

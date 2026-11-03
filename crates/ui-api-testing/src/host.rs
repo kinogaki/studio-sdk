@@ -4,15 +4,6 @@
 //! called the way the host calls it (state taken out per call and put
 //! back, callbacks queued, never nested).
 use super::{FakeNetwork, HostCall};
-use crate::Pos;
-use crate::gizmo::{TransformSpace, TransformTool};
-use crate::host::{
-    Cx, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell, HostSlots,
-    HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestJob,
-    LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View, ViewCamera,
-    ViewCx, Waker,
-};
-use crate::package::{Registered, State};
 use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::geometry::Polygons;
@@ -27,6 +18,15 @@ use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use studio_ui_api::Pos;
+use studio_ui_api::gizmo::{TransformSpace, TransformTool};
+use studio_ui_api::host::{
+    Cx, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell, HostSlots,
+    HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestJob,
+    LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View, ViewCamera,
+    ViewCx, Waker,
+};
+use studio_ui_api::package::{Registered, State};
 
 /// An object of a [`FakeHost`]'s scene.
 #[derive(Clone, Debug)]
@@ -103,7 +103,7 @@ pub struct FakeHost {
     /// The user's preferences.
     pub prefs: HostPrefs,
     /// The host's theme.
-    pub theme: crate::Theme,
+    pub theme: studio_ui_api::Theme,
     /// Settings sections' applied values, by context.
     pub sections: BTreeMap<ContextId, Arc<dyn Any + Send + Sync>>,
     /// The project's stored values.
@@ -177,7 +177,7 @@ impl FakeHost {
             view: None,
             inspected: Inspected::default(),
             prefs: HostPrefs::default(),
-            theme: crate::Theme::default(),
+            theme: studio_ui_api::Theme::default(),
             sections: BTreeMap::new(),
             stored: Default::default(),
             user_stored: Default::default(),
@@ -638,9 +638,9 @@ impl Cx for FakeHost {
     }
     /// No color management: every space the working one.
     fn colors(&self) -> &dyn kinogaki_studio_api::render::ColorService {
-        &kinogaki_studio_api::conformance::Unconverted
+        &kinogaki_studio_api_testing::Unconverted
     }
-    fn theme(&self) -> &crate::Theme {
+    fn theme(&self) -> &studio_ui_api::Theme {
         &self.theme
     }
     /// Queues `job` (cancelling a queued job of `key`, which then never
@@ -658,7 +658,7 @@ impl Cx for FakeHost {
     /// Records the call and answers its `node_rows` field.
     fn node_rows(
         &mut self,
-        _ui: &mut dyn crate::Ui,
+        _ui: &mut dyn studio_ui_api::Ui,
         object: ObjectRef,
         node: NodeRef,
         purpose: RowsFor,
@@ -711,7 +711,7 @@ impl Hosting {
     /// `package` with a new state of its UI, its wake `host`'s.
     ///
     /// # Panics
-    /// When `package` has no UI ([`WithUi`](crate::package::WithUi)).
+    /// When `package` has no UI ([`WithUi`](studio_ui_api::package::WithUi)).
     pub fn new(package: Package, host: &FakeHost) -> Self {
         let state = Self::ui(&package).state(host.wake());
         Hosting {
@@ -752,7 +752,7 @@ impl Hosting {
             .expect("the package's state, of its type")
     }
 
-    /// [`UiPackage::poll`](crate::package::UiPackage::poll) on `host`.
+    /// [`UiPackage::poll`](studio_ui_api::package::UiPackage::poll) on `host`.
     pub fn poll(&mut self, host: &mut FakeHost) {
         self.with(|p, s| p.poll(s, host))
     }

@@ -17,12 +17,7 @@ kinogaki-studio-api.workspace = true
 # The viewport packet contract: what a context's views draw of its own.
 kinogaki-viewport-api.workspace = true
 
-[features]
-# The headless fakes a package's tests drive its UI with (`testing`:
-# FakeHost, RecordingUi) and the API's conformance suite. Off by default:
-# tests only.
-testing = ["kinogaki-studio-api/testing"]
-
 [dev-dependencies]
-# The crate's own tests drive it through its fakes.
-kinogaki-studio-ui-api = { path = ".", features = ["testing"] }
+# The crate's tests drive it through its headless fakes.
+kinogaki-studio-ui-api-testing.workspace = true
+kinogaki-studio-api-testing.workspace = true

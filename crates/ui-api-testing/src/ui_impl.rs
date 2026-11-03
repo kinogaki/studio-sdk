@@ -2,19 +2,19 @@
 //! from the script.
 use super::painter::RecordingPainter;
 use super::ui::{Call, RecordingUi};
-use crate::card::{CardResponse, CardSpec, PopoverSpec};
-use crate::color::Color;
-use crate::geom::{Pos, Rect, Vec2, vec2};
-use crate::id::Id;
-use crate::input::{Input, KeyFilter};
-use crate::paint::Painter;
-use crate::response::{Response, Sense};
-use crate::sheet::{Edits, FieldKey, Number, Schema, SheetStyle};
-use crate::text::{Font, TextStyle};
-use crate::theme::Theme;
-use crate::ui::{Body, RowMenu, Ui};
-use crate::value_fields::ValueFields;
-use crate::widgets::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};
+use studio_ui_api::Color;
+use studio_ui_api::Id;
+use studio_ui_api::Painter;
+use studio_ui_api::Theme;
+use studio_ui_api::sheet::{Edits, FieldKey, Number, Schema, SheetStyle};
+use studio_ui_api::value_fields::ValueFields;
+use studio_ui_api::{Body, RowMenu, Ui};
+use studio_ui_api::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};
+use studio_ui_api::{CardResponse, CardSpec, PopoverSpec};
+use studio_ui_api::{Font, TextStyle};
+use studio_ui_api::{Input, KeyFilter};
+use studio_ui_api::{Pos, Rect, Vec2, vec2};
+use studio_ui_api::{Response, Sense};
 
 impl Ui for RecordingUi {
     fn input(&self) -> &Input {
@@ -83,7 +83,7 @@ impl Ui for RecordingUi {
         let response = self.place(id, size, Sense::HOVER);
         self.painter.clipped(self.rect).text(
             response.rect.min,
-            crate::geom::Align2::LEFT_TOP,
+            studio_ui_api::Align2::LEFT_TOP,
             text,
             font,
             color,
@@ -369,7 +369,7 @@ impl Ui for RecordingUi {
         places: &[Pos],
         hold_focus: bool,
     ) -> Vec<Rect> {
-        let shown: Vec<&crate::value_fields::ValueField> =
+        let shown: Vec<&studio_ui_api::value_fields::ValueField> =
             fields.fields.iter().take(places.len()).collect();
         self.record(Call::ValueFields(
             shown.iter().map(|f| f.shown().to_owned()).collect(),

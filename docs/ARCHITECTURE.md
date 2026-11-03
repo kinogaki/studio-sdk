@@ -102,7 +102,7 @@ The topology's `Index` (edges in canonical order, polygons and polylines per edg
 
 **Saving.** The SDK defines how the standard types save: `standard::PolygonsCodec`, `standard::CurvesCodec`, `standard::BrepCodec`, `standard::CameraCodec` and `standard::LightCodec` are the codecs core registers (core's Camera and Light objects save their lens and light through them too; a light value is unplaced and names a dome's image by its file: the Texture prim a host decodes it to is one scene's, as an Image Texture node's is), writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
 
-**Conformance.** `conformance` (the api crate's `testing` feature, as the UI layer's `testing` fakes are: test support, which a plugin enables in its dev-dependencies) runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
+**Conformance.** The conformance suite (the companion crate `kinogaki-studio-api-testing`, as the UI layer's fakes are `kinogaki-studio-ui-api-testing`: test support, only ever a dev-dependency) runs every producer's values through every consumer: a kernel implements `Producer` in its own repository, an engine or a format `Consumer`, and each runs beside the SDK's `Fixtures` (every shape and attribute kind), `Codecs` (a bit-exact round trip) and `Invariants` (rebuilt through the validating constructors, canonical edges).
 
 ## Data types and facets
 
@@ -377,10 +377,10 @@ Rules: every call runs on the UI thread and returns at once; a query gets `&S` a
 
 ## Testing
 
-`testing::FakeHost` stands in for Studio's host interface (slots and objects' networks with a real undo history, selections, a place, views and settings sections as plain fields, every request recorded as a `HostCall`), and `testing::Hosting` calls a registered package's parts on it as the host does.
+`studio_ui_api_testing::FakeHost` stands in for Studio's host interface (slots and objects' networks with a real undo history, selections, a place, views and settings sections as plain fields, every request recorded as a `HostCall`), and `studio_ui_api_testing::Hosting` calls a registered package's parts on it as the host does.
 
 `FakeHost` also keeps the clipboard, the views that render, the switches on in each view (`switched`, what `ViewCx::switched` answers), and the `Cx::latest` jobs, which `run_latest` runs as the host's lanes would.
 
-`testing::FakeNetwork` is one object's network in memory, made from the packages whose node types it holds. It answers `NetworkRead` and `NetworkEdit` as core does, refusing what core refuses, and cooks a node through its type (`cook`). Put into `FakeHost::networks`, it is what a package's tools edit through `HostNetwork`, one undo step an edit; so a tool's network edits, and a node type in a network, are tested without Studio. It is a test double, not core: it caches nothing and cooks every node anew, and its rustdoc lists where it is simpler than core.
+`studio_ui_api_testing::FakeNetwork` is one object's network in memory, made from the packages whose node types it holds. It answers `NetworkRead` and `NetworkEdit` as core does, refusing what core refuses, and cooks a node through its type (`cook`). Put into `FakeHost::networks`, it is what a package's tools edit through `HostNetwork`, one undo step an edit; so a tool's network edits, and a node type in a network, are tested without Studio. It is a test double, not core: it caches nothing and cooks every node anew, and its rustdoc lists where it is simpler than core.
 
-`testing::RecordingUi` and `testing::RecordingPainter` are headless fakes: they lay widgets out simply, record every call and every shape, and play back scripted user actions (click a button, edit a sheet field, type into a field, pick a choice). A plugin's unit tests drive its panels with them, with no window and no GPU.
+`studio_ui_api_testing::RecordingUi` and `studio_ui_api_testing::RecordingPainter` are headless fakes: they lay widgets out simply, record every call and every shape, and play back scripted user actions (click a button, edit a sheet field, type into a field, pick a choice). A plugin's unit tests drive its panels with them, with no window and no GPU.

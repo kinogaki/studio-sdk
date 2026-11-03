@@ -12,7 +12,7 @@ use kinogaki_studio_api::{
 };
 use std::sync::LazyLock;
 use studio_ui_api::host::{HostNetwork, HostUndo};
-use studio_ui_api::testing::{FakeHost, FakeNetwork, HostCall};
+use studio_ui_api_testing::{FakeHost, FakeNetwork, HostCall};
 
 static NUMBER: LazyLock<Typed<f64>> =
     LazyLock::new(|| Typed::new(DataTypeId::declared("acme.numbers.number")));

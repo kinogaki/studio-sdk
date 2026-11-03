@@ -1,10 +1,10 @@
 //! The SDK's consumers: [`Codecs`] and [`Invariants`].
 use super::Consumer;
-use crate::codec::DataCodec;
-use crate::data::Data;
-use crate::element::MemoryElement;
-use crate::standard::{self, BrepCodec, CurvesCodec, PolygonsCodec};
 use kinogaki_geometry::{Class, Curves, Polygons, Selection, Topology};
+use kinogaki_studio_api::codec::DataCodec;
+use kinogaki_studio_api::data::Data;
+use kinogaki_studio_api::element::MemoryElement;
+use kinogaki_studio_api::standard::{self, BrepCodec, CurvesCodec, PolygonsCodec};
 
 /// Saves each standard value with its codec and reads it back: the read
 /// value equals it bit for bit, and a selection of it round-trips too.

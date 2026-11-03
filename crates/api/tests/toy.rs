@@ -1,8 +1,8 @@
 //! The API through a toy kernel: a point cloud data type (codec, display,
 //! no other facet), a "count" type, a Cloud object kind, a format and a selection slot, registered as packages.
-use kinogaki_studio_api::conformance::Unconverted;
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::*;
+use kinogaki_studio_api_testing::Unconverted;
 use std::sync::{Arc, LazyLock};
 
 /// The toy kernel's value.

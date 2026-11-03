@@ -32,9 +32,9 @@ crate-type = ["dylib"]
 kinogaki-studio-api = { git = "https://github.com/kinogaki/studio-sdk" }
 
 [dev-dependencies]
-# The fake host and its in-memory networks, for the tests (the `testing`
-# feature).
-kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk", features = ["testing"] }
+# The fake host and its in-memory networks, for the tests (the SDK's test
+# support crate, never a plugin's own dependency).
+kinogaki-studio-ui-api-testing = { git = "https://github.com/kinogaki/studio-sdk" }
 ```
 
 Pin the dependency (`rev = "…"`) to the SDK your Studio release's kit was built from once you ship. During development, cargo and these crates are all you need; step 7 builds the shipping library against the kit.
@@ -374,7 +374,7 @@ use super::*;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
 use kinogaki_studio_api::parallel::Serial;
 use studio_ui_api::host::{HostNetwork, HostUndo};
-use studio_ui_api::testing::{FakeHost, FakeNetwork};
+use studio_ui_api_testing::{FakeHost, FakeNetwork};
 
 #[test]
 fn the_package_registers() {

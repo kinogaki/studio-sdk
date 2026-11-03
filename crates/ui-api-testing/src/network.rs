@@ -69,7 +69,7 @@ struct Node {
 /// ```
 /// use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode};
 /// use kinogaki_studio_api::{ContextId, Package, PackageId};
-/// use studio_ui_api::testing::FakeNetwork;
+/// use studio_ui_api_testing::FakeNetwork;
 ///
 /// let context = ContextId::declared("acme.trees.network");
 /// let package = Package::new(PackageId::declared("acme.trees"), "Trees")

@@ -8,7 +8,7 @@ use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
 use kinogaki_studio_api::parallel::Serial;
 use studio_ui_api::host::{HostNetwork, HostUndo};
-use studio_ui_api::testing::{FakeHost, FakeNetwork};
+use studio_ui_api_testing::{FakeHost, FakeNetwork};
 
 /// Cooks the Box node with `width`, `depth` and `height`, centered on the
 /// origin.

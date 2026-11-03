@@ -1,4 +1,5 @@
-//! Headless fakes of the host's UI for plugin unit tests:
+//! The UI layer's test support (a dev-dependency only): headless fakes of
+//! the host's UI for plugin unit tests:
 //! [`RecordingUi`] and [`RecordingPainter`] record what a plugin asks to
 //! show and draw, and play back scripted user actions, with no window and
 //! no GPU; [`FakeHost`] stands in for Studio's host interface, with its
@@ -6,7 +7,7 @@
 //! package's parts on it as the host does.
 //!
 //! ```
-//! use studio_ui_api::testing::{Call, RecordingUi};
+//! use studio_ui_api_testing::{Call, RecordingUi};
 //! use studio_ui_api::{ButtonSpec, Pos, Rect, Ui, Vec2};
 //!
 //! let mut ui = RecordingUi::new(Rect::from_min_size(Pos::ZERO, Vec2::new(300.0, 200.0)));

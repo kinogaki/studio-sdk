@@ -16,6 +16,8 @@ kinogaki-studio-ui-api = { path = "crates/ui-api" }
 kinogaki-render-api = { path = "crates/render-api" }
 kinogaki-viewport-api = { path = "crates/viewport-api" }
 kinogaki-geometry = { path = "crates/geometry" }
+kinogaki-studio-api-testing = { path = "crates/api-testing" }
+kinogaki-studio-ui-api-testing = { path = "crates/ui-api-testing" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

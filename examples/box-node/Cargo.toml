@@ -21,4 +21,5 @@ kinogaki-studio-api.workspace = true
 # The engines a creation may read (none, in the tests).
 kinogaki-render-api.workspace = true
 # Its tests add the node to a network on the SDK's fake host.
-kinogaki-studio-ui-api = { workspace = true, features = ["testing"] }
+kinogaki-studio-ui-api.workspace = true
+kinogaki-studio-ui-api-testing.workspace = true

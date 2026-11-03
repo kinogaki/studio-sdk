@@ -1,7 +1,6 @@
 //! `kinogaki.core.brep` as a data type: its codec over the B-rep
 //! fixtures, refusals of broken saves, counts across bodies, and the
 //! registered meshers.
-use kinogaki_studio_api::conformance::Fixtures;
 use kinogaki_studio_api::element::{Field, MemoryElement};
 use kinogaki_studio_api::geometry::brep::{Body, Brep, Element, FaceId};
 use kinogaki_studio_api::geometry::{Class, Detail, Polygons, Selection, Tolerances};
@@ -10,6 +9,7 @@ use kinogaki_studio_api::{
     CancelToken, Data, DataCodec, DisplayRequest, Error, Meshed, Mesher, MesherId, Package,
     PackageId, Registry,
 };
+use kinogaki_studio_api_testing::Fixtures;
 
 fn fixture(name: &str) -> Brep {
     let all = Fixtures::default().breps();

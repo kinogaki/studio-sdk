@@ -22,8 +22,8 @@ kinogaki-studio-api = { git = "https://github.com/kinogaki/studio-sdk" }
 kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk" }
 
 [dev-dependencies]
-# The fake host the tests run the UI on (the `testing` feature).
-kinogaki-studio-ui-api = { git = "https://github.com/kinogaki/studio-sdk", features = ["testing"] }
+# The fake host the tests run the UI on (the SDK's test support crate).
+kinogaki-studio-ui-api-testing = { git = "https://github.com/kinogaki/studio-sdk" }
 ```
 
 The UI layer, `kinogaki-studio-ui-api` (library `studio_ui_api`), is how a plugin's UI asks Studio to draw. Plugins never see Studio's UI library: they declare data (menus, rows, levels) and make immediate-mode calls, and Studio draws. Every call runs on the UI thread and returns at once; long work goes to workers, which wake the host. No timers.
@@ -336,7 +336,7 @@ mod tests;
 
 ## 8. Tests on the fake host
 
-`testing::FakeHost` stands in for Studio's host interface: slots and objects' networks with a real undo history, selections, the place, views and settings as plain fields, and every request recorded. `testing::Hosting` holds the package's UI state and calls its parts as Studio does, taking the state out for each call. `testing::RecordingUi` records what a part draws, with no window.
+`studio_ui_api_testing::FakeHost` stands in for Studio's host interface: slots and objects' networks with a real undo history, selections, the place, views and settings as plain fields, and every request recorded. `studio_ui_api_testing::Hosting` holds the package's UI state and calls its parts as Studio does, taking the state out for each call. `studio_ui_api_testing::RecordingUi` records what a part draws, with no window.
 
 Create `src/tests.rs`:
 
@@ -345,7 +345,7 @@ Create `src/tests.rs`:
 use super::*;
 use studio_ui_api::host::HostUndo;
 use studio_ui_api::package::Registered;
-use studio_ui_api::testing::{Call, FakeHost, Hosting, RecordingUi};
+use studio_ui_api_testing::{Call, FakeHost, Hosting, RecordingUi};
 use studio_ui_api::{Pos, Rect, Vec2};
 
 fn host() -> (FakeHost, Hosting) {
@@ -407,7 +407,7 @@ fn the_inspector_shows_the_count() {
 cargo test
 ```
 
-A tool that edits an object's network goes through `HostNetwork::edit_network`. On the fake host, put a `testing::FakeNetwork` (made from the packages whose node types it holds) into `host.networks` for the object first; each edit is then one undo step, refused whole when it fails, as in Studio. The node walkthrough's last test does this.
+A tool that edits an object's network goes through `HostNetwork::edit_network`. On the fake host, put a `studio_ui_api_testing::FakeNetwork` (made from the packages whose node types it holds) into `host.networks` for the object first; each edit is then one undo step, refused whole when it fails, as in Studio. The node walkthrough's last test does this.
 
 ## 9. Build and install
 

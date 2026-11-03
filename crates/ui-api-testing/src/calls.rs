@@ -1,13 +1,13 @@
 //! [`HostCall`]: what a package asked of a [`FakeHost`](super::FakeHost).
-use crate::gizmo::{TransformSpace, TransformTool};
+use kinogaki_studio_api::params::Severity;
+use kinogaki_studio_api::{Bounds, ContextId, RowsFor, SlotId, Time};
+use studio_ui_api::gizmo::{TransformSpace, TransformTool};
 #[cfg(doc)]
-use crate::host::{
+use studio_ui_api::host::{
     Cx, HostDoc, HostNetwork, HostSelection, HostSettings, HostShell, HostSlots, HostStatus,
     HostTransform, HostUndo, HostView,
 };
-use crate::host::{NodeRef, ObjectRef, Place};
-use kinogaki_studio_api::params::Severity;
-use kinogaki_studio_api::{Bounds, ContextId, RowsFor, SlotId, Time};
+use studio_ui_api::host::{NodeRef, ObjectRef, Place};
 
 /// What a package asked of a [`FakeHost`](super::FakeHost), in order (queries are not
 /// recorded).

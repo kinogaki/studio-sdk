@@ -4,8 +4,8 @@
 use super::*;
 use studio_ui_api::host::HostUndo;
 use studio_ui_api::package::Registered;
-use studio_ui_api::testing::{Call, FakeHost, Hosting, RecordingUi};
 use studio_ui_api::{Pos, Rect, Vec2};
+use studio_ui_api_testing::{Call, FakeHost, Hosting, RecordingUi};
 
 fn host() -> (FakeHost, Hosting) {
     let package = package();

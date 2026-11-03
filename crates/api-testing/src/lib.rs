@@ -1,4 +1,5 @@
-//! The conformance suite of the standard data types: producers make
+//! The SDK's test support (a dev-dependency only): the conformance suite
+//! of the standard data types: producers make
 //! standard values, consumers check them, and [`run`] tries every pair.
 //!
 //! A kernel implements [`Producer`] in its own repository (its operations'
@@ -11,9 +12,9 @@
 //! edges are canonical).
 //!
 //! ```
-//! use kinogaki_studio_api::conformance::{self, Codecs, Fixtures, Invariants};
+//! use kinogaki_studio_api_testing::{Codecs, Fixtures, Invariants, run};
 //!
-//! let report = conformance::run(&[&Fixtures::default()], &[&Codecs, &Invariants]);
+//! let report = run(&[&Fixtures::default()], &[&Codecs, &Invariants]);
 //! assert!(report.failures().is_empty(), "{report}");
 //! ```
 mod brep;
@@ -25,7 +26,7 @@ pub use checks::{Codecs, Invariants};
 pub use colors::Unconverted;
 pub use fixtures::Fixtures;
 
-use crate::data::Data;
+use kinogaki_studio_api::data::Data;
 use std::fmt;
 
 /// Makes standard values to check: a kernel's operations over the

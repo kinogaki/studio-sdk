@@ -1,0 +1,16 @@
+[package]
+name = "kinogaki-studio-api-testing"
+description = "Test support for Kinogaki Studio plugins: the conformance suite's fixtures and invariants a package's tests check its data types and engines against. A dev-dependency only"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+kinogaki-studio-api.workspace = true
+kinogaki-geometry.workspace = true
+kinogaki-render-api.workspace = true
+kinogaki-viewport-api.workspace = true

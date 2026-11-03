@@ -1,20 +1,20 @@
 //! [`RecordingUi`]: a [`Ui`] that records what it is asked to show and
 //! plays back scripted user actions.
 use super::painter::RecordingPainter;
-use crate::color::Color;
-use crate::geom::{Pos, Rect, Vec2, vec2};
-use crate::id::Id;
-use crate::input::{Input, KeyFilter};
-use crate::response::{Response, Sense};
-use crate::sheet::Action;
-use crate::text::Font;
-use crate::theme::Theme;
-use crate::ui::Body;
-#[cfg(doc)]
-use crate::ui::Ui;
 use kinogaki_studio_api::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
+use studio_ui_api::Body;
+use studio_ui_api::Color;
+use studio_ui_api::Font;
+use studio_ui_api::Id;
+use studio_ui_api::Theme;
+#[cfg(doc)]
+use studio_ui_api::Ui;
+use studio_ui_api::sheet::Action;
+use studio_ui_api::{Input, KeyFilter};
+use studio_ui_api::{Pos, Rect, Vec2, vec2};
+use studio_ui_api::{Response, Sense};
 
 /// One call a [`RecordingUi`] received, with what identifies it.
 #[derive(Clone, Debug, PartialEq)]
@@ -57,7 +57,7 @@ pub enum Call {
     ContextMenu,
     /// [`Ui::menu_item`].
     MenuItem(String),
-    /// [`Ui::close_menu`](crate::Ui::close_menu).
+    /// [`Ui::close_menu`](studio_ui_api::Ui::close_menu).
     CloseMenu,
     /// [`Ui::sheet`]: its fields' labels, in order.
     Sheet(Vec<String>),

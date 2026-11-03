@@ -20,11 +20,11 @@ use studio_ui_api::package::{
     ViewportLayer, VocabularyItem, When, WithUi,
 };
 use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
-use studio_ui_api::testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
 use studio_ui_api::{
     ButtonSpec, Color, Modifiers, Pos, Projection, Rect, Response, Slot as PaintSlot, Stroke, Ui,
     Vec2,
 };
+use studio_ui_api_testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
 
 fn forest() -> ContextId {
     ContextId::declared("toy.trees.forest")
@@ -662,7 +662,7 @@ fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
 fn shown_polygons_are_the_ones_the_object_draws() {
     use kinogaki_studio_api::geometry::{Attribute, Class};
     let mut host = host();
-    let (_, grid) = (kinogaki_studio_api::conformance::Fixtures::default().polygons())
+    let (_, grid) = (kinogaki_studio_api_testing::Fixtures::default().polygons())
         .into_iter()
         .next()
         .unwrap();
@@ -678,7 +678,7 @@ fn shown_polygons_are_the_ones_the_object_draws() {
     let object = ObjectRef(7);
     host.scene.insert(
         object,
-        studio_ui_api::testing::FakeObject {
+        studio_ui_api_testing::FakeObject {
             name: "Body".into(),
             kind: ObjectKindId::declared("toy.trees.body"),
             body: None,
@@ -710,7 +710,7 @@ fn a_body_is_set_whole_and_only_of_its_kind() {
     let object = ObjectRef(7);
     host.scene.insert(
         object,
-        studio_ui_api::testing::FakeObject {
+        studio_ui_api_testing::FakeObject {
             name: "Grove".into(),
             kind: grove,
             body: None,

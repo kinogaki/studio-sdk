@@ -1,0 +1,19 @@
+[package]
+name = "kinogaki-studio-ui-api-testing"
+description = "Test support for Kinogaki Studio plugins' UI: the headless fakes (FakeHost, FakeNetwork, RecordingUi, RecordingPainter) a package's tests drive its UI with. A dev-dependency only"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "studio_ui_api_testing"
+
+[lints]
+workspace = true
+
+[dependencies]
+kinogaki-studio-api.workspace = true
+kinogaki-studio-api-testing.workspace = true
+kinogaki-studio-ui-api.workspace = true
+kinogaki-viewport-api.workspace = true

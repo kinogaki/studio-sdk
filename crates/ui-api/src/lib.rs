@@ -44,10 +44,10 @@
 //! layer, an inspector, a vocabulary…) over the package's own state,
 //! which the host keeps and lends for one call at a time.
 //!
-//! `testing` (the `testing` feature, for tests only) has headless fakes
-//! (`testing::RecordingUi`, `testing::RecordingPainter`, and
-//! `testing::FakeHost` with its in-memory `testing::FakeNetwork`s and
-//! `testing::Hosting` for a package's parts) for plugin unit tests.
+//! The companion crate `kinogaki-studio-ui-api-testing` (a dev-dependency
+//! only) has headless fakes (`RecordingUi`, `RecordingPainter`, and
+//! `FakeHost` with its in-memory `FakeNetwork`s and `Hosting` for a
+//! package's parts) for plugin unit tests.
 mod card;
 mod color;
 pub mod geom;
@@ -61,8 +61,6 @@ mod paint;
 pub mod projection;
 mod response;
 pub mod sheet;
-#[cfg(feature = "testing")]
-pub mod testing;
 mod text;
 mod theme;
 mod ui;

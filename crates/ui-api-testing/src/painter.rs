@@ -1,13 +1,13 @@
 //! [`RecordingPainter`]: a [`Painter`] that records what it is asked to
 //! draw.
-use crate::color::Color;
-use crate::geom::{Align2, Pos, Rect, Vec2};
-use crate::paint::{
-    Circle, Painter, RectShape, Segment, Shape, Slot, Stroke, StrokeKind, TextShape,
-};
-use crate::text::Font;
 use std::cell::RefCell;
 use std::rc::Rc;
+use studio_ui_api::Color;
+use studio_ui_api::Font;
+use studio_ui_api::{Align2, Pos, Rect, Vec2};
+use studio_ui_api::{
+    Circle, Painter, RectShape, Segment, Shape, Slot, Stroke, StrokeKind, TextShape,
+};
 
 /// Every glyph's advance in the recording painter's made-up face, as a
 /// fraction of the font size; a line is one font size tall.
@@ -217,7 +217,7 @@ impl Painter for RecordingPainter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::geom::{pos, vec2};
+    use studio_ui_api::{pos, vec2};
 
     #[test]
     fn draws_are_recorded_in_order_with_their_clip() {

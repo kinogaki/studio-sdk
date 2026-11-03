@@ -1,10 +1,11 @@
 //! The standard data types: handles, codecs, the tolerances and display
 //! quality values and the conformance suite.
-use kinogaki_studio_api::conformance::{self, Codecs, Consumer, Fixtures, Invariants};
 use kinogaki_studio_api::element::{Field, MemoryElement};
 use kinogaki_studio_api::geometry::{Class, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, PolygonsCodec};
 use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue};
+use kinogaki_studio_api_testing as conformance;
+use kinogaki_studio_api_testing::{Codecs, Consumer, Fixtures, Invariants};
 use std::sync::Arc;
 
 #[test]

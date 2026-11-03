@@ -1,12 +1,12 @@
 //! [`Fixtures`]: hand-built standard values covering every shape the
 //! types allow and every attribute kind on every class.
 use super::Producer;
-use crate::data::Data;
-use crate::standard;
 use kinogaki_geometry::{
     Attribute, Attributes, Basis, Class, Column, Curves, Group, Polygons, Text, Topology, TypeInfo,
     names,
 };
+use kinogaki_studio_api::data::Data;
+use kinogaki_studio_api::standard;
 
 /// The SDK's fixtures: polygons (a quad grid; mixed triangles, quads and
 /// n-gons; concave polygons; polylines only; polygons and polylines
