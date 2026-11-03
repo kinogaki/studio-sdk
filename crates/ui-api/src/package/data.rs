@@ -2,8 +2,8 @@
 //! list's candidates, what live tools take, the numeric bar, its time and
 //! The host draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
+use kinogaki_studio_api::edit::select::Mode;
 use kinogaki_studio_api::params::Unit;
-use kinogaki_studio_api::viewport::ElementKind;
 use std::sync::Arc;
 
 /// One selection level of a context (Face, Edge, CV…), what the levels
@@ -16,8 +16,9 @@ pub struct LevelSpec {
     pub label: String,
     /// Its icon, by name (Studio's or a package's).
     pub icon: String,
-    /// What it addresses.
-    pub level: ElementKind,
+    /// What it selects, and how a pick grows there (Mesh's Pieces: the
+    /// Primitive domain, grown to connected pieces).
+    pub mode: Mode,
     /// Whether it may be active together with others (Shift+number).
     pub combines: bool,
 }

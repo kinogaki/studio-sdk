@@ -15,7 +15,6 @@
 //! - [`ElementSet`]: the selected points, edges, faces, vertices or
 //!   objects; [`ElementSelection`]: one set per drawn family (faces,
 //!   lines, markers) for surfaces whose levels combine.
-//! - [`PreviewUpdate`] patches and GPU motions for live transform previews.
 //! - [`OverlayDraw`] / [`GuideDraw`] layers for diagnostics and tool guides,
 //!   [`FaceNormals`], and [`SceneLines`] for glyphs placed in the world
 //!   (cameras, lights).
@@ -33,7 +32,6 @@ mod looks;
 mod overlay;
 mod packet;
 mod points;
-mod preview;
 mod selection;
 mod shading;
 mod updates;
@@ -47,7 +45,6 @@ pub use packet::{
     ColorLayout, Column, ElementKind, ElementSet, OverlayVertex, SurfaceSource, Vertex, packet_as,
 };
 pub use points::{PointClass, PointClassId, PointLook, PointShape, PointStyle};
-pub use preview::{MotionMask, PartMotion, Patch, PointWeights, PreviewUpdate, WeightedMotion};
 pub use selection::ElementSelection;
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,

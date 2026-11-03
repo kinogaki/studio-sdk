@@ -3,6 +3,7 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::facets::Drawn;
 use crate::viewport::{ElementKind, ElementSet, Hit};
+use kinogaki_edit::select::Expand;
 
 /// How a new selection meets the current one (click, Shift, Ctrl).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -29,6 +30,14 @@ pub trait Pickable: Send + Sync {
 
     /// The components a set of surface elements (a box or lasso's) is.
     fn select(&self, data: &Data, drawn: &Drawn, elements: &ElementSet) -> Components;
+
+    /// `picked` (of `data`) grown as a level's [`Mode`](kinogaki_edit::select::Mode)
+    /// says, before the context gets it (a pieces level's pick grows to
+    /// its connected pieces). By default, as picked.
+    fn expand(&self, data: &Data, picked: &Components, how: &Expand) -> Components {
+        let _ = (data, how);
+        picked.clone()
+    }
 
     /// `current` and `new` (both of `data`, at one level) combined by
     /// `how`.

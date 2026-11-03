@@ -86,7 +86,7 @@
 //! chart. A pole edge used once leaves its shell closed.
 //!
 //! **Radial rings.** An edge has one coedge or two; its ring runs from
-//! [`Edge::coedge`] ([`BrepTopology::edge_coedges`]; a boundary edge's
+//! [`Edge::coedge`] through each coedge's radial (a boundary edge's
 //! ring is itself). Two coedges of an edge run opposite ways, in one shell.
 //!
 //! **Shells and lumps.** A shell is a connected set of faces, each face in

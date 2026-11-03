@@ -121,7 +121,6 @@ impl Adjacency {
 pub struct Index {
     edges: Vec<Edge>,
     edge_faces: Adjacency,
-    edge_vertices: Vec<u32>,
     edge_polylines: Adjacency,
     face_edges: Adjacency,
     polyline_edges: Adjacency,
@@ -152,14 +151,6 @@ impl Index {
     /// polylines use).
     pub fn edge_faces(&self) -> &Adjacency {
         &self.edge_faces
-    }
-
-    /// Edge `e`'s side occurrences: the vertex starting each side, aligned
-    /// with [`edge_faces`](Self::edge_faces)' row `e`.
-    #[inline]
-    pub fn edge_vertices(&self, e: usize) -> &[u32] {
-        let rows = &self.edge_faces.offsets;
-        &self.edge_vertices[rows[e] as usize..rows[e + 1] as usize]
     }
 
     /// Per edge, the polylines with a segment on it (primitive ids).
@@ -209,7 +200,6 @@ impl Index {
     /// The bytes it holds, for memory accounting.
     pub fn bytes(&self) -> usize {
         self.edges.capacity() * 8
-            + self.edge_vertices.capacity() * 4
             + self.edge_faces.bytes()
             + self.edge_polylines.bytes()
             + self.face_edges.bytes()
@@ -244,16 +234,16 @@ impl Tables {
         let edge_count = self.edges.len();
         // Polygon vertices precede polyline vertices, so each edge's polygon
         // sides come first among its occurrences.
-        let (edge_faces, edge_vertices, edge_polylines) = if polylines == 0 {
+        let (edge_faces, edge_polylines) = if polylines == 0 {
             let faces = Adjacency {
                 offsets: self.offsets,
                 entries: self.prims,
             };
-            (faces, self.vertices, Adjacency::none())
+            (faces, Adjacency::none())
         } else {
-            let (faces, vertices, lines) =
+            let (faces, lines) =
                 split(&self.offsets, &self.prims, &self.vertices, polygon_vertices);
-            (faces, vertices, lines.compact())
+            (faces, lines.compact())
         };
         let mut vertex_edges = self.vertex_edges;
         let polyline_offsets: Vec<u32> = topology.offsets[polygons..]
@@ -307,7 +297,6 @@ impl Tables {
         point_polylines.dedup_rows();
         Index {
             edges,
-            edge_vertices,
             edge_faces,
             edge_polylines,
             face_edges: Adjacency {
@@ -329,18 +318,17 @@ impl Tables {
 }
 
 /// Each edge's occurrences split at `polygon_vertices` into polygon sides
-/// (faces and vertices) and polyline segments (primitive ids, once each).
+/// (faces) and polyline segments (primitive ids, once each).
 fn split(
     offsets: &[u32],
     prims: &[u32],
     vertices: &[u32],
     polygon_vertices: usize,
-) -> (Adjacency, Vec<u32>, Adjacency) {
+) -> (Adjacency, Adjacency) {
     let mut faces = Adjacency {
         offsets: Vec::with_capacity(offsets.len()),
         entries: Vec::with_capacity(prims.len()),
     };
-    let mut face_vertices = Vec::with_capacity(prims.len());
     let mut lines = Adjacency {
         offsets: Vec::with_capacity(offsets.len()),
         entries: Vec::new(),
@@ -352,7 +340,6 @@ fn split(
         let sides =
             row.start + vertices[row.clone()].partition_point(|&c| (c as usize) < polygon_vertices);
         faces.entries.extend_from_slice(&prims[row.start..sides]);
-        face_vertices.extend_from_slice(&vertices[row.start..sides]);
         let first = lines.entries.len();
         for &p in &prims[sides..row.end] {
             // A polyline crossing the same edge twice is listed once.
@@ -363,5 +350,5 @@ fn split(
         faces.offsets.push(faces.entries.len() as u32);
         lines.offsets.push(lines.entries.len() as u32);
     }
-    (faces, face_vertices, lines)
+    (faces, lines)
 }

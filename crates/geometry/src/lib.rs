@@ -12,7 +12,7 @@
 //! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves ([`Basis`]) |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
 //! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and [`Group`]s per [`Domain`]; [`Text`] is indexed; [standard names](names) |
-//! | [`Selection`] | selected elements of one class, with the active one |
+//! | [`Selection`], [`Incidence`] | selected elements of one domain, with the active one; which elements of a value touch which (selection rules live in `kinogaki-edit`) |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
 //! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
 //! | [`Tolerances`] | the project's modeling tolerances |
@@ -103,9 +103,9 @@ mod derived;
 mod detail;
 mod error;
 mod frame;
+mod incidence;
 mod kept;
 pub mod limits;
-mod motion;
 pub mod parallel;
 mod polygons;
 mod positions;
@@ -133,10 +133,10 @@ pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
 pub use detail::{Detail, DisplayQuality};
 pub use error::{ErrorKind, GeometryError};
 pub use frame::Frame;
-pub use motion::{Axis, Mirror, Side, WeightedMove};
+pub use incidence::Incidence;
 pub use polygons::Polygons;
 pub use sampled::Sampled;
-pub use selection::{Selection, SelectionCounts};
+pub use selection::Selection;
 pub use shading::ShadingNormals;
 pub use time::{Rate, Time};
 pub use tolerances::Tolerances;

@@ -318,7 +318,7 @@ impl BrepTopology {
     }
 
     /// The coedges of edge `e`'s radial ring, from [`Edge::coedge`].
-    pub fn edge_coedges(&self, e: EdgeId) -> impl Iterator<Item = CoedgeId> + '_ {
+    pub(crate) fn edge_coedges(&self, e: EdgeId) -> impl Iterator<Item = CoedgeId> + '_ {
         let first = self.edges[e.index()].coedge;
         let mut next = Some(first);
         std::iter::from_fn(move || {
@@ -330,7 +330,7 @@ impl BrepTopology {
     }
 
     /// The face coedge `c` bounds.
-    pub fn coedge_face(&self, c: CoedgeId) -> FaceId {
+    pub(crate) fn coedge_face(&self, c: CoedgeId) -> FaceId {
         self.loops[self.coedges[c.index()].owner.index()].face
     }
 

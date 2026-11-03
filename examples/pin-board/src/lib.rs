@@ -200,15 +200,18 @@ struct PinLevels;
 
 impl Levels<Pinning> for PinLevels {
     fn levels(&self) -> Vec<LevelSpec> {
-        [("Pin", ElementKind::Point), ("Board", ElementKind::Object)]
-            .map(|(name, level)| LevelSpec {
-                id: name.into(),
-                label: name.into(),
-                icon: "cube".into(),
-                level,
-                combines: false,
-            })
-            .into()
+        [
+            ("Pin", geometry::Domain::Point),
+            ("Board", geometry::Domain::Object),
+        ]
+        .map(|(name, domain)| LevelSpec {
+            id: name.into(),
+            label: name.into(),
+            icon: "cube".into(),
+            mode: domain.into(),
+            combines: false,
+        })
+        .into()
     }
     fn active(&self, s: &Pinning, _cx: &dyn Cx) -> Vec<usize> {
         vec![s.level]

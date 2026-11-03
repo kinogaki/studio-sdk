@@ -69,7 +69,7 @@ pub use data::{
     BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, TimeDomain, TimeMark,
     TimeUnits, Tools,
 };
-pub use edited::{Edited, Ghost, GhostTone, Moving};
+pub use edited::{Edited, Ghost, GhostTone};
 pub use library::{
     BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive, LevelItems,
     Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT, Shared,

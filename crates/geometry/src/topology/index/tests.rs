@@ -12,7 +12,6 @@ fn assert_same(topology: &Topology) {
     let serial: Index = sparse::edges(topology).finish(topology);
     let pairs = |i: &Index| i.edges.iter().map(|e| e.points).collect::<Vec<_>>();
     assert_eq!(pairs(&parallel), pairs(&serial));
-    assert_eq!(parallel.edge_vertices, serial.edge_vertices);
     assert_eq!(rows(&parallel.edge_faces), rows(&serial.edge_faces));
     assert_eq!(rows(&parallel.face_edges), rows(&serial.face_edges));
     assert_eq!(rows(&parallel.point_edges), rows(&serial.point_edges));

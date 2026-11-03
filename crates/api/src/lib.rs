@@ -88,6 +88,9 @@ pub mod standard;
 pub mod stored;
 pub mod viewport;
 
+/// The edit contracts core and the kernels share: selection rules and
+/// modes, deformations, a drag's moving points.
+pub use kinogaki_edit as edit;
 /// The standard geometry values: what the [`standard`] data types are.
 pub use kinogaki_geometry as geometry;
 /// The SDK's one vocabulary of vectors, placements, boxes, units and time,

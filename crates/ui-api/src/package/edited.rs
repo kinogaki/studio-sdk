@@ -9,7 +9,7 @@
 //! borrowing, nothing is copied, and the renderer uploads only values
 //! whose `Arc` changed since the last frame. A context keeps the same
 //! `Arc`s while nothing changed, so a steady frame costs nothing.
-use kinogaki_studio_api::geometry::WeightedMove;
+use kinogaki_studio_api::edit::preview::Moving;
 use kinogaki_studio_api::{NodeRef, ObjectRef};
 use kinogaki_viewport_api::{GuideDraw, OverlayDraw};
 use std::fmt;
@@ -39,7 +39,8 @@ pub struct Edited {
     /// are the value's, prepared once.
     pub pieces: Option<Range<usize>>,
     /// The points a drag is moving, shown moved over the open object's
-    /// polygons until the edit it commits is shown; `None`: no drag.
+    /// polygons until the edit it commits is shown ([`Moving`]); `None`:
+    /// no drag.
     pub moving: Option<Moving>,
     /// Nodes' cooked values core draws ghosted in this view, each placed
     /// by its object and in its tone (a tool's input beside what it makes,
@@ -72,31 +73,6 @@ pub enum GhostTone {
     /// What the edit takes away (a cut's removed volume): the theme's
     /// error color.
     Remove,
-}
-
-/// A drag of some of the open polygons' points, which core previews over
-/// the shown value: no cook, no cached value, and only the moved points'
-/// polygons sent to the GPU each step.
-///
-/// The context resolves `points` (and `weights`) once, when the drag
-/// begins, and hands the same `Arc`s every frame until it ends: core
-/// gathers what the preview needs once per `points` allocation, so a
-/// new allocation starts a new preview. `motion` is the current step,
-/// built with the function the context's commit cooks with, so the
-/// preview places each point where the edit will
-/// ([`WeightedMove::at`]). Once the drag ends the context returns no
-/// `Moving`; core keeps the last step shown while the edit it committed
-/// cooks, so the committed value replaces it.
-#[derive(Clone, Debug)]
-pub struct Moving {
-    /// The moved points, by index into the shown value's points, sorted
-    /// and without repeats.
-    pub points: Arc<[u32]>,
-    /// Each moved point's weight (0 fixed, 1 moving fully), in `points`'
-    /// order: a soft move. `None`: every point moves fully.
-    pub weights: Option<Arc<[f64]>>,
-    /// The step, with its mirror for a symmetric move.
-    pub motion: WeightedMove,
 }
 
 impl fmt::Debug for Edited {

@@ -3,10 +3,7 @@
 use crate::attributes::Domain;
 use crate::column::Column;
 use crate::error::{ErrorKind, GeometryError};
-use crate::topology::Topology;
-
-mod polygons;
-pub use polygons::SelectionCounts;
+use crate::incidence::Incidence;
 
 /// Selected elements of one domain: all of them, or a sorted set of
 /// indices; the active one (the last picked, which tools that need one
@@ -16,10 +13,10 @@ pub use polygons::SelectionCounts;
 /// strictly ascending ([`Selection::new`] sorts and deduplicates them);
 /// the active element is one of the selected.
 ///
-/// **Staleness.** A selection made on a topology keeps its
-/// [fingerprint](Topology::fingerprint); once the topology changes the
-/// indices mean other elements, so the holder resets it
-/// (`is_stale`).
+/// **Staleness.** A selection made on a value keeps its
+/// [fingerprint](Incidence::fingerprint); once that changes the indices
+/// mean other elements, so the holder resets it
+/// ([`validate`](Self::validate) refuses it).
 ///
 /// ```
 /// use kinogaki_geometry::{Domain, Selection};
@@ -63,7 +60,7 @@ impl Selection {
     /// # Errors
     /// When `indices` are not strictly ascending, or `active` is not
     /// selected.
-    pub(crate) fn from_ascending(
+    fn from_ascending(
         domain: Domain,
         indices: Column<u32>,
         active: Option<u32>,
@@ -157,11 +154,37 @@ impl Selection {
         self.all || self.indices.binary_search(&i).is_ok()
     }
 
-    /// Whether it was made on another topology than `on`: its indices no
-    /// longer mean what they did, and its holder resets it. A selection
-    /// made on no particular topology is never stale.
-    pub(crate) fn is_stale(&self, on: &Topology) -> bool {
-        self.topology.is_some_and(|t| t != on.fingerprint())
+    /// Whether it was made on `on` (or on no value in particular) and
+    /// every index is one of its elements.
+    ///
+    /// # Errors
+    /// A stale selection ([`ErrorKind::Selection`], no element), a domain
+    /// `on` has none of, or the first index past the end (at it).
+    pub fn validate(&self, on: &dyn Incidence) -> Result<(), GeometryError> {
+        if self.topology.is_some_and(|t| t != on.fingerprint()) {
+            return Err(GeometryError::whole(
+                ErrorKind::Selection,
+                "the selection was made on another value",
+            ));
+        }
+        let Some(count) = on.count(self.domain) else {
+            return Err(GeometryError::whole(
+                ErrorKind::Selection,
+                format!("the value has no {} domain", self.domain.name()),
+            ));
+        };
+        match self.indices.last() {
+            Some(&last) if last as usize >= count => {
+                let first = self.indices.partition_point(|&i| (i as usize) < count);
+                let i = self.indices[first];
+                Err(GeometryError::at(
+                    ErrorKind::Selection,
+                    i as usize,
+                    format!("{} {i} is past the last of {count}", self.domain.name()),
+                ))
+            }
+            _ => Ok(()),
+        }
     }
 
     /// How many are selected out of `count` elements.

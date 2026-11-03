@@ -12,6 +12,9 @@ workspace = true
 [dependencies]
 # The standard geometry values: the standard data types.
 kinogaki-geometry.workspace = true
+# The edit contracts kernels and core share: selection rules and modes,
+# deformations.
+kinogaki-edit.workspace = true
 # The render interface: the triangle source contract data types render through.
 kinogaki-render-api.workspace = true
 # The viewport packet contract: what data types draw through.
