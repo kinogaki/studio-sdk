@@ -1,9 +1,9 @@
 //! Lights as a data type: a light shaped as UsdLux shapes one
-//! (render-api's standard [`Light`], unplaced). Where a light is belongs
-//! to what holds it (an object's placement, a file item's), never to the
-//! value. A dome's image is its file (an asset path, as typed); the
-//! Texture prim a host decodes it to belongs to one scene, never to a
-//! value.
+//! (render-api's standard [`Light`], unplaced: no transform or motion).
+//! Where a light is belongs to what holds it (an object's placement, a
+//! file item's), never to the value. A dome's image is its file (an
+//! asset path, as typed); the Texture prim a host decodes it to belongs
+//! to one scene, never to a value.
 //!
 //! ```text
 //! type (RectLight, DiskLight, DomeLight, DistantLight, SphereLight),
@@ -18,8 +18,8 @@ use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
-use kinogaki_render_api::IDENTITY;
 use kinogaki_render_api::standard::{Emission, ImageRef, Light, Shape};
+use kinogaki_render_api::{IDENTITY, Motion};
 
 /// The largest size, intensity or temperature a light takes.
 const MAX_VALUE: f32 = 1e12;
@@ -80,6 +80,7 @@ pub fn light_value(light: Light) -> Result<Light, Error> {
     }
     Ok(Light {
         transform: IDENTITY,
+        motion: Motion::none(),
         ..light
     })
 }
@@ -208,6 +209,7 @@ impl LightCodec {
             normalize: e.bool("normalize")?,
             color_temperature: scalar("colorTemperature")?,
             transform: IDENTITY,
+            motion: Motion::none(),
             visible: e.bool("visible")?,
         };
         light_value(light).map_err(|_| Error::invalid(format_args!("{}: invalid light", at())))

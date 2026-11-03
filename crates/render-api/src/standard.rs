@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 use crate::declared::{Declared, PrimType, Role};
 use crate::id::TextureId;
-use crate::prim::{IDENTITY, Matrix};
+use crate::prim::{IDENTITY, Matrix, Motion};
 use crate::settings::{
     SettingDescriptor, SettingGroup, SettingKind, SettingValue, SettingValues, Trailing, Unit,
     set_value,
@@ -517,6 +517,8 @@ pub struct Light {
     pub color_temperature: f32,
     /// Light to world.
     pub transform: Matrix,
+    /// Its placements across the shutter (empty: it doesn't move).
+    pub motion: Motion<Matrix>,
     /// Whether the camera sees the light itself.
     pub visible: bool,
 }
@@ -536,6 +538,7 @@ impl Default for Light {
             normalize: false,
             color_temperature: 6500.0,
             transform: IDENTITY,
+            motion: Motion::none(),
             visible: true,
         }
     }
@@ -575,6 +578,7 @@ impl Light {
             normalize: prim.bool("normalize"),
             color_temperature: prim.float("colorTemperature"),
             transform: prim.transform,
+            motion: prim.motion.clone(),
             visible: prim.visible,
         })
     }
@@ -634,7 +638,7 @@ impl Light {
             type_id: ty.id,
             values,
             transform: self.transform,
-            motion: crate::Motion::none(),
+            motion: self.motion.clone(),
             visible: self.visible,
         }
     }
@@ -713,5 +717,27 @@ impl Fog {
             (Arc::from("anisotropy"), float(self.anisotropy)),
         ];
         Declared::new(FOG, values)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_light_keeps_its_motion_through_its_prim() {
+        let moved = |x: f32| {
+            let mut m = IDENTITY;
+            m[3][0] = x;
+            m
+        };
+        let motion = Motion::new([-0.25, 0.25], [moved(0.0), moved(1.0)]).unwrap();
+        let light = Light {
+            motion: motion.clone(),
+            ..Light::default()
+        };
+        let prim = light.declared();
+        assert_eq!(prim.motion, motion);
+        assert_eq!(Light::decode(&prim).unwrap(), light);
     }
 }
