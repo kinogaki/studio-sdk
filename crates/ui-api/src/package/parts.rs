@@ -162,11 +162,16 @@ pub trait ViewportLayer<S: ?Sized>: Send + Sync {
         let _ = (s, cx);
         Holds::default()
     }
-    /// The context's rows of `popover`, called while it is open (and,
-    /// for the Gear, once a frame to know whether it has any).
+    /// The context's rows of `popover`, called while it is open.
     fn rows(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
         let _ = (s, cx, popover);
         Vec::new()
+    }
+    /// Whether `popover` has rows of the context's: asked once a frame for
+    /// the Gear, to know whether it shows. A context whose rows cost
+    /// something to build answers without building them.
+    fn shows(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover) -> bool {
+        !self.rows(s, cx, popover).is_empty()
     }
     /// An edit of one of [`rows`](Self::rows)'s rows.
     fn apply_row(&self, s: &mut S, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
@@ -488,6 +493,9 @@ impl<S: 'static> ViewportLayer<dyn Any> for Erased<S, dyn ViewportLayer<S>> {
     }
     fn rows(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover) -> Vec<PopoverRow> {
         self.part.rows(own_mut(s), cx, popover)
+    }
+    fn shows(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover) -> bool {
+        self.part.shows(own_mut(s), cx, popover)
     }
     fn apply_row(&self, s: &mut dyn Any, cx: &mut dyn Cx, popover: Popover, edit: RowEdit) {
         self.part.apply_row(own_mut(s), cx, popover, edit)
