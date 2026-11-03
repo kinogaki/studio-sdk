@@ -1,7 +1,6 @@
 //! The cook contract through toy nodes over a toy "numbers" data type: a
 //! Scale node (parameters, ports, parallel work, scratch, incremental
 //! updates) and a held edit that adds an authored delta.
-use kinogaki_studio_api::parallel::Serial;
 use kinogaki_studio_api::*;
 use std::any::Any;
 use std::sync::{Arc, LazyLock};
@@ -30,7 +29,7 @@ impl Scale {
             .flatten()
             .copied()
             .collect();
-        cx.parallel_for(&mut values, 4, |_, block| {
+        kinogaki_studio_api::geometry::parallel::chunks_mut(&mut values, 4, |_, block| {
             block.iter_mut().for_each(|v| *v *= factor);
             Ok::<_, CookError>(())
         })?;
@@ -150,7 +149,7 @@ fn a_cook_reads_parameters_ports_and_scratch() {
     // Port 0 has two wires, port 1 one.
     let inputs = [numbers(&[1.0, 2.0]), numbers(&[3.0]), numbers(&[100.0])];
     for cooks in 1..=2 {
-        let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch)
+        let mut cx = CookCx::new(&parameters, &cancel, &mut scratch)
             .with_ports(&[2, 1])
             .with_incoming(&incoming);
         assert_eq!((cx.port(0), cx.port(1), cx.port(2)), (0..2, 2..3, 3..3));
@@ -160,7 +159,7 @@ fn a_cook_reads_parameters_ports_and_scratch() {
         assert_eq!(*cx.scratch::<usize>(), cooks);
     }
     // Scratch of another type replaces the slot.
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     assert_eq!(cx.scratch::<String>(), "");
 }
 
@@ -169,7 +168,7 @@ fn withheld_and_wrong_parameters_fail_by_name() {
     let parameters = Parameters::from([("factor".to_owned(), Value::Text("x".into()))]);
     let cancel = CancelToken::default();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     // Without ports each input is its own port; no names, no selection.
     assert_eq!(cx.port(1), 1..2);
     assert!(cx.selection().is_none());
@@ -186,7 +185,7 @@ fn a_cancelled_cook_reports_cancelled() {
     let cancel = CancelToken::default();
     cancel.cancel();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     assert_eq!(
         Scale.cook(&mut cx, &[numbers(&[1.0])]).unwrap_err(),
         CookError::Cancelled
@@ -200,7 +199,7 @@ fn plans_update_until_their_input_changes() {
     let mut scratch = None;
     let input = numbers(&[1.0, 2.0]);
     let parameters = factor(2.0);
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     let prepared = Scale
         .incremental()
         .unwrap()
@@ -210,7 +209,7 @@ fn plans_update_until_their_input_changes() {
     let before = FULL_COOKS.get();
     // A drag of the factor updates from the plan.
     let parameters = factor(3.0);
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     let updated = plan
         .update(&mut cx, std::slice::from_ref(&input))
         .unwrap()
@@ -293,7 +292,7 @@ fn the_registry_holds_cooks_and_held_edits() {
     );
     let held = registry.held_edit(OFFSETS.id()).unwrap();
     let (cancel, mut scratch, none) = (CancelToken::default(), None, Parameters::new());
-    let mut cx = CookCx::new(&none, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&none, &cancel, &mut scratch);
     let short = OFFSETS.wrap(vec![0.5]);
     assert!(!held.reads_input(&short, 1));
     let edited = held

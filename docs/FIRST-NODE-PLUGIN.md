@@ -269,7 +269,7 @@ impl NodeType for BoxNode {
 }
 ```
 
-A cook is a pure function of its inputs and parameters. It reads only what its type declares (`NodeType::reads`: time, input names, the selection, objects, the project), polls `cx.check()` in long work, and splits work with `cx.parallel_for`; it never starts threads or keeps caches of its own (`cx.scratch` is the core-owned slot for that).
+A cook is a pure function of its inputs and parameters. It reads only what its type declares (`NodeType::reads`: time, input names, the selection, objects, the project), polls `cx.check()` in long work, and splits work with `geometry::parallel::chunks_mut` (the host's shared workers); it never starts threads or keeps caches of its own (`cx.scratch` is the core-owned slot for that).
 
 Studio checks each parameter value against its declaration before a cook (a size under the range's 0.001 is refused), so the cook needn't.
 
@@ -366,13 +366,12 @@ Studio admits the package through the SDK's `Registry` before anything of it is 
 
 ## 6. Tests
 
-A plugin's tests run with plain `cargo test`, no Studio needed. Create `src/tests.rs`. The first test registers the package as Studio does; the second cooks the node the way core does, with `Serial` workers; the third puts the node in a Boxes network on the SDK's fake host, adds and edits it as Tab and the inspector do (one undo step each), and cooks it.
+A plugin's tests run with plain `cargo test`, no Studio needed. Create `src/tests.rs`. The first test registers the package as Studio does; the second cooks the node the way core does (its parallel steps on the calling thread, since a test installs no workers); the third puts the node in a Boxes network on the SDK's fake host, adds and edits it as Tab and the inspector do (one undo step each), and cooks it.
 
 ```rust
 //! The package registers, the node cooks, and it works in a network.
 use super::*;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
-use kinogaki_studio_api::parallel::Serial;
 use studio_ui_api::host::{HostNetwork, HostUndo};
 use studio_ui_api_testing::{FakeHost, FakeNetwork};
 
@@ -390,7 +389,7 @@ fn the_node_makes_a_box() {
     parameters.insert("size".into(), vec![2.0, 3.0, 4.0].into());
     let cancel = CancelToken::default();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     let data = BoxNode.cook(&mut cx, &[]).unwrap().data.remove(0);
     let bounds = BoxType.bounds(&data).unwrap();
     assert_eq!(bounds.max, Vec3::new(1.0, 1.5, 2.0));

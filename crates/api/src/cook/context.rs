@@ -4,12 +4,10 @@ use crate::components::Components;
 use crate::cook::{CookError, Inside, Project, Resolved};
 use crate::data::Data;
 use crate::id::ContextId;
-use crate::parallel::{self, Workers};
 use crate::params::{Parameters, Value};
 use crate::time::Time;
 use std::any::Any;
 use std::ops::Range;
-use std::panic::Location;
 
 /// One cook's context, built by core for each cook of a node.
 ///
@@ -29,7 +27,6 @@ pub struct CookCx<'a> {
     selection: Option<&'a Components>,
     incoming: Option<&'a Components>,
     cancel: &'a CancelToken,
-    workers: &'a dyn Workers,
     time: Time,
     fps: f64,
     node: u64,
@@ -41,10 +38,9 @@ pub struct CookCx<'a> {
 }
 
 impl<'a> CookCx<'a> {
-    /// A context with `parameters`, polling `cancel`, running parallel
-    /// work on `workers`, lending the node's scratch slot `scratch`: one
-    /// wire on each input port, no names, no selection, the default time.
-    /// A package's tests pass [`Serial`](crate::parallel::Serial) workers.
+    /// A context with `parameters`, polling `cancel`, lending the node's
+    /// scratch slot `scratch`: one wire on each input port, no names, no
+    /// selection, the default time.
     ///
     /// Core keeps one scratch slot per node and lends it to one cook of
     /// the node at a time; a cook that runs beside it (the same node at
@@ -53,7 +49,6 @@ impl<'a> CookCx<'a> {
     pub fn new(
         parameters: &'a Parameters,
         cancel: &'a CancelToken,
-        workers: &'a dyn Workers,
         scratch: &'a mut Option<Box<dyn Any + Send>>,
     ) -> Self {
         Self {
@@ -64,7 +59,6 @@ impl<'a> CookCx<'a> {
             selection: None,
             incoming: None,
             cancel,
-            workers,
             time: Time::ZERO,
             fps: 24.0,
             node: 0,
@@ -318,33 +312,6 @@ impl<'a> CookCx<'a> {
             .and_then(|s| s.downcast_mut())
             .expect("the slot holds a T: it was just checked or filled")
     }
-
-    /// `work(first_index, block)` over disjoint blocks of `values`, at
-    /// least `minimum` items each, on the environment's shared workers
-    /// (packages never start their own threads). The first error stops
-    /// handing out blocks and is returned. The host sizes the run by what
-    /// it learnt of this call site.
-    #[track_caller]
-    pub fn parallel_for<T: Send, E: Send>(
-        &self,
-        values: &mut [T],
-        minimum: usize,
-        work: impl Fn(usize, &mut [T]) -> Result<(), E> + Sync,
-    ) -> Result<(), E> {
-        parallel::for_each_block(self.workers, Location::caller(), values, minimum, work)
-    }
-
-    /// `work` over consecutive ranges of `0..len`, `block` items each, on
-    /// the shared workers; results in range order.
-    #[track_caller]
-    pub fn parallel_map<T: Send, E: Send>(
-        &self,
-        len: usize,
-        block: usize,
-        work: impl Fn(Range<usize>) -> Result<T, E> + Sync,
-    ) -> Result<Vec<T>, E> {
-        parallel::map_blocks(self.workers, Location::caller(), len, block, work)
-    }
 }
 
 #[cfg(test)]
@@ -352,7 +319,6 @@ mod tests {
     use super::*;
     use crate::data::Typed;
     use crate::id::DataTypeId;
-    use crate::parallel::Serial;
 
     /// A node sees what core resolved its path parameters to, by name: an
     /// object's result, or a path.
@@ -369,7 +335,7 @@ mod tests {
         let parameters = Parameters::new();
         let cancel = CancelToken::default();
         let mut scratch = None;
-        let cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch).with_resolved(&resolved);
+        let cx = CookCx::new(&parameters, &cancel, &mut scratch).with_resolved(&resolved);
         assert_eq!(cx.object("source").and_then(|d| number.get(d)), Some(&2.0));
         assert_eq!(cx.path("material"), Some("/Materials/Red"));
         assert!(cx.object("material").is_none() && cx.path("source").is_none());
@@ -384,10 +350,10 @@ mod tests {
         let parameters = Parameters::new();
         let cancel = CancelToken::default();
         let (mut a, mut b) = (None, None);
-        let plain = CookCx::new(&parameters, &cancel, &Serial, &mut a);
+        let plain = CookCx::new(&parameters, &cancel, &mut a);
         assert!(plain.inside().is_none());
-        let holder = CookCx::new(&parameters, &cancel, &Serial, &mut b)
-            .with_inside(Inside::Walked(&outputs));
+        let holder =
+            CookCx::new(&parameters, &cancel, &mut b).with_inside(Inside::Walked(&outputs));
         match holder.inside() {
             Some(Inside::Walked(o)) => assert_eq!(number.get(&o.data[0]), Some(&3.0)),
             other => panic!("the walked inside, not {other:?}"),

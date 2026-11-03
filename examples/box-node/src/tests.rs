@@ -6,7 +6,6 @@ use super::*;
 use kinogaki_studio_api::cook::{Constraint, Space};
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
-use kinogaki_studio_api::parallel::Serial;
 use studio_ui_api::host::{HostNetwork, HostUndo};
 use studio_ui_api_testing::{FakeHost, FakeNetwork};
 
@@ -23,7 +22,7 @@ fn cook_at(width: f64, depth: f64, height: f64, center: [f64; 3]) -> Result<Outp
     parameters.insert("center".into(), center.to_vec().into());
     let cancel = CancelToken::default();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     BoxNode.cook(&mut cx, &[])
 }
 
@@ -231,7 +230,7 @@ fn the_node_binds_a_box_handle_to_its_center_and_sides() {
     center.write(&mut moved, [0.5, 0.0, 0.0]);
     let cancel = CancelToken::default();
     let mut scratch = None;
-    let mut cx = CookCx::new(&moved, &cancel, &Serial, &mut scratch);
+    let mut cx = CookCx::new(&moved, &cancel, &mut scratch);
     let data = BoxNode.cook(&mut cx, &[]).unwrap().data.remove(0);
     assert_eq!(
         BOX.get(&data),

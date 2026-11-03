@@ -245,7 +245,8 @@ pub trait NodeType: Any + Send + Sync {
     /// Computes the node's outputs from `inputs`: the values wired into
     /// it, in port order, a multi-input port's wires one after another
     /// ([`CookCx::port`] says which are whose). Long cooks poll
-    /// cancellation and split work with [`CookCx::parallel_for`].
+    /// cancellation and split work with
+    /// [`geometry::parallel`](crate::geometry::parallel).
     fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError>;
 
     /// Its incremental cooking, when it has any (an interactive drag of a

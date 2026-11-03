@@ -6,7 +6,6 @@ use kinogaki_studio_api::network::{
     Flag, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, NodeFlags, NodeInfo, Place,
     Wire,
 };
-use kinogaki_studio_api::parallel::Serial;
 use kinogaki_studio_api::params::Value;
 use kinogaki_studio_api::{
     CancelToken, ContextId, CookCx, CookError, Data, DataTypeId, Error, HeldEdit, NodeRef,
@@ -191,8 +190,8 @@ impl FakeNetwork {
     /// Cooks `node` and what it reads, as core does: a bypassed node
     /// passes its first input's first wire on, a frozen one gives the
     /// outputs it keeps, a held one applies its delta through its held
-    /// edit, any other cooks through its type, with [`Serial`] workers and
-    /// a scratch slot of its own each time, its handles checked
+    /// edit, any other cooks through its type, with a scratch slot of its own
+    /// each time, its handles checked
     /// ([`Outputs::check_handles`]).
     ///
     /// # Errors
@@ -235,7 +234,7 @@ impl FakeNetwork {
         }
         let cancel = CancelToken::default();
         let mut scratch = None;
-        let mut cx = CookCx::new(&at.parameters, &cancel, &Serial, &mut scratch).with_ports(&wires);
+        let mut cx = CookCx::new(&at.parameters, &cancel, &mut scratch).with_ports(&wires);
         match (&at.delta, code.held()) {
             (Some(delta), Some(ty)) => {
                 let held = self.types.held.get(&ty).ok_or_else(|| {

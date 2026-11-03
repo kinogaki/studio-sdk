@@ -20,7 +20,7 @@
 //!   own terms.
 //! - **Cooking** ([`cook`]): what a node type is and computes ([`NodeType`] with its [`Description`],
 //!   [`CookCx`], optional [`Incremental`] cooking); Studio's core owns the
-//!   cooking DAG, the caches and the [`parallel`] workers. [`HeldEdit`]s
+//!   cooking DAG, the caches and the workers ([`geometry::parallel`]). [`HeldEdit`]s
 //!   apply a held node's authored delta to a data type.
 //! - **Objects** ([`ObjectKindSpec`], [`ObjectBody`]): kinds of scene
 //!   objects a package adds and their package-owned state.
@@ -79,7 +79,6 @@ pub mod mesher;
 pub mod network;
 pub mod object;
 pub mod package;
-pub mod parallel;
 pub mod params;
 pub mod refs;
 pub mod registry;
@@ -128,7 +127,6 @@ pub use object::{
     PublishedMaterial, RenderSetup, RenderSetupKind, RenderedKind, UserSettings, Valued,
 };
 pub use package::{Package, PackageUi};
-pub use parallel::Workers;
 pub use params::{Diagnostic, Parameters, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::{Registry, RegistryError};

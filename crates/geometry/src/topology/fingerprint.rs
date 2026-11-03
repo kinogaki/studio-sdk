@@ -27,7 +27,7 @@ pub(super) fn of(points: usize, polygons: usize, offsets: &[u32], vertices: &[u3
         message.hash_into(&mut hash, 0, len);
         return *hash.finalize().as_bytes();
     }
-    let leaves = parallel::map_blocks(len, LEAF, |range| {
+    let leaves = parallel::map(len, LEAF, |range| {
         let mut hash = blake3::Hasher::new();
         hash.set_input_offset(range.start as u64);
         message.hash_into(&mut hash, range.start, range.end);

@@ -94,20 +94,20 @@ pub(super) fn build(topology: &Topology) -> Tables {
 
     // Occurrence vertices and primitives, and each vertex's edge.
     let mut edge_vertices = vec![0u32; occurrence_count];
-    parallel::chunks_mut(&mut edge_vertices, BLOCK, |first, out| {
+    parallel::chunks(&mut edge_vertices, BLOCK, |first, out| {
         for (i, vertex) in out.iter_mut().enumerate() {
             *vertex = occurrences[first + i] as u32;
         }
     });
     drop(occurrences);
     let mut edge_prims = vec![0u32; occurrence_count];
-    parallel::chunks_mut(&mut edge_prims, BLOCK, |first, out| {
+    parallel::chunks(&mut edge_prims, BLOCK, |first, out| {
         for (i, prim) in out.iter_mut().enumerate() {
             *prim = prim_of[edge_vertices[first + i] as usize];
         }
     });
     let mut vertex_edges = vec![0u32; vertex_count];
-    parallel::chunks_mut(&mut vertex_edges, BLOCK, |first, out| {
+    parallel::chunks(&mut vertex_edges, BLOCK, |first, out| {
         for (i, edge) in out.iter_mut().enumerate() {
             *edge = match low_high(first + i) {
                 Some((low, high)) => {
@@ -134,7 +134,7 @@ pub(super) fn build(topology: &Topology) -> Tables {
 fn prim_of_vertices(topology: &Topology) -> Vec<u32> {
     let mut prim_of = vec![0u32; topology.vertices.len()];
     let offsets = &topology.offsets;
-    parallel::chunks_mut(&mut prim_of, BLOCK, |first, out| {
+    parallel::chunks(&mut prim_of, BLOCK, |first, out| {
         let mut f = offsets.partition_point(|&o| o as usize <= first) - 1;
         for (i, prim) in out.iter_mut().enumerate() {
             while offsets[f + 1] as usize <= first + i {
@@ -196,6 +196,7 @@ fn prefix(counts: impl Iterator<Item = u32>) -> Vec<u32> {
 }
 
 /// `work(i)` for every `i` in `0..len`, in parallel blocks.
+#[track_caller]
 fn each(len: usize, work: impl Fn(usize) + Sync) {
     parallel::each(len, BLOCK, work);
 }

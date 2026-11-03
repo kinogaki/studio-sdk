@@ -202,7 +202,7 @@ fn triangles_of(value: &Polygons, polygons: Range<usize>) -> (Vec<Triangle>, Vec
 /// The triangulation of every polygon, in parallel blocks.
 fn build(value: &Polygons, polygons: Range<usize>) -> Triangulation {
     let len = polygons.len();
-    let blocks = parallel::map_blocks(len, BLOCK, |r| {
+    let blocks = parallel::map(len, BLOCK, |r| {
         triangles_of(value, polygons.start + r.start..polygons.start + r.end)
     });
     let total = blocks.iter().map(|(t, _)| t.len()).sum();

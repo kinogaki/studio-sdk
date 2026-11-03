@@ -30,7 +30,7 @@ pub(crate) fn check(positions: &Column<[f64; 3]>) -> Result<(), GeometryError> {
 /// The smallest box holding `positions`; `None` for none.
 pub(crate) fn bounds(positions: &[[f64; 3]]) -> Option<[[f64; 3]; 2]> {
     let first = *positions.first()?;
-    let boxes = parallel::map_blocks(positions.len(), BLOCK, |range| {
+    let boxes = parallel::map(positions.len(), BLOCK, |range| {
         positions[range].iter().fold([first, first], |[lo, hi], p| {
             [
                 [lo[0].min(p[0]), lo[1].min(p[1]), lo[2].min(p[2])],
@@ -59,7 +59,7 @@ pub(crate) fn cached_bounds(positions: &Column<[f64; 3]>) -> Option<[[f64; 3]; 2
 /// `0.0` differ (their bytes do) and equal bits never do.
 pub(crate) fn moved(before: &[[f64; 3]], after: &[[f64; 3]]) -> Vec<u32> {
     let bits = |p: &[f64; 3]| p.map(f64::to_bits);
-    let blocks = parallel::map_blocks(after.len(), BLOCK, |range| {
+    let blocks = parallel::map(after.len(), BLOCK, |range| {
         (range.filter(|&p| before.get(p).is_none_or(|b| bits(b) != bits(&after[p]))))
             .map(|p| p as u32)
             .collect::<Vec<_>>()

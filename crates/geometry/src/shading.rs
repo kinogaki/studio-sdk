@@ -164,12 +164,12 @@ fn face_normal(topology: &Topology, positions: &[V3], f: usize) -> V3 {
 fn build(value: &Polygons, inputs: &Inputs) -> ShadingNormals {
     let topology = value.topology();
     let positions: &[V3] = value.positions();
-    let faces: Vec<V3> = parallel::map_blocks(topology.polygons(), BLOCK, |r| {
+    let faces: Vec<V3> = parallel::map(topology.polygons(), BLOCK, |r| {
         r.map(|f| face_normal(topology, positions, f))
             .collect::<Vec<_>>()
     })
     .concat();
-    let fans = parallel::map_blocks(topology.points(), BLOCK, |r| {
+    let fans = parallel::map(topology.points(), BLOCK, |r| {
         let mut fan = Fan::default();
         let mut out = Vec::new();
         for p in r {

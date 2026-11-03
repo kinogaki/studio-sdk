@@ -36,7 +36,7 @@ pub(super) fn topology(
             "{polygons} polygons, but only {primitives} primitives"
         ));
     }
-    let faults = parallel::map_blocks(primitives, BLOCK, |range| {
+    let faults = parallel::map(primitives, BLOCK, |range| {
         range
             .into_iter()
             .find_map(|p| primitive(points, offsets, vertices, p, p < polygons).map(|m| (p, m)))

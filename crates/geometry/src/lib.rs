@@ -16,6 +16,7 @@
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
 //! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
 //! | [`Tolerances`] | the project's modeling tolerances |
+//! | [`parallel`] | the process's shared [`Workers`](parallel::Workers): every parallel step runs on what the host installed |
 //!
 //! **Validated values.** Every value's fields are private. It is made only
 //! through a constructor or builder that checks its rules (each type lists
@@ -101,7 +102,7 @@ mod frame;
 mod kept;
 pub mod limits;
 mod motion;
-mod parallel;
+pub mod parallel;
 mod polygons;
 mod positions;
 mod selection;

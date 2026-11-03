@@ -149,7 +149,7 @@ A package owns only what a node is and computes. It implements `NodeType`:
 - parameters by name (`Parameters` of `params::Value`; typed reads fail with the parameter's name);
 - which inputs are on which port (`port`), and input names when declared;
 - the component selection the node acts on and the one input 0 carries;
-- cancellation (`check`), time, and `parallel_for` / `parallel_map` on the host's shared workers (the `parallel::Workers` service, which receives each caller's location so the host can size runs per call site), so packages never start threads;
+- cancellation (`check`) and time; parallel work goes through `geometry::parallel` (`chunks_mut`, `map_blocks`) onto the `Workers` the host installs once per process, which receive each caller's location so the host can size runs per call site, so packages never start threads;
 - a core-owned scratch slot per node (`scratch::<T>()`), for state such as a tessellation cache. Core may empty it at any time, so it may only make cooks faster, never change their results.
 
 Packages keep no evaluator, worker or private cache.
