@@ -454,4 +454,46 @@ mod display {
             &shown.positions().as_slice()[first_curve]
         );
     }
+
+    /// Set when dropped: a cache slot that tells whether its column is gone.
+    struct Dropped(Arc<std::sync::atomic::AtomicBool>);
+
+    impl Drop for Dropped {
+        fn drop(&mut self) {
+            self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    /// A flag set once `positions` (and every clone of it) is freed.
+    fn watch(
+        positions: &kinogaki_geometry::Column<[f64; 3]>,
+    ) -> Arc<std::sync::atomic::AtomicBool> {
+        let freed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        positions.derived(|_| Dropped(freed.clone()));
+        freed
+    }
+
+    #[test]
+    fn a_display_never_keeps_its_positions_alive() {
+        let freed = std::sync::atomic::Ordering::SeqCst;
+        let points: Vec<[f64; 3]> = (0..7).map(|k| [k as f64, (k % 2) as f64, 0.0]).collect();
+        let first = Curves::builder(Basis::BSpline, points.clone().into(), vec![0, 4, 7].into())
+            .degree(2)
+            .build()
+            .unwrap();
+        let shown = first.display();
+        let mut moved = points;
+        moved[5][1] += 3.0;
+        let after = first.with_positions(moved.into()).unwrap();
+        let patched = after.display_after(&first, &[5]);
+        let (first_freed, after_freed) = (watch(first.positions()), watch(after.positions()));
+        drop((first, after));
+        assert!(first_freed.load(freed), "display() kept its positions");
+        assert!(
+            after_freed.load(freed),
+            "display_after() kept its positions"
+        );
+        // The displays themselves are the caller's, still whole.
+        assert_eq!(shown.offsets(), patched.offsets());
+    }
 }

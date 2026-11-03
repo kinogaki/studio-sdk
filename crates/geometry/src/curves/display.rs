@@ -3,7 +3,7 @@
 //! polyline the viewport draws.
 //!
 //! See [`CurveDisplay`] for the parameters, spans and display layout.
-use super::{Basis, Curves};
+use super::{Basis, Curves, Knots};
 use crate::column::Column;
 use crate::kept::Kept;
 use crate::spline::{self, homogeneous, rational};
@@ -75,32 +75,54 @@ impl CurveDisplay {
 }
 
 /// What a display is derived from besides the positions: the curves'
-/// structure, held so it compares by identity while kept.
-struct Layout(Curves);
+/// structure, its columns held so they compare by identity while kept.
+/// Never the positions: the key lives in the positions column's own cache,
+/// so holding them would keep that column alive forever.
+struct Layout {
+    basis: Basis,
+    offsets: Column<u32>,
+    points: Option<Column<u32>>,
+    degrees: Column<u8>,
+    periodic: Column<u64>,
+    knots: Option<Knots>,
+    weights: Option<Column<f64>>,
+}
 
 impl Layout {
-    fn same(&self, other: &Curves) -> bool {
-        let a = &self.0;
-        let same_column = |x: Option<&Column<u32>>, y: Option<&Column<u32>>| match (x, y) {
-            (Some(x), Some(y)) => x.ptr_eq(y),
-            (None, None) => true,
-            _ => false,
-        };
-        a.basis == other.basis
-            && a.offsets.ptr_eq(&other.offsets)
-            && same_column(a.points.as_ref(), other.points.as_ref())
-            && a.degrees.ptr_eq(&other.degrees)
-            && a.periodic.words().ptr_eq(other.periodic.words())
-            && match (&a.knots, &other.knots) {
-                (Some(x), Some(y)) => x.offsets.ptr_eq(&y.offsets) && x.values.ptr_eq(&y.values),
-                (None, None) => true,
-                _ => false,
-            }
-            && match (&a.weights, &other.weights) {
+    fn of(curves: &Curves) -> Self {
+        Layout {
+            basis: curves.basis,
+            offsets: curves.offsets.clone(),
+            points: curves.points.clone(),
+            degrees: curves.degrees.clone(),
+            periodic: curves.periodic.words().clone(),
+            knots: curves.knots.clone(),
+            weights: curves.weights.clone(),
+        }
+    }
+
+    fn same(&self, other: &Layout) -> bool {
+        fn same<T>(x: Option<&Column<T>>, y: Option<&Column<T>>) -> bool {
+            match (x, y) {
                 (Some(x), Some(y)) => x.ptr_eq(y),
                 (None, None) => true,
                 _ => false,
             }
+        }
+        self.basis == other.basis
+            && self.offsets.ptr_eq(&other.offsets)
+            && same(self.points.as_ref(), other.points.as_ref())
+            && self.degrees.ptr_eq(&other.degrees)
+            && self.periodic.ptr_eq(&other.periodic)
+            && same(
+                self.knots.as_ref().map(|k| &k.offsets),
+                other.knots.as_ref().map(|k| &k.offsets),
+            )
+            && same(
+                self.knots.as_ref().map(|k| &k.values),
+                other.knots.as_ref().map(|k| &k.values),
+            )
+            && same(self.weights.as_ref(), other.weights.as_ref())
     }
 }
 
@@ -198,12 +220,13 @@ impl Curves {
     /// Every curve as the polyline the viewport draws (see
     /// [`CurveDisplay`]), derived once per positions and structure.
     pub fn display(&self) -> Arc<CurveDisplay> {
+        let layout = Layout::of(self);
         let kept = self.positions.derived(|_| Displays::default());
-        if let Some(display) = kept.find(|k| k.same(self)) {
+        if let Some(display) = kept.find(|k| k.same(&layout)) {
             return display;
         }
         let built = Arc::new(self.displayed(None));
-        kept.keep(Layout(self.clone()), built.clone());
+        kept.keep(layout, built.clone());
         built
     }
 
@@ -212,14 +235,15 @@ impl Curves {
     /// curves through the points `moved` (which must include every point
     /// whose position differs). Otherwise made whole.
     pub fn display_after(&self, before: &Curves, moved: &[u32]) -> Arc<CurveDisplay> {
+        let layout = Layout::of(self);
         let kept = self.positions.derived(|_| Displays::default());
-        if let Some(display) = kept.find(|k| k.same(self)) {
+        if let Some(display) = kept.find(|k| k.same(&layout)) {
             return display;
         }
-        let previous = Layout(before.clone())
-            .same(self)
+        let previous = Layout::of(before)
+            .same(&layout)
             .then(|| before.positions.derived(|_| Displays::default()))
-            .and_then(|k| k.find(|k| k.same(self)));
+            .and_then(|k| k.find(|k| k.same(&layout)));
         let built = Arc::new(match previous {
             Some(previous) => {
                 let moved: std::collections::BTreeSet<u32> = moved.iter().copied().collect();
@@ -230,7 +254,7 @@ impl Curves {
             }
             None => self.displayed(None),
         });
-        kept.keep(Layout(self.clone()), built.clone());
+        kept.keep(layout, built.clone());
         built
     }
 
