@@ -10,7 +10,6 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
-use kinogaki_studio_api::geometry::Frame;
 use kinogaki_studio_api::geometry::Polygons;
 use kinogaki_studio_api::id::StoredId;
 use kinogaki_studio_api::params::Severity;
@@ -179,9 +178,7 @@ pub trait HostDoc {
     /// B-rep's bodies meshed by the installed mesher and joined at their
     /// placements, `face` and `edge` naming the value's faces and edges
     /// (in the value's numbering), `N` and `uv` on the polygons' corners
-    /// as the mesher made them. Per-point values a context draws over the
-    /// object ([`Edited::scalars`](crate::package::Edited::scalars)) are
-    /// numbered by these polygons' points. `None` while it isn't meshed
+    /// as the mesher made them. `None` while it isn't meshed
     /// yet, or for a value drawn otherwise (curves).
     fn shown_polygons(&self, object: ObjectRef) -> Option<Polygons>;
     /// Whether the node the open network displays is a held edit (an Edit
@@ -218,24 +215,6 @@ pub trait HostDocExt: HostDoc {
             .and_then(|v| v.downcast_ref())
             .unwrap_or_else(|| unstored::<T>())
     }
-    /// Sets the project's value `T`, or the user's.
-    ///
-    /// # Panics
-    /// When no package registered `T` for the project or user.
-    fn set_stored<T: Stored>(&mut self, value: T) {
-        if !self.set_stored_any(T::id(), None, Arc::new(value)) {
-            unstored::<T>()
-        }
-    }
-    /// Sets view `view`'s value `T`.
-    ///
-    /// # Panics
-    /// When no package registered `T` for views, or there is no such view.
-    fn set_view_stored<T: Stored>(&mut self, view: usize, value: T) {
-        if !self.set_stored_any(T::id(), Some(view), Arc::new(value)) {
-            unstored::<T>()
-        }
-    }
 }
 
 impl<H: HostDoc + ?Sized> HostDocExt for H {}
@@ -259,20 +238,6 @@ pub trait HostView {
     /// Frames the active view on `bounds` (in the edited object's space),
     /// as F frames the selection.
     fn frame_bounds(&mut self, bounds: Bounds);
-    /// Turns view `view` to look squarely at `frame` (in the edited
-    /// object's space) and projects it `orthographic` or in perspective:
-    /// down its −z with its y up on screen, its origin in the middle, as
-    /// far as the view was (a sketch's plane seen flat, Look At). A view
-    /// looking through a Camera object leaves it first. Its camera as it
-    /// was is kept for [`restore`](Self::restore) until the user turns the
-    /// view (an orbit, a view chosen), so a second look keeps the first
-    /// camera. Navigation, as the user's: never an undo step. Nothing for
-    /// no such view.
-    fn look_at(&mut self, view: usize, frame: Frame, orthographic: bool);
-    /// Puts view `view`'s camera back as it was before
-    /// [`look_at`](Self::look_at) turned it; nothing once the user turned
-    /// the view since (their view stays) or when no look turned it.
-    fn restore(&mut self, view: usize);
     /// Asks for one more frame (a package's own state changed outside an
     /// event: a worker's result it just adopted). Never a timer.
     fn redraw(&mut self);

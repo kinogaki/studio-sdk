@@ -1,7 +1,5 @@
 //! Selection, Detail, DisplayQuality and Tolerances: their rules.
-use kinogaki_geometry::{
-    Class, Column, Detail, DisplayQuality, ErrorKind, Selection, Tolerances, Topology,
-};
+use kinogaki_geometry::{Class, Detail, DisplayQuality, ErrorKind, Selection, Tolerances};
 
 #[test]
 fn selections_are_sorted_distinct_and_hold_their_active_element() {
@@ -17,36 +15,6 @@ fn selections_are_sorted_distinct_and_hold_their_active_element() {
     let all = Selection::all(Class::Edge, None);
     assert!(all.contains(1_000) && all.len(7) == 7 && !all.is_empty());
     assert!(Selection::none(Class::Point).is_empty());
-}
-
-#[test]
-fn a_selection_from_ascending_indices_shares_them() {
-    let picked = Column::from(vec![0, 4, 9]);
-    let s = Selection::from_ascending(Class::Edge, picked.clone(), Some(4), None).unwrap();
-    assert!(s.indices().ptr_eq(&picked));
-    let again = Selection::from_ascending(s.class(), s.indices().clone(), None, None).unwrap();
-    assert!(again.indices().ptr_eq(&picked));
-    for (indices, at) in [(vec![1, 1], 1), (vec![0, 5, 2], 2)] {
-        let e = Selection::from_ascending(Class::Point, indices.into(), None, None).unwrap_err();
-        assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, Some(at)));
-    }
-    let e = Selection::from_ascending(Class::Point, vec![1].into(), Some(2), None).unwrap_err();
-    assert_eq!(e.element(), Some(2));
-    assert!(
-        Selection::from_ascending(Class::Point, Column::default(), None, None)
-            .unwrap()
-            .is_empty()
-    );
-}
-
-#[test]
-fn a_selection_on_another_topology_is_stale() {
-    let quad = Topology::new(4, vec![0, 4].into(), vec![0, 1, 2, 3].into(), 1).unwrap();
-    let tri = Topology::new(4, vec![0, 3].into(), vec![0, 1, 2].into(), 1).unwrap();
-    let s = Selection::new(Class::Point, vec![2], None, Some(quad.fingerprint())).unwrap();
-    assert!(!s.is_stale(&quad) && s.is_stale(&tri));
-    let anywhere = Selection::new(Class::Point, vec![2], None, None).unwrap();
-    assert!(!anywhere.is_stale(&tri));
 }
 
 #[test]

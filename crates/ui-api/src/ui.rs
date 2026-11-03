@@ -209,34 +209,6 @@ pub trait UiExt: Ui {
         }
     }
 
-    /// [`Ui::scroll_vertical`] with a body that returns a value.
-    fn scroll_with<R>(
-        &mut self,
-        spec: &ScrollSpec,
-        body: impl FnOnce(&mut dyn Ui) -> R,
-    ) -> InnerResponse<R> {
-        let mut run = Once::new(body);
-        let response = self.scroll_vertical(spec, &mut |ui| run.call(ui));
-        InnerResponse {
-            inner: run.take(),
-            response,
-        }
-    }
-
-    /// [`Ui::card`] with a body that returns a value.
-    fn card_with<R>(
-        &mut self,
-        spec: &CardSpec<'_>,
-        body: impl FnOnce(&mut dyn Ui) -> R,
-    ) -> InnerResponse<R, CardResponse> {
-        let mut run = Once::new(body);
-        let response = self.card(spec, &mut |ui| run.call(ui));
-        InnerResponse {
-            inner: run.take(),
-            response,
-        }
-    }
-
     /// [`Ui::popover`] with a body that returns a value.
     fn popover_with<R>(
         &mut self,

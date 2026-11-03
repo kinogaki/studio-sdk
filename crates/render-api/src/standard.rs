@@ -1,7 +1,7 @@
 //! The standard prim types: UsdLux's lights and exponential height fog,
-//! as schemas ([`area_light`], [`dome_light`], [`distant_light`],
-//! [`spot_light`], [`fog`]) every engine that renders them declares as
-//! they are here, and as typed values ([`Light`], [`Fog`]) an engine
+//! as schemas (`area_light`, `dome_light`, `distant_light`,
+//! `spot_light`, `fog`) every engine that renders them declares as
+//! they are here, and as typed values ([`Light`], `Fog`) an engine
 //! decodes a [`Declared`] prim into and a host or test encodes one from.
 //!
 //! Lights are shaped as UsdLux shapes them: an area light is a RectLight
@@ -24,8 +24,7 @@ use crate::declared::{Declared, PrimType, Role};
 use crate::id::TextureId;
 use crate::prim::{IDENTITY, Matrix, Motion};
 use crate::settings::{
-    SettingDescriptor, SettingGroup, SettingKind, SettingValue, SettingValues, Trailing, Unit,
-    set_value,
+    SettingDescriptor, SettingGroup, SettingKind, SettingValue, Trailing, Unit, set_value,
 };
 use crate::vocabulary::Choice;
 
@@ -34,18 +33,18 @@ pub const AREA_LIGHT: &str = "kinogaki.render.area_light";
 /// The dome light's id.
 pub const DOME_LIGHT: &str = "kinogaki.render.dome_light";
 /// The distant light's id.
-pub const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
+pub(crate) const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
 /// The spot light's id.
-pub const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
+pub(crate) const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
 /// The fog's id.
-pub const FOG: &str = "kinogaki.render.fog";
+pub(crate) const FOG: &str = "kinogaki.render.fog";
 
 /// The group a light's parameters sit in.
-pub const LIGHT_GROUP: &str = "light";
+pub(crate) const LIGHT_GROUP: &str = "light";
 
 /// The published illuminants an emission may name: their CIE names (the
 /// keys in files) and labels, in the order a UI lists them.
-pub const ILLUMINANTS: [(&str, &str); 13] = [
+pub(crate) const ILLUMINANTS: [(&str, &str); 13] = [
     ("D50", "Daylight D50"),
     ("D55", "Daylight D55"),
     ("D65", "Daylight D65"),
@@ -72,7 +71,7 @@ pub enum Emission {
     /// A blackbody at the emitter's color temperature.
     Temperature,
     /// A published illuminant's spectrum, by its CIE name
-    /// ([`ILLUMINANTS`]).
+    /// (`ILLUMINANTS`).
     Illuminant(Arc<str>),
 }
 
@@ -102,7 +101,7 @@ impl Emission {
 /// The emission settings every standard light has (and Pixel's rim):
 /// Emission, Color, Temperature, Intensity and Exposure, the light's
 /// intensity `intensity` by default.
-pub fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
+pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
     let choices = [
         Choice::new("color", "Color"),
         Choice::new("temperature", "Color Temperature"),
@@ -249,7 +248,7 @@ fn light_type(
 /// UsdLux's RectLight and DiskLight: a rectangle (`width` × `height`) or
 /// a disk (`radius`) in its XY plane, shining down its -Z; a 1 × 1
 /// rectangle of intensity 1 by default.
-pub fn area_light() -> PrimType {
+pub(crate) fn area_light() -> PrimType {
     let shape = SettingDescriptor::new(
         "shape",
         "Shape",
@@ -287,7 +286,7 @@ pub fn area_light() -> PrimType {
 /// its file, which the host sends decoded); without an image, below the
 /// horizon it may shine `groundColor` instead (`ground`: a hemisphere
 /// gradient, the image's row hidden while it is on).
-pub fn dome_light() -> PrimType {
+pub(crate) fn dome_light() -> PrimType {
     light_type(
         DOME_LIGHT,
         "Dome Light",
@@ -314,7 +313,7 @@ pub fn dome_light() -> PrimType {
 /// UsdLux's DistantLight: parallel light down its -Z from infinitely far,
 /// the sun's size across (`angle`, 0.53°) and intensity 50,000 (an
 /// illuminance of about 3.4) by default.
-pub fn distant_light() -> PrimType {
+pub(crate) fn distant_light() -> PrimType {
     light_type(
         DISTANT_LIGHT,
         "Distant Light",
@@ -334,7 +333,7 @@ pub fn distant_light() -> PrimType {
 /// (`radius`) whose light leaves within `coneAngle` of its -Z, fading over
 /// `coneSoftness` of the cone; a 0.1 sphere in a 30° cone, normalized, of
 /// intensity 100 by default.
-pub fn spot_light() -> PrimType {
+pub(crate) fn spot_light() -> PrimType {
     light_type(
         SPOT_LIGHT,
         "Spot Light",
@@ -368,7 +367,7 @@ pub fn lights() -> Vec<PrimType> {
 /// height))` at height `h` along [`crate::RenderSettings::up`], from
 /// `start` along each view ray on (falloff 0: even distance fog). A scene
 /// has at most one.
-pub fn fog() -> PrimType {
+pub(crate) fn fog() -> PrimType {
     const GROUP: &str = "fog";
     let along = |default, min| SettingKind::Float {
         default,
@@ -437,7 +436,7 @@ pub enum ImageRef {
 impl ImageRef {
     /// A dome's image as setting `value` holds it (none: no image, or one
     /// not read yet).
-    pub fn of_value(value: &SettingValue) -> Option<ImageRef> {
+    pub(crate) fn of_value(value: &SettingValue) -> Option<ImageRef> {
         match value {
             SettingValue::File(path) if !path.trim().is_empty() => {
                 Some(ImageRef::File(path.clone()))
@@ -448,7 +447,7 @@ impl ImageRef {
     }
 
     /// It as a setting's value (none: an empty file).
-    pub fn value(image: Option<&ImageRef>) -> SettingValue {
+    pub(crate) fn value(image: Option<&ImageRef>) -> SettingValue {
         match image {
             Some(ImageRef::File(path)) => SettingValue::File(path.clone()),
             Some(ImageRef::Prim(id)) => SettingValue::Texture(Some(*id)),
@@ -642,82 +641,6 @@ impl Light {
             motion: self.motion.clone(),
             visible: self.visible,
         }
-    }
-}
-
-/// How a spot's light fades from its axis to the cone's edge (ShapingAPI):
-/// 1 inside `cone_angle × (1 - softness)`, 0 past `cone_angle`, a smoothstep
-/// between. `cos_axis` is the cosine between the light's -Z and the
-/// direction from the light to the lit point.
-pub fn cone_falloff(cos_axis: f32, cone_angle: f32, cone_softness: f32) -> f32 {
-    let outer = cone_angle.clamp(0.0, 180.0).to_radians().cos();
-    let inner = (cone_angle.clamp(0.0, 180.0) * (1.0 - cone_softness.clamp(0.0, 1.0)))
-        .to_radians()
-        .cos();
-    if inner - outer <= 1e-7 {
-        return if cos_axis >= outer { 1.0 } else { 0.0 };
-    }
-    let t = ((cos_axis - outer) / (inner - outer)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
-}
-
-/// Fog filling the scene, decoded ([`fog`]).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Fog {
-    /// Extinction a scene unit at `height` (0: no fog).
-    pub density: f32,
-    /// Its color, linear (ACEScg as an engine receives it): what it fades
-    /// toward, or, lit, its scattering color.
-    pub color: [f32; 3],
-    /// How far from the camera it begins, scene units.
-    pub start: f32,
-    /// The height `density` holds at, scene units.
-    pub height: f32,
-    /// How fast it thins above `height` (e-folds a scene unit up).
-    pub falloff: f32,
-    /// Whether the lights light it (marched as a medium, with shafts where
-    /// surfaces shadow it) rather than a flat haze of its color.
-    pub inscatter: bool,
-    /// Lit fog's Henyey–Greenstein g, −0.9 to 0.9.
-    pub anisotropy: f32,
-}
-
-impl Default for Fog {
-    fn default() -> Fog {
-        Fog::decode(&Declared::new(FOG, fog().defaults())).expect("fog")
-    }
-}
-
-impl Fog {
-    /// `prim` as fog (none when it is of another type).
-    pub fn decode(prim: &Declared) -> Option<Fog> {
-        (&*prim.type_id == FOG).then(|| Fog {
-            density: prim.float("density"),
-            color: prim.color("color"),
-            start: prim.float("start"),
-            height: prim.float("height"),
-            falloff: prim.float("falloff"),
-            inscatter: prim.bool("inscatter"),
-            anisotropy: prim.float("anisotropy"),
-        })
-    }
-
-    /// It as a prim.
-    pub fn declared(&self) -> Declared {
-        let float = |v: f32| SettingValue::Float(f64::from(v));
-        let values: SettingValues = vec![
-            (Arc::from("density"), float(self.density)),
-            (
-                Arc::from("color"),
-                SettingValue::Color(self.color.map(f64::from)),
-            ),
-            (Arc::from("start"), float(self.start)),
-            (Arc::from("height"), float(self.height)),
-            (Arc::from("falloff"), float(self.falloff)),
-            (Arc::from("inscatter"), SettingValue::Bool(self.inscatter)),
-            (Arc::from("anisotropy"), float(self.anisotropy)),
-        ];
-        Declared::new(FOG, values)
     }
 }
 

@@ -7,7 +7,7 @@ use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
 use kinogaki_render_api::Engines;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 /// Id `text` `package` declares as an id's text, when well formed (a
 /// creation's name, an engine's id: text, not yet an id type).
@@ -86,13 +86,6 @@ impl Registry {
                 owner(self.contexts.get(&c.id)),
             )?;
         }
-        for c in &package.conversions {
-            declare(
-                "conversion",
-                c.id().as_str(),
-                owner(self.conversions.get(&c.id())),
-            )?;
-        }
         for m in &package.meshers {
             let first = self.meshers.iter().find(|e| e.item.id() == m.id());
             declare("mesher", m.id().as_str(), owner(first))?;
@@ -141,12 +134,11 @@ impl Registry {
                 self.stored.get(&s.id()).copied(),
             )?;
         }
-        for &(context, mode) in package.ui.iter().flat_map(|ui| ui.contexts()) {
-            let what = if mode { "mode's UI" } else { "context's UI" };
+        for &context in package.ui.iter().flat_map(|ui| ui.contexts()) {
             declare(
-                what,
+                "context's UI",
                 context.as_str(),
-                self.ui_contexts.get(&(context, mode)).copied(),
+                self.ui_contexts.get(&context).copied(),
             )?;
         }
         for n in &package.node_types {
@@ -352,8 +344,7 @@ impl Registry {
         Ok(())
     }
 
-    /// Every data type `package` names is registered, by it or before it,
-    /// and no (from, to) pair gets a second conversion.
+    /// Every data type `package` names is registered, by it or before it.
     fn check_references(&self, package: &Package) -> Result<(), RegistryError> {
         let id = package.id;
         let own: BTreeSet<DataTypeId> = package.data_types.iter().map(|t| t.id()).collect();
@@ -390,21 +381,6 @@ impl Registry {
             for port in d.inputs.iter().chain(&d.outputs) {
                 known(n.id().as_str(), port.data)?;
             }
-        }
-        let mut routes = BTreeMap::new();
-        for c in &package.conversions {
-            known(c.id().as_str(), c.from())?;
-            known(c.id().as_str(), c.to())?;
-            let route = (c.from(), c.to());
-            if let Some(&first) = self.routes.get(&route).or(routes.get(&route)) {
-                return Err(RegistryError::DuplicateConversion {
-                    package: id,
-                    from: route.0,
-                    to: route.1,
-                    first,
-                });
-            }
-            routes.insert(route, c.id());
         }
         for k in &package.object_kinds {
             if let Some(result) = k.result() {

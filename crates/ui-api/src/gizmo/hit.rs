@@ -5,7 +5,7 @@ use crate::geom::Pos;
 use crate::vec3::{add, scale};
 
 /// Every axis of a gizmo (the 3D one).
-pub const ALL_AXES: [bool; 3] = [true; 3];
+pub(crate) const ALL_AXES: [bool; 3] = [true; 3];
 
 /// Whether `axes` hold the plane square about `axis` (both its others).
 fn plane_shown(axes: [bool; 3], axis: usize) -> bool {

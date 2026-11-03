@@ -6,15 +6,6 @@
 
 use std::sync::Arc;
 
-/// Which prims a Cryptomatte output separates.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CryptomatteOf {
-    /// Objects (Mesh prim paths).
-    Object,
-    /// Materials (Material prim paths).
-    Material,
-}
-
 /// What an output's values are, and so how many a pixel takes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AovClass {
@@ -31,8 +22,6 @@ pub enum AovClass {
     /// Cryptomatte with `levels` rank slots a pixel (an ID and a coverage
     /// each).
     Cryptomatte {
-        /// What it separates.
-        of: CryptomatteOf,
         /// Rank slots a pixel.
         levels: u8,
     },
@@ -66,7 +55,7 @@ impl Aov {
         match self.class {
             AovClass::Rgba => 4,
             AovClass::Color | AovClass::Vector => 3,
-            AovClass::Cryptomatte { levels, .. } => 2 * usize::from(levels),
+            AovClass::Cryptomatte { levels } => 2 * usize::from(levels),
             AovClass::Scalar | AovClass::Id => 1,
         }
     }
@@ -90,32 +79,32 @@ impl Aov {
 /// The standard outputs: their ids, and each one's [`Aov`]. An engine that
 /// writes one of these writes it as described here.
 pub mod standard {
-    use super::{Aov, AovClass, CryptomatteOf};
+    use super::{Aov, AovClass};
 
     /// The image.
     pub const BEAUTY: &str = "beauty";
     /// Albedo at the first non-specular hit.
     pub const ALBEDO: &str = "albedo";
     /// Light arriving straight from the lights, off a white diffuse surface.
-    pub const DIRECT: &str = "direct";
+    pub(crate) const DIRECT: &str = "direct";
     /// Ambient light (a dome's, an ambient color's), off a white diffuse
     /// surface.
-    pub const AMBIENT: &str = "ambient";
+    pub(crate) const AMBIENT: &str = "ambient";
     /// Indirect light (global illumination), off a white diffuse surface.
-    pub const INDIRECT: &str = "indirect";
+    pub(crate) const INDIRECT: &str = "indirect";
     /// Light scattered toward the camera by volumes and lit fog (R G B) and
     /// their opacity (A: 1 minus their transmittance), premultiplied: what
     /// lies behind shows as itself × (1 − A) + R G B.
     pub const VOLUME: &str = "volume";
     /// Ambient occlusion: the open share of the hemisphere (1 open, 0
     /// closed).
-    pub const OCCLUSION: &str = "occlusion";
+    pub(crate) const OCCLUSION: &str = "occlusion";
     /// Shading normal at the first non-specular hit.
-    pub const NORMAL: &str = "normal";
+    pub(crate) const NORMAL: &str = "normal";
     /// Camera distance at the first hit.
     pub const DEPTH: &str = "depth";
     /// World position at the first hit.
-    pub const POSITION: &str = "position";
+    pub(crate) const POSITION: &str = "position";
     /// The Mesh prim's `id` at the first hit.
     pub const OBJECT_ID: &str = "objectId";
     /// The material at the first hit, by its Material prim
@@ -123,22 +112,17 @@ pub mod standard {
     /// across every mesh, never a mesh's own slot index; 0 for the
     /// engine's default material).
     pub const MATERIAL_ID: &str = "materialId";
-    /// Cryptomatte of objects.
-    pub const CRYPTO_OBJECT: &str = "CryptoObject";
-    /// Cryptomatte of materials.
-    pub const CRYPTO_MATERIAL: &str = "CryptoMaterial";
     /// Samples each pixel took.
-    pub const SAMPLES: &str = "samples";
+    pub(crate) const SAMPLES: &str = "samples";
     /// Each pixel's estimated variance.
-    pub const VARIANCE: &str = "variance";
+    pub(crate) const VARIANCE: &str = "variance";
 
     /// The beauty.
     pub fn beauty() -> Aov {
         Aov::new(BEAUTY, "Beauty", AovClass::Rgba)
     }
 
-    /// Every standard output but Cryptomatte, whose levels are an
-    /// engine's ([`cryptomatte`]), in the order a UI lists them.
+    /// Every standard output, in the order a UI lists them.
     pub fn all() -> Vec<Aov> {
         [
             (BEAUTY, "Beauty", AovClass::Rgba),
@@ -161,19 +145,9 @@ pub mod standard {
         .collect()
     }
 
-    /// Standard output `id` (none for Cryptomatte and ids no standard
-    /// output has).
+    /// Standard output `id` (none for an id no standard output has).
     pub fn get(id: &str) -> Option<Aov> {
         all().into_iter().find(|a| &*a.id == id)
-    }
-
-    /// Cryptomatte of `of` with `levels` rank slots a pixel.
-    pub fn cryptomatte(of: CryptomatteOf, levels: u8) -> Aov {
-        let (id, label) = match of {
-            CryptomatteOf::Object => (CRYPTO_OBJECT, "Cryptomatte Object"),
-            CryptomatteOf::Material => (CRYPTO_MATERIAL, "Cryptomatte Material"),
-        };
-        Aov::new(id, label, AovClass::Cryptomatte { of, levels })
     }
 }
 

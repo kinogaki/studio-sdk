@@ -207,20 +207,6 @@ impl<K> Field<K> {
         )
     }
 
-    /// A dropdown over `all`, each named by `name`, at `value` (the first
-    /// item when `value` is not among them): the usual field for an enum.
-    pub fn dropdown_of<T: Copy + PartialEq>(
-        key: K,
-        label: impl Into<Text>,
-        all: &[T],
-        value: T,
-        name: impl Fn(T) -> &'static str,
-    ) -> Self {
-        let items = all.iter().map(|&t| name(t).into()).collect();
-        let at = all.iter().position(|&t| t == value).unwrap_or(0);
-        Self::dropdown(key, label, at, items)
-    }
-
     /// A text field, committed when the edit ends.
     pub fn text(key: K, label: impl Into<Text>, text: impl Into<String>) -> Self {
         Self::new(key, label, Kind::Text, Some(Value::Text(text.into())))
@@ -519,16 +505,11 @@ mod tests {
         s.push(Field::number(Key::Width, "Width", 2.0, Number::length()));
         s.push(Field::toggle(Key::Cap, "Cap", true).enabled(false, Some("Closed shapes only")));
         s.subsection("more", "More", false);
-        s.push(Field::dropdown_of(
+        s.push(Field::dropdown(
             Key::Mode,
             "Mode",
-            &[1, 2, 3],
-            3,
-            |n| match n {
-                1 => "One",
-                2 => "Two",
-                _ => "Three",
-            },
+            2,
+            vec!["One".into(), "Two".into(), "Three".into()],
         ));
         s.push(Field::button(Key::Go, "", "Go"));
         s

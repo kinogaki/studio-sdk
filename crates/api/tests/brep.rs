@@ -4,7 +4,7 @@
 use kinogaki_studio_api::conformance::Fixtures;
 use kinogaki_studio_api::element::{Field, MemoryElement};
 use kinogaki_studio_api::geometry::brep::{Body, Brep, Element, FaceId};
-use kinogaki_studio_api::geometry::{Class, Curves, Detail, Polygons, Selection, Tolerances};
+use kinogaki_studio_api::geometry::{Class, Detail, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, BrepCodec};
 use kinogaki_studio_api::{
     CancelToken, Data, DataCodec, DisplayRequest, Error, Meshed, Mesher, MesherId, Package,
@@ -33,11 +33,7 @@ fn every_fixture_reads_back_equal_with_its_ids() {
         // Saved again, the same save: nothing is reordered on the way.
         assert_eq!(save(&read), saved, "{name}");
         for (a, b) in value.bodies().iter().zip(back.bodies().iter()) {
-            assert_eq!(
-                a.topology().fingerprint(),
-                b.topology().fingerprint(),
-                "{name}"
-            );
+            assert_eq!(a.topology(), b.topology(), "{name}");
             assert_eq!(a.names().faces(), b.names().faces(), "{name}");
             assert_eq!(a.kind(), b.kind(), "{name}");
         }
@@ -115,9 +111,7 @@ fn counts_and_selections_span_the_bodies() {
     assert_eq!(value.element(Class::Primitive, 8), None);
     assert_eq!(value.id(Class::Point, Element::Datum(0)), None);
     assert_eq!(value.id(Class::Primitive, Element::Curve(0)), None);
-    // The numbering's fingerprint moves with what it stands on.
-    let fewer = value.with_curves(Curves::empty());
-    assert_ne!(fewer.fingerprint(), value.fingerprint());
+    // The numbering's fingerprint is the value's.
     assert_eq!(value.clone().fingerprint(), value.fingerprint());
     let data = standard::brep().wrap(value);
     let s = Selection::new(Class::Primitive, vec![6, 0], Some(6), None).unwrap();

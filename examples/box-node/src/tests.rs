@@ -33,10 +33,7 @@ fn the_package_registers() {
     registry.register(package()).unwrap();
     let node = NodeTypeId::declared("example.boxes.box_node");
     assert!(registry.node_type(node).is_some());
-    assert_eq!(
-        registry.data_type_owner(BOX.id()).unwrap().as_str(),
-        "example.boxes"
-    );
+    assert!(registry.data_type(BOX.id()).is_some());
     // Boxes objects hold Boxes networks and show the box they yield.
     let kind = registry.object_kind(boxes()).unwrap();
     assert_eq!(
@@ -107,8 +104,11 @@ fn the_node_shows_by_the_package_icon() {
         panic!("one icon")
     };
     assert!(icon.check().is_ok());
-    let name = kinogaki_studio_api::icon::qualified(package.id, &icon.name);
-    assert_eq!(BoxNode.description().icon, name);
+    // Others name it by its package: `example.boxes/<name>`.
+    assert_eq!(
+        BoxNode.description().icon,
+        format!("{}/{}", package.id, icon.name)
+    );
 }
 
 #[test]

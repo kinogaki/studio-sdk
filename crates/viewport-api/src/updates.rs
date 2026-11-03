@@ -2,7 +2,7 @@
 use std::{ops::Range, sync::Arc};
 
 /// Bounded, coalesced upload spans. Small gaps cost less than another copy;
-/// beyond [`Self::MOST`] spans an edit counts as scattered and falls back to
+/// beyond `Self::MOST` spans an edit counts as scattered and falls back to
 /// one full stream. Renderers stage many spans in one upload buffer, so an
 /// edit along a whole edge loop (a few thousand spans) stays a patch.
 #[derive(Clone, Debug)]
@@ -13,7 +13,7 @@ pub struct BufferRanges {
 }
 impl BufferRanges {
     /// Spans kept before the ranges become the whole stream.
-    pub const MOST: usize = 8192;
+    pub(crate) const MOST: usize = 8192;
     /// No ranges over a stream of `len` elements of `T`.
     pub fn new<T>(len: usize) -> Self {
         Self {
@@ -86,13 +86,13 @@ pub struct DrawUpdate {
     pub extends: bool,
     /// Older packets this update also applies over, newest first, each with
     /// the ranges changed since it.
-    pub ancestors: Vec<Ancestor>,
+    pub(crate) ancestors: Vec<Ancestor>,
 }
 #[derive(Clone, Debug)]
 /// An older packet a [`DrawUpdate`] also applies over.
-pub struct Ancestor {
+pub(crate) struct Ancestor {
     /// Its identity token.
-    pub identity: Arc<()>,
+    pub(crate) identity: Arc<()>,
     /// Point positions changed since it.
     pub positions: BufferRanges,
     /// Vertex records changed since it.
@@ -124,7 +124,7 @@ pub struct UpdateRanges<'a> {
 }
 impl DrawUpdate {
     /// Undisplayed packets bridged before a patch gives up (a full upload).
-    pub const ANCESTORS: usize = 4;
+    pub(crate) const ANCESTORS: usize = 4;
     /// A new update with no ancestors. `streams` are the position, vertex,
     /// index, line and point ranges.
     pub fn new(parent: Arc<()>, streams: [BufferRanges; 5]) -> Self {

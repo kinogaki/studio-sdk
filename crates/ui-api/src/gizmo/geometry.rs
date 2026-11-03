@@ -22,10 +22,10 @@ pub enum Handle {
 
 /// The Manipulator's rings, as a fraction of the handle length (outside
 /// the arrows' tips).
-pub const MANIPULATOR_RING: f64 = 1.25;
+pub(crate) const MANIPULATOR_RING: f64 = 1.25;
 /// The Manipulator's scale cubes' place along each arrow, as a fraction of
 /// the handle length.
-pub const MANIPULATOR_CUBE: f64 = 0.62;
+pub(crate) const MANIPULATOR_CUBE: f64 = 0.62;
 
 /// Where a gizmo is: its middle and axes in the edited object's space,
 /// how long its handles are, and the view it shows in.

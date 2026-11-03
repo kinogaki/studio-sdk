@@ -102,19 +102,6 @@ impl TypeInfo {
         TypeInfo::TextureCoord,
     ];
 
-    /// Whether values of this meaning are unit length, so a blend of them
-    /// is renormalized: normals.
-    ///
-    /// ```
-    /// use kinogaki_geometry::TypeInfo;
-    ///
-    /// assert!(TypeInfo::Normal.normalized());
-    /// assert!(!TypeInfo::Vector.normalized() && !TypeInfo::Color.normalized());
-    /// ```
-    pub fn normalized(self) -> bool {
-        self == TypeInfo::Normal
-    }
-
     /// Its name in messages and files: `none`, `point`, `vector`,
     /// `normal`, `color`, `texture_coord`. Never renamed.
     pub fn name(self) -> &'static str {

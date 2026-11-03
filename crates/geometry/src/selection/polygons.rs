@@ -11,7 +11,7 @@ use crate::polygons::Polygons;
 /// selected elements around it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum Coverage {
+pub(crate) enum Coverage {
     /// One selected related element is enough (an edge of a selected
     /// polygon, a point of a selected edge).
     Any,
@@ -84,9 +84,9 @@ impl Selection {
         })
     }
 
-    /// The selection as `class` by the standard rule: [`Coverage::Whole`]
+    /// The selection as `class` by the standard rule: `Coverage::Whole`
     /// into Primitive and Piece, and from Point into Edge;
-    /// [`Coverage::Any`] otherwise. An all-selection stays all; the same
+    /// `Coverage::Any` otherwise. An all-selection stays all; the same
     /// class is the selection itself. Elements related to nothing selected
     /// are never added.
     ///
@@ -118,7 +118,7 @@ impl Selection {
     ///
     /// # Errors
     /// As [`converted`](Self::converted).
-    pub fn converted_by(
+    pub(crate) fn converted_by(
         &self,
         on: &Polygons,
         class: Class,

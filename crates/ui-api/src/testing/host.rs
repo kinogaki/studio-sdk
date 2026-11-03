@@ -4,18 +4,17 @@
 //! called the way the host calls it (state taken out per call and put
 //! back, callbacks queued, never nested).
 use super::{FakeNetwork, HostCall};
-use crate::gizmo::{GizmoFrame, Handle, TransformSpace, TransformTool};
+use crate::Pos;
+use crate::gizmo::{TransformSpace, TransformTool};
 use crate::host::{
-    Cx, GizmoService, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell,
-    HostSlots, HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx,
-    LatestJob, LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View,
-    ViewCamera, ViewCx, Waker,
+    Cx, HostDoc, HostNetwork, HostPrefs, HostSelection, HostSettings, HostShell, HostSlots,
+    HostStatus, HostTools, HostTransform, HostUndo, HostView, Inspected, InspectorCx, LatestJob,
+    LatestResult, NodeRef, NodeRows, ObjectRef, Place, SnapOn, UnitsService, View, ViewCamera,
+    ViewCx, Waker,
 };
 use crate::package::{Registered, State};
-use crate::{Pos, Projection, Rect};
 use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
-use kinogaki_studio_api::geometry::Frame;
 use kinogaki_studio_api::geometry::Polygons;
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::{Severity, Unit};
@@ -501,12 +500,6 @@ impl HostView for FakeHost {
     fn frame_bounds(&mut self, bounds: Bounds) {
         self.calls.push(HostCall::Frame(bounds));
     }
-    fn look_at(&mut self, view: usize, frame: Frame, orthographic: bool) {
-        self.calls.push(HostCall::LookAt(view, frame, orthographic));
-    }
-    fn restore(&mut self, view: usize) {
-        self.calls.push(HostCall::Restore(view));
-    }
     fn redraw(&mut self) {
         self.calls.push(HostCall::Redraw);
     }
@@ -675,46 +668,11 @@ impl Cx for FakeHost {
     }
 }
 
-/// The gizmo draws nothing and nothing is hit; its projection is the
-/// view's.
-impl GizmoService for FakeHost {
-    fn projection(&self, _at: Rect) -> Projection {
-        self.view.map_or(
-            Projection {
-                clip_from_object: Default::default(),
-                object_from_clip: Default::default(),
-                backward: kinogaki_studio_api::Vec3::new(0.0, 0.0, 1.0),
-            },
-            |v| v.camera.projection,
-        )
-    }
-    fn paint(
-        &self,
-        _frame: &GizmoFrame,
-        _tool: TransformTool,
-        _hot: Option<Handle>,
-        _axes: [bool; 3],
-    ) {
-    }
-    fn hit(
-        &self,
-        _frame: &GizmoFrame,
-        _tool: TransformTool,
-        _p: Pos,
-        _axes: [bool; 3],
-    ) -> Option<Handle> {
-        None
-    }
-}
-
 impl ViewCx for FakeHost {
     fn view(&self) -> &View {
         self.view
             .as_ref()
             .expect("a view call on a FakeHost with its `view` set")
-    }
-    fn gizmo(&self) -> &dyn GizmoService {
-        self
     }
     /// Its `snap` field.
     fn snap(

@@ -8,7 +8,6 @@ use std::fmt;
 pub struct GeometryError {
     kind: ErrorKind,
     at: Option<usize>,
-    entity: Option<Entity>,
     message: String,
     detail: Option<String>,
 }
@@ -33,15 +32,12 @@ pub enum ErrorKind {
     Selection,
     /// A tolerance or a render detail is out of its range.
     Range,
-    /// A polygon can't be triangulated strictly: its outline crosses or
-    /// collapses ([`crate::Polygons::triangulate_strict`]).
-    Triangulation,
     /// A frame's origin isn't finite, or its axes aren't orthonormal and
     /// right-handed ([`crate::Frame`]).
     Frame,
     /// A B-rep body, its geometry or a value holding it breaks a rule of
-    /// [`crate::brep`] ([`GeometryError::entity`] names the entity at
-    /// fault).
+    /// [`crate::brep`] ([`GeometryError::element`] is the index of the
+    /// entity at fault).
     Brep,
 }
 
@@ -52,7 +48,6 @@ impl GeometryError {
         Self {
             kind,
             at,
-            entity: None,
             message: message.into(),
             detail: None,
         }
@@ -60,12 +55,11 @@ impl GeometryError {
 
     /// A B-rep refusal ([`ErrorKind::Brep`]) blaming `entity` when one is
     /// at fault: `phrase` is the short text (`{}`), `detail` the full one
-    /// (`{:#}`). Neither names an id or a number: the entity says which.
+    /// (`{:#}`). Neither names an id or a number.
     pub(crate) fn brep(entity: Option<Entity>, phrase: &'static str, detail: String) -> Self {
         Self {
             kind: ErrorKind::Brep,
             at: entity.map(Entity::index),
-            entity,
             message: phrase.into(),
             detail: Some(detail),
         }
@@ -90,12 +84,6 @@ impl GeometryError {
     /// message names it), when one is.
     pub fn element(&self) -> Option<usize> {
         self.at
-    }
-
-    /// The B-rep entity at fault, when a [`ErrorKind::Brep`] refusal
-    /// blames one; [`element`](Self::element) is then its index.
-    pub fn entity(&self) -> Option<Entity> {
-        self.entity
     }
 
     /// What failed, for the user ("polygon 12 repeats a point"). A B-rep

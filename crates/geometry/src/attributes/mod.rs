@@ -12,9 +12,9 @@ pub mod names;
 mod text;
 
 pub use class::{Class, TypeInfo};
-pub use group::{Group, GroupBuilder};
+pub use group::Group;
 pub use names::check_name;
-pub use text::{Text, TextBuilder};
+pub use text::Text;
 
 use crate::column::Column;
 use crate::error::{ErrorKind, GeometryError};
@@ -173,7 +173,7 @@ impl Attribute {
     }
 
     /// The whole numbers, when it holds them.
-    pub fn as_integer(&self) -> Option<&Column<i64>> {
+    pub(crate) fn as_integer(&self) -> Option<&Column<i64>> {
         match &self.values {
             AttributeValues::Integer(c) => Some(c),
             _ => None,
@@ -189,7 +189,7 @@ impl Attribute {
     }
 
     /// The text, when it holds text.
-    pub fn as_text(&self) -> Option<&Text> {
+    pub(crate) fn as_text(&self) -> Option<&Text> {
         match &self.values {
             AttributeValues::Text(t) => Some(t),
             _ => None,
@@ -241,7 +241,7 @@ impl Attributes {
     }
 
     /// Attribute `name` of `class`, shared.
-    pub fn get_shared(&self, class: Class, name: &str) -> Option<&Arc<Attribute>> {
+    pub(crate) fn get_shared(&self, class: Class, name: &str) -> Option<&Arc<Attribute>> {
         self.values.get(&class)?.get(name)
     }
 
@@ -288,7 +288,7 @@ impl Attributes {
     ///
     /// # Errors
     /// As [`with`](Self::with).
-    pub fn with_shared(
+    pub(crate) fn with_shared(
         &self,
         class: Class,
         name: &str,
@@ -349,13 +349,6 @@ impl Attributes {
             .or_default()
             .insert(name.into(), Arc::new(group));
         Ok(out)
-    }
-
-    /// The table without group `name` of `class`.
-    pub fn without_group(&self, class: Class, name: &str) -> Attributes {
-        let mut out = self.clone();
-        remove(&mut out.groups, class, name);
-        out
     }
 
     /// Reals `name` of `class`, when it holds reals.

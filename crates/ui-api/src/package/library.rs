@@ -417,11 +417,6 @@ pub struct ViewportSpec {
     /// The display popover's shared rows it offers; a row it leaves out
     /// is absent, and its views draw as at that row's default.
     pub shared_rows: SharedRows,
-    /// An analysis mode it adds after the shared ones under Shaded (CAD's
-    /// Deviation): the view draws the edited surface's scalars
-    /// ([`Edited::scalars`](super::Edited::scalars)) through a diverging
-    /// map. `None`: none.
-    pub analysis_mode: Option<AnalysisMode>,
     /// Its per-view switches, the display popover's Overlays: what its
     /// views draw is each view's own to switch ([`ViewSwitch`]).
     pub switches: Vec<ViewSwitch>,
@@ -452,7 +447,6 @@ impl Default for ViewportSpec {
     fn default() -> Self {
         ViewportSpec {
             shared_rows: SharedRows::ALL,
-            analysis_mode: None,
             switches: Vec::new(),
             snap_steps: true,
             own_snapping: None,
@@ -500,8 +494,7 @@ pub struct SharedRows {
     /// Back faces culled.
     pub backface_culling: bool,
     /// The shared analysis modes under Shaded (Zebra, Isophotes,
-    /// Curvature, Draft, Normal colors) and their settings, with the
-    /// context's own [`ViewportSpec::analysis_mode`].
+    /// Curvature, Draft, Normal colors) and their settings.
     pub analysis: bool,
 }
 
@@ -522,15 +515,6 @@ impl SharedRows {
         backface_culling: false,
         analysis: false,
     };
-}
-
-/// An analysis mode a context adds to the display popover.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnalysisMode {
-    /// Its tile's label ("Deviation").
-    pub label: String,
-    /// Its icon, by name.
-    pub icon: String,
 }
 
 /// A per-view switch a context declares: a row of the display popover's

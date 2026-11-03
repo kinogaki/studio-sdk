@@ -292,7 +292,7 @@ impl PublishedMaterial {
     /// looking as `preview`.
     ///
     /// # Errors
-    /// When `key` is not an [`is_path_step`].
+    /// When `key` is not an `is_path_step`.
     pub fn new(
         key: impl Into<String>,
         label: impl Into<String>,
@@ -327,13 +327,7 @@ impl PublishedMaterial {
 /// Whether `text` may name one step of a scene path: not empty, without
 /// `/`, the wildcards `*` and `?`, or space at either end, and neither `.`
 /// nor `..`. Spaces and any other characters are allowed.
-///
-/// ```
-/// use kinogaki_studio_api::object::is_path_step;
-/// assert!(is_path_step("AMS 1 · 2") && is_path_step("Crate 1"));
-/// assert!(!is_path_step("") && !is_path_step("a/b") && !is_path_step("..") && !is_path_step(" x"));
-/// ```
-pub fn is_path_step(text: &str) -> bool {
+pub(crate) fn is_path_step(text: &str) -> bool {
     !text.is_empty()
         && text.trim() == text
         && text != "."

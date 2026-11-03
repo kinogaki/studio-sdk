@@ -6,8 +6,7 @@
 pub enum Action {
     /// A [`Kind::Button`](super::Kind::Button) was pressed.
     Press,
-    /// A [`Kind::Expression`](super::Kind::Expression) or
-    /// [`Kind::Picks`](super::Kind::Picks) field's pick button.
+    /// A [`Kind::Expression`](super::Kind::Expression) field's pick button.
     Pick,
     /// A button of [`Kind::Buttons`](super::Kind::Buttons) or a chip of
     /// [`Kind::Chips`](super::Kind::Chips).

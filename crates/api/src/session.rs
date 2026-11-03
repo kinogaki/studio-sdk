@@ -142,11 +142,6 @@ impl SessionSlot {
     pub fn undoable(&self) -> bool {
         self.undoable
     }
-
-    /// Whether a new level starts it over ([`Slot::PLACE_BOUND`]).
-    pub fn place_bound(&self) -> bool {
-        self.place_bound
-    }
 }
 
 impl fmt::Debug for SessionSlot {
@@ -190,17 +185,6 @@ impl SessionSlots {
             slot,
             value: (slot.initial)(),
         });
-    }
-
-    /// Takes `other`'s value of every slot both tables hold (shared, not
-    /// copied): a table for a new set of packages keeps what the old one
-    /// held.
-    pub fn take_values(&mut self, other: &SessionSlots) {
-        for (id, entry) in &mut self.0 {
-            if let Some(kept) = other.0.get(id) {
-                entry.value = kept.value.clone();
-            }
-        }
     }
 
     /// Whether slot `id` is one of these.

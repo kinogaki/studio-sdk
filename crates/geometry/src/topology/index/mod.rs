@@ -79,7 +79,7 @@ impl Adjacency {
 
     /// Row `i` (empty in a table storing no rows).
     #[inline]
-    pub fn row(&self, i: usize) -> &[u32] {
+    pub(crate) fn row(&self, i: usize) -> &[u32] {
         if self.offsets.is_empty() {
             return &[];
         }
@@ -87,13 +87,8 @@ impl Adjacency {
     }
 
     /// The rows stored (none for a table without entries).
-    pub fn rows(&self) -> usize {
+    pub(crate) fn rows(&self) -> usize {
         self.offsets.len().saturating_sub(1)
-    }
-
-    /// Every entry, row after row.
-    pub fn entries(&self) -> &[u32] {
-        &self.entries
     }
 
     /// Drops repeated entries from each sorted row.
@@ -179,7 +174,7 @@ impl Index {
 
     /// Per polyline, the edge of each segment, in order: one fewer than
     /// its vertices.
-    pub fn polyline_edges(&self) -> &Adjacency {
+    pub(crate) fn polyline_edges(&self) -> &Adjacency {
         &self.polyline_edges
     }
 
@@ -189,20 +184,9 @@ impl Index {
         &self.point_edges
     }
 
-    /// Per point, the edges only polylines use. With
-    /// [`point_edges`](Self::point_edges) they are every edge at the point.
-    pub fn point_curve_edges(&self) -> &Adjacency {
-        &self.point_curve_edges
-    }
-
     /// Per point, the polygons through it, each once.
     pub fn point_faces(&self) -> &Adjacency {
         &self.point_faces
-    }
-
-    /// Per point, the polylines through it (primitive ids), each once.
-    pub fn point_polylines(&self) -> &Adjacency {
-        &self.point_polylines
     }
 
     /// Primitive `p`'s edges: a polygon's sides or a polyline's segments.
@@ -219,23 +203,6 @@ impl Index {
         self.edge_faces[e]
             .iter()
             .chain(&self.edge_polylines[e])
-            .copied()
-    }
-
-    /// Every edge at point `p`: polygon edges, then those only polylines
-    /// use.
-    pub fn point_all_edges(&self, p: usize) -> impl Iterator<Item = u32> + '_ {
-        self.point_edges[p]
-            .iter()
-            .chain(&self.point_curve_edges[p])
-            .copied()
-    }
-
-    /// The primitives through point `p`: polygons, then polylines.
-    pub fn point_primitives(&self, p: usize) -> impl Iterator<Item = u32> + '_ {
-        self.point_faces[p]
-            .iter()
-            .chain(&self.point_polylines[p])
             .copied()
     }
 

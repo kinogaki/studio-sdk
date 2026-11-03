@@ -10,7 +10,7 @@
 //!
 //! Each kind of id is its own type ([`DataTypeId`], [`ObjectKindId`],
 //! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`], [`StoredId`],
-//! [`ConversionId`], [`MesherId`]), so a node type id can't be passed where a data type
+//! `ConversionId`, [`MesherId`]), so a node type id can't be passed where a data type
 //! is meant. All of them are interned in one table: each distinct text is
 //! kept once for the program's life (packages are never unloaded), so an
 //! id is a `Copy` pointer-sized value and reading its text never allocates.
@@ -20,20 +20,13 @@ use std::sync::Mutex;
 
 /// Whether `text` is a well-formed id: three dot-separated segments, each
 /// a lowercase ASCII letter followed by lowercase letters, digits and `_`.
-///
-/// ```
-/// use kinogaki_studio_api::id::well_formed;
-/// assert!(well_formed("kinogaki.mesh.extrude"));
-/// assert!(!well_formed("kinogaki.mesh"));
-/// assert!(!well_formed("kinogaki.mesh.Extrude"));
-/// ```
-pub fn well_formed(text: &str) -> bool {
+pub(crate) fn well_formed(text: &str) -> bool {
     segments_well_formed(text, 3)
 }
 
 /// Whether `text` is a well-formed package id: two segments of the form
 /// [`well_formed`] describes (`kinogaki.mesh`).
-pub fn package_well_formed(text: &str) -> bool {
+pub(crate) fn package_well_formed(text: &str) -> bool {
     segments_well_formed(text, 2)
 }
 
@@ -75,7 +68,7 @@ macro_rules! declare_id {
         pub struct $name(&'static str);
 
         impl $name {
-            #[doc = concat!("`text` as a ", $what, " id; `None` unless it is [`well_formed`].")]
+            #[doc = concat!("`text` as a ", $what, " id; `None` unless it is `well_formed`.")]
             pub fn parse(text: &str) -> Option<Self> {
                 well_formed(text).then(|| Self(intern(text)))
             }
@@ -168,12 +161,6 @@ declare_id!(
     "stored value"
 );
 declare_id!(
-    /// A conversion between two data types (`kinogaki.cad.tessellate`).
-    /// Registered by a [`Conversion`](crate::Conversion).
-    ConversionId,
-    "conversion"
-);
-declare_id!(
     /// A B-rep mesher (`kinogaki.cad.mesher`). Registered by a
     /// [`Mesher`](crate::mesher::Mesher).
     MesherId,
@@ -187,7 +174,7 @@ pub struct PackageId(&'static str);
 
 impl PackageId {
     /// `text` as a package id; `None` unless it is
-    /// [`package_well_formed`].
+    /// `package_well_formed`.
     pub fn parse(text: &str) -> Option<Self> {
         package_well_formed(text).then(|| Self(intern(text)))
     }
@@ -207,7 +194,7 @@ impl PackageId {
     }
 
     /// The vendor, the first segment (`kinogaki`).
-    pub fn vendor(self) -> &'static str {
+    pub(crate) fn vendor(self) -> &'static str {
         self.0.split_once('.').map_or(self.0, |(vendor, _)| vendor)
     }
 }

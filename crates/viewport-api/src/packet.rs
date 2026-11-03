@@ -135,7 +135,7 @@ impl ElementSet {
         Self::from_sorted(kind, all, ids.into_iter().collect())
     }
     /// `ids` must already be sorted and unique (checked in debug builds).
-    pub fn from_sorted(kind: ElementKind, all: bool, ids: Arc<[u32]>) -> Self {
+    pub(crate) fn from_sorted(kind: ElementKind, all: bool, ids: Arc<[u32]>) -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(1);
         debug_assert!(ids.windows(2).all(|w| w[0] < w[1]));
         Self {
@@ -222,7 +222,7 @@ impl ColorLayout {
 
 /// An immutable surface packet. Implementations are shared as
 /// `Arc<dyn SurfaceSource>`; renderers treat the allocation as the packet's
-/// identity (see [`same_surface`]), and its maker reads it back as its own
+/// identity (two packets are the same when they are one allocation), and its maker reads it back as its own
 /// type with [`packet_as`].
 ///
 /// A packet of a value keeps the value's numbering, so overlays, weights,
@@ -330,11 +330,6 @@ pub trait SurfaceSource: Any + Send + Sync {
     }
 }
 
-/// Whether two packets are the same allocation.
-pub fn same_surface(a: &dyn SurfaceSource, b: &dyn SurfaceSource) -> bool {
-    std::ptr::addr_eq(a, b)
-}
-
 /// `packet` as its concrete type `T`, sharing the allocation; none when it
 /// is another type. A kernel reads back the packets it made this way (its
 /// picking structures, the base of a live preview).
@@ -428,7 +423,7 @@ mod tests {
     fn a_packet_reads_back_as_its_own_type_only() {
         let packet: Arc<dyn SurfaceSource> = Arc::new(Empty::<0>(Arc::new(())));
         let read = packet_as::<Empty<0>>(&packet).expect("its own type");
-        assert!(same_surface(&*read, &*packet));
+        assert!(std::ptr::addr_eq(&*read, &*packet));
         assert!(packet_as::<Empty<1>>(&packet).is_none());
     }
 }

@@ -391,7 +391,7 @@ pub enum PrimKind {
 
 impl PrimKind {
     /// The structural kinds.
-    pub const STRUCTURAL: [PrimKind; 5] = [
+    pub(crate) const STRUCTURAL: [PrimKind; 5] = [
         PrimKind::Mesh,
         PrimKind::Instancer,
         PrimKind::Camera,

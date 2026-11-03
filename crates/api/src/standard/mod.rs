@@ -44,7 +44,7 @@ pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use color::ColorConfiguration;
 pub use curves::CurvesCodec;
-pub use light::{LightCodec, light_value};
+pub use light::LightCodec;
 pub use materials::PreviewMaterialsCodec;
 pub use polygons::PolygonsCodec;
 
@@ -67,7 +67,7 @@ pub const BREP: &str = "kinogaki.core.brep";
 
 /// The id of a file's materials as a format reads them beside its
 /// geometry ([`preview_materials`]).
-pub const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
+pub(crate) const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
 
 /// The handle on [`Polygons`] values ([`POLYGONS`]).
 pub fn polygons() -> Typed<Polygons> {
@@ -91,11 +91,11 @@ pub fn camera() -> Typed<kinogaki_render_api::Camera> {
 
 /// The id of light values: an unplaced light ([`light_value`],
 /// [`LightCodec`]).
-pub const LIGHT: &str = "kinogaki.core.light";
+pub(crate) const LIGHT: &str = "kinogaki.core.light";
 
-/// The handle on light values ([`LIGHT`]): render-api's standard
+/// The handle on light values (`LIGHT`): render-api's standard
 /// [`Light`](kinogaki_render_api::standard::Light), unplaced, in UsdLux's
-/// terms; make one with [`light_value`].
+/// terms; make one with `light_value`.
 pub fn light() -> Typed<kinogaki_render_api::standard::Light> {
     Typed::new(DataTypeId::declared(LIGHT))
 }
@@ -106,7 +106,7 @@ pub fn brep() -> Typed<Brep> {
 }
 
 /// The handle on a file's materials as a format reads them beside its
-/// geometry ([`PREVIEW_MATERIALS`]): each keyed by the name the file's
+/// geometry (`PREVIEW_MATERIALS`): each keyed by the name the file's
 /// polygons' `material` values give it, with its preview surface.
 pub fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
     Typed::new(DataTypeId::declared(PREVIEW_MATERIALS))

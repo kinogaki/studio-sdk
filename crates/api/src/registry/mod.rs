@@ -13,20 +13,18 @@ mod error;
 
 pub use error::RegistryError;
 
-use crate::conversion::Conversion;
 use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::id::{
-    ContextId, ConversionId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
-    StoredId,
+    ContextId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId, StoredId,
 };
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
-use crate::session::{SessionSlot, SessionSlots};
+use crate::session::SessionSlot;
 use kinogaki_render_api::EngineId;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -50,7 +48,7 @@ fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
 }
 
 /// Every package's registered data types, held edits, node types, network
-/// contexts, conversions, B-rep meshers, object kinds, formats, session slots
+/// contexts, B-rep meshers, object kinds, formats, session slots
 /// and stored values.
 #[derive(Default)]
 pub struct Registry {
@@ -68,21 +66,18 @@ pub struct Registry {
     /// The package bringing each compiled context's runner.
     #[cfg(feature = "wgpu")]
     runners: BTreeMap<ContextId, PackageId>,
-    conversions: BTreeMap<ConversionId, Entry<dyn Conversion>>,
     /// Further ways to make nodes, in registration order.
     creations: Vec<Entry<NodeCreation>>,
     /// B-rep meshers, in registration order.
     meshers: Vec<Entry<dyn Mesher>>,
-    /// Each (from, to) pair's conversion.
-    routes: BTreeMap<(DataTypeId, DataTypeId), ConversionId>,
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
     formats: BTreeMap<FormatId, Entry<dyn FileFormat>>,
     slots: BTreeMap<SlotId, Entry<SessionSlot>>,
     /// The package declaring each stored value.
     stored: BTreeMap<StoredId, PackageId>,
-    /// The contexts packages' UIs give parts to (with whether it is the
-    /// context's mode), and the package giving them.
-    ui_contexts: BTreeMap<(ContextId, bool), PackageId>,
+    /// The contexts packages' UIs give parts to, and the package giving
+    /// them.
+    ui_contexts: BTreeMap<ContextId, PackageId>,
     /// The package describing each render engine, by engine id.
     engines: BTreeMap<EngineId, PackageId>,
     /// Each package's icons' names.
@@ -129,12 +124,6 @@ impl Registry {
         for (context, _) in &package.runners {
             self.runners.insert(*context, id);
         }
-        for conversion in package.conversions {
-            self.routes
-                .insert((conversion.from(), conversion.to()), conversion.id());
-            self.conversions
-                .insert(conversion.id(), Entry::new(id, conversion));
-        }
         for creation in package.creations {
             self.creations.push(Entry::new(id, Arc::new(creation)));
         }
@@ -161,19 +150,10 @@ impl Registry {
         self.packages.push((id, package.label));
         Ok(())
     }
-    /// Network context `id`; `None` when no package registered it.
-    pub fn network_context(&self, id: ContextId) -> Option<&NetworkContext> {
-        self.contexts.get(&id).map(|e| &*e.item)
-    }
 
     /// Compiled context `context`'s compiler.
     pub fn compiler(&self, context: ContextId) -> Option<&dyn NetworkCompiler> {
         self.compilers.get(&context).map(|e| &*e.item)
-    }
-
-    /// Whether package `id` is registered.
-    pub fn has_package(&self, id: PackageId) -> bool {
-        self.packages.iter().any(|(p, _)| *p == id)
     }
 
     /// The registered packages' ids and labels, in registration order.
@@ -204,18 +184,6 @@ impl Registry {
     /// (a host skips its nodes when it reads a project, and says so).
     pub fn node_type(&self, id: NodeTypeId) -> Option<&dyn NodeType> {
         self.node_types.get(&id).map(|e| &*e.item)
-    }
-
-    /// Conversion `id`.
-    pub fn conversion(&self, id: ConversionId) -> Option<&dyn Conversion> {
-        self.conversions.get(&id).map(|e| &*e.item)
-    }
-
-    /// The conversion from `from` to `to`, when a package provides one.
-    pub fn conversion_between(&self, from: DataTypeId, to: DataTypeId) -> Option<&dyn Conversion> {
-        self.routes
-            .get(&(from, to))
-            .and_then(|&id| self.conversion(id))
     }
 
     /// The further ways packages make nodes
@@ -253,34 +221,9 @@ impl Registry {
         self.formats.values().map(|e| &*e.item)
     }
 
-    /// The formats whose files hold values of type `ty`.
-    pub fn formats_producing(&self, ty: DataTypeId) -> impl Iterator<Item = &dyn FileFormat> {
-        self.formats().filter(move |f| f.produces().contains(&ty))
-    }
-
     /// Session slot `id`.
     pub fn slot(&self, id: SlotId) -> Option<SessionSlot> {
         self.slots.get(&id).map(|e| *e.item)
-    }
-
-    /// A new session's slots, each at its initial value.
-    pub fn new_session(&self) -> SessionSlots {
-        SessionSlots::new(self.slots.values().map(|e| *e.item))
-    }
-
-    /// The package that registered data type `id`.
-    pub fn data_type_owner(&self, id: DataTypeId) -> Option<PackageId> {
-        self.data_types.get(&id).map(|e| e.package)
-    }
-
-    /// The package that registered object kind `id`.
-    pub fn object_kind_owner(&self, id: ObjectKindId) -> Option<PackageId> {
-        self.object_kinds.get(&id).map(|e| e.package)
-    }
-
-    /// The package that registered format `id`.
-    pub fn format_owner(&self, id: FormatId) -> Option<PackageId> {
-        self.formats.get(&id).map(|e| e.package)
     }
 }
 
@@ -298,7 +241,6 @@ impl fmt::Debug for Registry {
             .field("data_types", &self.data_types.keys().collect::<Vec<_>>())
             .field("held_edits", &self.held_edits.keys().collect::<Vec<_>>())
             .field("node_types", &self.node_types.keys().collect::<Vec<_>>())
-            .field("conversions", &self.conversions.keys().collect::<Vec<_>>())
             .field(
                 "object_kinds",
                 &self.object_kinds.keys().collect::<Vec<_>>(),

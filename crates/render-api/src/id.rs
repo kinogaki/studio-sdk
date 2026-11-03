@@ -89,7 +89,7 @@ impl IdAllocator {
     }
 
     /// Whether `id` is live (given out and not released).
-    pub fn is_live(&self, id: PrimId) -> bool {
+    pub(crate) fn is_live(&self, id: PrimId) -> bool {
         let at = id.slot as usize;
         at < self.live.len() && self.live[at] && self.generations[at] == id.generation
     }

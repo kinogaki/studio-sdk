@@ -5,13 +5,11 @@
 //! from the node holding the parameter, when the node cooks.
 use crate::id::{DataTypeId, ObjectKindId};
 
-/// What a reference may name, and whether it may name several at once.
+/// What a reference may name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RefFilter {
     /// What fits.
     pub fits: Fits,
-    /// The path may hold wildcards (`*`, `?`) and name every match.
-    pub patterns: bool,
 }
 
 /// What fits a reference.
@@ -44,16 +42,7 @@ impl RefFilter {
         Self::of(Fits::Materials)
     }
 
-    /// Naming every match of a pattern too.
-    pub fn patterns(mut self) -> Self {
-        self.patterns = true;
-        self
-    }
-
     fn of(fits: Fits) -> Self {
-        RefFilter {
-            fits,
-            patterns: false,
-        }
+        RefFilter { fits }
     }
 }

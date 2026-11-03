@@ -50,7 +50,7 @@ pub enum Smoothing {
 /// `point_vertices[point_offsets[p]..point_offsets[p + 1]]`.
 ///
 /// For [`Smoothing::Edges`] each entry also carries, above [`PointFans::ID`],
-/// whether it starts a fan ([`PointFans::FIRST`]) and how its face joins the
+/// whether it starts a fan (`PointFans::FIRST`) and how its face joins the
 /// next entry of the same fan, the last joining the first
 /// ([`PointFans::LINK_SHIFT`]: a [`Link`]). A fan is the faces at the point
 /// in order across the point's edges; an open fan's last entry is
@@ -66,7 +66,7 @@ impl PointFans {
     /// The vertex id bits of an entry.
     pub const ID: u32 = (1 << 29) - 1;
     /// The entry starts a fan.
-    pub const FIRST: u32 = 1 << 29;
+    pub(crate) const FIRST: u32 = 1 << 29;
     /// The entry's [`Link`] to the next entry of its fan.
     pub const LINK_SHIFT: u32 = 30;
     /// An entry of an edge fan (`vertex` at most [`Self::ID`]).

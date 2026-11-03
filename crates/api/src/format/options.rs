@@ -9,18 +9,17 @@
 //! use kinogaki_studio_api::{FormatOptions, Value};
 //! const SIDES: [&str; 2] = ["front", "back"];
 //! let mut chosen = FormatOptions::new();
-//! chosen.insert("side".into(), options::choice_value(&SIDES, "back"));
+//! chosen.insert("side".into(), Value::Index(options::choice_index(&SIDES, "back")));
 //! chosen.insert("weld".into(), Value::Bool(true));
 //! assert_eq!(options::choice(&chosen, "side", &SIDES).unwrap(), "back");
 //! assert!(options::option(&chosen, "weld", Value::bool).unwrap());
 //! assert!(options::option(&chosen, "scale", Value::number).is_err());
 //! ```
-use crate::element::ElementReader;
 use crate::params::{Number, Parameter, ParameterKind, Schema};
 use crate::{Error, FormatOptions, Value};
 
 /// The smallest and largest import scale [`scale`]'s row accepts.
-pub const SCALE: std::ops::RangeInclusive<f64> = 1e-6..=1e6;
+pub(crate) const SCALE: std::ops::RangeInclusive<f64> = 1e-6..=1e6;
 
 /// Option `name` of `options`, read by `read`; an error naming it when it
 /// is missing or of another type.
@@ -45,31 +44,6 @@ pub fn choice<T: Copy>(options: &FormatOptions, name: &str, all: &[T]) -> Result
 /// Where `value` is among `all` (the first when it is none of them).
 pub fn choice_index<T: PartialEq>(all: &[T], value: T) -> usize {
     all.iter().position(|v| *v == value).unwrap_or(0)
-}
-
-/// `value` as a choice among `all` (its index, [`choice_index`]).
-pub fn choice_value<T: PartialEq>(all: &[T], value: T) -> Value {
-    Value::Index(choice_index(all, value))
-}
-
-/// The choice among `all` whose token (`token`) field `name` of `element`
-/// holds: how a saved choice is read back.
-pub fn read_token<T: Copy>(
-    element: &dyn ElementReader,
-    name: &str,
-    all: &[T],
-    token: impl Fn(T) -> &'static str,
-) -> Result<T, Error> {
-    let text = element.text(name)?;
-    all.iter()
-        .copied()
-        .find(|&v| token(v) == text)
-        .ok_or_else(|| {
-            Error::invalid(format_args!(
-                "{}: unknown {name} {text:?}",
-                element.location()
-            ))
-        })
 }
 
 /// A section band of a format's dialog, keyed by the format and the
@@ -112,7 +86,7 @@ pub fn units(schema: Schema, up: Choices<'_>, unit: Choices<'_>) -> Schema {
         )
 }
 
-/// The `scale` row, within [`SCALE`].
+/// The `scale` row, within `SCALE`.
 pub fn scale(schema: Schema, scale: f64) -> Schema {
     schema.parameter(
         Parameter::new(
@@ -138,26 +112,6 @@ pub fn toggle(schema: Schema, name: &str, label: &str, keywords: &str, value: bo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::element::{Field, MemoryElement};
-
-    #[test]
-    fn a_saved_token_reads_back_as_its_choice_and_an_unknown_one_is_named() {
-        const SIDES: [&str; 2] = ["front", "back"];
-        let saved = |text: &str| {
-            let mut element = MemoryElement::new("import");
-            element
-                .write(|w| w.set("side", Field::Text(text.into())))
-                .unwrap();
-            element
-        };
-        let read = |e: &MemoryElement| e.read(|r| read_token(r, "side", &SIDES, |s| s));
-        assert_eq!(read(&saved("back")).unwrap(), "back");
-        let error = read(&saved("left")).unwrap_err();
-        assert!(
-            error.to_string().contains("unknown side \"left\""),
-            "{error}"
-        );
-    }
 
     #[test]
     fn rows_carry_their_names_and_choices() {

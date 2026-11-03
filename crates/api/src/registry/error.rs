@@ -1,6 +1,6 @@
 //! [`RegistryError`]: why a package was refused.
 use crate::icon::IconError;
-use crate::id::{ContextId, ConversionId, DataTypeId, NodeTypeId, PackageId};
+use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use kinogaki_render_api::EngineId;
 use std::fmt;
 
@@ -22,7 +22,7 @@ pub enum RegistryError {
         first: PackageId,
     },
     /// `package` declares `id` (a creation's name, an engine's id), which
-    /// isn't a well-formed id ([`well_formed`](crate::id::well_formed)).
+    /// isn't a well-formed id (`well_formed`).
     MalformedId {
         /// The refused package.
         package: PackageId,
@@ -55,18 +55,6 @@ pub enum RegistryError {
         delta: DataTypeId,
         /// The package that declared it first.
         first: PackageId,
-    },
-    /// `package` declares a second conversion from `from` to `to`; `first`
-    /// is the one already registered.
-    DuplicateConversion {
-        /// The refused package.
-        package: PackageId,
-        /// The type converted from.
-        from: DataTypeId,
-        /// The type converted to.
-        to: DataTypeId,
-        /// The conversion registered first.
-        first: ConversionId,
     },
     /// `package` brings a compiler for `context`, which neither it nor a
     /// registered package declares as a compiled context.
@@ -209,15 +197,6 @@ impl fmt::Display for RegistryError {
             } => write!(
                 f,
                 "{package}'s node type {node} declares parameter {parameter}, a name spares take"
-            ),
-            Self::DuplicateConversion {
-                package,
-                from,
-                to,
-                first,
-            } => write!(
-                f,
-                "{package} converts {from} to {to}, which {first} already does"
             ),
             Self::StrayRunner { package, context } => write!(
                 f,

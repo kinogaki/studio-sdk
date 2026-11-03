@@ -66,8 +66,6 @@ pub struct RenderStats {
     pub target: u32,
     /// The last pass's GPU time, in milliseconds.
     pub pass_ms: f32,
-    /// The part of it the denoiser took (0 when it did not run).
-    pub denoise_ms: f32,
     /// Problems to report once (an unsupported node, a missing texture).
     pub problems: Vec<Arc<str>>,
 }

@@ -19,7 +19,7 @@
 //! | [`HostSettings`] ([`HostSettingsExt`]) | packages' settings sections |
 //!
 //! plus plain data ([`HostPrefs`]) and two services over the host's own
-//! drawing ([`GizmoService`], [`UnitsService`]).
+//! drawing ([`UnitsService`]).
 //!
 //! **Calls never nest.** The host keeps each package's state and lends it
 //! for one call at a time; none of these methods calls back into a
@@ -47,8 +47,7 @@ pub use data::{
 };
 pub use network::HostNetwork;
 
-use crate::gizmo::{GizmoFrame, Handle, TransformTool};
-use crate::{Pos, Projection, Rect};
+use crate::Pos;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::{CancelToken, RowsFor};
@@ -129,8 +128,6 @@ pub trait Cx:
 pub trait ViewCx: Cx {
     /// The view.
     fn view(&self) -> &View;
-    /// The transform gizmo, drawn by the host in this view.
-    fn gizmo(&self) -> &dyn GizmoService;
     /// The best of `targets` within `radius` pixels of screen point `at`
     /// in this view, as the host's gizmo snaps: the value `on` names
     /// asked through its type's `Snappable`, nothing of it moving, hidden
@@ -168,26 +165,6 @@ pub enum SnapOn {
 pub trait InspectorCx: Cx {
     /// What the inspector shows.
     fn inspected(&self) -> Inspected;
-}
-
-/// The host's transform gizmo, in one view: the same handles, colors and
-/// hit tests as the host's own tools. The geometry is
-/// [`gizmo`](crate::gizmo)'s; this paints it and hit-tests it with the
-/// host's drawing.
-pub trait GizmoService {
-    /// The view's projection for a gizmo frame at view rectangle `at`.
-    fn projection(&self, at: Rect) -> Projection;
-    /// Paints `tool`'s gizmo at `frame`, `hot` lit, with the handles of
-    /// `axes`.
-    fn paint(&self, frame: &GizmoFrame, tool: TransformTool, hot: Option<Handle>, axes: [bool; 3]);
-    /// The handle of `tool`'s gizmo at `frame` under screen point `p`.
-    fn hit(
-        &self,
-        frame: &GizmoFrame,
-        tool: TransformTool,
-        p: Pos,
-        axes: [bool; 3],
-    ) -> Option<Handle>;
 }
 
 /// Numbers in the user's units, as the host's own fields read and show

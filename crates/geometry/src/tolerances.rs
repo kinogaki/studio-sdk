@@ -3,13 +3,13 @@
 use crate::error::{ErrorKind, GeometryError};
 
 /// The positional tolerance's range, in millimeters.
-pub const POSITIONAL_MM: (f64, f64) = (1e-5, 1.0);
+pub(crate) const POSITIONAL_MM: (f64, f64) = (1e-5, 1.0);
 /// The fit tolerance's range, as multiples of the positional one.
-pub const FIT_OF_POSITIONAL: (f64, f64) = (1e-3, 10.0);
+pub(crate) const FIT_OF_POSITIONAL: (f64, f64) = (1e-3, 10.0);
 /// The tangent tolerance's range, in degrees.
-pub const TANGENT_DEGREES: (f64, f64) = (0.001, 5.0);
+pub(crate) const TANGENT_DEGREES: (f64, f64) = (0.001, 5.0);
 /// The curvature tolerance's range, as a fraction.
-pub const CURVATURE: (f64, f64) = (1e-4, 0.1);
+pub(crate) const CURVATURE: (f64, f64) = (1e-4, 0.1);
 
 /// The project's tolerances: one setting per project, chosen by the user,
 /// absolute (never derived from a model's size). Lengths are kept in
@@ -29,7 +29,7 @@ pub const CURVATURE: (f64, f64) = (1e-4, 0.1);
 /// use kinogaki_geometry::Tolerances;
 ///
 /// let inches = Tolerances::new(0.01, 0.001, 0.1, 0.005, 25.4).unwrap();
-/// assert!((inches.positional() - 0.01 / 25.4).abs() < 1e-15);
+/// assert!((inches.positional_mm() - 0.01).abs() < 1e-15);
 /// assert!(Tolerances::new(2.0, 0.001, 0.1, 0.005, 1.0).is_err()); // P above 1 mm
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -44,8 +44,8 @@ pub struct Tolerances {
 impl Tolerances {
     /// P and F in millimeters, T in degrees, K as a fraction, for a model
     /// whose unit is `millimeters_per_unit` mm (1 for millimeters, 25.4
-    /// for inches), checked against the ranges ([`POSITIONAL_MM`],
-    /// [`FIT_OF_POSITIONAL`], [`TANGENT_DEGREES`], [`CURVATURE`]).
+    /// for inches), checked against the ranges (`POSITIONAL_MM`,
+    /// `FIT_OF_POSITIONAL`, `TANGENT_DEGREES`, `CURVATURE`).
     ///
     /// # Errors
     /// The first setting out of its range, or a unit that isn't a finite,
@@ -111,11 +111,6 @@ impl Tolerances {
     /// How many millimeters one model unit is.
     pub fn millimeters_per_unit(&self) -> f64 {
         self.millimeters_per_unit
-    }
-
-    /// P, in model units.
-    pub fn positional(&self) -> f64 {
-        self.positional_mm / self.millimeters_per_unit
     }
 
     /// F, in model units.

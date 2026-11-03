@@ -1,7 +1,7 @@
 //! A selection over a polygons value: validity, its elements, the same
 //! selection as another class, its box and its counts.
 use kinogaki_geometry::{
-    Attributes, Class, Coverage, ErrorKind, Polygons, Selection, SelectionCounts, Topology,
+    Attributes, Class, ErrorKind, Polygons, Selection, SelectionCounts, Topology,
 };
 
 /// A unit quad (0 1 2 3) and a triangle (1 4 2) sharing the edge 1–2, and
@@ -117,11 +117,6 @@ fn points_become_whole_polygons_and_edges_by_the_standard_rule() {
     let mut edges = vec![edge(&p, 1, 2), edge(&p, 1, 4), edge(&p, 2, 4)];
     edges.sort_unstable();
     assert_eq!(ids(&points.converted(&p, Class::Edge).unwrap()), edges);
-    // Coverage::Any takes every polygon one point touches.
-    let any = points
-        .converted_by(&p, Class::Primitive, Coverage::Any)
-        .unwrap();
-    assert_eq!(ids(&any), [0, 1]);
     // Edges to points: any edge end.
     let shared = on(&p, Class::Edge, &[edge(&p, 1, 2)]);
     assert_eq!(ids(&shared.converted(&p, Class::Point).unwrap()), [1, 2]);

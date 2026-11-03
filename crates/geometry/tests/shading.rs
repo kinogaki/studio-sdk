@@ -271,13 +271,11 @@ fn the_refresh_after_a_drag_matches_a_whole_build() {
             let after = before.with_positions(positions.clone().into()).unwrap();
             before.shading_normals();
             let refreshed = after.shading_normals_after(&before, &moved);
-            let fresh = Polygons::with_topology(
-                positions.into(),
-                after.topology().clone(),
-                after.attributes().clone(),
-            )
-            .unwrap()
-            .shading_normals();
+            // The same positions in a column of their own: built whole.
+            let fresh = after
+                .with_positions(positions.into())
+                .unwrap()
+                .shading_normals();
             assert_eq!(*refreshed, *fresh, "round {round}, sharp {with_sharp}");
             before = after;
         }

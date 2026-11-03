@@ -6,20 +6,20 @@ use crate::error::{ErrorKind, GeometryError};
 use crate::topology::Topology;
 
 mod polygons;
-pub use polygons::{Coverage, SelectionCounts};
+pub use polygons::SelectionCounts;
 
 /// Selected elements of one class: all of them, or a sorted set of
 /// indices; the active one (the last picked, which tools that need one
 /// element start from); and the topology it was made on.
 ///
-/// **Rules** ([`Selection::from_ascending`] checks them): indices are
+/// **Rules** (`Selection::from_ascending` checks them): indices are
 /// strictly ascending ([`Selection::new`] sorts and deduplicates them);
 /// the active element is one of the selected.
 ///
 /// **Staleness.** A selection made on a topology keeps its
 /// [fingerprint](Topology::fingerprint); once the topology changes the
 /// indices mean other elements, so the holder resets it
-/// ([`is_stale`](Self::is_stale)). A Piece selection selects primitives
+/// (`is_stale`). A Piece selection selects primitives
 /// by their indices, as Primitive does.
 ///
 /// ```
@@ -61,19 +61,10 @@ impl Selection {
     /// as given: a selection made from another's
     /// [`indices`](Self::indices) shares them.
     ///
-    /// ```
-    /// use kinogaki_geometry::{Class, Column, Selection};
-    ///
-    /// let picked = Column::from(vec![1, 3, 7]);
-    /// let s = Selection::from_ascending(Class::Point, picked.clone(), None, None).unwrap();
-    /// assert!(s.indices().ptr_eq(&picked));
-    /// assert!(Selection::from_ascending(Class::Point, vec![3, 3].into(), None, None).is_err());
-    /// ```
-    ///
     /// # Errors
     /// When `indices` are not strictly ascending, or `active` is not
     /// selected.
-    pub fn from_ascending(
+    pub(crate) fn from_ascending(
         class: Class,
         indices: Column<u32>,
         active: Option<u32>,
@@ -170,7 +161,7 @@ impl Selection {
     /// Whether it was made on another topology than `on`: its indices no
     /// longer mean what they did, and its holder resets it. A selection
     /// made on no particular topology is never stale.
-    pub fn is_stale(&self, on: &Topology) -> bool {
+    pub(crate) fn is_stale(&self, on: &Topology) -> bool {
         self.topology.is_some_and(|t| t != on.fingerprint())
     }
 

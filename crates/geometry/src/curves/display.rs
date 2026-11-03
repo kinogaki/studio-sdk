@@ -27,7 +27,7 @@ use std::sync::Arc;
 /// NURBS curve is the knots' and vertices' business.
 ///
 /// **Display.** Linear curves show their points. Every other span shows
-/// [`CurveDisplay::SAMPLES`] points, uniform in its parameter, an open curve its last
+/// 16 points, uniform in its parameter, an open curve its last
 /// point besides; periodic curves close. The layout depends on the
 /// curves' structure alone, never on positions, so a display's point
 /// numbering holds through a drag. Final renders take their curve detail
@@ -43,7 +43,7 @@ pub struct CurveDisplay {
 
 impl CurveDisplay {
     /// Points a span of a non-linear curve shows.
-    pub const SAMPLES: usize = 16;
+    pub(crate) const SAMPLES: usize = 16;
 
     /// The polylines' points.
     pub fn positions(&self) -> &Column<[f64; 3]> {
@@ -53,17 +53,6 @@ impl CurveDisplay {
     /// Where each curve's points start, and the point count last.
     pub fn offsets(&self) -> &Column<u32> {
         &self.offsets
-    }
-
-    /// The span of its curve each point lies on.
-    pub fn spans(&self) -> &Column<u32> {
-        &self.spans
-    }
-
-    /// Whether curve `i`'s polyline closes (its last point joins its
-    /// first).
-    pub fn closed(&self, i: usize) -> bool {
-        self.closed[i]
     }
 
     /// Curve `i`'s segments, as pairs of point ids.

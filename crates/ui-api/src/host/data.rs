@@ -111,10 +111,6 @@ impl View {
         ];
         self.camera.projection.ray(uv)
     }
-    /// The ray under the pointer, while it is over the view.
-    pub fn pointer_ray(&self) -> Option<Ray> {
-        self.pointer.map(|p| self.ray(p))
-    }
 }
 
 /// What the inspector shows: the open level's active node, or the object
@@ -163,56 +159,5 @@ impl Default for HostPrefs {
             snap_radius: 12.0,
             transform: TransformTool::Select,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::projection::test_camera;
-    use crate::{Id, pos};
-
-    /// A 200 px view at (100, 50) looking at the origin from 10 units.
-    fn view(pointer: Option<Pos>) -> View {
-        let rect = Rect::from_min_max(pos(100.0, 50.0), pos(300.0, 250.0));
-        View {
-            rect,
-            index: 0,
-            interactive: true,
-            modal: false,
-            response: Response::new(Id::new("view"), rect),
-            over_chrome: false,
-            over_cube: false,
-            over_handle: false,
-            pointer,
-            modifiers: Modifiers::default(),
-            stacking: false,
-            under: Slot(0),
-            camera: ViewCamera {
-                projection: test_camera::projection(Vec3::ZERO, 10.0, false, 1.0),
-                eye: Vec3::ZERO,
-                target: Vec3::ZERO,
-                orthographic: false,
-                ground: Ground {
-                    origin: Vec3::ZERO,
-                    normal: Vec3::new(0.0, 1.0, 0.0),
-                    step: 1.0,
-                },
-            },
-        }
-    }
-
-    #[test]
-    fn the_ray_through_the_views_middle_meets_what_the_camera_looks_at() {
-        let v = view(Some(pos(200.0, 150.0)));
-        let ray = v.pointer_ray().expect("the pointer is over the view");
-        // The target's distance from the ray's line.
-        let to = Vec3::new(-ray.origin.x, -ray.origin.y, -ray.origin.z);
-        let d = ray.direction;
-        let along = to.x * d.x + to.y * d.y + to.z * d.z;
-        let off = Vec3::new(to.x - d.x * along, to.y - d.y * along, to.z - d.z * along);
-        assert!((off.x * off.x + off.y * off.y + off.z * off.z).sqrt() < 1e-9);
-        assert!(along > 0.0, "in front of the eye");
-        assert!(view(None).pointer_ray().is_none());
     }
 }

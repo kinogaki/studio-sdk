@@ -18,13 +18,9 @@ use std::sync::Arc;
 /// empty.
 ///
 /// ```
-/// use kinogaki_geometry::{Text, TextBuilder};
+/// use kinogaki_geometry::Text;
 ///
-/// let mut materials = TextBuilder::new();
-/// for m in ["/Materials/Red", "", "/Materials/Red", "/Materials/Blue"] {
-///     materials.push(m);
-/// }
-/// let text = materials.finish();
+/// let text = Text::from_strs(["/Materials/Red", "", "/Materials/Red", "/Materials/Blue"]);
 /// assert_eq!(&**text.indices(), &[0, Text::NONE, 0, 1]);
 /// assert_eq!(text.get(3), Some("/Materials/Blue"));
 /// assert_eq!(text.get(1), None);
@@ -200,7 +196,7 @@ impl PartialEq for Text {
 /// Builds a [`Text`] one element at a time, keeping each distinct string
 /// once. `""` is pushed as no value.
 #[derive(Debug, Default)]
-pub struct TextBuilder {
+pub(crate) struct TextBuilder {
     indices: Vec<u32>,
     table: Vec<Arc<str>>,
     known: HashMap<Arc<str>, u32>,
@@ -214,7 +210,7 @@ impl TextBuilder {
 
     /// The index `text` has in the table being built (added if new);
     /// [`Text::NONE`] for `""`. Pushes nothing.
-    pub fn intern(&mut self, text: &str) -> u32 {
+    pub(crate) fn intern(&mut self, text: &str) -> u32 {
         if text.is_empty() {
             return Text::NONE;
         }
@@ -230,32 +226,14 @@ impl TextBuilder {
 
     /// Adds an element with value `text` (`""`: no value), returning its
     /// index.
-    pub fn push(&mut self, text: &str) -> u32 {
+    pub(crate) fn push(&mut self, text: &str) -> u32 {
         let i = self.intern(text);
         self.indices.push(i);
         i
     }
 
-    /// Adds an element with no value.
-    pub fn push_none(&mut self) {
-        self.indices.push(Text::NONE);
-    }
-
-    /// Adds an element by an index [`intern`](Self::intern) gave (or
-    /// [`Text::NONE`]).
-    ///
-    /// # Panics
-    /// When `index` is not one this builder gave.
-    pub fn push_index(&mut self, index: u32) {
-        assert!(
-            index == Text::NONE || (index as usize) < self.table.len(),
-            "text index {index} was not interned here"
-        );
-        self.indices.push(index);
-    }
-
     /// The text built.
-    pub fn finish(self) -> Text {
+    pub(crate) fn finish(self) -> Text {
         Text {
             indices: Column::new(self.indices),
             table: self.table.into(),

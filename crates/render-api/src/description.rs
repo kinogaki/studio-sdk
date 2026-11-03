@@ -112,7 +112,7 @@ pub struct MotionSupport {
     /// ([`crate::Motion`]).
     pub transforms: bool,
     /// Points moving by their velocities (the `v` attribute).
-    pub velocities: bool,
+    pub(crate) velocities: bool,
 }
 
 impl MotionSupport {
@@ -187,27 +187,13 @@ impl EngineDescription {
         self.aovs.iter().map(|a| &a.aov).find(|a| &*a.id == id)
     }
 
-    /// The outputs new Render Settings ask for.
-    pub fn default_aovs(&self) -> Vec<Aov> {
-        self.aovs
-            .iter()
-            .filter(|a| a.default)
-            .map(|a| a.aov.clone())
-            .collect()
-    }
-
-    /// Its setting `name`'s descriptor.
-    pub fn setting(&self, name: &str) -> Option<&SettingDescriptor> {
-        self.settings.iter().find(|d| &*d.name == name)
-    }
-
     /// Its prim type `id`, when it declares it.
     pub fn prim_type(&self, id: &str) -> Option<&PrimType> {
         self.types.iter().find(|t| &*t.id == id)
     }
 
     /// The schemas it applies to type `id`.
-    pub fn applied_to<'a>(&'a self, id: &'a str) -> impl Iterator<Item = &'a AppliedSchema> {
+    pub(crate) fn applied_to<'a>(&'a self, id: &'a str) -> impl Iterator<Item = &'a AppliedSchema> {
         self.applied.iter().filter(move |a| a.applies(id))
     }
 

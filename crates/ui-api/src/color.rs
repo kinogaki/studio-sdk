@@ -181,7 +181,7 @@ impl Color {
 
     /// The relative luminance (WCAG 2) of the color as drawn over black,
     /// 0 to 1.
-    pub fn luminance(self) -> f32 {
+    pub(crate) fn luminance(self) -> f32 {
         let l = linear_f32_from_gamma_u8;
         0.2126 * l(self.r()) + 0.7152 * l(self.g()) + 0.0722 * l(self.b())
     }

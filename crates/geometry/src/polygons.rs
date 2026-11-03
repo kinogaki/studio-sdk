@@ -113,7 +113,7 @@ impl Polygons {
     ///
     /// # Errors
     /// As [`with_attributes`](Self::with_attributes).
-    pub fn with_shared_attributes(
+    pub(crate) fn with_shared_attributes(
         &self,
         attributes: Arc<Attributes>,
     ) -> Result<Self, GeometryError> {

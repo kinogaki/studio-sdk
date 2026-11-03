@@ -17,7 +17,7 @@
 //!   value it can't look inside (bounds, info, a stamp, saving) and the
 //!   optional [`facets`]: [`Displayable`], [`Pickable`], [`Tabular`] and
 //!   [`Renderable`]. [`Components`] is a component selection in a type's
-//!   own terms; [`Conversion`]s turn one type into another.
+//!   own terms.
 //! - **Cooking** ([`cook`]): what a node type is and computes ([`NodeType`] with its [`Description`],
 //!   [`CookCx`], optional [`Incremental`] cooking); Studio's core owns the
 //!   cooking DAG, the caches and the [`parallel`] workers. [`HeldEdit`]s
@@ -64,7 +64,6 @@ pub mod cancel;
 pub mod codec;
 pub mod components;
 pub mod conformance;
-pub mod conversion;
 pub mod cook;
 pub mod data;
 pub mod data_type;
@@ -99,7 +98,6 @@ pub use anim::{Interp, Key};
 pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
-pub use conversion::Conversion;
 pub use cook::{
     Category, CookCx, CookError, CookPlan, Description, Incremental, Inside, Listing, NewCx,
     NodeRole, NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, RowsFor,
@@ -120,8 +118,8 @@ pub use format::{
 pub use held::HeldEdit;
 pub use icon::{Icon, IconError};
 pub use id::{
-    ContextId, ConversionId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
-    SlotId, StoredId,
+    ContextId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId, SlotId,
+    StoredId,
 };
 pub use math::{Affine3, Bounds, Mat4, Units, UpAxis, Vec3};
 pub use mesher::{Failed, Meshed, Mesher};

@@ -8,8 +8,8 @@
 //! [`Displayable`](crate::Displayable) facet prepares, and what a pick on
 //! them means, through its [`Pickable`](crate::Pickable) facet. Packets
 //! are `kinogaki-viewport-api`'s [`SurfaceSource`]s; a [`Surface`] is the
-//! simple one, built from points, polygon corners, triangles, edges and
-//! markers. The host uploads a packet's shared arrays as they are and, for
+//! simple one, built from points, polygon corners, triangles and edges.
+//! The host uploads a packet's shared arrays as they are and, for
 //! a surface [`derived`](Surface::derived) from the one on screen, only the
 //! points that moved.
 use crate::error::Error;
@@ -53,8 +53,7 @@ pub struct Corner {
 ///
 /// It is a [`SurfaceSource`] itself, so the host draws it as it is. Its
 /// identity is the allocation of a token made with it: a clone shares it;
-/// [`derived`](Self::derived), [`with_lines`](Self::with_lines) and
-/// [`with_markers`](Self::with_markers) make a new one.
+/// [`derived`](Self::derived) and `with_lines` make a new one.
 #[derive(Clone)]
 pub struct Surface {
     points: Arc<[[f32; 3]]>,
@@ -66,7 +65,6 @@ pub struct Surface {
     lines: Arc<[OverlayVertex]>,
     /// The lines' one class, edges (none without lines).
     classes: Arc<[LineClass]>,
-    markers: Arc<[OverlayVertex]>,
     topology: u64,
     identity: Arc<()>,
     /// What changed since the surface this one was derived from (and the
@@ -81,9 +79,9 @@ const VERTEX_PIECE: usize = 4096;
 impl Surface {
     /// A surface of `points`, `corners` and `triangles` (corner indices,
     /// in face order: each face's triangles together, faces ascending)
-    /// with `faces` faces, and no lines or markers. `topology` is the
-    /// type's key for the connectivity (corners, triangles, lines and
-    /// markers): equal keys mean equal connectivity, so the host keeps its
+    /// with `faces` faces, and no lines. `topology` is the
+    /// type's key for the connectivity (corners, triangles and lines):
+    /// equal keys mean equal connectivity, so the host keeps its
     /// buffers.
     ///
     /// # Errors
@@ -132,7 +130,6 @@ impl Surface {
             face_starts,
             lines: Arc::from([]),
             classes: Arc::from([]),
-            markers: Arc::from([]),
             topology,
             identity: Arc::new(()),
             update: None,
@@ -217,7 +214,11 @@ impl Surface {
     /// # Errors
     /// When a segment lacks its second vertex or a vertex names a point
     /// past the surface's.
-    pub fn with_lines(mut self, lines: Arc<[OverlayVertex]>, topology: u64) -> Result<Self, Error> {
+    pub(crate) fn with_lines(
+        mut self,
+        lines: Arc<[OverlayVertex]>,
+        topology: u64,
+    ) -> Result<Self, Error> {
         if !lines.len().is_multiple_of(2) {
             return Err(Error::invalid("a line segment without its end"));
         }
@@ -237,21 +238,6 @@ impl Surface {
             }])
         };
         self.lines = lines;
-        Ok(self.renewed(topology))
-    }
-
-    /// With point `markers`, `topology` the key of the connectivity with
-    /// them. A new surface, as with [`with_lines`](Self::with_lines).
-    ///
-    /// # Errors
-    /// When a marker names a point past the surface's.
-    pub fn with_markers(
-        mut self,
-        markers: Arc<[OverlayVertex]>,
-        topology: u64,
-    ) -> Result<Self, Error> {
-        self.check_vertices(&markers)?;
-        self.markers = markers;
         Ok(self.renewed(topology))
     }
 
@@ -301,7 +287,7 @@ impl Surface {
                 BufferRanges::new::<Vertex>(self.corners.len()),
                 unchanged(self.triangles.len() * 3),
                 BufferRanges::new::<OverlayVertex>(self.lines.len()),
-                BufferRanges::new::<OverlayVertex>(self.markers.len()),
+                BufferRanges::new::<OverlayVertex>(0),
             ],
         );
         if let Some(held) = &self.update {
@@ -338,11 +324,6 @@ impl Surface {
     /// The line vertices, two a segment.
     pub fn lines(&self) -> &Arc<[OverlayVertex]> {
         &self.lines
-    }
-
-    /// The point markers.
-    pub fn markers(&self) -> &Arc<[OverlayVertex]> {
-        &self.markers
     }
 
     /// The connectivity key.
@@ -426,7 +407,7 @@ impl SurfaceSource for Surface {
     }
 
     fn points(&self) -> &[OverlayVertex] {
-        &self.markers
+        &[]
     }
 
     fn line_classes(&self) -> &[LineClass] {
@@ -518,7 +499,6 @@ impl fmt::Debug for Surface {
             .field("triangles", &self.triangles.len())
             .field("faces", &self.faces)
             .field("segments", &(self.lines.len() / 2))
-            .field("markers", &self.markers.len())
             .finish()
     }
 }
@@ -568,7 +548,7 @@ pub struct Hit {
 mod tests {
     use super::*;
 
-    /// A unit square of two triangles, its four edges and four markers.
+    /// A unit square of two triangles and its four edges.
     fn square() -> Surface {
         let corner = |point| Corner {
             point,
@@ -605,8 +585,6 @@ mod tests {
             42,
         )
         .unwrap()
-        .with_markers((0..4).map(|i| vertex(i, i)).collect(), 42)
-        .unwrap()
     }
 
     #[test]
@@ -620,7 +598,7 @@ mod tests {
         ));
         let lines = SurfaceSource::lines(&surface);
         assert_eq!((lines.len(), lines[2].point, lines[2].component), (8, 1, 1));
-        assert_eq!(SurfaceSource::points(&surface)[3].component, 3);
+        assert!(SurfaceSource::points(&surface).is_empty());
         assert_eq!(surface.element_count(ElementKind::Edge), 4);
         assert_eq!(surface.element_count(ElementKind::Face), 1);
         assert_eq!(surface.bounds().unwrap().1, [1.0, 1.0, 0.0]);
@@ -661,12 +639,6 @@ mod tests {
             .unwrap();
         assert!(!relined.same(&surface), "other lines, another surface");
         assert_eq!(relined.topology_key()[0], 43, "of another connectivity");
-        let marked = surface
-            .clone()
-            .with_markers(Arc::from([vertex(1)]), 44)
-            .unwrap();
-        assert!(!marked.same(&surface), "other markers, another surface");
-        assert_eq!(marked.topology_key()[0], 44);
         // A drag's frame, given new lines, derives from nothing.
         let mut points = surface.points().to_vec();
         points[1][2] += 1.0;
@@ -718,7 +690,6 @@ mod tests {
         let lines = |l: &[OverlayVertex]| surface.clone().with_lines(Arc::from(l), 1);
         assert!(lines(&[vertex(0)]).is_err(), "a segment without its end");
         assert!(lines(&[vertex(0), vertex(3)]).is_err(), "past the points");
-        assert!(surface.with_markers(Arc::from([vertex(9)]), 1).is_err());
     }
 
     #[test]

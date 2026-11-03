@@ -161,9 +161,6 @@ impl Vocabulary<Heard> for Edits {
         "acme.counts"
     }
     fn run(&self, _: &mut Heard, _: &mut dyn Cx, _: &str, _: Invoked) {}
-    fn edit(&self, s: &mut Heard, _: &mut dyn Cx, node: NodeRef) {
-        s.0.push(format!("edit {}", node.0));
-    }
 }
 
 struct Counts;
@@ -183,7 +180,7 @@ impl UiPackage for Counts {
 }
 
 #[test]
-fn row_actions_typing_and_node_edits_reach_the_contexts_parts() {
+fn row_actions_and_typing_reach_the_contexts_parts() {
     let mut host = host();
     let package = Package::new(PackageId::declared("acme.counts"), "Counts").with_ui(Counts);
     let mut hosted = Hosting::new(package, &host);
@@ -192,17 +189,10 @@ fn row_actions_typing_and_node_edits_reach_the_contexts_parts() {
         inspector.row_action(s, &mut host, NodeRef(4), "group", RowAction::Pick);
         inspector.typing(s, &mut host, NodeRef(4), "group", Some("top"));
         inspector.typing(s, &mut host, NodeRef(4), "group", None);
-        let vocabulary = p.contexts[0].vocabulary.as_ref().unwrap();
-        vocabulary.edit(s, &mut host, NodeRef(4));
     });
     assert_eq!(
         hosted.state::<Heard>().0,
-        [
-            "4 group Pick",
-            "4 group Some(\"top\")",
-            "4 group None",
-            "edit 4"
-        ]
+        ["4 group Pick", "4 group Some(\"top\")", "4 group None",]
     );
 }
 

@@ -54,7 +54,7 @@ pub struct Reads {
     /// The scene time ([`CookCx::time`]); otherwise the node sees a fixed
     /// time.
     pub time: bool,
-    /// The names of the nodes wired into it ([`CookCx::input_name`]);
+    /// The names of the nodes wired into it (`CookCx::input_name`);
     /// otherwise it sees none.
     pub input_names: bool,
     /// The component selection it acts on ([`CookCx::selection`]);

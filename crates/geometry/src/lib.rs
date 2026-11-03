@@ -114,8 +114,7 @@ mod vector;
 
 pub use attributes::names;
 pub use attributes::{
-    Attribute, AttributeKind, AttributeValues, Attributes, Class, Group, GroupBuilder, Text,
-    TextBuilder, TypeInfo, check_name,
+    Attribute, AttributeKind, AttributeValues, Attributes, Class, Group, Text, TypeInfo, check_name,
 };
 pub use column::Column;
 pub use curves::{Basis, CurveDisplay, Curves, CurvesBuilder, Knots};
@@ -124,8 +123,8 @@ pub use error::{ErrorKind, GeometryError};
 pub use frame::Frame;
 pub use motion::{Axis, Mirror, Side, WeightedMove};
 pub use polygons::Polygons;
-pub use selection::{Coverage, Selection, SelectionCounts};
+pub use selection::{Selection, SelectionCounts};
 pub use shading::ShadingNormals;
-pub use tolerances::{CURVATURE, FIT_OF_POSITIONAL, POSITIONAL_MM, TANGENT_DEGREES, Tolerances};
+pub use tolerances::Tolerances;
 pub use topology::{Adjacency, Edge, Index, Topology};
 pub use triangulation::{Triangle, Triangulation};

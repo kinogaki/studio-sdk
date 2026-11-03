@@ -47,14 +47,6 @@ impl SettingValue {
         }
     }
 
-    /// A whole number.
-    pub fn as_int(&self) -> Option<i64> {
-        match self {
-            SettingValue::Int(v) => Some(*v),
-            _ => None,
-        }
-    }
-
     /// A number.
     pub fn as_float(&self) -> Option<f64> {
         match self {
@@ -64,7 +56,7 @@ impl SettingValue {
     }
 
     /// A choice's name.
-    pub fn as_choice(&self) -> Option<&str> {
+    pub(crate) fn as_choice(&self) -> Option<&str> {
         match self {
             SettingValue::Choice(name) => Some(name),
             _ => None,
@@ -75,30 +67,6 @@ impl SettingValue {
     pub fn as_color(&self) -> Option<[f64; 3]> {
         match self {
             SettingValue::Color(c) => Some(*c),
-            _ => None,
-        }
-    }
-
-    /// Two numbers.
-    pub fn as_vector2(&self) -> Option<[f64; 2]> {
-        match self {
-            SettingValue::Vector2(v) => Some(*v),
-            _ => None,
-        }
-    }
-
-    /// An image file's path.
-    pub fn as_file(&self) -> Option<&str> {
-        match self {
-            SettingValue::File(path) => Some(path),
-            _ => None,
-        }
-    }
-
-    /// A texture.
-    pub fn as_texture(&self) -> Option<Option<TextureId>> {
-        match self {
-            SettingValue::Texture(t) => Some(*t),
             _ => None,
         }
     }
@@ -248,7 +216,7 @@ pub enum SettingKind {
         default: [f64; 3],
     },
     /// A color ramp: keys from 0 to 1, each with its interpolation
-    /// ([`ramp::color_at`] reads it).
+    /// (`ramp::color_at` reads it).
     ColorRamp {
         /// Its default keys.
         default: Arc<[ramp::Key]>,
@@ -284,16 +252,16 @@ pub enum Unit {
 /// A setting holding a value: what [`Visibility::When`] and a group's
 /// [`SettingGroup::open_with`] test.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Condition {
+pub(crate) struct Condition {
     /// The setting tested.
-    pub setting: Arc<str>,
+    pub(crate) setting: Arc<str>,
     /// The value it holds.
-    pub value: SettingValue,
+    pub(crate) value: SettingValue,
 }
 
 impl Condition {
     /// Setting `setting` holding `value`.
-    pub fn new(setting: &str, value: SettingValue) -> Condition {
+    pub(crate) fn new(setting: &str, value: SettingValue) -> Condition {
         Condition {
             setting: Arc::from(setting),
             value,
@@ -301,14 +269,14 @@ impl Condition {
     }
 
     /// Whether `values` meet it (a setting missing from them does not).
-    pub fn met(&self, values: &SettingValues) -> bool {
+    pub(crate) fn met(&self, values: &SettingValues) -> bool {
         value(values, &self.setting) == Some(&self.value)
     }
 }
 
 /// When a UI shows a setting's row.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub enum Visibility {
+pub(crate) enum Visibility {
     /// Always.
     #[default]
     Always,
@@ -320,7 +288,7 @@ pub enum Visibility {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Trailing {
     /// The color the standard emission settings beside it make
-    /// ([`crate::standard::emission_params`]), brightest channel at 1: the
+    /// (`crate::standard::emission_params`), brightest channel at 1: the
     /// host works it out (an illuminant's or blackbody's color needs its
     /// spectrum).
     EmissionSwatch,
@@ -329,13 +297,13 @@ pub enum Trailing {
 /// When a setting applies: while setting `setting` holds `value` (else a UI
 /// shows it disabled, saying `reason`).
 #[derive(Clone, Debug, PartialEq)]
-pub struct Requirement {
+pub(crate) struct Requirement {
     /// The setting it depends on.
-    pub setting: Arc<str>,
+    pub(crate) setting: Arc<str>,
     /// The value it needs.
-    pub value: SettingValue,
+    pub(crate) value: SettingValue,
     /// Why it does not apply otherwise.
-    pub reason: Arc<str>,
+    pub(crate) reason: Arc<str>,
 }
 
 /// A group of settings: a section of the inspector.
@@ -387,9 +355,9 @@ pub struct SettingDescriptor {
     /// What it means, where its label alone does not say.
     pub tooltip: Option<Arc<str>>,
     /// When it applies (none: always).
-    pub requires: Option<Requirement>,
+    pub(crate) requires: Option<Requirement>,
     /// When its row is shown.
-    pub visible: Visibility,
+    pub(crate) visible: Visibility,
     /// What its row shows after it.
     pub trailing: Option<Trailing>,
     /// Whether a host may key it over time. Its kind gives the default
@@ -429,7 +397,7 @@ impl SettingDescriptor {
 
     /// It, applying while `setting` holds `value` (else disabled, saying
     /// `reason`).
-    pub fn requires(
+    pub(crate) fn requires(
         mut self,
         setting: &str,
         value: SettingValue,
@@ -444,7 +412,7 @@ impl SettingDescriptor {
     }
 
     /// It, shown while `setting` holds `value`.
-    pub fn shown_when(mut self, setting: &str, value: SettingValue) -> SettingDescriptor {
+    pub(crate) fn shown_when(mut self, setting: &str, value: SettingValue) -> SettingDescriptor {
         self.visible = Visibility::When(Condition::new(setting, value));
         self
     }

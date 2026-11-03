@@ -33,7 +33,7 @@ impl Surface {
     /// (NURBS, an extrusion, a revolution) they need its second
     /// derivatives, which nothing here evaluates: `None`, and a kernel
     /// evaluates such an offset itself.
-    pub fn partials(&self, uv: [f64; 2]) -> Option<[[f64; 3]; 3]> {
+    pub(crate) fn partials(&self, uv: [f64; 2]) -> Option<[[f64; 3]; 3]> {
         let [u, v] = uv;
         Some(match self {
             Surface::Plane(p) => {
@@ -217,7 +217,7 @@ impl Surface {
     /// cone, sphere and revolution, and in both for the torus; an
     /// extrusion's profile's period in `t`; for NURBS, the domain's width
     /// in each closed direction; an offset's base's. `None`: open.
-    pub fn periods(&self) -> [Option<f64>; 2] {
+    pub(crate) fn periods(&self) -> [Option<f64>; 2] {
         let turn = Some(TAU);
         match self {
             Surface::Plane(_) => [None, None],
@@ -235,12 +235,6 @@ impl Curve {
     /// The point at `t`.
     pub fn point(&self, t: f64) -> [f64; 3] {
         self.jet(t)[0]
-    }
-
-    /// The first derivative at `t` (one-sided from above at a NURBS
-    /// knot): unit for a line, of length `r` for a circle.
-    pub fn derivative(&self, t: f64) -> [f64; 3] {
-        self.jet(t)[1]
     }
 
     pub(crate) fn jet(&self, t: f64) -> [[f64; 3]; 2] {
@@ -271,11 +265,6 @@ impl PCurve {
     /// The chart point at `t`.
     pub fn point(&self, t: f64) -> [f64; 2] {
         self.jet(t)[0]
-    }
-
-    /// The first derivative at `t` in the chart.
-    pub fn derivative(&self, t: f64) -> [f64; 2] {
-        self.jet(t)[1]
     }
 
     pub(crate) fn jet(&self, t: f64) -> [[f64; 2]; 2] {

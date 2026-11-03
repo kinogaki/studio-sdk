@@ -158,7 +158,6 @@ impl Levels<Forest> for TreeLevels {
                 icon: "cube".into(),
                 level: kinogaki_studio_api::ElementKind::Object,
                 combines: false,
-                own: false,
             })
             .into()
     }
@@ -420,14 +419,11 @@ fn registering_reads_the_contexts_once_and_erases_the_state() {
     assert_eq!(whole.id, PackageId::declared("toy.trees"));
     assert_eq!(whole.label, "Trees");
     assert_eq!(whole.slots[0].id(), Picked::id());
-    // Its UI names the contexts it gives parts to, for the registry.
-    assert_eq!(whole.ui.as_ref().unwrap().contexts(), [(forest(), false)]);
     let package = Registered::of(&whole).unwrap();
     assert!(Registered::of(&Package::new(PackageId::declared("toy.bare"), "Bare")).is_none());
-    let context = package.context(forest(), false).unwrap();
+    let context = package.context(forest()).unwrap();
     assert!(context.levels.is_some() && context.viewport.is_some());
     assert!(context.vocabulary.is_none());
-    assert!(package.context(forest(), true).is_none());
     assert_eq!(package.settings[0].context(), forest());
     let levels = context.levels.as_ref().unwrap().levels();
     assert_eq!(levels.len(), 2);

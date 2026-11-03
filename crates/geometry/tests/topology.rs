@@ -28,7 +28,6 @@ fn valid_topologies_are_accepted() {
     assert_eq!((t.vertex_count(), t.polygon_vertices()), (12, 7));
     assert_eq!(t.primitive(1), &[0, 2, 3, 4]);
     assert_eq!(t.primitive_vertices(2), 7..9);
-    assert!(t.is_polyline(3) && !t.is_polyline(1));
     assert!(make(0, &[], 0).is_ok());
     assert!(make(3, &[], 0).is_ok(), "points only");
     assert_eq!(Topology::empty(), make(0, &[], 0).unwrap());
@@ -212,7 +211,7 @@ fn naive_edges(t: &Topology) -> Vec<Edge> {
     for p in 0..t.primitives() {
         let ids = t.primitive(p);
         let n = ids.len();
-        let segments = if t.is_polyline(p) { n - 1 } else { n };
+        let segments = if p >= t.polygons() { n - 1 } else { n };
         for i in 0..segments {
             let (a, b) = (ids[i], ids[(i + 1) % n]);
             edges.push(Edge {

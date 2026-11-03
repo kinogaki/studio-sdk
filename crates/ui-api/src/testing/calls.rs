@@ -6,7 +6,6 @@ use crate::host::{
     HostTransform, HostUndo, HostView,
 };
 use crate::host::{NodeRef, ObjectRef, Place};
-use kinogaki_studio_api::geometry::Frame;
 use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::{Bounds, ContextId, RowsFor, SlotId, Time};
 
@@ -39,10 +38,6 @@ pub enum HostCall {
     SetBody(ObjectRef, String),
     /// [`HostView::frame_bounds`].
     Frame(Bounds),
-    /// [`HostView::look_at`]: the view, the frame and whether orthographic.
-    LookAt(usize, Frame, bool),
-    /// [`HostView::restore`].
-    Restore(usize),
     /// [`HostView::redraw`].
     Redraw,
     /// [`HostStatus::fail`].

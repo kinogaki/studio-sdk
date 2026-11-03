@@ -32,19 +32,9 @@ const MAX_VALUE: f32 = 1e12;
 /// the scene's holds), and a dome's image a file whose path isn't blank.
 /// Its transform is dropped: where a light is isn't the value's.
 ///
-/// ```
-/// use kinogaki_render_api::standard::{Light, Shape};
-/// use kinogaki_studio_api::standard::light_value;
-///
-/// let disk = Light { shape: Shape::Disk { radius: 0.5 }, ..Light::default() };
-/// assert_eq!(light_value(disk.clone()).unwrap(), disk);
-/// let dark = Light { intensity: -1.0, ..Light::default() };
-/// assert!(light_value(dark).is_err());
-/// ```
-///
 /// # Errors
 /// A value out of range.
-pub fn light_value(light: Light) -> Result<Light, Error> {
+pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
     let within = |v: f32| v.is_finite() && v.abs() <= MAX_VALUE;
     let positive = |v: f32| within(v) && v > 0.0;
     let at_least_0 = |v: f32| within(v) && v >= 0.0;
@@ -95,7 +85,7 @@ impl LightCodec {
     ///
     /// # Errors
     /// The element refusing a field.
-    pub fn write_light(light: &Light, out: &mut dyn ElementWriter) -> Result<(), Error> {
+    pub(crate) fn write_light(light: &Light, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let float = |v: f32| Field::Float(f64::from(v));
         let ty = match &light.shape {
             Shape::Rect { width, height } => {
@@ -153,7 +143,7 @@ impl LightCodec {
     ///
     /// # Errors
     /// A field missing or of another kind, or an invalid light.
-    pub fn read_light(e: &dyn ElementReader) -> Result<Light, Error> {
+    pub(crate) fn read_light(e: &dyn ElementReader) -> Result<Light, Error> {
         let at = || e.location();
         let scalar = |name| e.float(name).map(|v| v as f32);
         let color = |name| match e.f32s(name)? {

@@ -37,17 +37,12 @@ pub struct PrimType {
     /// Its role.
     pub role: Role,
     /// Its parameters' groups, in order.
-    pub groups: Vec<SettingGroup>,
+    pub(crate) groups: Vec<SettingGroup>,
     /// Its parameters, in the order a UI lists them.
     pub params: Vec<SettingDescriptor>,
 }
 
 impl PrimType {
-    /// Its parameter `name`.
-    pub fn param(&self, name: &str) -> Option<&SettingDescriptor> {
-        self.params.iter().find(|d| &*d.name == name)
-    }
-
     /// Every parameter's default.
     pub fn defaults(&self) -> SettingValues {
         defaults(&self.params)
@@ -59,12 +54,10 @@ impl PrimType {
 /// either way.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AppliedSchema {
-    /// Its id (`kinogaki.pixel.gobo`).
-    pub id: Arc<str>,
     /// The types it applies to, by id.
-    pub applies_to: Vec<Arc<str>>,
+    pub(crate) applies_to: Vec<Arc<str>>,
     /// Its parameters' groups, in order (after the type's).
-    pub groups: Vec<SettingGroup>,
+    pub(crate) groups: Vec<SettingGroup>,
     /// Its parameters (names no type it applies to uses).
     pub params: Vec<SettingDescriptor>,
 }
@@ -109,19 +102,6 @@ impl Declared {
     /// Value `name`.
     pub fn value(&self, name: &str) -> Option<&SettingValue> {
         value(&self.values, name)
-    }
-
-    /// Made type `ty`: values of the same names are kept (so switching
-    /// back restores them), and the type's others, or those that don't
-    /// fit it, take their defaults.
-    pub fn retype(&mut self, ty: &PrimType) {
-        self.type_id = ty.id.clone();
-        for d in &ty.params {
-            let fits = value(&self.values, &d.name).is_some_and(|v| d.accepts(v));
-            if !fits {
-                crate::settings::set_value(&mut self.values, &d.name, d.default_value());
-            }
-        }
     }
 
     /// Number `name`, as `f32` (0 when missing or not a number).

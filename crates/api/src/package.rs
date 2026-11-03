@@ -1,6 +1,5 @@
 //! [`Package`]: what one package registers with the environment, and
 //! [`PackageUi`], the UI it carries when it has one.
-use crate::conversion::Conversion;
 use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
@@ -18,7 +17,7 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
-/// types (a kernel's), held edits over them, conversions (a bridge's),
+/// types (a kernel's), held edits over them,
 /// B-rep meshers (a kernel's),
 /// node types' cooks, the network contexts its object kinds hold, object
 /// kinds, file formats, session slots, stored values and icons, the render
@@ -45,8 +44,6 @@ pub struct Package {
     pub data_types: Vec<Arc<dyn DataType>>,
     /// How authored deltas apply to its data types.
     pub held_edits: Vec<Arc<dyn HeldEdit>>,
-    /// The conversions it provides between registered data types.
-    pub conversions: Vec<Arc<dyn Conversion>>,
     /// How it meshes B-rep bodies for display, rendering and export.
     pub meshers: Vec<Arc<dyn Mesher>>,
     /// What its node types compute.
@@ -103,23 +100,21 @@ pub struct Package {
 /// crate can't name its types.
 #[derive(Clone)]
 pub struct PackageUi {
-    contexts: Vec<(ContextId, bool)>,
+    contexts: Vec<ContextId>,
     parts: Arc<dyn Any + Send + Sync>,
 }
 
 impl PackageUi {
-    /// The UI giving parts to `contexts` (each with whether it is its
-    /// context's mode on a node rather than the network itself), the
-    /// parts being `parts`.
-    pub fn new(contexts: Vec<(ContextId, bool)>, parts: impl Any + Send + Sync) -> Self {
+    /// The UI giving parts to `contexts`, the parts being `parts`.
+    pub fn new(contexts: Vec<ContextId>, parts: impl Any + Send + Sync) -> Self {
         Self {
             contexts,
             parts: Arc::new(parts),
         }
     }
 
-    /// The contexts it gives parts to, each with whether it is a mode.
-    pub fn contexts(&self) -> &[(ContextId, bool)] {
+    /// The contexts it gives parts to.
+    pub(crate) fn contexts(&self) -> &[ContextId] {
         &self.contexts
     }
 
@@ -145,7 +140,6 @@ impl Package {
             label: label.into(),
             data_types: Vec::new(),
             held_edits: Vec::new(),
-            conversions: Vec::new(),
             meshers: Vec::new(),
             node_types: Vec::new(),
             contexts: Vec::new(),
@@ -210,12 +204,6 @@ impl Package {
         self
     }
 
-    /// With conversion `conversion` too.
-    pub fn with_conversion(mut self, conversion: impl Conversion + 'static) -> Self {
-        self.conversions.push(Arc::new(conversion));
-        self
-    }
-
     /// With B-rep mesher `mesher` too.
     pub fn with_mesher(mut self, mesher: impl Mesher + 'static) -> Self {
         self.meshers.push(Arc::new(mesher));
@@ -241,7 +229,7 @@ impl Package {
     }
 
     /// With icon `icon` too: others name it `"<package id>/<icon name>"`
-    /// ([`icon::qualified`](crate::icon::qualified)).
+    /// (`icon::qualified`).
     pub fn with_icon(mut self, icon: Icon) -> Self {
         self.icons.push(icon);
         self
@@ -291,7 +279,6 @@ impl fmt::Debug for Package {
             .field("label", &self.label)
             .field("data_types", &ids(&self.data_types, |t| t.id().as_str()))
             .field("held_edits", &ids(&self.held_edits, |h| h.delta().as_str()))
-            .field("conversions", &ids(&self.conversions, |c| c.id().as_str()))
             .field("node_types", &ids(&self.node_types, |n| n.id().as_str()))
             .field(
                 "contexts",

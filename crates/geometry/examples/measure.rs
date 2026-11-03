@@ -6,7 +6,7 @@
 //! cargo run --release -p kinogaki-geometry --example measure
 //! ```
 use kinogaki_geometry::{
-    Attribute, Attributes, Class, Column, Polygons, Text, TextBuilder, Topology, TypeInfo, names,
+    Attribute, Attributes, Class, Column, Polygons, Text, Topology, TypeInfo, names,
 };
 use std::hint::black_box;
 use std::time::{Duration, Instant};
@@ -33,15 +33,13 @@ fn grid() -> (Vec<[f64; 3]>, Vec<u32>, Vec<u32>) {
 }
 
 fn attributes(points: usize, vertices: usize, faces: usize) -> Attributes {
-    let mut materials = TextBuilder::new();
-    for f in 0..faces {
-        materials.push(if f % 2 == 0 {
+    let text = Text::from_strs((0..faces).map(|f| {
+        if f % 2 == 0 {
             "/Materials/A"
         } else {
             "/Materials/B"
-        });
-    }
-    let text: Text = materials.finish();
+        }
+    }));
     Attributes::new()
         .with(
             Class::Point,
@@ -152,13 +150,10 @@ fn main() {
         ),
     );
     report(
-        "Polygons::with_topology (shared topology)",
+        "Polygons::with_positions (shared topology)",
         best(
             || positions.to_vec().into(),
-            |p| {
-                Polygons::with_topology(p, value.topology().clone(), value.attributes().clone())
-                    .unwrap()
-            },
+            |p| value.with_positions(p).unwrap(),
         ),
     );
 }

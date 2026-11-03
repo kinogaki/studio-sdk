@@ -162,8 +162,6 @@ fn a_cook_reads_parameters_ports_and_scratch() {
     // Scratch of another type replaces the slot.
     let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
     assert_eq!(cx.scratch::<String>(), "");
-    cx.clear_scratch();
-    assert!(scratch.is_none());
 }
 
 #[test]
@@ -174,7 +172,7 @@ fn withheld_and_wrong_parameters_fail_by_name() {
     let mut cx = CookCx::new(&parameters, &cancel, &Serial, &mut scratch);
     // Without ports each input is its own port; no names, no selection.
     assert_eq!(cx.port(1), 1..2);
-    assert!(cx.input_name(0).is_none() && cx.selection().is_none());
+    assert!(cx.selection().is_none());
     assert_eq!((cx.time(), cx.fps()), (Time::ZERO, 24.0));
     let error = Scale.cook(&mut cx, &[numbers(&[1.0])]).unwrap_err();
     assert!(error.to_string().contains("\"factor\" is not a number"));

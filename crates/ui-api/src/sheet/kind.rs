@@ -100,13 +100,6 @@ pub enum Kind {
         /// The pick button's hover text, when there is one.
         pick: Option<Text>,
     },
-    /// `Value::Text`, read-only, left-aligned: what references picked in
-    /// the viewport come to ("4", "Body 1"); with `pick`, a pick button
-    /// with that hover text ([`Action::Pick`](super::Action::Pick)).
-    Picks {
-        /// The pick button's hover text, when there is one.
-        pick: Option<Text>,
-    },
     /// `Value::Text`: names, with a menu of `names` behind a button.
     Name {
         /// The names the menu offers.

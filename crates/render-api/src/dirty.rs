@@ -29,14 +29,12 @@ impl Dirty {
     pub const PARAMS: Dirty = Dirty(1 << 7);
     /// A Material's nodes or links.
     pub const NETWORK: Dirty = Dirty(1 << 8);
-    /// A Texture's pixels or size.
-    pub const PIXELS: Dirty = Dirty(1 << 9);
     /// Mesh attributes the materials read (names, layout or values).
     pub const ATTRIBUTES: Dirty = Dirty(1 << 10);
     /// A placed prim's placements across the shutter (its `motion`) alone.
     pub const MOTION: Dirty = Dirty(1 << 11);
     /// How many bits there are.
-    pub const COUNT: usize = 12;
+    pub(crate) const COUNT: usize = 12;
     /// Every bit.
     pub const ALL: Dirty = Dirty((1 << Dirty::COUNT) - 1);
 

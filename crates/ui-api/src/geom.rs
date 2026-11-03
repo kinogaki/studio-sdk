@@ -54,11 +54,6 @@ impl Pos {
         (self - other).length()
     }
 
-    /// The squared distance to `other`.
-    pub fn distance_sq(self, other: Pos) -> f32 {
-        (self - other).length_sq()
-    }
-
     /// The smaller of each coordinate.
     pub fn min(self, other: Pos) -> Pos {
         pos(self.x.min(other.x), self.y.min(other.y))
@@ -97,11 +92,6 @@ impl Vec2 {
         vec2(v, v)
     }
 
-    /// The position this vector reaches from the origin.
-    pub const fn to_pos(self) -> Pos {
-        pos(self.x, self.y)
-    }
-
     /// The length.
     pub fn length(self) -> f32 {
         self.x.hypot(self.y)
@@ -110,12 +100,6 @@ impl Vec2 {
     /// The squared length.
     pub fn length_sq(self) -> f32 {
         self.x * self.x + self.y * self.y
-    }
-
-    /// This vector at length 1; a zero vector stays zero.
-    pub fn normalized(self) -> Vec2 {
-        let len = self.length();
-        if len <= 0.0 { self } else { self / len }
     }
 
     /// The dot product with `other`.
@@ -133,24 +117,13 @@ impl Vec2 {
         self.y.atan2(self.x)
     }
 
-    /// The unit vector at `angle` radians (clockwise on screen from x).
-    pub fn angled(angle: f32) -> Vec2 {
-        let (sin, cos) = angle.sin_cos();
-        vec2(cos, sin)
-    }
-
     /// Each component's magnitude.
     pub fn abs(self) -> Vec2 {
         vec2(self.x.abs(), self.y.abs())
     }
 
-    /// The smaller component.
-    pub fn min_elem(self) -> f32 {
-        self.x.min(self.y)
-    }
-
     /// The larger component.
-    pub fn max_elem(self) -> f32 {
+    pub(crate) fn max_elem(self) -> f32 {
         self.x.max(self.y)
     }
 
@@ -277,12 +250,6 @@ pub struct Rect {
 }
 
 impl Rect {
-    /// Every point: the identity of [`Rect::intersect`].
-    pub const EVERYTHING: Rect = Rect {
-        min: pos(f32::NEG_INFINITY, f32::NEG_INFINITY),
-        max: pos(f32::INFINITY, f32::INFINITY),
-    };
-
     /// No point, inside out: the identity of [`Rect::union`].
     pub const NOTHING: Rect = Rect {
         min: pos(f32::INFINITY, f32::INFINITY),
@@ -316,11 +283,6 @@ impl Rect {
             min: a.min(b),
             max: a.max(b),
         }
-    }
-
-    /// The smallest rectangle holding `points` ([`Rect::NOTHING`] for none).
-    pub fn from_points(points: &[Pos]) -> Self {
-        points.iter().fold(Rect::NOTHING, |r, &p| r.extended(p))
     }
 
     /// The middle.
@@ -381,7 +343,7 @@ impl Rect {
 
     /// The left and right edges moved `amount.x` inwards, top and bottom
     /// `amount.y`.
-    pub fn shrink2(self, amount: Vec2) -> Rect {
+    pub(crate) fn shrink2(self, amount: Vec2) -> Rect {
         Rect::from_min_max(self.min + amount, self.max - amount)
     }
 
@@ -458,16 +420,7 @@ pub enum Align {
     Max,
 }
 
-impl Align {
-    /// 0, 0.5 or 1.
-    pub fn to_factor(self) -> f32 {
-        match self {
-            Self::Min => 0.0,
-            Self::Center => 0.5,
-            Self::Max => 1.0,
-        }
-    }
-}
+impl Align {}
 
 /// Where in two dimensions: the horizontal then the vertical [`Align`].
 /// A text's anchor says which of its points sits at the given position.
@@ -481,16 +434,8 @@ impl Align2 {
     pub const LEFT_CENTER: Align2 = Align2(Align::Min, Align::Center);
     /// Bottom left.
     pub const LEFT_BOTTOM: Align2 = Align2(Align::Min, Align::Max);
-    /// Middle of the top edge.
-    pub const CENTER_TOP: Align2 = Align2(Align::Center, Align::Min);
     /// The middle.
     pub const CENTER_CENTER: Align2 = Align2(Align::Center, Align::Center);
-    /// Middle of the bottom edge.
-    pub const CENTER_BOTTOM: Align2 = Align2(Align::Center, Align::Max);
-    /// Top right.
-    pub const RIGHT_TOP: Align2 = Align2(Align::Max, Align::Min);
-    /// Middle of the right edge.
-    pub const RIGHT_CENTER: Align2 = Align2(Align::Max, Align::Center);
     /// Bottom right.
     pub const RIGHT_BOTTOM: Align2 = Align2(Align::Max, Align::Max);
 
@@ -507,21 +452,6 @@ impl Align2 {
             Align::Max => at.y - size.y,
         };
         Rect::from_min_size(pos(x, y), size)
-    }
-
-    /// The anchor point of `rect`.
-    pub fn pos_in_rect(self, rect: &Rect) -> Pos {
-        let x = match self.0 {
-            Align::Min => rect.min.x,
-            Align::Center => rect.center().x,
-            Align::Max => rect.max.x,
-        };
-        let y = match self.1 {
-            Align::Min => rect.min.y,
-            Align::Center => rect.center().y,
-            Align::Max => rect.max.y,
-        };
-        pos(x, y)
     }
 }
 
@@ -540,12 +470,7 @@ mod tests {
         let s = Rect::from_min_size(pos(30.0, 50.0), vec2(30.0, 30.0));
         assert_eq!(r.intersect(s), Rect::from_min_max(pos(30.0, 50.0), r.max));
         assert_eq!(Rect::NOTHING.union(r), r);
-        assert_eq!(Rect::EVERYTHING.intersect(r), r);
         assert!(!r.intersect(r.translate(vec2(100.0, 0.0))).is_positive());
-        assert_eq!(
-            Rect::from_points(&[pos(3.0, 1.0), pos(1.0, 3.0)]).size(),
-            vec2(2.0, 2.0)
-        );
     }
 
     #[test]
@@ -555,15 +480,11 @@ mod tests {
         assert_eq!(Align2::LEFT_TOP.anchor_size(at, size).min, at);
         assert_eq!(Align2::CENTER_CENTER.anchor_size(at, size).center(), at);
         assert_eq!(Align2::RIGHT_BOTTOM.anchor_size(at, size).max, at);
-        let r = Align2::LEFT_BOTTOM.anchor_size(at, size);
-        assert_eq!(Align2::LEFT_BOTTOM.pos_in_rect(&r), at);
     }
 
     #[test]
     fn vectors_measure() {
         assert_eq!(vec2(3.0, 4.0).length(), 5.0);
-        assert_eq!(vec2(3.0, 4.0).normalized(), vec2(0.6, 0.8));
-        assert_eq!(Vec2::ZERO.normalized(), Vec2::ZERO);
         assert_eq!(pos(1.0, 1.0).distance(pos(4.0, 5.0)), 5.0);
         assert_eq!(vec2(-2.0, 1.0).abs().max_elem(), 2.0);
     }

@@ -30,7 +30,6 @@ fn the_package_registers_whole() {
         registry.object_kind(board()).unwrap().context(),
         Some(pinning())
     );
-    assert!(registry.network_context(pinning()).is_some());
     assert!(registry.slot(Pins::id()).is_some());
     let package = package();
     let ui = Registered::of(&package).unwrap();

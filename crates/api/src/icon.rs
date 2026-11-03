@@ -6,7 +6,7 @@
 //! layer's buttons, painter icons and library entries), a plain name
 //! (`"cube"`) is one of Studio's own icons, the default set. A package's
 //! own icon is named by the package's id, a `/` and the icon's name
-//! ([`qualified`]): icon `"leaf"` of package `acme.trees` is
+//! (`qualified`): icon `"leaf"` of package `acme.trees` is
 //! `"acme.trees/leaf"`. A package registers its icons under its own id
 //! alone, so two packages' names never meet.
 //!
@@ -22,7 +22,7 @@
 //! transforms and fills are read as a browser reads them.
 //!
 //! **Checks.** The registry checks each icon when the package registers:
-//! its name ([`name_well_formed`]), its size and its text
+//! its name (`name_well_formed`), its size and its text
 //! ([`Icon::check`]), that no two share a name, and that each package
 //! icon the package shows (a node type's, an object kind's) is one it or
 //! an earlier package carries; a package failing any is refused. Studio
@@ -39,11 +39,9 @@
 //! let trees = PackageId::declared("acme.trees");
 //! let package = Package::new(trees, "Trees").with_icon(Icon::new("leaf", LEAF));
 //! assert!(package.icons[0].check().is_ok());
-//! assert_eq!(icon::qualified(trees, "leaf"), "acme.trees/leaf");
 //! assert_eq!(icon::split("acme.trees/leaf"), Some(("acme.trees", "leaf")));
 //! assert_eq!(icon::split("cube"), None);
 //! ```
-use crate::id::PackageId;
 use std::fmt;
 
 /// The most bytes an icon's SVG document may have.
@@ -54,18 +52,18 @@ pub const MAX_BYTES: usize = 16 * 1024;
 pub const MAX_PIXELS: u32 = 11;
 
 /// The longest an icon's name may be, in bytes.
-pub const MAX_NAME: usize = 64;
+pub(crate) const MAX_NAME: usize = 64;
 
 /// One icon a package adds: its name within the package and its SVG
 /// document.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Icon {
     /// Its name within its package (`"leaf"`); others name it
-    /// [`qualified`] (`"acme.trees/leaf"`).
+    /// `qualified` (`"acme.trees/leaf"`).
     pub name: String,
     /// Its SVG document, as the package embeds it (`include_str!` or
     /// `include_bytes!`).
-    pub svg: Vec<u8>,
+    pub(crate) svg: Vec<u8>,
 }
 
 impl Icon {
@@ -104,7 +102,7 @@ impl fmt::Debug for Icon {
 /// Why an icon was left out.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IconError {
-    /// Its name is not of the form [`name_well_formed`] describes.
+    /// Its name is not of the form `name_well_formed` describes.
     Name(String),
     /// Its document has this many bytes, more than [`MAX_BYTES`].
     TooLarge(usize),
@@ -136,24 +134,11 @@ impl std::error::Error for IconError {}
 /// Whether `name` is a well-formed icon name within a package: a lowercase
 /// ASCII letter followed by lowercase letters, digits and `-`, at most
 /// [`MAX_NAME`] bytes (`"leaf"`, `"branch-2"`), as Studio's own are.
-///
-/// ```
-/// use kinogaki_studio_api::icon::name_well_formed;
-/// assert!(name_well_formed("branch-2"));
-/// assert!(!name_well_formed("Branch"));
-/// assert!(!name_well_formed("acme.trees/leaf"));
-/// ```
-pub fn name_well_formed(name: &str) -> bool {
+pub(crate) fn name_well_formed(name: &str) -> bool {
     let mut chars = name.chars();
     name.len() <= MAX_NAME
         && chars.next().is_some_and(|c| c.is_ascii_lowercase())
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
-
-/// The name others give icon `name` of package `package`:
-/// `"acme.trees/leaf"`.
-pub fn qualified(package: PackageId, name: &str) -> String {
-    format!("{package}/{name}")
 }
 
 /// A package icon's name as its package's id and its name within the
@@ -207,12 +192,5 @@ mod tests {
             Icon::new("bytes", vec![0xff, 0xfe]).check(),
             Err(IconError::NotText)
         );
-    }
-
-    #[test]
-    fn qualified_names_split_into_package_and_name() {
-        let name = qualified(PackageId::declared("acme.trees"), "leaf");
-        assert_eq!(split(&name), Some(("acme.trees", "leaf")));
-        assert_eq!(split("cube"), None);
     }
 }

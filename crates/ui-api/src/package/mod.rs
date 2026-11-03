@@ -42,7 +42,7 @@
 //! offers the host's menus, keys, Tab and viewport chrome, as data) and a
 //! set of optional parts: the selection [`Levels`], the [`ViewportLayer`],
 //! the [`Inspector`], the [`Vocabulary`] that runs its items, the
-//! [`ObjectRows`] and [`OutlineRows`] for the object
+//! [`ObjectRows`] for the object
 //! kinds it owns (their creations are the kinds' own,
 //! `ObjectKindSpec::creations`). A part a
 //! context leaves out is never another context's. In a context whose
@@ -66,20 +66,18 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, Pick,
-    TimeDomain, TimeMark, TimeUnits, Tools,
+    BarField, BarValue, Candidate, LevelPreset, LevelSpec, NumericBar, TimeDomain, TimeMark,
+    TimeUnits, Tools,
 };
-pub use edited::{Edited, Ghost, GhostTone, Moving, SurfaceLook};
+pub use edited::{Edited, Ghost, GhostTone, Moving};
 pub use library::{
-    AnalysisMode, BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive,
-    LevelItems, Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT,
-    Shared, SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewSwitch,
+    BarMenu, BarSection, ContextMenuSpec, Held, KeyBinding, KeyStore, KeysActive, LevelItems,
+    Library, MarkingDefault, MenuDefaults, MenuEntry, ObjectMenus, Places, REPEAT, Shared,
+    SharedRows, Shelf, ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewSwitch,
     ViewportSpec, VocabularyItem, When,
 };
-pub use parts::{
-    Erased, Inspector, Invoked, Levels, ObjectRows, OutlineRows, RowAction, ViewportLayer,
-    Vocabulary,
-};
+pub(crate) use parts::Erased;
+pub use parts::{Inspector, Invoked, Levels, ObjectRows, RowAction, ViewportLayer, Vocabulary};
 pub use project::{ProjectSection, ProjectSettingsSection};
 pub use settings::{Section, SettingsSection};
 pub use view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
@@ -134,9 +132,6 @@ pub trait UiPackage: Send + Sync + 'static {
 pub struct ContextPart<S: ?Sized> {
     /// Its id (`acme.trees.forest`).
     pub id: ContextId,
-    /// Whether it is its context's mode on one of the network's nodes (CAD's
-    /// sketch mode on a Sketch node) rather than the network itself.
-    pub mode: bool,
     /// What it offers the host's menus, keys, Tab and viewport chrome.
     pub library: Library,
     /// Its selection levels; `None`: whole objects.
@@ -149,8 +144,6 @@ pub struct ContextPart<S: ?Sized> {
     pub vocabulary: Option<Box<dyn Vocabulary<S>>>,
     /// Inspector rows of the object kinds it owns.
     pub objects: Option<Box<dyn ObjectRows<S>>>,
-    /// Outliner rows inside the object kinds it owns.
-    pub outline: Option<Box<dyn OutlineRows<S>>>,
 }
 
 impl<S: ?Sized> ContextPart<S> {
@@ -158,21 +151,13 @@ impl<S: ?Sized> ContextPart<S> {
     pub fn new(id: ContextId) -> Self {
         ContextPart {
             id,
-            mode: false,
             library: Library::default(),
             levels: None,
             viewport: None,
             inspector: None,
             vocabulary: None,
             objects: None,
-            outline: None,
         }
-    }
-
-    /// As its context's mode on a node.
-    pub fn as_mode(mut self) -> Self {
-        self.mode = true;
-        self
     }
 
     /// With its library.
@@ -210,12 +195,6 @@ impl<S: ?Sized> ContextPart<S> {
         self.objects = Some(Box::new(part));
         self
     }
-
-    /// With outliner rows.
-    pub fn with_outline(mut self, part: impl OutlineRows<S> + 'static) -> Self {
-        self.outline = Some(Box::new(part));
-        self
-    }
 }
 
 impl<S: 'static> ContextPart<S> {
@@ -223,7 +202,6 @@ impl<S: 'static> ContextPart<S> {
     fn erase(self) -> ContextPart<dyn Any> {
         ContextPart {
             id: self.id,
-            mode: self.mode,
             library: self.library,
             levels: self
                 .levels
@@ -240,9 +218,6 @@ impl<S: 'static> ContextPart<S> {
             objects: self
                 .objects
                 .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn ObjectRows<dyn Any>>),
-            outline: self
-                .outline
-                .map(|p| Box::new(Erased::<S, _>::new(p)) as Box<dyn OutlineRows<dyn Any>>),
         }
     }
 }
@@ -252,14 +227,12 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
         let has = |b: bool| if b { "yes" } else { "no" };
         f.debug_struct("ContextPart")
             .field("id", &self.id)
-            .field("mode", &self.mode)
             .field("items", &self.library.items.len())
             .field("levels", &has(self.levels.is_some()))
             .field("viewport", &has(self.viewport.is_some()))
             .field("inspector", &has(self.inspector.is_some()))
             .field("vocabulary", &has(self.vocabulary.is_some()))
             .field("objects", &has(self.objects.is_some()))
-            .field("outline", &has(self.outline.is_some()))
             .finish()
     }
 }
@@ -324,9 +297,9 @@ impl Registered {
         self.package.reset(state, cx)
     }
 
-    /// Context `id`'s part (its mode when `mode`).
-    pub fn context(&self, id: ContextId, mode: bool) -> Option<&ContextPart<dyn Any>> {
-        self.contexts.iter().find(|c| c.id == id && c.mode == mode)
+    /// Context `id`'s part.
+    pub fn context(&self, id: ContextId) -> Option<&ContextPart<dyn Any>> {
+        self.contexts.iter().find(|c| c.id == id)
     }
 }
 
@@ -362,7 +335,7 @@ impl WithUi for Package {
                 .collect(),
             package: Arc::new(ui),
         };
-        let contexts = registered.contexts.iter().map(|c| (c.id, c.mode)).collect();
+        let contexts = registered.contexts.iter().map(|c| c.id).collect();
         self.ui = Some(PackageUi::new(contexts, registered));
         self
     }

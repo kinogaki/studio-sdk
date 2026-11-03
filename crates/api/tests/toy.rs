@@ -1,9 +1,7 @@
 //! The API through a toy kernel: a point cloud data type (codec, display,
-//! no other facet), a "count" type a bridge converts clouds into, a Cloud
-//! object kind, a format and a selection slot, registered as packages.
+//! no other facet), a "count" type, a Cloud object kind, a format and a selection slot, registered as packages.
 use kinogaki_studio_api::conformance::Unconverted;
 use kinogaki_studio_api::element::MemoryElement;
-use kinogaki_studio_api::viewport::OverlayVertex;
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
@@ -52,16 +50,9 @@ impl Displayable for CloudDisplay {
         let cloud = CLOUD
             .get(data)
             .ok_or_else(|| Error::invalid("not a cloud"))?;
-        // Points as markers, no triangles.
+        // Points, no triangles.
         let points: Arc<[[f32; 3]]> = cloud.0.iter().map(|p| p.map(|c| c as f32)).collect();
-        let markers: Arc<[OverlayVertex]> = (0..points.len() as u32)
-            .map(|i| OverlayVertex {
-                point: i,
-                component: i,
-            })
-            .collect();
-        let surface =
-            Surface::new(points, Arc::from([]), Arc::from([]), 0, 0)?.with_markers(markers, 0)?;
+        let surface = Surface::new(points, Arc::from([]), Arc::from([]), 0, 0)?;
         Ok(Drawn::one(Arc::new(surface)).with_detail(cloud.0.len()))
     }
     fn highlight(&self, _data: &Data, _drawn: &Drawn, components: &Components) -> ElementSet {
@@ -139,30 +130,6 @@ impl DataType for CountType {
     }
     fn codec(&self) -> &dyn DataCodec {
         &CloudCodec
-    }
-}
-
-/// The bridge: a cloud as its point count.
-struct Counting;
-impl Conversion for Counting {
-    fn id(&self) -> ConversionId {
-        ConversionId::declared("toy.bridge.count")
-    }
-    fn label(&self) -> &str {
-        "Count"
-    }
-    fn from(&self) -> DataTypeId {
-        CLOUD.id()
-    }
-    fn to(&self) -> DataTypeId {
-        COUNT.id()
-    }
-    fn convert(&self, data: &Data, cancel: &CancelToken) -> Result<Data, Error> {
-        cancel.check()?;
-        let cloud = CLOUD
-            .get(data)
-            .ok_or_else(|| Error::invalid("not a cloud"))?;
-        Ok(COUNT.wrap(cloud.0.len()))
     }
 }
 
@@ -289,10 +256,6 @@ fn kernel() -> Package {
         .with_slot::<Selection>()
 }
 
-fn bridge() -> Package {
-    Package::new(PackageId::declared("toy.bridge"), "Counting").with_conversion(Counting)
-}
-
 fn cloud(points: &[[f64; 3]]) -> Data {
     CLOUD.wrap(Cloud(points.to_vec()))
 }
@@ -340,7 +303,6 @@ fn display_prepares_highlights_and_cancels() {
     assert_eq!(drawn.detail::<usize>(), Some(&3));
     assert!(drawn.detail::<String>().is_none());
     let surface = viewport::packet_as::<Surface>(&drawn.pieces[0].packet).unwrap();
-    assert_eq!(surface.markers().len(), 3);
     assert_eq!(surface.points()[2], [2.0; 3]);
     let picked = Components::new(CLOUD.id(), ElementKind::Point, 2, vec![2u32, 0]);
     assert_eq!(display.highlight(&data, &drawn, &picked).ids(), &[0, 2]);
@@ -403,36 +365,6 @@ fn objects_adopt_imported_values_of_their_result_type() {
         .unwrap();
     let back = back.downcast_ref::<CloudBody>().unwrap();
     assert_eq!(CLOUD.get(&back.0), CLOUD.get(value));
-    assert_eq!(
-        registry
-            .formats_producing(CLOUD.id())
-            .map(|f| f.id())
-            .collect::<Vec<_>>(),
-        [format.id()]
-    );
-    assert_eq!(registry.formats_producing(COUNT.id()).count(), 0);
-}
-
-#[test]
-fn conversions_come_from_bridges() {
-    let mut registry = Registry::new();
-    registry.register(kernel()).unwrap();
-    assert!(
-        registry
-            .conversion_between(CLOUD.id(), COUNT.id())
-            .is_none()
-    );
-    registry.register(bridge()).unwrap();
-    let count = registry.conversion_between(CLOUD.id(), COUNT.id()).unwrap();
-    let converted = count
-        .convert(&cloud(&[[0.0; 3]; 4]), &CancelToken::default())
-        .unwrap();
-    assert_eq!(COUNT.get(&converted), Some(&4));
-    assert!(
-        registry
-            .conversion_between(COUNT.id(), CLOUD.id())
-            .is_none()
-    );
 }
 
 /// Where a slot test pretends the user is.
@@ -452,12 +384,8 @@ fn session_slots_start_initial_and_are_copied_on_write() {
     let mut registry = Registry::new();
     registry.register(kernel()).unwrap();
     let id = SlotId::declared("toy.points.selection");
-    assert!(
-        registry
-            .slot(id)
-            .is_some_and(|s| s.place_bound() && s.undoable())
-    );
-    let mut session = registry.new_session();
+    assert!(registry.slot(id).is_some_and(|s| s.undoable()));
+    let mut session = SessionSlots::new(registry.slot(id));
     assert_eq!(session.get::<Selection>(), Some(&Selection::default()));
     let before = session.clone();
     session.get_mut::<Selection>().unwrap().0.push(1);
@@ -554,48 +482,4 @@ fn packages_declare_only_their_vendors_ids() {
             id: "toy.points.cloud",
         }
     );
-}
-
-#[test]
-fn named_data_types_must_be_registered_first() {
-    let mut registry = Registry::new();
-    // The bridge before the kernel it converts between.
-    let error = registry.register(bridge()).unwrap_err();
-    assert_eq!(
-        error,
-        RegistryError::UnknownDataType {
-            package: PackageId::declared("toy.bridge"),
-            by: "toy.bridge.count",
-            data: CLOUD.id(),
-        }
-    );
-    assert!(error.to_string().contains("isn't registered"));
-    registry.register(kernel()).unwrap();
-    registry.register(bridge()).unwrap();
-    // A second route between the same types is ambiguous.
-    let again = Package::new(PackageId::declared("toy.again"), "Again").with_conversion(Again);
-    assert!(matches!(
-        registry.register(again),
-        Err(RegistryError::DuplicateConversion { .. })
-    ));
-}
-
-/// Another conversion from clouds to counts.
-struct Again;
-impl Conversion for Again {
-    fn id(&self) -> ConversionId {
-        ConversionId::declared("toy.again.count")
-    }
-    fn label(&self) -> &str {
-        "Count again"
-    }
-    fn from(&self) -> DataTypeId {
-        CLOUD.id()
-    }
-    fn to(&self) -> DataTypeId {
-        COUNT.id()
-    }
-    fn convert(&self, data: &Data, cancel: &CancelToken) -> Result<Data, Error> {
-        Counting.convert(data, cancel)
-    }
 }

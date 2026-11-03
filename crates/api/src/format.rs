@@ -99,7 +99,7 @@ pub struct Reading<'a> {
     /// reading one file give values told apart.
     pub origin: u64,
     /// Values of the project the host lends formats, found by their Rust
-    /// type ([`Reading::setting`]): a CAD kernel's tolerances.
+    /// type (`Reading::setting`): a CAD kernel's tolerances.
     pub settings: &'a [&'a (dyn Any + Send + Sync)],
     /// Raised once the read is no longer wanted; long reads poll it
     /// ([`Reading::check`]) and stop with [`Error::Cancelled`].
@@ -123,13 +123,6 @@ impl<'a> Reading<'a> {
             cancel: CancelToken::default(),
             wants: None,
         }
-    }
-
-    /// The lent value of type `T`, when the host lends one.
-    pub fn setting<T: Any>(&self) -> Option<&'a T> {
-        self.settings
-            .iter()
-            .find_map(|s| (*s as &dyn Any).downcast_ref())
     }
 
     /// `Err(Error::Cancelled)` once the read is no longer wanted.
@@ -335,8 +328,6 @@ pub trait Frames: Sync {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    /// The items at frame `index` (from 0), cooked at its time.
-    fn items_at(&self, index: usize) -> Result<Vec<FileItem>, Error>;
 }
 
 #[cfg(test)]
@@ -434,8 +425,6 @@ mod tests {
             cancel: stop,
             ..Reading::new(Purpose::Node, units, &crate::conformance::Unconverted)
         };
-        assert_eq!(reading.setting::<f64>(), Some(&0.01));
-        assert_eq!(reading.setting::<u32>(), None);
         let read = Plain.read(Path::new("a.plain"), &Plain.options(), &reading);
         assert_eq!(read.unwrap_err(), Error::Cancelled);
         let fine = Reading::new(

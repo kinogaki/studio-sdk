@@ -318,10 +318,4 @@ impl NodeCreation {
         self.inside.node(node);
         self
     }
-
-    /// With its inside started from `seed`.
-    pub fn seeded(mut self, seed: NetworkSeed) -> Self {
-        self.inside = seed;
-        self
-    }
 }

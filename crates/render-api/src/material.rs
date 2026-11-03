@@ -130,10 +130,6 @@ pub struct Link {
 /// this is its own).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NetworkError {
-    /// A link names a node past the end.
-    NodeOutOfRange(NodeIndex),
-    /// An input is linked twice.
-    LinkedTwice(NodeIndex, Arc<str>),
     /// The links form a cycle through this node.
     Cycle(NodeIndex),
 }
@@ -180,28 +176,6 @@ impl MaterialNetwork {
         }
     }
 
-    /// The mesh attributes the network's nodes read, each once, in their
-    /// nodes' order (the host sends a mesh these).
-    pub fn attribute_names(&self) -> Vec<Arc<str>> {
-        let mut names: Vec<Arc<str>> = Vec::new();
-        for node in &self.nodes {
-            for (_, value) in &node.params {
-                if let ParamValue::Attribute(name) = value
-                    && !name.is_empty()
-                    && !names.contains(name)
-                {
-                    names.push(name.clone());
-                }
-            }
-        }
-        names
-    }
-
-    /// The link into input `input` of node `to`, if any.
-    pub fn link_into(&self, to: NodeIndex, input: &str) -> Option<&Link> {
-        self.links.iter().find(|l| l.to == to && &*l.input == input)
-    }
-
     /// Whether `other` has the same nodes (types and settings) and links,
     /// so only constants differ.
     pub fn same_wiring(&self, other: &MaterialNetwork) -> bool {
@@ -213,56 +187,5 @@ impl MaterialNetwork {
                 .iter()
                 .zip(&other.nodes)
                 .all(|(a, b)| a.kind == b.kind && a.params == b.params)
-    }
-
-    /// Check the links: every one between nodes the network has, each
-    /// input linked once, no cycles.
-    pub fn validate_links(&self) -> Result<(), NetworkError> {
-        let count = self.nodes.len();
-        for (k, link) in self.links.iter().enumerate() {
-            for node in [link.from, link.to] {
-                if node as usize >= count {
-                    return Err(NetworkError::NodeOutOfRange(node));
-                }
-            }
-            if self.links[..k]
-                .iter()
-                .any(|l| l.to == link.to && l.input == link.input)
-            {
-                return Err(NetworkError::LinkedTwice(link.to, link.input.clone()));
-            }
-        }
-        // Depth-first over the links: 0 unvisited, 1 on the path, 2 done.
-        let mut state = vec![0u8; count];
-        for start in 0..count {
-            if state[start] != 0 {
-                continue;
-            }
-            let mut stack = vec![(start, 0usize)];
-            state[start] = 1;
-            while let Some((node, next)) = stack.pop() {
-                let sources: Vec<usize> = self
-                    .links
-                    .iter()
-                    .filter(|l| l.to as usize == node)
-                    .map(|l| l.from as usize)
-                    .collect();
-                if next < sources.len() {
-                    stack.push((node, next + 1));
-                    let source = sources[next];
-                    match state[source] {
-                        0 => {
-                            state[source] = 1;
-                            stack.push((source, 0));
-                        }
-                        1 => return Err(NetworkError::Cycle(source as NodeIndex)),
-                        _ => {}
-                    }
-                } else {
-                    state[node] = 2;
-                }
-            }
-        }
-        Ok(())
     }
 }

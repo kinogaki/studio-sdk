@@ -11,9 +11,7 @@
 //! The host erases `S` when a package registers: [`Erased`] turns each
 //! part over `S` into the same part over `dyn Any`, downcasting the state
 //! the host lends back to `S`.
-use super::data::{
-    Candidate, LevelPreset, LevelSpec, NumericBar, OutlineRow, Pick, TimeDomain, Tools,
-};
+use super::data::{Candidate, LevelPreset, LevelSpec, NumericBar, TimeDomain, Tools};
 use super::edited::Edited;
 use super::view::{Holds, KeyPress, Popover, PopoverRow, RowEdit};
 use crate::gizmo::{PivotFrame, TransformPhase, TransformStep};
@@ -72,17 +70,6 @@ pub trait Levels<S: ?Sized>: Send + Sync {
     /// adds, Command removes): the context decides what the hit selects.
     fn picked(&self, s: &mut S, cx: &mut dyn Cx, hit: Option<Components>, how: Combine) {
         let _ = (s, cx, hit, how);
-    }
-    /// What a click or a box in the call's view takes of what the package
-    /// draws itself, at its active [`own`](LevelSpec::own) levels, asked
-    /// before core's picks: a click while one of them is active, a box
-    /// while the primary level is one (a box selects at the primary
-    /// level). `Some` goes to [`picked`](Self::picked) in place of core's
-    /// hit, through the same selection and undo path; `None` leaves a
-    /// click to core's picks at the other active levels.
-    fn hit(&self, s: &S, cx: &dyn ViewCx, pick: Pick) -> Option<Components> {
-        let _ = (s, cx, pick);
-        None
     }
     /// The selection as the transform pivot reads it, in the context's
     /// space; `None`: nothing to pivot about (no pivot button). Called
@@ -358,13 +345,6 @@ pub trait Vocabulary<S: ?Sized>: Send + Sync {
         let _ = (s, cx, item);
         None
     }
-    /// The user double-clicked node `node` of the open network, which
-    /// opens nothing the host knows (no subnet, no network it holds): the
-    /// context may edit it (a tool node's tool live again on it). Nothing
-    /// by default.
-    fn edit(&self, s: &mut S, cx: &mut dyn Cx, node: NodeRef) {
-        let _ = (s, cx, node);
-    }
 }
 
 /// Where an item was run from: what running it means.
@@ -415,20 +395,9 @@ pub trait ObjectRows<S: ?Sized>: Send + Sync {
     }
 }
 
-/// What the outliner lists inside objects of the kinds a context owns.
-pub trait OutlineRows<S: ?Sized>: Send + Sync {
-    /// The kinds whose rows it gives. Read once.
-    fn kinds(&self) -> Vec<ObjectKindId>;
-    /// The rows under object `object`; with `searching` they include those
-    /// inside collapsed branches.
-    fn rows(&self, s: &S, cx: &dyn Cx, object: ObjectRef, searching: bool) -> Vec<OutlineRow>;
-    /// One of its rows picked.
-    fn pick(&self, s: &mut S, cx: &mut dyn Cx, row: &OutlineRow);
-}
-
 /// A part over `S` as the same part over `dyn Any`: the host's state,
 /// lent as `dyn Any`, is downcast back to `S` for each call.
-pub struct Erased<S, P: ?Sized> {
+pub(crate) struct Erased<S, P: ?Sized> {
     pub(super) part: Box<P>,
     state: PhantomData<fn() -> S>,
 }
@@ -481,9 +450,6 @@ impl<S: 'static> Levels<dyn Any> for Erased<S, dyn Levels<S>> {
     }
     fn picked(&self, s: &mut dyn Any, cx: &mut dyn Cx, hit: Option<Components>, how: Combine) {
         self.part.picked(own_mut(s), cx, hit, how)
-    }
-    fn hit(&self, s: &dyn Any, cx: &dyn ViewCx, pick: Pick) -> Option<Components> {
-        self.part.hit(own(s), cx, pick)
     }
     fn pivot(&self, s: &mut dyn Any, cx: &mut dyn Cx) -> Option<PivotFrame> {
         self.part.pivot(own_mut(s), cx)
@@ -638,9 +604,6 @@ impl<S: 'static> Vocabulary<dyn Any> for Erased<S, dyn Vocabulary<S>> {
     fn label(&self, s: &dyn Any, cx: &dyn Cx, item: &str) -> Option<String> {
         self.part.label(own(s), cx, item)
     }
-    fn edit(&self, s: &mut dyn Any, cx: &mut dyn Cx, node: NodeRef) {
-        self.part.edit(own_mut(s), cx, node)
-    }
 }
 
 impl<S: 'static> ObjectRows<dyn Any> for Erased<S, dyn ObjectRows<S>> {
@@ -665,23 +628,5 @@ impl<S: 'static> ObjectRows<dyn Any> for Erased<S, dyn ObjectRows<S>> {
     }
     fn opened(&self, s: &mut dyn Any, cx: &mut dyn Cx, object: ObjectRef) {
         self.part.opened(own_mut(s), cx, object)
-    }
-}
-
-impl<S: 'static> OutlineRows<dyn Any> for Erased<S, dyn OutlineRows<S>> {
-    fn kinds(&self) -> Vec<ObjectKindId> {
-        self.part.kinds()
-    }
-    fn rows(
-        &self,
-        s: &dyn Any,
-        cx: &dyn Cx,
-        object: ObjectRef,
-        searching: bool,
-    ) -> Vec<OutlineRow> {
-        self.part.rows(own(s), cx, object, searching)
-    }
-    fn pick(&self, s: &mut dyn Any, cx: &mut dyn Cx, row: &OutlineRow) {
-        self.part.pick(own_mut(s), cx, row)
     }
 }

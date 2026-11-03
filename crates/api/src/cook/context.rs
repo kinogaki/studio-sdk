@@ -260,15 +260,6 @@ impl<'a> CookCx<'a> {
         start..start + self.wires.get(port).copied().unwrap_or(0)
     }
 
-    /// The name of the node behind input `input`, when the node reads
-    /// input names and core gave one.
-    pub fn input_name(&self, input: usize) -> Option<&str> {
-        self.names
-            .get(input)
-            .map(String::as_str)
-            .filter(|n| !n.is_empty())
-    }
-
     /// Whether anything reads output `output`: a node may skip making an
     /// output nobody reads (see [`Outputs::data`](crate::Outputs::data)).
     /// Output 0, the node's result, is always wanted.
@@ -326,11 +317,6 @@ impl<'a> CookCx<'a> {
             .as_mut()
             .and_then(|s| s.downcast_mut())
             .expect("the slot holds a T: it was just checked or filled")
-    }
-
-    /// Empties the node's scratch slot.
-    pub fn clear_scratch(&mut self) {
-        *self.scratch = None;
     }
 
     /// `work(first_index, block)` over disjoint blocks of `values`, at

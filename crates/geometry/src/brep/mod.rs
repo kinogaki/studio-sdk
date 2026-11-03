@@ -6,17 +6,16 @@
 //! [`BrepTopology`] (vertices, edges, coedges, loops, faces, shells and
 //! lumps), the entities' persistent [`Names`] and its [`Attributes`]. Ids
 //! are dense typed `u32` indices ([`FaceId`], [`EdgeId`]…), each table
-//! holding at most [`MAX_ENTITIES`] (2²⁸) entities. Any CAD kernel can
+//! holding at most `MAX_ENTITIES` (2²⁸) entities. Any CAD kernel can
 //! produce and consume one: the conventions below are the contract two
 //! kernels agree on, and [`BrepBuilder::build`] refuses a body that
 //! breaks the ones it can check.
 //!
 //! The value carries no algorithms beyond evaluating a carrier's point
-//! and first derivatives ([`Surface::partials`], [`Curve::point`],
-//! [`PCurve::point`]): no closest points, intersections, bounds, meshing
+//! ([`Curve::point`], [`PCurve::point`]): no closest points, intersections, bounds, meshing
 //! or healing. A kernel's caches (a vertex → edges index, bounds, an
 //! offset's approximation, a closed seam's gap, a mesher's output) live
-//! in [`BrepTopology::derived`] and [`Geometry::derived`] under the
+//! in `BrepTopology::derived` and [`Geometry::derived`] under the
 //! crate's cache rule. Display triangles are a kernel's mesher's output,
 //! not part of the value.
 //!
@@ -54,7 +53,7 @@
 //! `counter_clockwise` says which way it turns in the chart, so it shares
 //! its edge's parameter. NURBS curves run over their knots' domain.
 //!
-//! **Periods.** [`Surface::periods`]: 2π in θ, and in a closed NURBS
+//! **Periods.** 2π in θ, and in a closed NURBS
 //! direction the domain's width (evaluation wraps there). A parameter of
 //! a periodic direction may lie in any lift: `S(u + period) = S(u)`.
 //!
@@ -87,8 +86,8 @@
 //! chart. A pole edge used once leaves its shell closed.
 //!
 //! **Radial rings.** An edge has one coedge or two; its ring runs from
-//! [`Edge::coedge`] through [`Coedge::radial`] (a boundary edge's ring is
-//! itself). Two coedges of an edge run opposite ways, in one shell.
+//! [`Edge::coedge`] ([`BrepTopology::edge_coedges`]; a boundary edge's
+//! ring is itself). Two coedges of an edge run opposite ways, in one shell.
 //!
 //! **Shells and lumps.** A shell is a connected set of faces, each face in
 //! exactly one shell; it is closed when every edge of it but a pole has
@@ -175,12 +174,16 @@ mod body;
 mod builder;
 mod consistency;
 mod eval;
+#[cfg(test)]
+mod eval_tests;
 mod fingerprint;
 mod geometry;
 mod ids;
 mod names;
 mod numbering;
 mod nurbs;
+#[cfg(test)]
+mod tests;
 mod topology;
 
 pub use body::{Body, Placement};
@@ -189,15 +192,15 @@ pub use geometry::{
     Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Geometry, Line, Line2,
     Offset, PCurve, Plane, Revolution, Sphere, Surface, Torus,
 };
+pub(crate) use ids::Entity;
 pub use ids::{
-    CoedgeId, CurveId, EdgeId, Entity, FaceId, LoopId, LumpId, PCurveId, ShellId, SurfaceId,
-    VertexId,
+    CoedgeId, CurveId, EdgeId, FaceId, LoopId, LumpId, PCurveId, ShellId, SurfaceId, VertexId,
 };
 pub use names::{End, History, Name, NameNode, OperationId, Role};
 pub use numbering::Element;
 pub use nurbs::{NurbsCurve, NurbsSurface, SeamContinuity};
 pub use topology::{
-    BodyKind, BrepTopology, Coedge, Counts, Edge, Face, Loop, Lump, Names, Sense, Shell, Vertex,
+    BodyKind, BrepTopology, Coedge, Counts, Edge, Face, Loop, Names, Sense, Shell, Vertex,
 };
 
 use crate::Frame;
@@ -212,7 +215,7 @@ use std::sync::Arc;
 
 /// The most entities of one kind a body holds (2²⁸), and the most bodies
 /// or datums a [`Brep`] holds.
-pub const MAX_ENTITIES: usize = 1 << 28;
+pub(crate) const MAX_ENTITIES: usize = 1 << 28;
 
 /// What a datum is.
 ///
@@ -268,7 +271,7 @@ pub struct Datum {
 /// one, across its bodies, free curves and datums ([`Brep::count`],
 /// [`Brep::element`]); a selection keeps [`Brep::fingerprint`].
 ///
-/// **Rules** ([`Brep::new`]): at most [`MAX_ENTITIES`] bodies and datums;
+/// **Rules** ([`Brep::new`]): at most `MAX_ENTITIES` bodies and datums;
 /// Detail attributes only, one element each; each datum finite, an axis's
 /// direction unit and a hint's size not negative.
 #[derive(Clone, Debug, PartialEq)]
@@ -411,14 +414,6 @@ impl Brep {
         };
         value.check()?;
         Ok(value)
-    }
-
-    /// This value with `history`, sharing the rest.
-    pub fn with_history(&self, history: History) -> Self {
-        Self {
-            history: Arc::new(history),
-            ..self.clone()
-        }
     }
 }
 

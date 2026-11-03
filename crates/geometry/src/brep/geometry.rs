@@ -668,7 +668,7 @@ impl Ellipse2 {
     }
 
     /// `(x, y)`: the chart directions of `t = 0` and `t = π/2`.
-    pub fn axes(&self) -> ([f64; 2], [f64; 2]) {
+    pub(crate) fn axes(&self) -> ([f64; 2], [f64; 2]) {
         (self.x, quarter(self.x, self.counter_clockwise))
     }
 }

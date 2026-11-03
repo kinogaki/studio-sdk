@@ -126,7 +126,6 @@ impl Group {
     /// assert_eq!(a.intersection(&b).unwrap().iter().collect::<Vec<_>>(), [1]);
     /// assert_eq!(a.difference(&b).unwrap().iter().collect::<Vec<_>>(), [0]);
     /// assert_eq!(a.symmetric_difference(&b).unwrap().iter().collect::<Vec<_>>(), [0, 4]);
-    /// assert_eq!(a.complement().iter().collect::<Vec<_>>(), [2, 3, 4]);
     /// assert!(a.union(&Group::none(6)).is_err());
     /// ```
     ///
@@ -158,16 +157,6 @@ impl Group {
     /// When the sets are over different numbers of elements.
     pub fn symmetric_difference(&self, other: &Group) -> Result<Group, GeometryError> {
         self.combine(other, |a, b| a ^ b)
-    }
-
-    /// The elements not in this set.
-    pub fn complement(&self) -> Group {
-        let mut words: Vec<u64> = self.words.iter().map(|w| !w).collect();
-        clear_tail(&mut words, self.elements);
-        Self {
-            elements: self.elements,
-            words: Column::new(words),
-        }
     }
 
     /// Word by word; every `op` keeps the bits past the last element clear.
@@ -241,88 +230,5 @@ fn clear_tail(words: &mut [u64], elements: usize) {
         && !elements.is_multiple_of(64)
     {
         *last &= (1 << (elements % 64)) - 1;
-    }
-}
-
-/// Builds a [`Group`] one element at a time, as bits; [`finish`](Self::finish)
-/// adopts them without a copy. Indices are those of [`Group::contains`].
-///
-/// ```
-/// use kinogaki_geometry::{Group, GroupBuilder};
-///
-/// let mut seams = GroupBuilder::new(100);
-/// seams.set(3, true).unwrap();
-/// seams.set(70, true).unwrap();
-/// seams.set(3, false).unwrap();
-/// assert!(seams.contains(70) && !seams.contains(3));
-/// assert!(seams.set(100, true).is_err());
-/// assert_eq!(seams.finish(), Group::from_indices(100, [70]).unwrap());
-/// ```
-#[derive(Clone, Debug)]
-pub struct GroupBuilder {
-    elements: usize,
-    words: Vec<u64>,
-}
-
-impl GroupBuilder {
-    /// No members, over `elements` elements.
-    pub fn new(elements: usize) -> Self {
-        Self {
-            elements,
-            words: vec![0; elements.div_ceil(64)],
-        }
-    }
-
-    /// `group`'s members, to change (one copy of its words).
-    pub fn from_group(group: &Group) -> Self {
-        Self {
-            elements: group.elements,
-            words: group.words.to_vec(),
-        }
-    }
-
-    /// How many elements it is over.
-    pub fn elements(&self) -> usize {
-        self.elements
-    }
-
-    /// Makes element `i` a member or not.
-    ///
-    /// # Errors
-    /// When `i` is not below the elements.
-    pub fn set(&mut self, i: usize, member: bool) -> Result<(), GeometryError> {
-        if i >= self.elements {
-            return Err(GeometryError::at(
-                ErrorKind::Attribute,
-                i,
-                format!("group member {i} is past its {} elements", self.elements),
-            ));
-        }
-        let bit = 1 << (i % 64);
-        if member {
-            self.words[i / 64] |= bit;
-        } else {
-            self.words[i / 64] &= !bit;
-        }
-        Ok(())
-    }
-
-    /// Whether element `i` is a member (`false` past the elements).
-    #[inline]
-    pub fn contains(&self, i: usize) -> bool {
-        i < self.elements && self.words[i / 64] >> (i % 64) & 1 == 1
-    }
-
-    /// How many elements are members.
-    pub fn members(&self) -> usize {
-        self.words.iter().map(|w| w.count_ones() as usize).sum()
-    }
-
-    /// The group built.
-    pub fn finish(self) -> Group {
-        Group {
-            elements: self.elements,
-            words: Column::new(self.words),
-        }
     }
 }

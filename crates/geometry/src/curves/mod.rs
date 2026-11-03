@@ -89,7 +89,7 @@ impl Knots {
     }
 
     /// Curve `i`'s knots.
-    pub fn of(&self, i: usize) -> &[f64] {
+    pub(crate) fn of(&self, i: usize) -> &[f64] {
         &self.values[self.offsets[i] as usize..self.offsets[i + 1] as usize]
     }
 }

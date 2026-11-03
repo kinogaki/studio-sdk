@@ -1,12 +1,11 @@
 //! A small plugin panel driven through the headless fakes: layouts that
-//! return values, a sheet keyed by the plugin's own type, menus, a card,
-//! overlays and value fields fed by input.
+//! return values, a sheet keyed by the plugin's own type, menus, overlays
+//! and value fields.
 use studio_ui_api::sheet::{Action, Field, Number, Schema};
 use studio_ui_api::testing::{Call, RecordingUi};
-use studio_ui_api::value_fields::Typing;
 use studio_ui_api::{
-    Align2, ButtonSpec, CardSpec, Color, Event, Font, Id, Input, KeyFilter, MenuItem, Pos, Rect,
-    Shape, SheetStyle, Stroke, TextStyle, Ui, UiExt, ValueFields, pos, vec2,
+    Align2, ButtonSpec, Color, Font, Id, KeyFilter, MenuItem, Pos, Rect, Shape, SheetStyle, Stroke,
+    TextStyle, Ui, UiExt, ValueFields, pos, vec2,
 };
 
 /// The plugin's own field keys.
@@ -142,27 +141,6 @@ fn menus_run_only_while_open() {
 }
 
 #[test]
-fn a_card_reports_done_and_its_body() {
-    let mut ui = RecordingUi::new(window());
-    ui.click("Done");
-    let spec = CardSpec {
-        id: Id::new("bevel-card"),
-        rect: Rect::from_min_size(pos(10.0, 10.0), vec2(200.0, 120.0)),
-        bounds: window(),
-        title: "Bevel",
-        more: None,
-    };
-    let card = ui.card_with(&spec, |ui| {
-        ui.label("Distance", TextStyle::default());
-        7
-    });
-    assert_eq!(card.inner, 7);
-    assert!(card.response.done && !card.response.cancel);
-    assert_eq!(card.response.rect, spec.rect);
-    assert_eq!(ui.calls()[0], Call::Card("Bevel".into()));
-}
-
-#[test]
 fn overlays_are_recorded_as_shapes() {
     let ui = RecordingUi::new(window());
     let theme = ui.theme().clone();
@@ -194,16 +172,13 @@ fn overlays_are_recorded_as_shapes() {
 }
 
 #[test]
-fn value_fields_take_typing_from_input_and_hold_the_keys() {
-    let input = Input {
-        events: vec![Event::Text("4".into()), Event::Text("2".into())],
-        ..Input::default()
-    };
-    let mut ui = RecordingUi::new(window()).with_input(input);
+fn value_fields_show_what_was_typed_and_hold_the_keys() {
+    let mut ui = RecordingUi::new(window());
     let mut fields = ValueFields::new(2);
     fields.fields[0].live = "10".into();
     fields.fields[1].live = "45°".into();
-    assert_eq!(fields.type_events(&ui.input().events), Typing::Changed);
+    fields.fields[0].text = "42".into();
+    fields.fields[0].locked = true;
     let rects = ui.value_fields(&fields, &[pos(100.0, 100.0), pos(100.0, 130.0)], true);
     assert_eq!(rects.len(), 2);
     assert_eq!(rects[0].center(), pos(100.0, 100.0));

@@ -18,15 +18,7 @@ pub enum Sense {
     Reversed,
 }
 
-impl Sense {
-    /// The other sense.
-    pub fn flipped(self) -> Self {
-        match self {
-            Sense::Same => Sense::Reversed,
-            Sense::Reversed => Sense::Same,
-        }
-    }
-}
+impl Sense {}
 
 /// What a body is, from its shells.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -115,17 +107,6 @@ impl Coedge {
         self.sense
     }
 
-    /// The loop it is in.
-    pub fn owner(&self) -> LoopId {
-        self.owner
-    }
-
-    /// The next coedge round its edge's radial ring (itself when the edge
-    /// has one coedge).
-    pub fn radial(&self) -> CoedgeId {
-        self.radial
-    }
-
     /// Its edge in its face's chart, sharing the edge's parameter.
     pub fn pcurve(&self) -> Option<PCurveId> {
         self.pcurve
@@ -209,7 +190,7 @@ impl Shell {
 
 /// An outer shell and its voids.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Lump {
+pub(crate) struct Lump {
     pub(crate) first: u32,
     pub(crate) len: u32,
 }
@@ -237,7 +218,7 @@ pub struct Counts {
 /// lumps, each table by its id, made only by
 /// [`BrepBuilder`](super::BrepBuilder). Shared by every body that shares
 /// it (a CV drag keeps it), with typed cache slots of its own
-/// ([`derived`](Self::derived)) for what a kernel derives from it: a
+/// (`derived`) for what a kernel derives from it: a
 /// vertex → edges index, adjacency, a mesher's face order.
 pub struct BrepTopology {
     pub(crate) vertices: Column<Vertex>,
@@ -273,23 +254,13 @@ impl BrepTopology {
     }
 
     /// Loop `l`.
-    pub fn loop_(&self, l: LoopId) -> &Loop {
+    pub(crate) fn loop_(&self, l: LoopId) -> &Loop {
         &self.loops[l.index()]
     }
 
     /// Face `f`.
     pub fn face(&self, f: FaceId) -> &Face {
         &self.faces[f.index()]
-    }
-
-    /// Shell `s`.
-    pub fn shell(&self, s: ShellId) -> &Shell {
-        &self.shells[s.index()]
-    }
-
-    /// Lump `l`.
-    pub fn lump(&self, l: LumpId) -> &Lump {
-        &self.lumps[l.index()]
     }
 
     /// Every vertex's id.
@@ -303,7 +274,7 @@ impl BrepTopology {
     }
 
     /// Every coedge's id.
-    pub fn coedge_ids(&self) -> impl ExactSizeIterator<Item = CoedgeId> + use<> {
+    pub(crate) fn coedge_ids(&self) -> impl ExactSizeIterator<Item = CoedgeId> + use<> {
         (0..self.coedges.len()).map(CoedgeId::new)
     }
 
@@ -358,26 +329,6 @@ impl BrepTopology {
         })
     }
 
-    /// The coedge after `c` in its loop.
-    pub fn next(&self, c: CoedgeId) -> CoedgeId {
-        let l = self.loops[self.coedges[c.index()].owner.index()];
-        let i = c.index() as u32 + 1;
-        CoedgeId::new((if i == l.first + l.len { l.first } else { i }) as usize)
-    }
-
-    /// The coedge before `c` in its loop.
-    pub fn previous(&self, c: CoedgeId) -> CoedgeId {
-        let l = self.loops[self.coedges[c.index()].owner.index()];
-        let i = c.index() as u32;
-        CoedgeId::new(
-            (if i == l.first {
-                l.first + l.len - 1
-            } else {
-                i - 1
-            }) as usize,
-        )
-    }
-
     /// The face coedge `c` bounds.
     pub fn coedge_face(&self, c: CoedgeId) -> FaceId {
         self.loops[self.coedges[c.index()].owner.index()].face
@@ -394,7 +345,7 @@ impl BrepTopology {
     }
 
     /// Where coedge `c` ends.
-    pub fn coedge_end(&self, c: CoedgeId) -> VertexId {
+    pub(crate) fn coedge_end(&self, c: CoedgeId) -> VertexId {
         let c = self.coedges[c.index()];
         let [start, end] = self.edges[c.edge.index()].vertices;
         match c.sense {
@@ -419,7 +370,7 @@ impl BrepTopology {
     /// The `D` derived from this topology, built by `build` the first time
     /// any holder asks and dropped with it (the crate's cache rule; only
     /// the crate that defines `D` asks for it).
-    pub fn derived<D: Send + Sync + 'static>(
+    pub(crate) fn derived<D: Send + Sync + 'static>(
         &self,
         build: impl FnOnce(&BrepTopology) -> D,
     ) -> Arc<D> {
@@ -432,7 +383,7 @@ impl BrepTopology {
     /// its face, edge and vertex ids still mean the same elements, which a
     /// resize keeps and a face added or split changes. What a
     /// [`Selection`](crate::Selection) made on it records. Cached.
-    pub fn fingerprint(&self) -> [u8; 32] {
+    pub(crate) fn fingerprint(&self) -> [u8; 32] {
         struct Fingerprint([u8; 32]);
         self.derived(|t| Fingerprint(super::fingerprint::of(t))).0
     }
@@ -487,19 +438,9 @@ impl Names {
         *(self.fingerprint).get_or_init(|| super::fingerprint::names(self))
     }
 
-    /// Face `f`'s name.
-    pub fn face(&self, f: FaceId) -> &Name {
-        &self.faces[f.index()]
-    }
-
     /// Edge `e`'s name.
     pub fn edge(&self, e: EdgeId) -> &Name {
         &self.edges[e.index()]
-    }
-
-    /// Vertex `v`'s name.
-    pub fn vertex(&self, v: VertexId) -> &Name {
-        &self.vertices[v.index()]
     }
 
     /// Every face's name, by id.

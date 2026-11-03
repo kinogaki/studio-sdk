@@ -1,8 +1,7 @@
 //! Polygons as triangles: the display triangulation (exact outlines, the
 //! tolerant clip of cut outlines, the fan for damaged ones, n − 2 always),
-//! the strict triangulation modeling uses (its errors in order, no fan),
 //! and the cache and its refresh after a drag matching a whole build.
-use kinogaki_geometry::{Attributes, ErrorKind, Polygons, Topology, Triangle};
+use kinogaki_geometry::{Attributes, Polygons, Topology};
 use std::sync::Arc;
 
 /// One value of `polygons` (each a ring of point ids) over `positions`.
@@ -36,7 +35,7 @@ fn area_along_y(v: &Polygons, p: usize) -> f64 {
 }
 
 #[test]
-fn damaged_polygons_show_as_a_fan_while_the_strict_triangulation_refuses_them() {
+fn damaged_polygons_show_as_a_fan() {
     let x = |s: f64| [s, 0.0, 0.0];
     for positions in [
         // Collinear.
@@ -51,18 +50,11 @@ fn damaged_polygons_show_as_a_fan_while_the_strict_triangulation_refuses_them() 
         assert_eq!(t.corners().as_slice(), [[0, 1, 2], [0, 2, 3]]);
         assert_eq!(t.triangles().as_slice(), [[0, 1, 2], [0, 2, 3]]);
         assert_eq!(t.fans().as_slice(), [0]);
-        let mut out = Vec::new();
-        let refused = v.triangulate_strict(0, &mut out).unwrap_err();
-        assert_eq!(
-            (refused.kind(), refused.element()),
-            (ErrorKind::Triangulation, Some(0))
-        );
-        assert!(out.is_empty(), "a refusal leaves the output as it was");
     }
 }
 
 #[test]
-fn exact_polygons_keep_their_vertex_ids_and_bad_requests_leave_the_output_alone() {
+fn exact_polygons_keep_their_vertex_ids() {
     // A triangle, then one whose first and second points are one place.
     let v = value(
         &[[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0; 3]],
@@ -73,27 +65,6 @@ fn exact_polygons_keep_their_vertex_ids_and_bad_requests_leave_the_output_alone(
     assert_eq!(t.corners()[1], [3, 4, 5]);
     assert_eq!(t.triangles()[1], [0, 3, 1]);
     assert_eq!(t.primitives().as_slice(), [0, 1]);
-    let mut out = vec![Triangle {
-        vertices: [9; 3],
-        points: [9; 3],
-        primitive: 9,
-    }];
-    let kept = out.clone();
-    let beyond = v.triangulate_strict(2, &mut out).unwrap_err();
-    assert_eq!(
-        (beyond.kind(), beyond.element()),
-        (ErrorKind::Selection, Some(2))
-    );
-    let nan = v
-        .triangulate_strict_at(0, &|_| [f64::NAN; 3], &mut out)
-        .unwrap_err();
-    assert_eq!((nan.kind(), nan.element()), (ErrorKind::Position, Some(0)));
-    assert_eq!(out, kept);
-    // The order: a primitive out of range is refused before its positions are read.
-    let first = v
-        .triangulate_strict_at(7, &|_| [f64::NAN; 3], &mut out)
-        .unwrap_err();
-    assert_eq!(first.kind(), ErrorKind::Selection);
 }
 
 #[test]
@@ -157,7 +128,7 @@ fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 
 #[test]
-fn strict_triangles_are_n_minus_two_wind_with_the_polygon_and_take_alternate_positions() {
+fn triangles_are_n_minus_two_and_wind_with_the_polygon() {
     // A concave pentagon (an arrow) in the xy plane, wound both ways.
     let arrow = [
         [0.0, 0.0, 0.0],
@@ -168,31 +139,21 @@ fn strict_triangles_are_n_minus_two_wind_with_the_polygon_and_take_alternate_pos
     ];
     for (ring, z) in [([0u32, 1, 2, 3, 4], 1.0), ([4, 3, 2, 1, 0], -1.0)] {
         let v = value(&arrow, &[&ring]);
-        let all = v.triangulate_all_strict().unwrap();
-        assert_eq!(all.len(), 3);
+        let t = v.triangulation();
+        assert_eq!(t.len(), 3);
+        assert!(t.fans().is_empty());
         assert!(
-            all.iter()
-                .all(|t| dot(triangle_normal(&arrow, t.points), [0.0, 0.0, z]) > 0.0)
+            t.triangles()
+                .iter()
+                .all(|&points| dot(triangle_normal(&arrow, points), [0.0, 0.0, z]) > 0.0)
         );
         // Corners are global vertex ids, read back to the same points.
-        for t in &all {
+        for (k, corners) in t.corners().iter().enumerate() {
             assert_eq!(
-                t.points,
-                t.vertices.map(|c| v.topology().vertices()[c as usize])
+                t.triangles()[k],
+                corners.map(|c| v.topology().vertices()[c as usize])
             );
         }
-        // An offset outline, triangulated at caller-given positions.
-        let mut out = Vec::new();
-        v.triangulate_strict_at(
-            0,
-            &|p| {
-                let q = arrow[p as usize];
-                [q[0], q[1], q[2] + 5.0]
-            },
-            &mut out,
-        )
-        .unwrap();
-        assert_eq!(out, all);
     }
     // A polyline has no triangles.
     let topology = Topology::new(2, vec![0, 2].into(), vec![0, 1].into(), 0).unwrap();
@@ -202,11 +163,6 @@ fn strict_triangles_are_n_minus_two_wind_with_the_polygon_and_take_alternate_pos
         Attributes::new(),
     )
     .unwrap();
-    let refused = line.triangulate_strict(0, &mut Vec::new()).unwrap_err();
-    assert_eq!(
-        (refused.kind(), refused.element()),
-        (ErrorKind::Selection, Some(0))
-    );
     assert!(line.triangulation().is_empty());
     assert_eq!(line.triangulation().of(0), 0..0);
 }
@@ -223,7 +179,7 @@ fn a_skew_outline_that_collapses_in_every_axis_plane_clips_in_its_own_plane() {
         [1.0, 1.0, 0.0],
     ];
     let v = value(&ring, &[&[0, 1, 2, 3, 4, 5]]);
-    assert_eq!(v.triangulate_all_strict().unwrap().len(), 4);
+    assert_eq!(v.triangulation().len(), 4);
     assert!(v.triangulation().fans().is_empty());
 }
 
@@ -271,12 +227,8 @@ fn the_triangulation_is_kept_and_its_refresh_after_a_drag_matches_a_whole_build(
         assert_eq!(t.of(p).len(), n - 2);
         assert!(t.of(p).all(|i| t.primitives()[i] == p as u32));
     }
-    // Every polygon clips, so the display and strict triangulations agree.
-    let strict = v.triangulate_all_strict().unwrap();
-    assert_eq!(
-        t.triangles().as_slice(),
-        strict.iter().map(|t| t.points).collect::<Vec<_>>()
-    );
+    // Every polygon clips: no fans.
+    assert!(t.fans().is_empty());
     let mut state = 0x9e37_79b9_7f4a_7c15;
     let mut before = v;
     let mut fanned = 0;
@@ -293,13 +245,11 @@ fn the_triangulation_is_kept_and_its_refresh_after_a_drag_matches_a_whole_build(
         let after = before.with_positions(positions.clone().into()).unwrap();
         before.triangulation();
         let refreshed = after.triangulation_after(&before, &moved);
-        let fresh = Polygons::with_topology(
-            positions.into(),
-            after.topology().clone(),
-            after.attributes().clone(),
-        )
-        .unwrap()
-        .triangulation();
+        // The same positions in a column of their own: built whole.
+        let fresh = after
+            .with_positions(positions.into())
+            .unwrap()
+            .triangulation();
         fanned += fresh.fans().len();
         assert_eq!(*refreshed, *fresh, "round {round}");
         before = after;
@@ -324,64 +274,4 @@ fn a_drag_that_flips_no_diagonal_keeps_the_triangle_columns() {
     let folded = after.with_positions(positions.into()).unwrap();
     let refolded = folded.triangulation_after(&after, &[10]);
     assert!(!refolded.triangles().ptr_eq(t.triangles()));
-}
-
-#[test]
-fn a_polygons_display_triangles_at_given_positions_are_its_triangulation() {
-    // Exact, concave and damaged polygons in one value: each polygon's
-    // display triangles at the value's own positions are its run of the
-    // triangulation, the fan flagged where the triangulation lists one.
-    let mut cases = vec![grid(6)];
-    for positions in [
-        vec![[0.0; 3], [3.0, 2.0, 0.0], [0.0, 2.0, 0.0], [2.0, 0.0, 0.0]],
-        vec![[0.0; 3]; 4],
-    ] {
-        cases.push(value(&positions, &[&[0, 1, 2, 3]]));
-    }
-    for v in &cases {
-        let t = v.triangulation();
-        let positions = v.positions();
-        for p in 0..v.topology().polygons() {
-            let mut out = vec![Triangle {
-                vertices: [9; 3],
-                points: [9; 3],
-                primitive: 9,
-            }];
-            let fan = v
-                .triangulate_display_at(p, &|i| positions[i as usize], &mut out)
-                .unwrap();
-            assert_eq!(fan, t.fans().contains(&(p as u32)), "polygon {p}");
-            let run = t.of(p);
-            assert_eq!(out.len(), 1 + run.len(), "appended, the rest kept");
-            for (k, tri) in run.zip(&out[1..]) {
-                assert_eq!(tri.points, t.triangles()[k]);
-                assert_eq!(tri.vertices, t.corners()[k]);
-                assert_eq!(tri.primitive, p as u32);
-            }
-        }
-    }
-    // At other positions: the polygon as it would show there.
-    let v = &cases[0];
-    let lifted = |i: u32| {
-        let p = v.positions()[i as usize];
-        [p[0], p[1] + 2.0, p[2]]
-    };
-    let mut out = Vec::new();
-    assert!(!v.triangulate_display_at(0, &lifted, &mut out).unwrap());
-    assert!(out.iter().all(|t| t.primitive == 0));
-}
-
-#[test]
-fn display_requests_for_polylines_or_bad_positions_leave_the_output_alone() {
-    let positions = [[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [2.0, 0.0, 0.0]];
-    let topology = Topology::new(4, vec![0, 3, 5].into(), vec![0, 1, 2, 1, 3].into(), 1).unwrap();
-    let v = Polygons::new(positions.to_vec().into(), topology, Attributes::new()).unwrap();
-    let at = |i: u32| positions[i as usize];
-    let mut out = Vec::new();
-    let e = v.triangulate_display_at(1, &at, &mut out).unwrap_err();
-    assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, Some(1)));
-    let nan = |i: u32| if i == 2 { [f64::NAN; 3] } else { at(i) };
-    let e = v.triangulate_display_at(0, &nan, &mut out).unwrap_err();
-    assert_eq!((e.kind(), e.element()), (ErrorKind::Position, Some(2)));
-    assert!(out.is_empty());
 }

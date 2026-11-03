@@ -186,11 +186,6 @@ impl<S: ?Sized> SettingsSection<S> {
         (self.eq)(a, b)
     }
 
-    /// Formats `value` for debugging.
-    pub fn debug(&self, value: &dyn Any, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        (self.debug)(value, f)
-    }
-
     /// Page `page`'s rows for `value`, lent the package's `state`.
     pub fn page(
         &self,

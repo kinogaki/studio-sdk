@@ -1,5 +1,5 @@
 //! Changed element ranges of a stream (a drag's points), coalesced: spans
-//! closer than a small gap join, and past [`Ranges::MOST`] spans the
+//! closer than a small gap join, and past `Ranges::MOST` spans the
 //! change counts as the whole stream.
 
 use std::ops::Range;
@@ -13,9 +13,9 @@ pub struct Ranges {
 
 impl Ranges {
     /// Spans kept before the ranges become the whole stream.
-    pub const MOST: usize = 1024;
+    pub(crate) const MOST: usize = 1024;
     /// Elements between two spans that cost less to rewrite than a second span.
-    pub const GAP: u32 = 16;
+    pub(crate) const GAP: u32 = 16;
 
     /// No changed elements.
     pub fn new() -> Ranges {
@@ -57,7 +57,7 @@ impl Ranges {
         self.spans.iter().map(|r| u64::from(r.end - r.start)).sum()
     }
 
-    /// Add `range`, joining spans it overlaps or comes within [`Self::GAP`] of.
+    /// Add `range`, joining spans it overlaps or comes within `Self::GAP` of.
     pub fn add(&mut self, mut range: Range<u32>) {
         if self.whole || range.start >= range.end {
             return;

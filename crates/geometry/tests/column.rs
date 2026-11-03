@@ -29,7 +29,7 @@ fn a_slice_shares_the_buffer_but_not_the_slots() {
     let a = Column::new((0..10u32).collect::<Vec<_>>());
     let s = a.slice(2..5);
     assert_eq!(&*s, &[2, 3, 4]);
-    assert!(s.shares_buffer(&a) && !s.ptr_eq(&a));
+    assert!(!s.ptr_eq(&a));
     assert_eq!(s.as_ptr(), a[2..].as_ptr());
     let sum = |c: &Column<u32>| *c.derived(|v| v.iter().sum::<u32>());
     assert_eq!((sum(&a), sum(&s)), (45, 9));

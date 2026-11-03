@@ -31,15 +31,15 @@ pub fn pack_linear(rgb: [f32; 3]) -> u32 {
     m[0] | m[1] << 9 | m[2] << 18 | (exponent as u32) << 27
 }
 
-/// What a packed color unpacks to in the shader (`packed_linear`).
-pub fn unpack_linear(c: u32) -> [f32; 3] {
-    let scale = 2f32.powi((c >> 27) as i32 - 24);
-    [c & 511, (c >> 9) & 511, (c >> 18) & 511].map(|m| m as f32 * scale)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What a packed color unpacks to in the shader (`packed_linear`).
+    fn unpack_linear(c: u32) -> [f32; 3] {
+        let scale = 2f32.powi((c >> 27) as i32 - 24);
+        [c & 511, (c >> 9) & 511, (c >> 18) & 511].map(|m| m as f32 * scale)
+    }
 
     #[test]
     fn packed_colors_round_trip_within_a_mantissa_step_and_are_never_zero() {

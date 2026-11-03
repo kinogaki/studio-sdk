@@ -74,13 +74,6 @@ impl<T> Column<T> {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Whether `self` and `other` view one buffer (one is a
-    /// [`slice`](Self::slice) of the other, or both are of a third): no
-    /// value was copied between them.
-    pub fn shares_buffer(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0.buffer, &other.0.buffer)
-    }
-
     /// The column's identity, for keying a cache within this session:
     /// equal keys of two live columns mean [`ptr_eq`](Self::ptr_eq). A key
     /// may be reused once the column is dropped, so it never outlives the

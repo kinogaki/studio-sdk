@@ -1,11 +1,9 @@
 //! Polygons as triangles: the display [`Triangulation`] every viewport,
-//! render engine and kernel shares, and the strict triangulation modeling
-//! uses ([`Polygons::triangulate_strict`]). Both clip ears with one
-//! clipper; they differ in what they do with a polygon that doesn't clip.
+//! render engine and kernel shares. Ears are clipped; a polygon that
+//! doesn't clip shows as a fan.
 mod clip;
 
 use crate::column::Column;
-use crate::error::{ErrorKind, GeometryError};
 use crate::kept::Kept;
 use crate::parallel;
 use crate::polygons::Polygons;
@@ -44,9 +42,7 @@ pub struct Triangle {
 /// alone: polygon `p`'s triangles are [`of(p)`](Self::of).
 ///
 /// It is the one triangulation the viewport, render engines and kernels
-/// show polygons with, so Solid and Render views always agree. Modeling
-/// that must refuse a damaged polygon uses
-/// [`Polygons::triangulate_strict`] instead.
+/// show polygons with, so Solid and Render views always agree.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Triangulation {
     triangles: Column<[u32; 3]>,
@@ -147,118 +143,6 @@ impl Polygons {
         kept.keep(self.topology().clone(), built.clone());
         built
     }
-
-    /// The **strict** (modeling) triangulation of polygon `primitive` with
-    /// its points at `position(point)`: exactly n − 2 [`Triangle`]s
-    /// appended to `out`, winding as the polygon does. Unlike the display
-    /// [`triangulation`](Self::triangulation) it never falls back to a
-    /// fan, and refuses a polygon that doesn't clip, leaving `out` as it
-    /// was.
-    ///
-    /// # Errors
-    /// In this order: `primitive` out of range or a polyline
-    /// ([`ErrorKind::Selection`]); a position among the polygon's points
-    /// that isn't finite ([`ErrorKind::Position`], naming the point); an
-    /// outline that clips in no plane ([`ErrorKind::Triangulation`]).
-    pub fn triangulate_strict_at(
-        &self,
-        primitive: usize,
-        position: &impl Fn(u32) -> [f64; 3],
-        out: &mut Vec<Triangle>,
-    ) -> Result<(), GeometryError> {
-        let topology = self.topology();
-        checked(topology, primitive, position)?;
-        clip(&outline(topology, primitive), position, false, out).map_err(|()| {
-            GeometryError::at(
-                ErrorKind::Triangulation,
-                primitive,
-                format!("polygon {primitive} can't be triangulated"),
-            )
-        })
-    }
-
-    /// [`triangulate_strict_at`](Self::triangulate_strict_at) at the
-    /// value's own positions.
-    ///
-    /// # Errors
-    /// As [`triangulate_strict_at`](Self::triangulate_strict_at).
-    pub fn triangulate_strict(
-        &self,
-        primitive: usize,
-        out: &mut Vec<Triangle>,
-    ) -> Result<(), GeometryError> {
-        let positions = self.positions();
-        self.triangulate_strict_at(primitive, &|p| positions[p as usize], out)
-    }
-
-    /// Polygon `primitive`'s n − 2 display triangles at `position`
-    /// appended to `out`: what [`triangulation`](Self::triangulation)
-    /// holds for it at those positions (clipped strictly, else tolerantly,
-    /// else a fan from its first vertex). Whether it fell back to the fan.
-    /// For a preview that shows polygons at positions no value holds yet.
-    ///
-    /// # Errors
-    /// In this order: `primitive` out of range or a polyline
-    /// ([`ErrorKind::Selection`]); a position among the polygon's points
-    /// that isn't finite ([`ErrorKind::Position`], naming the point). `out`
-    /// is left as it was.
-    pub fn triangulate_display_at(
-        &self,
-        primitive: usize,
-        position: &impl Fn(u32) -> [f64; 3],
-        out: &mut Vec<Triangle>,
-    ) -> Result<bool, GeometryError> {
-        let topology = self.topology();
-        checked(topology, primitive, position)?;
-        Ok(display(topology, primitive, position, out))
-    }
-
-    /// Every polygon, strictly, in order.
-    ///
-    /// # Errors
-    /// The first polygon that doesn't clip.
-    pub fn triangulate_all_strict(&self) -> Result<Vec<Triangle>, GeometryError> {
-        let topology = self.topology();
-        let count = topology.polygon_vertices() - 2 * topology.polygons();
-        let mut out = Vec::with_capacity(count);
-        for p in 0..topology.polygons() {
-            self.triangulate_strict(p, &mut out)?;
-        }
-        Ok(out)
-    }
-}
-
-/// Whether `primitive` is a polygon of `topology` whose points are finite
-/// at `position`.
-fn checked(
-    topology: &Topology,
-    primitive: usize,
-    position: &impl Fn(u32) -> [f64; 3],
-) -> Result<(), GeometryError> {
-    if primitive >= topology.polygons() {
-        let what = if primitive < topology.primitives() {
-            "is a polyline"
-        } else {
-            "is not a primitive"
-        };
-        return Err(GeometryError::at(
-            ErrorKind::Selection,
-            primitive,
-            format!("primitive {primitive} {what}"),
-        ));
-    }
-    let points = topology.primitive(primitive);
-    if let Some(&p) = points
-        .iter()
-        .find(|&&p| !position(p).iter().all(|c| c.is_finite()))
-    {
-        return Err(GeometryError::at(
-            ErrorKind::Position,
-            p as usize,
-            format!("point {p} is not finite"),
-        ));
-    }
-    Ok(())
 }
 
 fn outline(topology: &Topology, polygon: usize) -> Outline<'_> {

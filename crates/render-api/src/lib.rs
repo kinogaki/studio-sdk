@@ -47,7 +47,7 @@ pub mod trace;
 pub mod update;
 pub mod vocabulary;
 
-pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec, CryptomatteOf};
+pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
 pub use color::{ColorService, RENDER_SPACE};
 pub use declared::{AppliedSchema, Declared, PrimType, Role};
 pub use description::{
@@ -74,8 +74,8 @@ pub use prim::{
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
 pub use settings::{
-    Condition, RenderSettings, Requirement, SettingDescriptor, SettingError, SettingGroup,
-    SettingKind, SettingValue, SettingValues, Trailing, Unit, Visibility,
+    RenderSettings, SettingDescriptor, SettingError, SettingGroup, SettingKind, SettingValue,
+    SettingValues, Trailing, Unit,
 };
 pub use source::{Look, PlainTriangles, TriangleSource};
 pub use update::{Change, SceneUpdate};
@@ -83,3 +83,6 @@ pub use vocabulary::{
     Choice, InputEdit, Layout, NodeLayout, NodeType, ParamKind, ParamSpec, ParamValue, Params,
     SocketKind, SocketSpec,
 };
+
+#[cfg(test)]
+mod tests;

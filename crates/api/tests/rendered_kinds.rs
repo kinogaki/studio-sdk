@@ -58,14 +58,14 @@ impl RenderedKind for LampPrims {
         let Some(lamp) = body.downcast_ref::<Lamp>() else {
             return Vec::new();
         };
-        let mut values = standard::spot_light().defaults();
+        let mut values = area_light().defaults();
         settings::set_value(
             &mut values,
             "intensity",
             SettingValue::Float(lamp.intensity),
         );
         vec![kinogaki_render_api::Declared::new(
-            standard::SPOT_LIGHT,
+            standard::AREA_LIGHT,
             values,
         )]
     }
@@ -150,7 +150,7 @@ fn engine(spots: bool) -> EngineDescription {
         .as_ref()
         .clone();
     e.types = if spots {
-        vec![standard::spot_light()]
+        vec![area_light()]
     } else {
         Vec::new()
     };
@@ -169,7 +169,7 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     let lamp = Lamp { intensity: 4.0 };
     let mut declared = rendered.declared(&lamp);
     assert_eq!(declared.len(), 1);
-    assert_eq!(&*declared[0].type_id, standard::SPOT_LIGHT);
+    assert_eq!(&*declared[0].type_id, standard::AREA_LIGHT);
     assert_eq!(
         declared[0].value("intensity"),
         Some(&SettingValue::Float(4.0))
@@ -191,20 +191,6 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     };
     assert!(rendered.with_declared(&setup, &declared).is_none());
     assert!(kind.render_setup().is_none() && !kind.at_root());
-}
-
-#[test]
-fn retyping_a_prim_keeps_its_values_by_name() {
-    let mut spot =
-        kinogaki_render_api::Declared::new(standard::SPOT_LIGHT, standard::spot_light().defaults());
-    settings::set_value(&mut spot.values, "intensity", SettingValue::Float(3.0));
-    spot.retype(&standard::area_light());
-    assert_eq!(&*spot.type_id, standard::AREA_LIGHT);
-    assert_eq!(spot.value("intensity"), Some(&SettingValue::Float(3.0)));
-    // The area light's own parameters take their defaults; the spot's stay.
-    assert!(spot.value("width").is_some() && spot.value("coneAngle").is_some());
-    spot.retype(&standard::spot_light());
-    assert_eq!(spot.value("intensity"), Some(&SettingValue::Float(3.0)));
 }
 
 #[test]
@@ -279,7 +265,7 @@ impl ObjectCodec for Lamps {
         let lamp = body
             .downcast_ref::<Lamp>()
             .ok_or_else(|| Error::invalid("not a lamp"))?;
-        out.set("type", element::Field::Text(standard::SPOT_LIGHT.into()))?;
+        out.set("type", element::Field::Text(standard::AREA_LIGHT.into()))?;
         out.set("intensity", element::Field::Float(lamp.intensity))
     }
     fn read(
@@ -319,8 +305,14 @@ fn a_codec_reads_what_is_installed_and_says_what_isnt() {
             error,
             Error::NotInstalled(format!(
                 "light type {} isn't installed",
-                standard::SPOT_LIGHT
+                standard::AREA_LIGHT
             ))
         );
     }
+}
+
+/// The standard area light's prim type.
+fn area_light() -> kinogaki_render_api::PrimType {
+    let mut lights = standard::lights().into_iter();
+    lights.find(|t| &*t.id == standard::AREA_LIGHT).unwrap()
 }

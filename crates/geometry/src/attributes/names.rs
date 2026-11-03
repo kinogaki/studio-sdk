@@ -27,7 +27,7 @@ pub const UV: &str = "uv";
 /// working space.
 pub const CD: &str = "Cd";
 /// Opacity, 0 to 1 (Float).
-pub const ALPHA: &str = "Alpha";
+pub(crate) const ALPHA: &str = "Alpha";
 /// A curve's or point's width, in scene units (Float).
 pub const WIDTH: &str = "width";
 /// The Material a primitive renders with, by its path (Text).
@@ -36,8 +36,6 @@ pub const MATERIAL: &str = "material";
 pub const NAME: &str = "name";
 /// The part an element belongs to (Text).
 pub const PART: &str = "part";
-/// Which prototype an instance places (Integer).
-pub const INSTANCE: &str = "instance";
 /// The hard edges (an [`Class::Edge`] group): shading always breaks
 /// across them, whatever the angle between their faces. An edge in both
 /// this and [`SMOOTH`] is sharp. An edge in neither follows the 60° cusp
@@ -61,7 +59,7 @@ pub(crate) enum Standard {
 
 /// The standard meaning of `name`, if it has one.
 pub(crate) fn standard(name: &str) -> Option<Standard> {
-    use AttributeKind::{Float, Integer, Text, Vector};
+    use AttributeKind::{Float, Text, Vector};
     Some(match name {
         P => Standard::Attribute(Vector, TypeInfo::Point),
         N => Standard::Attribute(Vector, TypeInfo::Normal),
@@ -70,47 +68,10 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
         CD => Standard::Attribute(Vector, TypeInfo::Color),
         ALPHA | WIDTH => Standard::Attribute(Float, TypeInfo::None),
         MATERIAL | NAME | PART => Standard::Attribute(Text, TypeInfo::None),
-        INSTANCE => Standard::Attribute(Integer, TypeInfo::None),
         SHARP | SMOOTH => Standard::Group(Class::Edge),
         HIDDEN => Standard::Group(Class::Primitive),
         _ => return None,
     })
-}
-
-/// The kind and type info a standard attribute name always has (`N` a
-/// normal vector, `Cd` a color, `material` text…); `None` for a standard
-/// group's name and for any other name.
-///
-/// ```
-/// use kinogaki_geometry::{AttributeKind, TypeInfo, names};
-///
-/// assert_eq!(names::standard_type("N"), Some((AttributeKind::Vector, TypeInfo::Normal)));
-/// assert_eq!(names::standard_type("material"), Some((AttributeKind::Text, TypeInfo::None)));
-/// assert_eq!(names::standard_type("sharp"), None);
-/// assert_eq!(names::standard_type("acme:weight"), None);
-/// ```
-pub fn standard_type(name: &str) -> Option<(AttributeKind, TypeInfo)> {
-    match standard(name)? {
-        Standard::Attribute(kind, info) => Some((kind, info)),
-        Standard::Group(_) => None,
-    }
-}
-
-/// The class a standard group name always belongs to (`sharp` the edges,
-/// `.hidden` the primitives); `None` for any other name.
-///
-/// ```
-/// use kinogaki_geometry::{Class, names};
-///
-/// assert_eq!(names::standard_group("sharp"), Some(Class::Edge));
-/// assert_eq!(names::standard_group(".hidden"), Some(Class::Primitive));
-/// assert_eq!(names::standard_group("N"), None);
-/// ```
-pub fn standard_group(name: &str) -> Option<Class> {
-    match standard(name)? {
-        Standard::Group(class) => Some(class),
-        Standard::Attribute(..) => None,
-    }
 }
 
 /// Whether `name` may name an attribute or a group: a letter, `_` or `.`

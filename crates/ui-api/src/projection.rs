@@ -28,7 +28,7 @@ impl ClipMatrix {
     };
 
     /// `v` through the matrix.
-    pub fn mul_vec4(&self, v: [f64; 4]) -> [f64; 4] {
+    pub(crate) fn mul_vec4(&self, v: [f64; 4]) -> [f64; 4] {
         let c = &self.cols;
         std::array::from_fn(|i| c[0][i] * v[0] + c[1][i] * v[1] + c[2][i] * v[2] + c[3][i] * v[3])
     }

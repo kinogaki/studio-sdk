@@ -34,7 +34,7 @@ impl Data {
     }
 
     /// A shared `value` as data of type `ty`, without copying it.
-    pub fn from_arc<T: Any + Send + Sync>(ty: DataTypeId, value: Arc<T>) -> Self {
+    pub(crate) fn from_arc<T: Any + Send + Sync>(ty: DataTypeId, value: Arc<T>) -> Self {
         Self { ty, value }
     }
 
@@ -50,7 +50,7 @@ impl Data {
     }
 
     /// The shared value as an `Arc<T>`, when it is a `T`.
-    pub fn downcast_arc<T: Any + Send + Sync>(&self) -> Option<Arc<T>> {
+    pub(crate) fn downcast_arc<T: Any + Send + Sync>(&self) -> Option<Arc<T>> {
         self.value.clone().downcast().ok()
     }
 
@@ -135,11 +135,6 @@ impl<T: Any + Send + Sync> Typed<T> {
         Data::new(self.id, value)
     }
 
-    /// A shared `value` as [`Data`] of this type, without copying it.
-    pub fn wrap_arc(self, value: Arc<T>) -> Data {
-        Data::from_arc(self.id, value)
-    }
-
     /// Whether `data` is of this type.
     pub fn is(self, data: &Data) -> bool {
         data.ty() == self.id && data.downcast_ref::<T>().is_some()
@@ -202,9 +197,5 @@ mod tests {
         let equal_but_new = cloud().wrap(Cloud(vec![1.0]));
         assert!(!data.ptr_eq(&equal_but_new));
         assert_ne!(data, equal_but_new);
-        let arc = Arc::new(Cloud(vec![]));
-        let a = cloud().wrap_arc(arc.clone());
-        let b = cloud().wrap_arc(arc);
-        assert!(a.ptr_eq(&b));
     }
 }

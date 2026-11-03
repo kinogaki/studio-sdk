@@ -4,7 +4,7 @@
 //! numbers. This is the one definition: a node's ramp parameter (the
 //! API's `params::ramp`, a `Value::Numbers` of `ParameterKind::Ramp`),
 //! Studio's ramp widget (`sheet::ramp`) and a render engine's color ramps
-//! (a `SettingValue::ColorRamp`'s keys, [`color_at`]) evaluate a ramp with
+//! (a `SettingValue::ColorRamp`'s keys, `color_at`) evaluate a ramp with
 //! [`Ramp::evaluate`] or [`Keys::evaluate_channel`] and get the same
 //! values.
 //!
@@ -172,25 +172,6 @@ impl Ramp {
         self.keys.remove(k);
         true
     }
-
-    /// Move key `k` to `position` (clamped to 0–1), keeping the keys sorted
-    /// (it passes the keys it crosses); returns its index after.
-    pub fn move_key(&mut self, k: usize, position: f64) -> usize {
-        let Some(key) = self.keys.get_mut(k) else {
-            return k;
-        };
-        key.position = position.clamp(0.0, 1.0);
-        let mut k = k;
-        while k > 0 && self.keys[k].position < self.keys[k - 1].position {
-            self.keys.swap(k, k - 1);
-            k -= 1;
-        }
-        while k + 1 < self.keys.len() && self.keys[k].position > self.keys[k + 1].position {
-            self.keys.swap(k, k + 1);
-            k += 1;
-        }
-        k
-    }
 }
 
 impl Keys for Ramp {
@@ -221,11 +202,6 @@ impl Keys for [Key] {
     fn interpolation(&self, k: usize) -> Interpolation {
         self[k].interpolation
     }
-}
-
-/// Color ramp `keys` (by position) at `t`: black when there are none.
-pub fn color_at(keys: &[Key], t: f64) -> [f64; 3] {
-    [0, 1, 2].map(|c| keys.evaluate_channel(t, c))
 }
 
 /// The channels a key of a color (3) or float (1) ramp holds.
@@ -592,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn keys_insert_move_and_remove_in_order() {
+    fn keys_insert_and_remove_in_order() {
         let mut r = Ramp::default_of(false);
         let k = r.insert(0.5);
         assert_eq!(k, 1);
@@ -600,13 +576,6 @@ mod tests {
             (r.keys[1].value[0] - 0.5).abs() < 1e-12,
             "it takes the ramp's value"
         );
-        assert_eq!(r.move_key(0, 0.7), 1, "it passes the key it crosses");
-        assert_eq!(
-            r.move_key(1, 1.5),
-            1,
-            "clamped to 1, it stays before the end key"
-        );
-        assert_eq!(r.keys[1].position, 1.0);
         assert!(r.remove(0));
         assert!(r.remove(0));
         assert!(!r.remove(0), "the last key stays");

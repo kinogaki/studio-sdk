@@ -67,7 +67,7 @@ ids! {
 /// refusal without pointing at an entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
-pub enum Entity {
+pub(crate) enum Entity {
     /// A vertex of the body being built or checked.
     Vertex(VertexId),
     /// An edge.
@@ -84,19 +84,13 @@ pub enum Entity {
     Lump(LumpId),
     /// A surface.
     Surface(SurfaceId),
-    /// A curve.
-    Curve(CurveId),
-    /// A p-curve.
-    PCurve(PCurveId),
-    /// Body `index` of a [`Brep`](super::Brep).
-    Body(usize),
     /// Datum `index` of a [`Brep`](super::Brep).
     Datum(usize),
 }
 
 impl Entity {
     /// The entity's index in its table.
-    pub fn index(self) -> usize {
+    pub(crate) fn index(self) -> usize {
         match self {
             Entity::Vertex(id) => id.index(),
             Entity::Edge(id) => id.index(),
@@ -106,9 +100,7 @@ impl Entity {
             Entity::Shell(id) => id.index(),
             Entity::Lump(id) => id.index(),
             Entity::Surface(id) => id.index(),
-            Entity::Curve(id) => id.index(),
-            Entity::PCurve(id) => id.index(),
-            Entity::Body(i) | Entity::Datum(i) => i,
+            Entity::Datum(i) => i,
         }
     }
 }

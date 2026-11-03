@@ -179,24 +179,9 @@ impl Pointer {
         self.button_released(PointerButton::Primary)
     }
 
-    /// Whether the secondary button is held.
-    pub fn secondary_down(&self) -> bool {
-        self.button_down(PointerButton::Secondary)
-    }
-
-    /// Whether the secondary button went down this frame.
-    pub fn secondary_pressed(&self) -> bool {
-        self.button_pressed(PointerButton::Secondary)
-    }
-
     /// Whether the secondary button came up this frame.
     pub fn secondary_released(&self) -> bool {
         self.button_released(PointerButton::Secondary)
-    }
-
-    /// Whether the middle button is held.
-    pub fn middle_down(&self) -> bool {
-        self.button_down(PointerButton::Middle)
     }
 }
 
@@ -532,7 +517,7 @@ mod tests {
         let mut pointer = Pointer::default();
         pointer.down[PointerButton::Secondary.index()] = true;
         pointer.pressed[0] = true;
-        assert!(pointer.secondary_down() && !pointer.primary_down());
+        assert!(!pointer.primary_down());
         assert!(pointer.primary_pressed() && pointer.any_pressed() && !pointer.any_released());
         assert!(!pointer.has_pointer() && !pointer.moved());
     }

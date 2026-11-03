@@ -1,8 +1,8 @@
 //! The attribute model: names, standard types, indexed text, groups, and
 //! sharing between tables.
 use kinogaki_geometry::{
-    Attribute, AttributeKind, Attributes, Class, ErrorKind, Group, GroupBuilder, Text, TextBuilder,
-    TypeInfo, check_name, limits::MAX_NAME, names,
+    Attribute, AttributeKind, Attributes, Class, ErrorKind, Group, Text, TypeInfo, check_name,
+    limits::MAX_NAME, names,
 };
 use std::sync::Arc;
 
@@ -35,7 +35,6 @@ fn standard_names_keep_their_types() {
         (Class::Vertex, names::UV, vector(TypeInfo::TextureCoord)),
         (Class::Primitive, names::CD, vector(TypeInfo::Color)),
         (Class::Point, names::V, vector(TypeInfo::Vector)),
-        (Class::Point, names::ALPHA, Attribute::float(vec![1.0])),
         (Class::Point, names::WIDTH, Attribute::float(vec![1.0])),
         (
             Class::Primitive,
@@ -51,11 +50,6 @@ fn standard_names_keep_their_types() {
             Class::Primitive,
             names::PART,
             Attribute::text(Text::from_strs(["a"])),
-        ),
-        (
-            Class::Instance,
-            names::INSTANCE,
-            Attribute::integer(vec![0]),
         ),
         (Class::Vertex, names::P, vector(TypeInfo::Point)),
     ];
@@ -117,9 +111,9 @@ fn with_shares_every_other_entry() {
     let b = a
         .with(Class::Point, "w", Attribute::float(vec![1.0, 2.0]))
         .unwrap();
-    assert!(Arc::ptr_eq(
-        a.get_shared(Class::Point, names::N).unwrap(),
-        b.get_shared(Class::Point, names::N).unwrap()
+    assert!(std::ptr::eq(
+        a.get(Class::Point, names::N).unwrap(),
+        b.get(Class::Point, names::N).unwrap()
     ));
     assert!(
         a.get(Class::Point, "w").is_none(),
@@ -149,31 +143,6 @@ fn with_shares_every_other_entry() {
     );
     let grouped = b.with_group(Class::Point, "w", Group::none(2)).unwrap();
     assert!(grouped.get(Class::Point, "w").is_some() && grouped.group(Class::Point, "w").is_some());
-    assert!(
-        grouped
-            .without_group(Class::Point, "w")
-            .group(Class::Point, "w")
-            .is_none()
-    );
-}
-
-#[test]
-fn text_is_indexed_and_empty_is_no_value() {
-    let mut b = TextBuilder::new();
-    assert_eq!(b.push("a"), 0);
-    assert_eq!(b.push(""), Text::NONE);
-    assert_eq!(b.push("b"), 1);
-    assert_eq!(b.push("a"), 0);
-    b.push_none();
-    let red = b.intern("red");
-    b.push_index(red);
-    let text = b.finish();
-    assert_eq!(&**text.indices(), &[0, Text::NONE, 1, 0, Text::NONE, 2]);
-    assert_eq!(text.table().len(), 3);
-    assert_eq!(
-        (0..text.len()).map(|i| text.get(i)).collect::<Vec<_>>(),
-        [Some("a"), None, Some("b"), Some("a"), None, Some("red")]
-    );
 }
 
 #[test]
@@ -193,12 +162,6 @@ fn text_rules_are_checked() {
     );
     let repeated = Text::new(vec![0].into(), table(&["a", "a"])).unwrap_err();
     assert_eq!(repeated.message(), "text table entry 1 repeats \"a\"");
-}
-
-#[test]
-#[should_panic(expected = "text index 5 was not interned here")]
-fn a_foreign_text_index_panics() {
-    TextBuilder::new().push_index(5);
 }
 
 #[test]
@@ -266,47 +229,11 @@ fn group_set_algebra_matches_the_per_index_definitions() {
             members(a.symmetric_difference(&b).unwrap()),
             per_index(&|x, y| x != y)
         );
-        assert_eq!(members(a.complement()), per_index(&|x, _| !x));
         assert_eq!(members(Group::all(elements)), per_index(&|_, _| true));
         assert_eq!(Group::all(elements).members(), elements);
-        assert_eq!(Group::all(elements).complement(), Group::none(elements));
     }
     let refused = Group::none(3).union(&Group::none(4)).unwrap_err();
     assert_eq!(refused.kind(), ErrorKind::Attribute);
-}
-
-#[test]
-fn a_group_builder_makes_the_group_of_its_members() {
-    for elements in [0usize, 1, 64, 65, 130] {
-        let members: Vec<u32> = (0..elements as u32)
-            .filter(|i| i % 7 == 0 || i % 64 == 63)
-            .collect();
-        let mut b = GroupBuilder::new(elements);
-        for &i in &members {
-            b.set(i as usize, true).unwrap();
-        }
-        assert_eq!(b.members(), members.len());
-        let built = b.finish();
-        assert_eq!(
-            built,
-            Group::from_indices(elements, members.iter().copied()).unwrap()
-        );
-        // From a group, clearing members: the rest stays.
-        let mut again = GroupBuilder::from_group(&built);
-        for &i in members.iter().step_by(2) {
-            again.set(i as usize, false).unwrap();
-        }
-        let kept: Vec<u32> = members.iter().copied().skip(1).step_by(2).collect();
-        assert!(kept.iter().all(|&i| again.contains(i as usize)));
-        assert_eq!(again.finish().iter().collect::<Vec<_>>(), kept);
-    }
-    let mut b = GroupBuilder::new(3);
-    let refused = b.set(3, true).unwrap_err();
-    assert_eq!(
-        (refused.kind(), refused.element()),
-        (ErrorKind::Attribute, Some(3))
-    );
-    assert!(!b.contains(3));
 }
 
 #[test]
@@ -328,62 +255,7 @@ fn texts_are_equal_by_their_values_whatever_their_tables() {
         Text::from_strs(["", ""]),
         Text::new(vec![Text::NONE; 2].into(), table).unwrap()
     );
-    assert_eq!(Text::from_strs([]), TextBuilder::new().finish());
     // A compact text compacts to itself, sharing everything.
     let compact = fresh.compacted();
     assert!(compact.indices().ptr_eq(fresh.indices()));
-}
-
-#[test]
-fn the_standard_types_are_the_ones_a_table_accepts() {
-    let attribute = |kind: AttributeKind, info: TypeInfo| match kind {
-        AttributeKind::Float => Attribute::float(vec![0.0]),
-        AttributeKind::Integer => Attribute::integer(vec![0]),
-        AttributeKind::Vector => Attribute::vector(vec![[0.0; 3]], info),
-        _ => Attribute::text(Text::from_strs(["a"])),
-    };
-    let standard = [
-        names::N,
-        names::V,
-        names::UV,
-        names::CD,
-        names::ALPHA,
-        names::WIDTH,
-        names::MATERIAL,
-        names::NAME,
-        names::PART,
-        names::INSTANCE,
-    ];
-    for name in standard {
-        let (kind, info) = names::standard_type(name).unwrap();
-        let t = Attributes::new();
-        assert!(
-            t.with(Class::Primitive, name, attribute(kind, info))
-                .is_ok(),
-            "{name}"
-        );
-        let other = if kind == AttributeKind::Float {
-            AttributeKind::Integer
-        } else {
-            AttributeKind::Float
-        };
-        assert!(
-            t.with(Class::Primitive, name, attribute(other, TypeInfo::None))
-                .is_err(),
-            "{name}"
-        );
-        assert_eq!(names::standard_group(name), None);
-    }
-    for (name, class) in [
-        (names::SHARP, Class::Edge),
-        (names::SMOOTH, Class::Edge),
-        (names::HIDDEN, Class::Primitive),
-    ] {
-        assert_eq!(names::standard_group(name), Some(class));
-        assert_eq!(names::standard_type(name), None);
-    }
-    assert_eq!(
-        names::standard_type(names::P),
-        Some((AttributeKind::Vector, TypeInfo::Point))
-    );
 }

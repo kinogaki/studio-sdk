@@ -11,7 +11,7 @@
 //!   see-through ([`FaceLook`]). A kernel reads its own packets back with
 //!   [`packet_as`].
 //! - [`pack_linear`]: a linear color as the RGB9E5 word surface colors
-//!   are carried in ([`ColorLayout`]); [`unpack_linear`] reads one back.
+//!   are carried in ([`ColorLayout`]).
 //! - [`ElementSet`]: the selected points, edges, faces, vertices or
 //!   objects; [`ElementSelection`]: one set per drawn family (faces,
 //!   lines, markers) for surfaces whose levels combine.
@@ -37,7 +37,7 @@ mod preview;
 mod selection;
 mod shading;
 mod updates;
-pub use color::{pack_linear, unpack_linear};
+pub use color::pack_linear;
 pub use lines::{ACCENT, LineClass, LineClassId, LineHighlight, LineLook, LineStyle};
 pub use looks::{FaceLook, FaceRun, check_runs};
 pub use overlay::{
@@ -45,7 +45,6 @@ pub use overlay::{
 };
 pub use packet::{
     ColorLayout, Column, ElementKind, ElementSet, OverlayVertex, SurfaceSource, Vertex, packet_as,
-    same_surface,
 };
 pub use points::{PointClass, PointClassId, PointLook, PointShape, PointStyle};
 pub use preview::{MotionMask, PartMotion, Patch, PointWeights, PreviewUpdate, WeightedMotion};
@@ -53,4 +52,4 @@ pub use selection::ElementSelection;
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,
 };
-pub use updates::{Ancestor, BufferRanges, DrawUpdate, UpdateRanges};
+pub use updates::{BufferRanges, DrawUpdate, UpdateRanges};

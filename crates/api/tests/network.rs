@@ -44,10 +44,6 @@ fn a_context_registers_once_under_its_vendor() {
     let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(context("acme.trees.network").flags(FlagSet::all()));
     registry.register(trees).unwrap();
-    let declared = registry
-        .network_context(ContextId::declared("acme.trees.network"))
-        .unwrap();
-    assert!(declared.heals && declared.flags.offers(Flag::Freeze));
     let again = Package::new(PackageId::declared("acme.more"), "More")
         .with_context(context("acme.trees.network"));
     assert!(matches!(

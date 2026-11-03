@@ -17,11 +17,8 @@ mod hit;
 mod pivot;
 mod step;
 
-pub use geometry::{
-    GizmoFrame, Handle, MANIPULATOR_CUBE, MANIPULATOR_RING, angle_change, distance, inside, scale,
-    stepped,
-};
-pub use hit::{ALL_AXES, hit, hit_axes};
+pub use geometry::{GizmoFrame, Handle, angle_change, distance, inside, scale, stepped};
+pub use hit::{hit, hit_axes};
 pub use pivot::{Pivot, PivotFrame};
 pub use step::{TransformPhase, TransformSpace, TransformStep};
 

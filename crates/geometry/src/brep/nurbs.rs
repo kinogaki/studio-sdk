@@ -210,38 +210,11 @@ impl<const D: usize> NurbsCurve<D> {
         [self.knots[d], self.knots[self.points.len()]]
     }
 
-    /// The same curve with control `points` moved (a CV edit): knots and
-    /// weights shared.
-    ///
-    /// # Errors
-    /// A different number of points, or a point not finite.
-    pub fn with_points(&self, points: impl Into<Column<[f64; D]>>) -> Result<Self, GeometryError> {
-        let points = points.into();
-        if points.len() != self.points.len() {
-            return Err(refuse(
-                None,
-                "wrong control point count",
-                "a CV edit keeps the number of control points",
-            ));
-        }
-        check_points(&points)?;
-        Ok(Self {
-            points,
-            ..self.clone()
-        })
-    }
-
     /// The point at `t`: in the domain, de Boor's algorithm on the span
     /// holding `t` (the span above at an interior knot); outside it, the
     /// polynomial of the end span continued.
     pub fn point(&self, t: f64) -> [f64; D] {
         self.jet(t)[0]
-    }
-
-    /// The first derivative at `t` (from the span above at an interior
-    /// knot).
-    pub fn derivative(&self, t: f64) -> [f64; D] {
-        self.jet(t)[1]
     }
 
     /// The point and first derivative at `t`.
@@ -339,7 +312,7 @@ impl NurbsSurface {
     }
 
     /// Control point `(i, j)`.
-    pub fn point_at(&self, i: usize, j: usize) -> [f64; 3] {
+    pub(crate) fn point_at(&self, i: usize, j: usize) -> [f64; 3] {
         self.points[i * self.counts[1] + j]
     }
 
@@ -363,31 +336,9 @@ impl NurbsSurface {
 
     /// The width of the domain in each closed direction: the chart's
     /// period there.
-    pub fn periods(&self) -> [Option<f64>; 2] {
+    pub(crate) fn periods(&self) -> [Option<f64>; 2] {
         let domain = self.domain();
         [0, 1].map(|k| self.closed[k].map(|_| domain[k][1] - domain[k][0]))
-    }
-
-    /// The same surface with its control `points` moved (a CV edit):
-    /// knots, weights and closures shared. A body built on it checks the
-    /// closed rows again.
-    ///
-    /// # Errors
-    /// A different number of points, or a point not finite.
-    pub fn with_points(&self, points: impl Into<Column<[f64; 3]>>) -> Result<Self, GeometryError> {
-        let points = points.into();
-        if points.len() != self.points.len() {
-            return Err(refuse(
-                None,
-                "wrong control point count",
-                "a CV edit keeps the number of control points",
-            ));
-        }
-        check_points(&points)?;
-        Ok(Self {
-            points,
-            ..self.clone()
-        })
     }
 
     /// `(u, v)` with each closed direction wrapped into the domain by

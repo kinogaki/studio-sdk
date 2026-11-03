@@ -5,7 +5,7 @@
 //! - A change to a prim added in the same batch replaces the added payload.
 //! - Dirty bits of two changes OR together; the later payload wins.
 //! - Point ranges merge, and fall back to the whole stream past a cap
-//!   ([`Ranges::MOST`]) or when either change was not a patch.
+//!   (`Ranges::MOST`) or when either change was not a patch.
 //!
 //! A drag that sends 60 updates a second while a pass is in flight is
 //! therefore applied once, at the next pass boundary.

@@ -95,69 +95,6 @@ fn parallel_build_matches_serial_on_irregular_topology() {
     assert_same(&Topology::new(0, vec![0].into(), Vec::new().into(), 0).unwrap());
 }
 
-/// Polylines after polygons: a branch starting on a polygon's point, one
-/// running along a polygon side, one revisiting a point, a lone segment.
-fn mixed() -> Topology {
-    let prims: Vec<Vec<u32>> = vec![
-        vec![0, 1, 2],
-        vec![2, 1, 3],
-        vec![2, 4, 5, 6],
-        vec![1, 2, 7],
-        vec![8, 9, 10, 8, 11],
-        vec![12, 13],
-    ];
-    let mut offsets = vec![0];
-    let mut vertices = Vec::new();
-    for p in prims {
-        vertices.extend(p);
-        offsets.push(vertices.len() as u32);
-    }
-    Topology::new(14, offsets.into(), vertices.into(), 2).unwrap()
-}
-
-#[test]
-fn polylines_add_segment_edges_beside_polygon_sides() {
-    let t = mixed();
-    assert_same(&t);
-    let index = t.index();
-    let edge = |a: u32, b: u32| {
-        index
-            .edges()
-            .iter()
-            .position(|e| e.points == [a.min(b), a.max(b)])
-            .unwrap()
-    };
-    // Shared side 1-2: two polygons and the polyline along it.
-    assert_eq!(&index.edge_faces()[edge(1, 2)], &[0, 1]);
-    assert_eq!(&index.edge_polylines()[edge(1, 2)], &[3]);
-    // A polyline-only edge has no faces.
-    assert!(index.edge_faces()[edge(4, 5)].is_empty());
-    assert_eq!(&index.edge_polylines()[edge(4, 5)], &[2]);
-    // Segments: one fewer than vertices; no closing segment.
-    assert_eq!(
-        &index.polyline_edges()[0],
-        &[edge(2, 4), edge(4, 5), edge(5, 6)].map(|e| e as u32)
-    );
-    assert_eq!(&index.polyline_edges()[3], &[edge(12, 13) as u32]);
-    assert!(index.edges().iter().all(|e| e.points != [2, 6]));
-    assert_eq!(index.face_edges().rows(), 2);
-    assert_eq!(index.polyline_edges().rows(), 4);
-    // Point 2 is on both polygons and two polylines; 8 is visited twice.
-    assert_eq!(&index.point_faces()[2], &[0, 1]);
-    assert_eq!(&index.point_polylines()[2], &[2, 3]);
-    assert_eq!(&index.point_polylines()[8], &[4]);
-    assert!(index.point_edges()[8].is_empty());
-    assert_eq!(index.point_curve_edges()[8].len(), 3);
-    assert_eq!(index.point_all_edges(8).count(), 3);
-    // Point 2: its polygon sides, and the segments 2-4 and 2-7 only
-    // polylines use.
-    assert_eq!(index.point_edges()[2].len(), 3);
-    assert_eq!(
-        &index.point_curve_edges()[2],
-        &[edge(2, 4) as u32, edge(2, 7) as u32]
-    );
-}
-
 #[test]
 fn polyline_validation_rejects_degenerate_curves() {
     let make = |prims: &[&[u32]], polygons| {

@@ -121,7 +121,7 @@ impl Brep {
     }
 
     /// What its numbering stands on, as one 32-byte hash: BLAKE3 of the
-    /// body count, each body's [topology fingerprint](super::BrepTopology::fingerprint)
+    /// body count, each body's topology fingerprint
     /// and the fingerprint of its persistent names in body order; then the
     /// free curves' count and the hash of their Primitive `name`s in order
     /// (each its byte length and bytes, `u64::MAX` for none; 32 zero bytes
