@@ -7,7 +7,7 @@ use kinogaki_studio_api::network::{
 };
 use kinogaki_studio_api::params::{Number, Parameter, Value, ValueKind};
 use kinogaki_studio_api::{
-    ContextId, CookCx, CookError, Data, DataTypeId, Description, NodeRef, NodeTypeId, ObjectRef,
+    ContextId, CookCx, Data, DataTypeId, Description, Error, NodeRef, NodeTypeId, ObjectRef,
     Outputs, Package, PackageId, Schema, Typed,
 };
 use std::sync::LazyLock;
@@ -42,7 +42,7 @@ impl NodeType for Source {
             .parameters(Schema::default().parameter(value_parameter("value", "Value", 1.0)))
     }
     /// Its value's arrow along X, and one naming a parameter it hasn't.
-    fn cook(&self, cx: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, cx: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         let arrow = |label: &str, number: &str| {
             let kind = HandleKind::Distance {
                 distance: number.into(),
@@ -70,7 +70,7 @@ impl NodeType for Add {
             .output(Port::new("number", "Number", NUMBER.id()))
             .parameters(Schema::default().parameter(value_parameter("amount", "Amount", 1.0)))
     }
-    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
         let input = NUMBER.get(&inputs[0]).copied().unwrap_or_default();
         Ok(Outputs::one(NUMBER.wrap(input + cx.number("amount")?)))
     }
@@ -250,7 +250,7 @@ impl NodeType for Box_ {
             .context(ContextId::declared("acme.boxes.network"))
             .holding(context())
     }
-    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Ok(Outputs::default())
     }
 }

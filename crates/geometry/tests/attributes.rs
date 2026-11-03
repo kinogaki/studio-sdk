@@ -30,7 +30,7 @@ fn names_follow_the_rule() {
         "a name has at most 256 bytes"
     );
     let bad = Attributes::new().with(Domain::Point, "a b", f32s::<1>(1, Meaning::None));
-    assert_eq!(bad.unwrap_err().kind(), ErrorKind::Attribute);
+    assert_eq!(bad.unwrap_err().kind, ErrorKind::Invalid);
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn values_are_whole_items_of_their_storage_and_finite() {
     bad[7] = f64::NAN;
     let nan = Attribute::new(ty, values(bad)).unwrap_err();
     assert_eq!(
-        (nan.element(), nan.message()),
+        (nan.diagnostic.element, nan.message()),
         (Some(2), "value 7 is not finite")
     );
     let infinite = Attribute::tuples(vec![[0.0f32, f32::INFINITY]], Meaning::None);
@@ -368,7 +368,7 @@ fn text_rules_are_checked() {
     let table = |s: &[&str]| -> Arc<[Arc<str>]> { s.iter().map(|&s| Arc::from(s)).collect() };
     assert!(Text::new(vec![0, 1, Text::NONE].into(), table(&["a", "b"])).is_ok());
     let past = Text::new(vec![0, 2].into(), table(&["a", "b"])).unwrap_err();
-    assert_eq!(past.element(), Some(1));
+    assert_eq!(past.diagnostic.element, Some(1));
     assert_eq!(
         past.message(),
         "element 1's text index 2 is past the table of 2"

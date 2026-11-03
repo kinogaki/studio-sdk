@@ -12,6 +12,7 @@
 //! the rest, owned and read by the package. A project that names a kind no
 //! package provides still opens: its objects are kept as they were read,
 //! shown grey, written back unchanged on save, and reported.
+use crate::Diagnostic;
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
@@ -207,14 +208,14 @@ impl KindCreation {
 }
 
 /// A networkless object's value ([`ObjectKindSpec::value`]) and what of
-/// its body the value leaves out, as lines ("Gobo is Pixel's own; left
-/// out"), each about the object and without its path.
+/// its body the value leaves out, as warnings ("the gobo is left out"),
+/// each about the object and without its path.
 #[derive(Clone)]
 pub struct Valued {
     /// The value.
     pub value: Data,
     /// What it leaves out.
-    pub lines: Vec<String>,
+    pub warnings: Vec<Diagnostic>,
 }
 
 impl Valued {
@@ -222,14 +223,8 @@ impl Valued {
     pub fn new(value: Data) -> Self {
         Self {
             value,
-            lines: Vec::new(),
+            warnings: Vec::new(),
         }
-    }
-
-    /// With `line` said of what it leaves out.
-    pub fn line(mut self, line: impl Into<String>) -> Self {
-        self.lines.push(line.into());
-        self
     }
 }
 

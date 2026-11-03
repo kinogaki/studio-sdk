@@ -44,8 +44,9 @@
 //!   [`export_package!`] ([`entry`]).
 //!
 //! And the plain types those exchange: the geometry crate's one vocabulary
-//! ([`Vec3`], [`Xform`], [`Bounds`], [`Units`], [`Time`] and [`Rate`]),
-//! [`params`] (parameter values, schemas, diagnostics), [`element`] (the
+//! ([`Vec3`], [`Xform`], [`Bounds`], [`Units`], [`Time`] and [`Rate`], and
+//! the one [`Error`] every fallible call returns, its [`Diagnostic`] what
+//! the user reads), [`params`] (parameter values and schemas), [`element`] (the
 //! project's element tree codecs write), [`viewport`] (display surfaces,
 //! element sets, picks), [`refs`] (the host's objects and nodes),
 //! [`render`] (neutral render items) and [`anim`] (a parameter's keys over
@@ -71,7 +72,6 @@ pub mod cook;
 pub mod data_type;
 pub mod element;
 pub mod entry;
-pub mod error;
 pub mod facets;
 pub mod format;
 pub mod held;
@@ -94,9 +94,12 @@ pub mod viewport;
 pub use kinogaki_edit as edit;
 /// The standard geometry values: what the [`standard`] data types are.
 pub use kinogaki_geometry as geometry;
-/// The SDK's one vocabulary of vectors, placements, boxes, units and time,
-/// which every crate exchanges: the standard geometry values' own.
-pub use kinogaki_geometry::{Bounds, Rate, Time, Units, UpAxis, Vec3, Xform};
+/// The SDK's one vocabulary of vectors, placements, boxes, units, time and
+/// errors, which every crate exchanges: the standard geometry values' own.
+pub use kinogaki_geometry::{
+    Bounds, Diagnostic, Error, ErrorKind, Rate, Severity, TextSpan, Time, Units, UpAxis, Vec3,
+    Xform,
+};
 /// The value model: declared ids, data values, and the one [`Value`] and
 /// [`ValueKind`](params::ValueKind) parameters, render settings and
 /// material ports hold.
@@ -108,14 +111,12 @@ pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
 pub use cook::{
-    Category, CookCx, CookError, CookPlan, Description, Incremental, Inside, Listing, NewCx,
-    NodeRole, NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, RowsFor,
-    SchemaCx,
+    Category, CookCx, CookPlan, Description, Incremental, Inside, Listing, NewCx, NodeRole,
+    NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, RowsFor, SchemaCx,
 };
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
-pub use error::Error;
 pub use facets::{
     CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn, Look, Materials,
     ObjectPicking, Pickable, Piece, RenderCx, Renderable, Rendered, Role, SnapHit, SnapKind,
@@ -125,21 +126,21 @@ pub use format::{
     FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Purpose, Reading, Writing,
 };
 pub use held::HeldEdit;
-pub use icon::{Icon, IconError};
+pub use icon::Icon;
 pub use id::{
     ContextId, CreationId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
     SlotId, StoredId,
 };
-pub use mesher::{Failed, Meshed, Mesher};
+pub use mesher::{Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     Adoption, CreateCx, KindCreation, MOTION_SAMPLES, ObjectBody, ObjectKindSpec, Processing,
     PublishedMaterial, RenderSetup, RenderSetupKind, RenderedKind, Valued,
 };
 pub use package::{Package, PackageUi};
-pub use params::{Diagnostic, Parameters, Schema, Value};
+pub use params::{Parameters, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
-pub use registry::{Registry, RegistryError};
+pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, TriangleSource};
 pub use session::{GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};

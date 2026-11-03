@@ -1,8 +1,8 @@
 //! [`Displayable`]: how a value is drawn in the viewport.
+use crate::Error;
 use crate::cancel::CancelToken;
 use crate::components::Components;
 use crate::data::Data;
-use crate::error::Error;
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
 use crate::viewport::{ElementKind, ElementSet, SurfaceSource};

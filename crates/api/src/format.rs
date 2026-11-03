@@ -20,9 +20,9 @@ use crate::cancel::CancelToken;
 use crate::color::ColorService;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
-use crate::error::Error;
 use crate::id::{DataTypeId, FormatId};
 use crate::params::{Parameters, Schema, Value};
+use crate::{Diagnostic, Error};
 use kinogaki_geometry::{Rate, Units, Xform};
 use std::any::Any;
 use std::path::Path;
@@ -68,8 +68,8 @@ impl FileItem {
 pub struct Imported {
     /// The file's items, parents before their children.
     pub items: Vec<FileItem>,
-    /// What was read with loss or skipped, for the user.
-    pub warnings: Vec<String>,
+    /// What was read with loss or skipped, for the user: warnings.
+    pub warnings: Vec<Diagnostic>,
 }
 
 /// What the host makes of a read.
@@ -98,7 +98,7 @@ pub struct Reading<'a> {
     /// type (`Reading::setting`): a CAD kernel's tolerances.
     pub settings: &'a [&'a (dyn Any + Send + Sync)],
     /// Raised once the read is no longer wanted; long reads poll it
-    /// ([`Reading::check`]) and stop with [`Error::Cancelled`].
+    /// ([`Reading::check`]) and stop with [`Error::cancelled()`].
     pub cancel: CancelToken,
     /// The data type the host wants the file read as, for
     /// [`Purpose::Node`]: the File node's output (a STEP file as B-rep or
@@ -120,7 +120,7 @@ impl<'a> Reading<'a> {
         }
     }
 
-    /// `Err(Error::Cancelled)` once the read is no longer wanted.
+    /// `Err(Error::cancelled())` once the read is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
         self.cancel.check()
     }
@@ -271,7 +271,7 @@ pub trait FormatWriter: Send + Sync {
         items: &[FileItem],
         writing: &Writing<'_>,
         options: &FormatOptions,
-    ) -> Result<Vec<String>, Error>;
+    ) -> Result<Vec<Diagnostic>, Error>;
 }
 
 /// What a write is for, besides the writer's options.
@@ -283,7 +283,7 @@ pub struct Writing<'a> {
     /// space, converted into the file's.
     pub colors: &'a dyn ColorService,
     /// Raised once the write is no longer wanted; long writes poll it
-    /// ([`Writing::check`]) and stop with [`Error::Cancelled`], and so does
+    /// ([`Writing::check`]) and stop with [`Error::cancelled()`], and so does
     /// the work they ask of the host ([`meshed`](Self::meshed)).
     pub cancel: CancelToken,
     /// An item's value as polygons, for a writer that writes only those
@@ -308,7 +308,7 @@ impl<'a> Writing<'a> {
         }
     }
 
-    /// `Err(Error::Cancelled)` once the write is no longer wanted.
+    /// `Err(Error::cancelled())` once the write is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
         self.cancel.check()
     }
@@ -342,7 +342,7 @@ mod tests {
         fn working(&self) -> &str {
             kinogaki_render_api::RENDER_SPACE
         }
-        fn convert(&self, _: &str, _: &str, _: &mut [[f64; 3]]) -> Result<(), String> {
+        fn convert(&self, _: &str, _: &str, _: &mut [[f64; 3]]) -> Result<(), Error> {
             Ok(())
         }
         fn view_transform(&self, _: &ViewChoice, _: &str, _: u32, _: u32) -> Option<ViewTransform> {
@@ -413,7 +413,7 @@ mod tests {
                 _: &[FileItem],
                 _: &Writing<'_>,
                 _: &FormatOptions,
-            ) -> Result<Vec<String>, Error> {
+            ) -> Result<Vec<Diagnostic>, Error> {
                 Ok(Vec::new())
             }
         }
@@ -441,7 +441,7 @@ mod tests {
             ..Reading::new(Purpose::Node, units, &Unconverted)
         };
         let read = Plain.read(Path::new("a.plain"), &Plain.options(), &reading);
-        assert_eq!(read.unwrap_err(), Error::Cancelled);
+        assert_eq!(read.unwrap_err(), Error::cancelled());
         let fine = Reading::new(Purpose::Objects, Units::default(), &Unconverted);
         assert!(
             Plain

@@ -3,6 +3,7 @@
 //! packet lists its see-through triangles as runs of its indices
 //! ([`crate::SurfaceSource::face_runs`]); every other triangle is shaded.
 //! See-through faces are picked, hovered and selected per face like any.
+use kinogaki_geometry::Error;
 use std::ops::Range;
 
 /// The look of a surface's (or a merged part's) faces.
@@ -35,7 +36,7 @@ pub struct FaceRun {
 /// Why `runs` can't be drawn over `indices` triangle indices: runs must
 /// be whole triangles, in order, apart and inside the indices, each in a
 /// look other than shaded.
-pub fn check_runs(runs: &[FaceRun], indices: usize) -> Result<(), String> {
+pub fn check_runs(runs: &[FaceRun], indices: usize) -> Result<(), Error> {
     let mut end = 0u32;
     for r in runs {
         if r.indices.start < end
@@ -44,15 +45,17 @@ pub fn check_runs(runs: &[FaceRun], indices: usize) -> Result<(), String> {
             || r.indices.start % 3 != 0
             || r.indices.end % 3 != 0
         {
-            return Err(format!(
+            return Err(Error::invalid(format_args!(
                 "face run {:?} is not whole triangles in order within {indices} indices",
                 r.indices
-            ));
+            )));
         }
         match r.look {
-            FaceLook::Shaded => return Err("a face run lists shaded triangles".into()),
+            FaceLook::Shaded => return Err(Error::invalid("a face run lists shaded triangles")),
             FaceLook::SeeThrough { opacity, .. } if !(0.0..=1.0).contains(&opacity) => {
-                return Err(format!("see-through opacity {opacity} is outside 0–1"));
+                return Err(Error::invalid(format_args!(
+                    "see-through opacity {opacity} is outside 0–1"
+                )));
             }
             FaceLook::SeeThrough { .. } => {}
         }

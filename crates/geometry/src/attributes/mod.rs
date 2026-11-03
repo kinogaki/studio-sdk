@@ -22,8 +22,8 @@ pub use names::check_name;
 pub use text::Text;
 pub use types::{AttributeType, Meaning, Storage};
 
+use crate::Error;
 use crate::elements::Elements;
-use crate::error::{ErrorKind, GeometryError};
 use names::Standard;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -121,7 +121,7 @@ impl Attributes {
         domain: Domain,
         name: &str,
         attribute: Attribute,
-    ) -> Result<Attributes, GeometryError> {
+    ) -> Result<Attributes, Error> {
         self.with_shared(domain, name, Arc::new(attribute))
     }
 
@@ -135,7 +135,7 @@ impl Attributes {
         domain: Domain,
         name: &str,
         attribute: Arc<Attribute>,
-    ) -> Result<Attributes, GeometryError> {
+    ) -> Result<Attributes, Error> {
         check_name(name)?;
         check_standard_attribute(domain, name, &attribute)?;
         let mut out = self.clone();
@@ -164,7 +164,7 @@ impl Attributes {
         domain: Domain,
         name: &str,
         group: Elements,
-    ) -> Result<Attributes, GeometryError> {
+    ) -> Result<Attributes, Error> {
         check_name(name)?;
         match names::standard(name) {
             Some(Standard::Group(must)) if must != domain => {
@@ -211,7 +211,7 @@ impl Attributes {
         what: &str,
         previous: Option<&Attributes>,
         mut count: impl FnMut(Domain) -> Option<usize>,
-    ) -> Result<usize, GeometryError> {
+    ) -> Result<usize, Error> {
         let mut checked = 0;
         let domains: std::collections::BTreeSet<&Domain> =
             self.values.keys().chain(self.groups.keys()).collect();
@@ -253,11 +253,11 @@ fn remove<T>(map: &mut Named<T>, domain: Domain, name: &str) {
     }
 }
 
-fn refused(why: String) -> GeometryError {
-    GeometryError::whole(ErrorKind::Attribute, why)
+fn refused(why: String) -> Error {
+    Error::invalid(why)
 }
 
-fn missized(domain: Domain, name: &str, what: &str, len: usize, expected: usize) -> GeometryError {
+fn missized(domain: Domain, name: &str, what: &str, len: usize, expected: usize) -> Error {
     refused(format!(
         "{} {what} {name} has {len} values for {expected} elements",
         domain.name()
@@ -268,7 +268,7 @@ fn check_standard_attribute(
     domain: Domain,
     name: &str,
     attribute: &Attribute,
-) -> Result<(), GeometryError> {
+) -> Result<(), Error> {
     match names::standard(name) {
         Some(Standard::Group(on)) => Err(refused(format!(
             "{name} is a standard group of the {} domain",

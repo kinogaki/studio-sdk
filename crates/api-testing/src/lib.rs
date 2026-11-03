@@ -1,5 +1,6 @@
-//! The SDK's test support (a dev-dependency only): the conformance suite
-//! of the standard data types: producers make
+//! The SDK's test support (a dev-dependency only): [`assert_refused`] for
+//! admission tests, and the conformance suite of the standard data types:
+//! producers make
 //! standard values, consumers check them, and [`run`] tries every pair.
 //!
 //! A kernel implements [`Producer`] in its own repository (its operations'
@@ -21,10 +22,12 @@ mod brep;
 mod checks;
 mod colors;
 mod fixtures;
+mod refusals;
 
 pub use checks::{Codecs, Invariants};
 pub use colors::Unconverted;
 pub use fixtures::Fixtures;
+pub use refusals::assert_refused;
 
 use kinogaki_studio_api::data::Data;
 use std::fmt;

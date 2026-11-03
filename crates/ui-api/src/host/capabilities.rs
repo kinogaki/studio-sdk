@@ -10,9 +10,9 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
+use kinogaki_studio_api::Severity;
 use kinogaki_studio_api::geometry::Geometry;
 use kinogaki_studio_api::id::StoredId;
-use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
@@ -141,7 +141,7 @@ pub trait HostDoc {
     fn place(&self) -> Place;
     /// Shows `place` (navigation, not an undo step); `Err` says why it
     /// can't (the object is locked or gone).
-    fn go_to(&mut self, place: Place) -> Result<(), String>;
+    fn go_to(&mut self, place: Place) -> Result<(), Error>;
     /// Bumped by every change to a network: what a cook would see.
     fn revision(&self) -> u64;
     /// Object `object`'s name.
@@ -159,7 +159,7 @@ pub trait HostDoc {
         object: ObjectRef,
         label: &str,
         body: Arc<dyn ObjectBody>,
-    ) -> Result<(), String>;
+    ) -> Result<(), Error>;
     /// Every object of kind `kind`, in the scene's order.
     fn objects_of_kind(&self, kind: ObjectKindId) -> Vec<ObjectRef>;
     /// Stored value `id` (a package's [`Stored`]): the project's or the

@@ -9,10 +9,8 @@
 //! [`Registry::register`]) and turns a refusal into a plugin it doesn't
 //! load, never a crash.
 mod check;
-mod error;
 
-pub use error::RegistryError;
-
+use crate::Error;
 use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
@@ -92,7 +90,7 @@ impl Registry {
 
     /// Registers `package` once [`check`](Self::check) passes. On an
     /// error nothing of the package is kept.
-    pub fn register(&mut self, package: Package) -> Result<(), RegistryError> {
+    pub fn register(&mut self, package: Package) -> Result<(), Error> {
         self.check(&package)?;
         let id = package.id;
         self.holds.extend(

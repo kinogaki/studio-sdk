@@ -1,8 +1,8 @@
 //! [`Geometry`]: polygons, polylines and curves over shared points, with
 //! attributes — the standard value `kinogaki.core.geometry`.
+use crate::Error;
 use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
-use crate::error::GeometryError;
 use crate::positions;
 use crate::primitives::Primitives;
 use std::sync::Arc;
@@ -58,7 +58,7 @@ impl Geometry {
         positions: Column<[f64; 3]>,
         primitives: Primitives,
         attributes: Attributes,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         Self::with_primitives(positions, Arc::new(primitives), Arc::new(attributes))
     }
 
@@ -74,7 +74,7 @@ impl Geometry {
         positions: Column<[f64; 3]>,
         primitives: Arc<Primitives>,
         attributes: Arc<Attributes>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         check_positions(&positions, &primitives)?;
         check_attributes(&attributes, None, &primitives)?;
         Ok(Self {
@@ -89,7 +89,7 @@ impl Geometry {
     ///
     /// # Errors
     /// A bad position, or not one per point.
-    pub fn with_positions(&self, positions: Column<[f64; 3]>) -> Result<Self, GeometryError> {
+    pub fn with_positions(&self, positions: Column<[f64; 3]>) -> Result<Self, Error> {
         check_positions(&positions, &self.primitives)?;
         Ok(Self {
             positions,
@@ -105,7 +105,7 @@ impl Geometry {
     ///
     /// # Errors
     /// A missized or misplaced attribute.
-    pub fn with_attributes(&self, attributes: Attributes) -> Result<Self, GeometryError> {
+    pub fn with_attributes(&self, attributes: Attributes) -> Result<Self, Error> {
         self.with_shared_attributes(Arc::new(attributes))
     }
 
@@ -117,7 +117,7 @@ impl Geometry {
     pub(crate) fn with_shared_attributes(
         &self,
         attributes: Arc<Attributes>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         check_attributes(&attributes, Some(&self.attributes), &self.primitives)?;
         Ok(Self {
             positions: self.positions.clone(),
@@ -202,19 +202,13 @@ fn count(primitives: &Primitives, domain: Domain) -> Option<usize> {
     })
 }
 
-fn check_positions(
-    positions: &Column<[f64; 3]>,
-    primitives: &Primitives,
-) -> Result<(), GeometryError> {
+fn check_positions(positions: &Column<[f64; 3]>, primitives: &Primitives) -> Result<(), Error> {
     if positions.len() != primitives.points() {
-        return Err(GeometryError::whole(
-            crate::ErrorKind::Position,
-            format!(
-                "{} positions for a table of {} points",
-                positions.len(),
-                primitives.points()
-            ),
-        ));
+        return Err(Error::invalid(format!(
+            "{} positions for a table of {} points",
+            positions.len(),
+            primitives.points()
+        )));
     }
     positions::check(positions)
 }
@@ -223,7 +217,7 @@ fn check_attributes(
     attributes: &Attributes,
     previous: Option<&Attributes>,
     primitives: &Primitives,
-) -> Result<(), GeometryError> {
+) -> Result<(), Error> {
     attributes.check("polygons", previous, |domain| count(primitives, domain))?;
     Ok(())
 }

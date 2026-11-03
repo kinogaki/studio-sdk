@@ -1,7 +1,7 @@
 //! [`Renderable`]: how a value reaches render engines.
+use crate::Error;
 use crate::cancel::CancelToken;
 use crate::data::Data;
-use crate::error::Error;
 use crate::render::{Detail, RenderItem};
 use kinogaki_geometry::Time;
 use kinogaki_geometry::Tolerances;

@@ -1,9 +1,9 @@
 //! [`Selection`]: which elements of one domain of a standard value are
 //! selected — the standard component selection.
+use crate::Error;
 use crate::attributes::Domain;
 use crate::column::Column;
 use crate::elements::Elements;
-use crate::error::{ErrorKind, GeometryError};
 use crate::incidence::Incidence;
 
 /// Selected elements of one domain ([`Elements`]); the active one (the
@@ -45,19 +45,15 @@ impl Selection {
     ///
     /// # Errors
     /// When `active` is not a member.
-    pub fn new(
-        domain: Domain,
-        members: Elements,
-        active: Option<u32>,
-    ) -> Result<Self, GeometryError> {
+    pub fn new(domain: Domain, members: Elements, active: Option<u32>) -> Result<Self, Error> {
         if let Some(a) = active
             && !members.contains(a)
         {
-            return Err(GeometryError::at(
-                ErrorKind::Selection,
-                a as usize,
-                format!("the active {} {a} is not selected", domain.name()),
-            ));
+            return Err(Error::invalid(format!(
+                "the active {} {a} is not selected",
+                domain.name()
+            ))
+            .element(a as usize));
         }
         Ok(Self {
             domain,
@@ -80,7 +76,7 @@ impl Selection {
         domain: Domain,
         members: Elements,
         active: Option<u32>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let mut s = Self::new(domain, members, active)?;
         s.check_count(value)?;
         s.on = Some(value.fingerprint());
@@ -105,19 +101,16 @@ impl Selection {
         mut self,
         on: Option<[u8; 32]>,
         ids: Option<Column<i64>>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         if let Some(ids) = &ids
             && ids.len() != self.members.len()
         {
-            return Err(GeometryError::whole(
-                ErrorKind::Selection,
-                format!(
-                    "{} ids for {} selected {} elements",
-                    ids.len(),
-                    self.members.len(),
-                    self.domain.name()
-                ),
-            ));
+            return Err(Error::invalid(format!(
+                "{} ids for {} selected {} elements",
+                ids.len(),
+                self.members.len(),
+                self.domain.name()
+            )));
         }
         self.on = on;
         self.ids = ids;
@@ -170,34 +163,28 @@ impl Selection {
     /// a set of as many elements as `on` has of its domain.
     ///
     /// # Errors
-    /// A stale selection ([`ErrorKind::Selection`], no element), a domain
+    /// A stale selection (no element), a domain
     /// `on` has none of, or a set of another count.
-    pub fn validate(&self, on: &dyn Incidence) -> Result<(), GeometryError> {
+    pub fn validate(&self, on: &dyn Incidence) -> Result<(), Error> {
         if self.on.is_some_and(|t| t != on.fingerprint()) {
-            return Err(GeometryError::whole(
-                ErrorKind::Selection,
-                "the selection was made on another value",
-            ));
+            return Err(Error::invalid("the selection was made on another value"));
         }
         self.check_count(on)
     }
 
-    fn check_count(&self, on: &dyn Incidence) -> Result<(), GeometryError> {
+    fn check_count(&self, on: &dyn Incidence) -> Result<(), Error> {
         let Some(count) = on.count(self.domain) else {
-            return Err(GeometryError::whole(
-                ErrorKind::Selection,
-                format!("the value has no {} domain", self.domain.name()),
-            ));
+            return Err(Error::invalid(format!(
+                "the value has no {} domain",
+                self.domain.name()
+            )));
         };
         if self.members.count() != count {
-            return Err(GeometryError::whole(
-                ErrorKind::Selection,
-                format!(
-                    "a selection of {} {} elements on a value of {count}",
-                    self.members.count(),
-                    self.domain.name()
-                ),
-            ));
+            return Err(Error::invalid(format!(
+                "a selection of {} {} elements on a value of {count}",
+                self.members.count(),
+                self.domain.name()
+            )));
         }
         Ok(())
     }

@@ -1,11 +1,9 @@
 //! The product limits: the largest values Studio and every kernel accept.
-//! Builders refuse anything larger ([`ErrorKind::Limit`]), so every
+//! Builders refuse anything larger, so every
 //! element id fits a `u32` and `u32::MAX` stays free as "no element" (an
 //! indexed text's missing value, an open primitive's last vertex). Memory
 //! is the budget's to bound, not the limits'.
-//!
-//! [`ErrorKind::Limit`]: crate::ErrorKind::Limit
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 
 /// The most points a value holds (2³² − 2).
 pub const MAX_POINTS: usize = u32::MAX as usize - 1;
@@ -24,12 +22,11 @@ pub const MAX_DEGREE: u8 = 25;
 pub const MAX_COORDINATE: f64 = 1e100;
 
 /// `Err` naming `what` when `count` is over `limit`.
-pub(crate) fn check(count: usize, limit: usize, what: &str) -> Result<(), GeometryError> {
+pub(crate) fn check(count: usize, limit: usize, what: &str) -> Result<(), Error> {
     if count > limit {
-        return Err(GeometryError::whole(
-            ErrorKind::Limit,
-            format!("{count} {what} is over the limit of {limit}"),
-        ));
+        return Err(Error::invalid(format!(
+            "{count} {what} is over the limit of {limit}"
+        )));
     }
     Ok(())
 }
@@ -43,7 +40,7 @@ mod tests {
         for limit in [MAX_POINTS, MAX_PRIMITIVES, MAX_VERTICES] {
             assert!(check(limit, limit, "elements").is_ok());
             let e = check(limit + 1, limit, "elements").unwrap_err();
-            assert_eq!(e.kind(), ErrorKind::Limit);
+            assert_eq!(e.kind, crate::ErrorKind::Invalid);
         }
     }
 }

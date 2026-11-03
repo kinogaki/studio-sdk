@@ -13,10 +13,10 @@ pub use curves::{CurveData, Knots};
 pub use index::{Adjacency, Index};
 pub use kind::{Basis, Kind};
 
+use crate::Error;
 use crate::column::Column;
 use crate::derived::Derived;
 use crate::elements::Elements;
-use crate::error::GeometryError;
 use std::fmt;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
@@ -118,13 +118,13 @@ impl Primitives {
         vertices: Column<u32>,
         kinds: Column<Kind>,
         curves: Option<CurveData>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let primitives = offsets.len().saturating_sub(1);
         if kinds.len() != primitives {
-            return Err(GeometryError::whole(
-                crate::ErrorKind::Primitive,
-                format!("{} kinds for {primitives} primitives", kinds.len()),
-            ));
+            return Err(Error::invalid(format!(
+                "{} kinds for {primitives} primitives",
+                kinds.len()
+            )));
         }
         let kinds = match kinds.first() {
             Some(&first) if kinds.iter().all(|&k| k == first) => Kinds::All(first),
@@ -157,7 +157,7 @@ impl Primitives {
         points: usize,
         offsets: Column<u32>,
         vertices: Column<u32>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let kinds = Kinds::All(Kind::POLYGON);
         let primitives = offsets.len().saturating_sub(1);
         validate::primitives(points, &offsets, &vertices, &kinds, primitives, None)?;

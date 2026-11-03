@@ -49,18 +49,7 @@ macro_rules! erase {
 impl<S: 'static> ContextPart<S> {
     /// The same context over the host's erased state.
     fn erase(self) -> ContextPart<dyn Any> {
-        erase!(self, S, {
-            levels: Levels,
-            tools: LiveTools,
-            panels: Panels,
-            transforms: Transforms,
-            display: Display,
-            timeline: Timeline,
-            numeric: NumericBar,
-            inspector: Inspector,
-            vocabulary: Vocabulary,
-            objects: ObjectRows,
-        })
+        erase!(self, S, {levels: Levels, tools: LiveTools, panels: Panels, transforms: Transforms, display: Display, timeline: Timeline, numeric: NumericBar, inspector: Inspector, vocabulary: Vocabulary, objects: ObjectRows})
     }
 }
 

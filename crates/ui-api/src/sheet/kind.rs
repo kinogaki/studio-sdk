@@ -2,7 +2,8 @@
 //! pieces some kinds carry ([`PathChoice`], [`Chip`], [`FileDialog`]), a material input's connection button ([`Socket`]) and
 //! the slot at a field's right edge ([`Trailing`]).
 use super::{Number, Text};
-use kinogaki_studio_api::params::{Choice, CurveChannel, Diagnostic};
+use kinogaki_studio_api::Diagnostic;
+use kinogaki_studio_api::params::{Choice, CurveChannel};
 use std::sync::Arc;
 
 /// The type of a field and how it is presented. Each kind says which

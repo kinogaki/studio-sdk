@@ -14,7 +14,10 @@ fn selections_are_sorted_distinct_and_hold_their_active_element() {
     );
     let two = Elements::from_indices(10, [1, 2]).unwrap();
     let e = Selection::new(Domain::Point, two.clone(), Some(4)).unwrap_err();
-    assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, Some(4)));
+    assert_eq!(
+        (e.kind, e.diagnostic.element),
+        (ErrorKind::Invalid, Some(4))
+    );
     assert_eq!(e.message(), "the active point 4 is not selected");
     let all = Selection::new(Domain::Edge, Elements::all(7), None).unwrap();
     assert!(all.contains(6) && !all.contains(7) && all.len() == 7 && !all.is_empty());
@@ -40,8 +43,8 @@ fn render_detail_is_in_range() {
         (0.1, 91.0),
     ] {
         assert_eq!(
-            Detail::render(chord, angle).unwrap_err().kind(),
-            ErrorKind::Range
+            Detail::render(chord, angle).unwrap_err().kind,
+            ErrorKind::Invalid
         );
     }
     let direct = Detail::Render {

@@ -187,14 +187,14 @@ pub trait Engine: Send + Sync {
     fn description(&self) -> EngineDescription;
 
     /// One on the host's `device` and `queue`, waking `wake` once per
-    /// result; an error says why there is none on this platform or device.
+    /// result; the error says why there is none on this platform or device.
     fn make(
         &self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         wake: Wake,
         options: &Options,
-    ) -> Result<Made, String>;
+    ) -> Result<Made, kinogaki_geometry::Error>;
 }
 
 /// What an image means.

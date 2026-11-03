@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// let work = token.clone();
 /// assert_eq!(work.check(), Ok(()));
 /// token.cancel();
-/// assert_eq!(work.check(), Err(Error::Cancelled));
+/// assert_eq!(work.check(), Err(Error::cancelled()));
 /// ```
 #[derive(Clone, Debug, Default)]
 pub struct CancelToken(Arc<AtomicBool>);
@@ -40,10 +40,10 @@ impl CancelToken {
         self.0.load(Ordering::Relaxed)
     }
 
-    /// `Err(Error::Cancelled)` once the flag is raised, for `?` in loops.
+    /// `Err(Error::cancelled())` once the flag is raised, for `?` in loops.
     pub fn check(&self) -> Result<(), crate::Error> {
         if self.is_cancelled() {
-            Err(crate::Error::Cancelled)
+            Err(crate::Error::cancelled())
         } else {
             Ok(())
         }

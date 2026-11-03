@@ -10,11 +10,12 @@
 //! saves, stamps and counts memory through that type. How a delta is
 //! authored (the interactive tools that record moves, inserts and
 //! deletions) is the package's UI, through the host UI interface.
+use crate::Error;
 use crate::cook::SchemaCx;
-use crate::cook::{CookCx, CookError, Outputs};
+use crate::cook::{CookCx, Outputs};
 use crate::data::Data;
 use crate::id::DataTypeId;
-use crate::params::{Diagnostic, Parameters, Schema};
+use crate::params::{Parameters, Schema};
 
 /// How authored deltas apply to values of one data type.
 pub trait HeldEdit: Send + Sync {
@@ -48,12 +49,12 @@ pub trait HeldEdit: Send + Sync {
         base: &Data,
         delta: &Data,
         inputs: &[Option<Data>],
-    ) -> Result<Outputs, CookError>;
+    ) -> Result<Outputs, Error>;
 
     /// Checks of `delta` beyond its data type's: whether these edits can
     /// hold it (a host edit or a project may hand any value of the type).
     /// Core asks whenever it checks the node. Anything goes by default.
-    fn validate(&self, delta: &Data) -> Result<(), Diagnostic> {
+    fn validate(&self, delta: &Data) -> Result<(), Error> {
         let _ = delta;
         Ok(())
     }

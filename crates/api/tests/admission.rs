@@ -4,7 +4,7 @@
 //! doubled icon, and a package icon no package carries.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
-use kinogaki_studio_api::icon::{Icon, IconError};
+use kinogaki_studio_api::icon::Icon;
 use kinogaki_studio_api::network::NetworkContext;
 use kinogaki_studio_api::*;
 use std::sync::Arc;
@@ -39,7 +39,7 @@ impl NodeType for Grow {
             .context(ContextId::declared(self.offered))
             .output(Port::new("out", "Out", DataTypeId::declared(self.data)))
     }
-    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Ok(Outputs::default())
     }
 }
@@ -213,11 +213,12 @@ fn a_ports_data_type_is_registered() {
     let stray = package(|p| p.with_node_type(grow(TREES, "acme.trees.bark")));
     assert_eq!(
         Registry::new().register(stray),
-        Err(RegistryError::UnknownDataType {
-            package: trees(),
-            by: "acme.trees.grow",
-            data: DataTypeId::declared("acme.trees.bark"),
-        })
+        Err(Error::refused(format_args!(
+            "{package}'s {by} names data type {data}, which isn't registered",
+            package = trees(),
+            by = "acme.trees.grow",
+            data = DataTypeId::declared("acme.trees.bark")
+        )))
     );
 }
 
@@ -226,11 +227,12 @@ fn a_node_type_is_offered_in_declared_contexts() {
     let stray = package(|p| p.with_node_type(grow("acme.trees.orchard", WOOD)));
     assert_eq!(
         Registry::new().register(stray),
-        Err(RegistryError::UnknownContext {
-            package: trees(),
-            by: "acme.trees.grow",
-            context: ContextId::declared("acme.trees.orchard"),
-        })
+        Err(Error::refused(format_args!(
+            "{package}'s {by} names context {context}, which no package declares",
+            package = trees(),
+            by = "acme.trees.grow",
+            context = ContextId::declared("acme.trees.orchard")
+        )))
     );
 }
 
@@ -244,11 +246,12 @@ fn an_object_kind_holds_a_declared_context() {
     });
     assert_eq!(
         Registry::new().register(stray),
-        Err(RegistryError::UnknownContext {
-            package: trees(),
-            by: "acme.trees.grove",
-            context: ContextId::declared("acme.trees.orchard"),
-        })
+        Err(Error::refused(format_args!(
+            "{package}'s {by} names context {context}, which no package declares",
+            package = trees(),
+            by = "acme.trees.grove",
+            context = ContextId::declared("acme.trees.orchard")
+        )))
     );
 }
 
@@ -260,11 +263,12 @@ fn a_context_adopts_a_node_type_once() {
             .adopts(import, "Model")
             .adopts(import, "Model"),
     );
-    let refused = Err(RegistryError::Adopted {
-        package: trees(),
-        context: ContextId::declared(TREES),
-        node: import,
-    });
+    let refused = Err(Error::refused(format_args!(
+        "{package}'s {context} adopts {node} twice",
+        package = trees(),
+        context = ContextId::declared(TREES),
+        node = import
+    )));
     assert_eq!(Registry::new().register(twice), refused);
     let once = Package::new(trees(), "Trees").with_context(context(TREES).adopts(import, "Model"));
     assert!(Registry::new().register(once).is_ok());
@@ -275,10 +279,11 @@ fn icons_are_well_formed_named_once_and_found() {
     let bad = package(|p| p.with_icon(Icon::new("Leaf", SQUARE)));
     assert_eq!(
         Registry::new().register(bad),
-        Err(RegistryError::BadIcon {
-            package: trees(),
-            error: IconError::Name("Leaf".into()),
-        })
+        Err(Error::refused(format_args!(
+            "{}'s icon: \"Leaf\" is not an icon name: a lowercase letter, then lowercase \
+             letters, digits and `-`, at most 64 bytes",
+            trees()
+        )))
     );
     let twice = package(|p| {
         p.with_icon(Icon::new("leaf", SQUARE))
@@ -286,10 +291,10 @@ fn icons_are_well_formed_named_once_and_found() {
     });
     assert_eq!(
         Registry::new().register(twice),
-        Err(RegistryError::BadIcon {
-            package: trees(),
-            error: IconError::Twice("leaf".into()),
-        })
+        Err(Error::refused(format_args!(
+            "{}'s icon: a second icon is named \"leaf\"",
+            trees()
+        )))
     );
     for missing in ["acme.trees/bark", "acme.moss/leaf"] {
         let shown = package(|p| {
@@ -300,11 +305,12 @@ fn icons_are_well_formed_named_once_and_found() {
         });
         assert_eq!(
             Registry::new().register(shown),
-            Err(RegistryError::UnknownIcon {
-                package: trees(),
-                by: "acme.trees.grow",
-                icon: missing.into(),
-            })
+            Err(Error::refused(format_args!(
+                "{package}'s {by} shows icon {icon}, which no package carries",
+                package = trees(),
+                by = "acme.trees.grow",
+                icon = missing
+            )))
         );
     }
 }

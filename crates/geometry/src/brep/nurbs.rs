@@ -1,8 +1,8 @@
 //! Clamped NURBS curves (in space and in a chart) and tensor-product NURBS
 //! surfaces, with the one evaluation the contract is stated through.
 use super::geometry::refuse;
+use crate::Error;
 use crate::column::Column;
-use crate::error::GeometryError;
 use crate::limits::MAX_COORDINATE;
 use crate::spline::{self, KnotFault};
 
@@ -28,7 +28,7 @@ pub enum SeamContinuity {
 /// by the one NURBS rule ([`spline::nurbs_check`]): finite, never
 /// decreasing, the end knots each exactly `degree + 1` times, interior
 /// knots at most `degree` times, a domain of positive width.
-fn check_knots(degree: u8, knots: &[f64], count: usize) -> Result<(), GeometryError> {
+fn check_knots(degree: u8, knots: &[f64], count: usize) -> Result<(), Error> {
     let Err(fault) = spline::nurbs_check(degree, knots, count, true) else {
         return Ok(());
     };
@@ -62,7 +62,7 @@ fn check_knots(degree: u8, knots: &[f64], count: usize) -> Result<(), GeometryEr
     Err(refuse(None, phrase, detail))
 }
 
-fn check_points<const D: usize>(points: &[[f64; D]]) -> Result<(), GeometryError> {
+fn check_points<const D: usize>(points: &[[f64; D]]) -> Result<(), Error> {
     if points
         .iter()
         .any(|p| !p.iter().all(|c| c.abs() <= MAX_COORDINATE))
@@ -76,7 +76,7 @@ fn check_points<const D: usize>(points: &[[f64; D]]) -> Result<(), GeometryError
     Ok(())
 }
 
-fn check_weights(weights: Option<&[f64]>, count: usize) -> Result<(), GeometryError> {
+fn check_weights(weights: Option<&[f64]>, count: usize) -> Result<(), Error> {
     let Some(weights) = weights else {
         return Ok(());
     };
@@ -154,7 +154,7 @@ impl<const D: usize> NurbsCurve<D> {
         knots: impl Into<Column<f64>>,
         points: impl Into<Column<[f64; D]>>,
         weights: Option<Column<f64>>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let () = Self::DIMENSION;
         let (knots, points) = (knots.into(), points.into());
         check_knots(degree, &knots, points.len())?;
@@ -250,7 +250,7 @@ impl NurbsSurface {
         points: impl Into<Column<[f64; 3]>>,
         weights: Option<Column<f64>>,
         closed: [Option<SeamContinuity>; 2],
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let points = points.into();
         let counts = [0, 1].map(|k| (knots[k].len()).saturating_sub(degrees[k] as usize + 1));
         for k in 0..2 {

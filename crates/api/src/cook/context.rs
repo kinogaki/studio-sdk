@@ -1,7 +1,7 @@
 //! [`CookCx`]: everything one cook may read besides its inputs.
 use crate::cancel::CancelToken;
 use crate::components::Components;
-use crate::cook::{CookError, Inside, Project, Resolved};
+use crate::cook::{Error, Inside, Project, Resolved};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, Value};
@@ -210,32 +210,32 @@ impl<'a> CookCx<'a> {
     }
 
     /// Parameter `name` as a number, or a failure naming it.
-    pub fn number(&self, name: &str) -> Result<f64, CookError> {
+    pub fn number(&self, name: &str) -> Result<f64, Error> {
         self.typed(name, "a number", Value::number)
     }
 
     /// Parameter `name` as a toggle's state, or a failure naming it.
-    pub fn toggle(&self, name: &str) -> Result<bool, CookError> {
+    pub fn toggle(&self, name: &str) -> Result<bool, Error> {
         self.typed(name, "a toggle", Value::bool)
     }
 
     /// Parameter `name` as a whole number, or a failure naming it.
-    pub fn integer(&self, name: &str) -> Result<i64, CookError> {
+    pub fn integer(&self, name: &str) -> Result<i64, Error> {
         self.typed(name, "a whole number", Value::integer)
     }
 
     /// Parameter `name` as a choice's key, or a failure naming it.
-    pub fn choice(&self, name: &str) -> Result<&str, CookError> {
+    pub fn choice(&self, name: &str) -> Result<&str, Error> {
         self.typed(name, "a choice", Value::choice)
     }
 
     /// Parameter `name` as text, or a failure naming it.
-    pub fn text(&self, name: &str) -> Result<&str, CookError> {
+    pub fn text(&self, name: &str) -> Result<&str, Error> {
         self.typed(name, "text", Value::text)
     }
 
     /// Data parameter `name`'s value, or a failure naming it.
-    pub fn data(&self, name: &str) -> Result<&Data, CookError> {
+    pub fn data(&self, name: &str) -> Result<&Data, Error> {
         self.typed(name, "data", Value::data)
     }
 
@@ -244,10 +244,10 @@ impl<'a> CookCx<'a> {
         name: &str,
         what: &str,
         read: impl Fn(&'v Value) -> Option<T>,
-    ) -> Result<T, CookError> {
+    ) -> Result<T, Error> {
         self.parameter(name)
             .and_then(read)
-            .ok_or_else(|| CookError::message(format!("parameter {name:?} is not {what}")))
+            .ok_or_else(|| Error::invalid(format!("parameter {name:?} is not {what}")))
     }
 
     /// The range of `inputs` wired into port `port` (empty when nothing
@@ -283,10 +283,10 @@ impl<'a> CookCx<'a> {
         self.cancel
     }
 
-    /// `Err(CookError::Cancelled)` once the cook is cancelled, for `?`.
-    pub fn check(&self) -> Result<(), CookError> {
+    /// `Err(Error::cancelled())` once the cook is cancelled, for `?`.
+    pub fn check(&self) -> Result<(), Error> {
         if self.cancel.is_cancelled() {
-            Err(CookError::Cancelled)
+            Err(Error::cancelled())
         } else {
             Ok(())
         }

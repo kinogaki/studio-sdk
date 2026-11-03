@@ -1,14 +1,12 @@
 //! Primitives: every rule with a passing and a failing case, the limits, the
 //! canonical edges, the fingerprint and the derived slots.
 use kinogaki_geometry::limits::{MAX_POINTS, MAX_PRIMITIVES, MAX_VERTICES};
-use kinogaki_geometry::{
-    Basis, CurveData, Edge, ErrorKind, GeometryError, Kind, Knots, Primitives,
-};
+use kinogaki_geometry::{Basis, CurveData, Edge, Error, ErrorKind, Kind, Knots, Primitives};
 use std::sync::{Arc, Weak};
 
 /// The table of `prims` over `points`, the first `polygons` polygons, the
 /// rest polylines.
-fn make(points: usize, prims: &[&[u32]], polygons: usize) -> Result<Primitives, GeometryError> {
+fn make(points: usize, prims: &[&[u32]], polygons: usize) -> Result<Primitives, Error> {
     let kinds: Vec<Kind> = (0..prims.len())
         .map(|p| {
             if p < polygons {
@@ -27,7 +25,7 @@ fn of(
     prims: &[&[u32]],
     kinds: &[Kind],
     curves: Option<CurveData>,
-) -> Result<Primitives, GeometryError> {
+) -> Result<Primitives, Error> {
     let mut offsets = vec![0];
     let mut vertices = Vec::new();
     for p in prims {
@@ -43,10 +41,10 @@ fn of(
     )
 }
 
-fn refused(result: Result<Primitives, GeometryError>) -> (Option<usize>, String) {
+fn refused(result: Result<Primitives, Error>) -> (Option<usize>, String) {
     let e = result.unwrap_err();
-    assert_eq!(e.kind(), ErrorKind::Primitive, "{}", e.message());
-    (e.element(), e.message().to_owned())
+    assert_eq!(e.kind, ErrorKind::Invalid, "{}", e.message());
+    (e.diagnostic.element, e.message().to_owned())
 }
 
 #[test]
@@ -160,14 +158,14 @@ fn the_first_fault_in_primitive_order_is_reported_on_large_topologies() {
     let offsets: Vec<u32> = (0..=n).map(|f| f * 3).collect();
     let e = Primitives::of_polygons(n as usize + 2, offsets.into(), vertices.into()).unwrap_err();
     assert_eq!(
-        (e.element(), e.message()),
+        (e.diagnostic.element, e.message()),
         (Some(70_000), "polygon 70000 repeats a point")
     );
 }
 
 #[test]
 fn one_past_each_limit_is_refused() {
-    let limit = |r: Result<Primitives, GeometryError>| r.unwrap_err().kind();
+    let limit = |r: Result<Primitives, Error>| r.unwrap_err().kind;
     assert!(Primitives::of_polygons(MAX_POINTS, vec![0].into(), Vec::new().into()).is_ok());
     assert_eq!(
         limit(Primitives::of_polygons(
@@ -175,7 +173,7 @@ fn one_past_each_limit_is_refused() {
             vec![0].into(),
             Vec::new().into()
         )),
-        ErrorKind::Limit
+        ErrorKind::Invalid
     );
     // Every id fits a u32, with u32::MAX free as "no element"; a table
     // past the primitive or vertex limits would take 16 GB to hold here.
@@ -346,7 +344,7 @@ fn curve(
     degree: u8,
     knots: Vec<f64>,
     weights: Option<Vec<f64>>,
-) -> Result<Primitives, GeometryError> {
+) -> Result<Primitives, Error> {
     let ids: Vec<u32> = (0..count).collect();
     let k = knots.len() as u32;
     let data = CurveData::new(
@@ -368,9 +366,12 @@ fn curves_follow_their_basis_rules() {
     assert!(curve(Basis::Nurbs, false, 4, 3, open.to_vec(), None).is_ok());
     assert!(curve(Basis::BSpline, true, 4, 3, vec![], None).is_ok());
     assert!(curve(Basis::Bezier, false, 4, 3, vec![], None).is_ok());
-    let message = |r: Result<Primitives, GeometryError>| {
+    let message = |r: Result<Primitives, Error>| {
         let e = r.unwrap_err();
-        assert_eq!((e.kind(), e.element()), (ErrorKind::Curve, Some(0)));
+        assert_eq!(
+            (e.kind, e.diagnostic.element),
+            (ErrorKind::Invalid, Some(0))
+        );
         e.message().to_owned()
     };
     assert_eq!(

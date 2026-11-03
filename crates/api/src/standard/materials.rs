@@ -1,9 +1,9 @@
 //! [`PreviewMaterialsCodec`]: how a file's imported materials save.
 use super::preview_materials;
+use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use kinogaki_render_api::{Extra, ImportedMaterial, PreviewSurface};
 
 /// Saves a file's materials as imported: `count`, then one `material`

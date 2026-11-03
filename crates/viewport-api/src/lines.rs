@@ -19,6 +19,7 @@
 //! drawn as its samples). A face class's line `local` is face `local`, so
 //! it picks, hovers and boxes as that face.
 use crate::ElementKind;
+use kinogaki_geometry::Error;
 use std::{ops::Range, sync::Arc};
 
 /// A class's id, unique within its packet and below [`LineClassId::LIMIT`]
@@ -157,24 +158,33 @@ impl LineClass {
     /// Classes of one packet must cover distinct segments and distinct ids,
     /// with distinct class ids below the limit, each selecting edges or
     /// faces.
-    pub fn validate(classes: &[LineClass], segments: usize) -> Result<(), String> {
+    pub fn validate(classes: &[LineClass], segments: usize) -> Result<(), Error> {
         let mut seen = 0u32;
         for (at, c) in classes.iter().enumerate() {
             if c.id.0 >= LineClassId::LIMIT || seen & (1 << c.id.0) != 0 {
-                return Err(format!("line class {} has a repeated or large id", c.name));
+                return Err(Error::invalid(format_args!(
+                    "line class {} has a repeated or large id",
+                    c.name
+                )));
             }
             seen |= 1 << c.id.0;
             if !matches!(c.selects, ElementKind::Edge | ElementKind::Face) {
-                return Err(format!(
+                return Err(Error::invalid(format_args!(
                     "line class {} selects neither edges nor faces",
                     c.name
-                ));
+                )));
             }
             if c.segments.start > c.segments.end || c.segments.end as usize > segments {
-                return Err(format!("line class {} exceeds the packet's lines", c.name));
+                return Err(Error::invalid(format_args!(
+                    "line class {} exceeds the packet's lines",
+                    c.name
+                )));
             }
             if !c.style.valid() {
-                return Err(format!("line class {} has an invalid style", c.name));
+                return Err(Error::invalid(format_args!(
+                    "line class {} has an invalid style",
+                    c.name
+                )));
             }
             let ids = c.first_id as u64..c.first_id as u64 + c.ids as u64;
             for other in &classes[at + 1..] {
@@ -182,10 +192,10 @@ impl LineClass {
                 if c.segments.start < other.segments.end && other.segments.start < c.segments.end
                     || ids.start < o.end && o.start < ids.end
                 {
-                    return Err(format!(
+                    return Err(Error::invalid(format_args!(
                         "line classes {} and {} overlap",
                         c.name, other.name
-                    ));
+                    )));
                 }
             }
         }

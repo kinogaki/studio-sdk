@@ -1,115 +1,141 @@
-//! [`GeometryError`]: why a standard value was refused.
-use crate::brep::Entity;
+//! [`Error`]: why a call failed, as one [`Diagnostic`] for the user and
+//! the [`ErrorKind`] a caller branches on.
+use crate::diagnostic::{Diagnostic, TextSpan};
 use std::fmt;
 
-/// Why a builder or constructor refused a value: what failed, and which
-/// element when one element is at fault. Nothing is built when it fails.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GeometryError {
-    kind: ErrorKind,
-    at: Option<usize>,
-    message: String,
-    detail: Option<String>,
+/// Why a call failed: what the user reads ([`diagnostic`](Self::diagnostic),
+/// an error saying what failed and where) and the kind of failure, for
+/// the caller that acts on it. Every fallible call of the SDK returns it:
+/// a value's constructor, a kernel's operation, a node's cook, a reader, a
+/// compiler, a package's admission. Nothing the failed call would have
+/// produced is kept.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Error {
+    /// What kind of failure it is.
+    pub kind: ErrorKind,
+    /// What failed, for the user: its message, and the place in a text or
+    /// the element it concerns.
+    pub diagnostic: Diagnostic,
 }
 
-/// What kind of rule a refused value broke. New kinds may be added; a
-/// caller that doesn't know one treats it as any other refusal and shows
-/// the message.
+/// What kind of failure an [`Error`] is: what its caller does differs by
+/// it, while the user reads the diagnostic alone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
 pub enum ErrorKind {
-    /// A count is over a product limit ([`crate::limits`]).
-    Limit,
-    /// A primitive's offsets, vertices or kind break a rule of
-    /// [`Primitives`](crate::Primitives).
-    Primitive,
-    /// A position is not finite, or too large.
-    Position,
-    /// An attribute or group is misnamed, mistyped or missized.
-    Attribute,
-    /// A curve breaks its basis's rules (degree, counts, knots, weights).
-    Curve,
-    /// A selection's indices or active element are inconsistent.
-    Selection,
-    /// A tolerance or a render detail is out of its range.
-    Range,
-    /// A frame's origin isn't finite, or its axes aren't orthonormal and
-    /// right-handed ([`crate::Frame`]).
-    Frame,
-    /// A B-rep body, its geometry or a value holding it breaks a rule of
-    /// [`crate::brep`] ([`GeometryError::element`] is the index of the
-    /// entity at fault).
-    Brep,
+    /// The input can't be used: a value breaking a rule, a malformed file,
+    /// a stored value of the wrong shape, data of another type, a file the
+    /// system couldn't read.
+    Invalid,
+    /// What the work needs isn't installed (a light of a type no installed
+    /// engine declares). Reading a project, the host keeps the object as it
+    /// was read and reports the message.
+    Missing,
+    /// A package was refused at admission (a duplicate id, a data type no
+    /// package registered); the message says which package and why.
+    Refused,
+    /// The work saw its cancellation raised and stopped, or whoever was to
+    /// answer let the request go; the caller drops it.
+    Cancelled,
 }
 
-impl GeometryError {
-    /// A refusal of kind `kind`, at element `at` when one element is at
-    /// fault, saying `message`.
-    pub(crate) fn new(kind: ErrorKind, at: Option<usize>, message: impl Into<String>) -> Self {
+impl Error {
+    /// A `kind` failure saying `message`.
+    pub fn new(kind: ErrorKind, message: impl fmt::Display) -> Self {
         Self {
             kind,
-            at,
-            message: message.into(),
-            detail: None,
+            diagnostic: Diagnostic::error(message.to_string()),
         }
     }
 
-    /// A B-rep refusal ([`ErrorKind::Brep`]) blaming `entity` when one is
-    /// at fault: `phrase` is the short text (`{}`), `detail` the full one
-    /// (`{:#}`). Neither names an id or a number.
-    pub(crate) fn brep(entity: Option<Entity>, phrase: &'static str, detail: String) -> Self {
-        Self {
-            kind: ErrorKind::Brep,
-            at: entity.map(Entity::index),
-            message: phrase.into(),
-            detail: Some(detail),
-        }
+    /// An [`ErrorKind::Invalid`] failure saying `message`.
+    pub fn invalid(message: impl fmt::Display) -> Self {
+        Self::new(ErrorKind::Invalid, message)
     }
 
-    /// A refusal blaming element `at`.
-    pub(crate) fn at(kind: ErrorKind, at: usize, message: impl Into<String>) -> Self {
-        Self::new(kind, Some(at), message)
+    /// An [`ErrorKind::Missing`] failure saying `message`: what isn't
+    /// installed, plainly ("light type acme.lights.rim isn't installed").
+    pub fn missing(message: impl fmt::Display) -> Self {
+        Self::new(ErrorKind::Missing, message)
     }
 
-    /// A refusal blaming no one element.
-    pub(crate) fn whole(kind: ErrorKind, message: impl Into<String>) -> Self {
-        Self::new(kind, None, message)
+    /// An [`ErrorKind::Refused`] failure saying `message`.
+    pub fn refused(message: impl fmt::Display) -> Self {
+        Self::new(ErrorKind::Refused, message)
     }
 
-    /// The kind of rule broken.
-    pub fn kind(&self) -> ErrorKind {
-        self.kind
+    /// An [`ErrorKind::Cancelled`] failure.
+    pub fn cancelled() -> Self {
+        Self::new(ErrorKind::Cancelled, "cancelled")
     }
 
-    /// The element at fault (a primitive, point, curve or index, as the
-    /// message names it), when one is.
-    pub fn element(&self) -> Option<usize> {
-        self.at
+    /// Whether it is a cancellation, which a caller drops rather than
+    /// shows.
+    pub fn is_cancelled(&self) -> bool {
+        self.kind == ErrorKind::Cancelled
     }
 
-    /// What failed, for the user ("polygon 12 repeats a point"). A B-rep
-    /// refusal's is a short phrase ("open loop"), naming no id or number.
+    /// Concerning element `element` (the lowest failing one, in the
+    /// numbering of what was checked).
+    pub fn element(mut self, element: usize) -> Self {
+        self.diagnostic.element = Some(element);
+        self
+    }
+
+    /// Pointing at `span` of a text.
+    pub fn at(mut self, span: TextSpan) -> Self {
+        self.diagnostic.span = Some(span);
+        self
+    }
+
+    /// What failed, for the user, without the place it concerns.
     pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    /// The full text: what failed and the rule it broke. The message
-    /// itself when the refusal has no more to say.
-    pub fn detail(&self) -> &str {
-        self.detail.as_deref().unwrap_or(&self.message)
+        &self.diagnostic.message
     }
 }
 
-/// `{}` writes the [`message`](GeometryError::message), `{:#}` the
-/// [`detail`](GeometryError::detail).
-impl fmt::Display for GeometryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if f.alternate() {
-            f.write_str(self.detail())
-        } else {
-            f.write_str(&self.message)
+/// An [`ErrorKind::Invalid`] failure reporting `diagnostic`.
+impl From<Diagnostic> for Error {
+    fn from(diagnostic: Diagnostic) -> Self {
+        Self {
+            kind: ErrorKind::Invalid,
+            diagnostic,
         }
     }
 }
 
-impl std::error::Error for GeometryError {}
+/// An [`ErrorKind::Invalid`] failure with the system's message.
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Self::invalid(error)
+    }
+}
+
+/// The diagnostic: "line 7, column 12: message", or the message.
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.diagnostic.fmt(f)
+    }
+}
+
+impl std::error::Error for Error {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_error_is_its_diagnostic_and_its_kind() {
+        let e = Error::invalid("polygon repeats a point").element(12);
+        assert_eq!(e.to_string(), "polygon repeats a point");
+        assert_eq!(
+            (e.kind, e.message()),
+            (ErrorKind::Invalid, "polygon repeats a point")
+        );
+        assert!(Error::cancelled().is_cancelled());
+        let read = Error::from(std::io::Error::other("no such file"));
+        assert_eq!(
+            (read.kind, read.message()),
+            (ErrorKind::Invalid, "no such file")
+        );
+    }
+}

@@ -629,26 +629,28 @@ fn settings_pages_edit_the_stored_values_they_are_lent() {
 /// under the package's vendor, and given parts by one package alone.
 #[test]
 fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
-    use kinogaki_studio_api::{Registry, RegistryError};
+    use kinogaki_studio_api::{Error, Registry};
     let mut registry = Registry::new();
     registry.register(package()).unwrap();
     let groves = PackageId::declared("toy.groves");
     assert_eq!(
         registry.check(&Package::new(groves, "Groves").with_ui(Trees)),
-        Err(RegistryError::DuplicateId {
-            package: groves,
-            what: "context's UI",
-            id: "toy.trees.forest",
-            first: PackageId::declared("toy.trees"),
-        })
+        Err(Error::refused(format_args!(
+            "{package} declares {what} {id}, which {first} declared",
+            package = groves,
+            what = "context's UI",
+            id = "toy.trees.forest",
+            first = PackageId::declared("toy.trees")
+        )))
     );
     let acme = PackageId::declared("acme.trees");
     assert_eq!(
         Registry::new().check(&Package::new(acme, "Trees").with_ui(Trees)),
-        Err(RegistryError::ForeignId {
-            package: acme,
-            id: "toy.trees.forest",
-        })
+        Err(Error::refused(format_args!(
+            "{package} declares {id}, under another vendor's name",
+            package = acme,
+            id = "toy.trees.forest"
+        )))
     );
 }
 

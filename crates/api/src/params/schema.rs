@@ -1,6 +1,7 @@
 //! [`Schema`]: how parameters are presented, as data. The host turns it
 //! into its inspector's rows; edits come back as new [`Value`]s.
-use super::{Diagnostic, Parameters, Value, ValueKind};
+use super::{Parameters, Value, ValueKind};
+use crate::Error;
 use crate::data::Data;
 
 /// What a parameter dialog or inspector shows, top to bottom: sections and
@@ -222,8 +223,8 @@ impl Parameter {
     /// node's parameters (when a node is made, edited or loaded): its
     /// kind's [`check`](ValueKind::check). The error says why, naming the
     /// parameter by its label.
-    pub fn check(&self, value: &Value) -> Result<(), Diagnostic> {
-        (self.kind.check(value)).map_err(|why| Diagnostic::error(format!("{} {why}", self.label)))
+    pub fn check(&self, value: &Value) -> Result<(), Error> {
+        (self.kind.check(value)).map_err(|why| Error::invalid(format_args!("{} {why}", self.label)))
     }
 }
 
@@ -277,13 +278,13 @@ mod tests {
         );
         assert!(length.check(&Value::Number(10.0)).is_ok());
         assert_eq!(
-            length.check(&Value::Number(-1.0)).unwrap_err().message,
+            length.check(&Value::Number(-1.0)).unwrap_err().message(),
             "Distance must be a number from 0 to 10"
         );
         let count = Parameter::new("count", "Count", ValueKind::integer(1, i64::MAX), 2_i64);
         assert!(count.check(&Value::Integer(1 << 60)).is_ok());
         assert_eq!(
-            count.check(&Value::Number(2.0)).unwrap_err().message,
+            count.check(&Value::Number(2.0)).unwrap_err().message(),
             "Count doesn't take that value"
         );
     }

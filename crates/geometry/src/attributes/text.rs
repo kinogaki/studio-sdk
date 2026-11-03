@@ -1,6 +1,6 @@
 //! [`Text`]: indexed text values, and [`TextBuilder`], which writes them.
+use crate::Error;
 use crate::column::Column;
-use crate::error::{ErrorKind, GeometryError};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -40,40 +40,33 @@ impl Text {
     /// # Errors
     /// An index past the table (naming the element), a repeated or empty
     /// string in the table, or a table of [`Text::NONE`] or more strings.
-    pub fn new(indices: Column<u32>, table: Arc<[Arc<str>]>) -> Result<Self, GeometryError> {
+    pub fn new(indices: Column<u32>, table: Arc<[Arc<str>]>) -> Result<Self, Error> {
         if table.len() >= Self::NONE as usize {
-            return Err(GeometryError::whole(
-                ErrorKind::Attribute,
+            return Err(Error::invalid(
                 "a text table holds fewer than 4294967295 strings",
             ));
         }
         let mut seen = HashSet::with_capacity(table.len());
         for (i, s) in table.iter().enumerate() {
             if s.is_empty() {
-                return Err(GeometryError::at(
-                    ErrorKind::Attribute,
-                    i,
-                    format!("text table entry {i} is empty: an empty string is no value"),
-                ));
+                return Err(Error::invalid(format!(
+                    "text table entry {i} is empty: an empty string is no value"
+                ))
+                .element(i));
             }
             if !seen.insert(&**s) {
-                return Err(GeometryError::at(
-                    ErrorKind::Attribute,
-                    i,
-                    format!("text table entry {i} repeats {s:?}"),
-                ));
+                return Err(
+                    Error::invalid(format!("text table entry {i} repeats {s:?}")).element(i),
+                );
             }
         }
         let size = table.len() as u32;
         if let Some(at) = indices.iter().position(|&i| i >= size && i != Self::NONE) {
-            return Err(GeometryError::at(
-                ErrorKind::Attribute,
-                at,
-                format!(
-                    "element {at}'s text index {} is past the table of {size}",
-                    indices[at]
-                ),
-            ));
+            return Err(Error::invalid(format!(
+                "element {at}'s text index {} is past the table of {size}",
+                indices[at]
+            ))
+            .element(at));
         }
         Ok(Self { indices, table })
     }

@@ -2,8 +2,8 @@
 //! package tests (a codec's round trip without Studio). Its reads are as
 //! strict as Studio's: what a read leaves unread is refused.
 use super::{ElementReader, ElementWriter, Field, FieldRef, ReadShared, SharedValue, check_name};
+use crate::Error;
 use crate::data::Data;
-use crate::error::Error;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 

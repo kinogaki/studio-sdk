@@ -1,7 +1,7 @@
 //! [`Elements`]: a set of the elements of one domain, the one shape a
 //! group and a selection both hold.
+use crate::Error;
 use crate::column::Column;
-use crate::error::{ErrorKind, GeometryError};
 
 /// A set of the elements of one domain: which of its
 /// [`count`](Self::count) elements are members.
@@ -68,14 +68,13 @@ impl Elements {
     pub fn from_indices(
         count: usize,
         indices: impl IntoIterator<Item = u32>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let mut ids: Vec<u32> = indices.into_iter().collect();
         if let Some(&past) = ids.iter().find(|&&i| i as usize >= count) {
-            return Err(GeometryError::at(
-                ErrorKind::Attribute,
-                past as usize,
-                format!("element {past} is past the last of {count}"),
-            ));
+            return Err(
+                Error::invalid(format!("element {past} is past the last of {count}"))
+                    .element(past as usize),
+            );
         }
         if ids.windows(2).any(|w| w[0] >= w[1]) {
             ids.sort_unstable();
@@ -91,24 +90,20 @@ impl Elements {
     /// When the words don't cover exactly `count` bits
     /// (`count.div_ceil(64)` words), or a bit past the last element is
     /// set.
-    pub fn from_bits(count: usize, words: Column<u64>) -> Result<Self, GeometryError> {
+    pub fn from_bits(count: usize, words: Column<u64>) -> Result<Self, Error> {
         if words.len() != count.div_ceil(64) {
-            return Err(GeometryError::whole(
-                ErrorKind::Attribute,
-                format!(
-                    "a set of {count} elements has {} words, not {}",
-                    words.len(),
-                    count.div_ceil(64)
-                ),
-            ));
+            return Err(Error::invalid(format!(
+                "a set of {count} elements has {} words, not {}",
+                words.len(),
+                count.div_ceil(64)
+            )));
         }
         if let Some(&last) = words.last() {
             let used = count % 64;
             if used != 0 && last >> used != 0 {
-                return Err(GeometryError::whole(
-                    ErrorKind::Attribute,
-                    format!("a set of {count} elements holds bits past its last element"),
-                ));
+                return Err(Error::invalid(format!(
+                    "a set of {count} elements holds bits past its last element"
+                )));
             }
         }
         let members: u32 = words.iter().map(|w| w.count_ones()).sum();
@@ -254,7 +249,7 @@ impl Elements {
     ///
     /// # Errors
     /// When the sets are of different counts.
-    pub fn union(&self, other: &Elements) -> Result<Elements, GeometryError> {
+    pub fn union(&self, other: &Elements) -> Result<Elements, Error> {
         self.combine(other, |a, b| a | b)
     }
 
@@ -262,7 +257,7 @@ impl Elements {
     ///
     /// # Errors
     /// When the sets are of different counts.
-    pub fn intersection(&self, other: &Elements) -> Result<Elements, GeometryError> {
+    pub fn intersection(&self, other: &Elements) -> Result<Elements, Error> {
         self.combine(other, |a, b| a & b)
     }
 
@@ -270,7 +265,7 @@ impl Elements {
     ///
     /// # Errors
     /// When the sets are of different counts.
-    pub fn difference(&self, other: &Elements) -> Result<Elements, GeometryError> {
+    pub fn difference(&self, other: &Elements) -> Result<Elements, Error> {
         self.combine(other, |a, b| a & !b)
     }
 
@@ -278,7 +273,7 @@ impl Elements {
     ///
     /// # Errors
     /// When the sets are of different counts.
-    pub fn symmetric_difference(&self, other: &Elements) -> Result<Elements, GeometryError> {
+    pub fn symmetric_difference(&self, other: &Elements) -> Result<Elements, Error> {
         self.combine(other, |a, b| a ^ b)
     }
 
@@ -288,15 +283,12 @@ impl Elements {
         &self,
         other: &Elements,
         op: impl Fn(bool, bool) -> bool,
-    ) -> Result<Elements, GeometryError> {
+    ) -> Result<Elements, Error> {
         if self.count != other.count {
-            return Err(GeometryError::whole(
-                ErrorKind::Attribute,
-                format!(
-                    "a set of {} elements combined with one of {}",
-                    self.count, other.count
-                ),
-            ));
+            return Err(Error::invalid(format!(
+                "a set of {} elements combined with one of {}",
+                self.count, other.count
+            )));
         }
         let count = self.count();
         if let (Repr::Sparse(a), Repr::Sparse(b)) = (&self.repr, &other.repr) {

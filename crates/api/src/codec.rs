@@ -15,12 +15,12 @@
 //! Codecs follow the project's rules: strict reading (no defaults for
 //! missing values, no fallbacks) and no version fields. A body that needs
 //! something no installed package provides (a light of a type no engine
-//! declares) reads as [`Error::NotInstalled`]: the host keeps that object
+//! declares) reads as a [`Missing`](crate::ErrorKind::Missing) error: the host keeps that object
 //! as it was read, says why, and opens the rest of the project.
+use crate::Error;
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter};
-use crate::error::Error;
 use crate::object::ObjectBody;
 use kinogaki_render_api::Engines;
 use std::sync::Arc;
@@ -78,7 +78,7 @@ pub trait ObjectCodec: Send + Sync {
     fn write(&self, body: &dyn ObjectBody, out: &mut dyn ElementWriter) -> Result<(), Error>;
 
     /// Reads the body [`write`](Self::write) wrote into `element`, with
-    /// `cx` saying what is installed: [`Error::NotInstalled`] when the body
+    /// `cx` saying what is installed: a [`Missing`](crate::ErrorKind::Missing) error when the body
     /// needs something that isn't.
     fn read(
         &self,

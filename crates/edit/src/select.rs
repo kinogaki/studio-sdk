@@ -22,9 +22,7 @@
 //! let faces = select::convert(&points, &p, Domain::Primitive).unwrap();
 //! assert_eq!(faces.members().iter().collect::<Vec<_>>(), [0]);
 //! ```
-use kinogaki_geometry::{
-    Column, Domain, Elements, Geometry, GeometryError, Incidence, Selection, names,
-};
+use kinogaki_geometry::{Column, Domain, Elements, Error, Geometry, Incidence, Selection, names};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -48,7 +46,7 @@ pub enum Coverage {
 ///
 /// # Errors
 /// As [`Selection::validate`], or a domain `on` has none of.
-pub fn convert(s: &Selection, on: &dyn Incidence, to: Domain) -> Result<Selection, GeometryError> {
+pub fn convert(s: &Selection, on: &dyn Incidence, to: Domain) -> Result<Selection, Error> {
     s.validate(on)?;
     if to == s.domain() {
         return Ok(s.clone());
@@ -75,7 +73,7 @@ pub fn convert_by(
     on: &dyn Incidence,
     to: Domain,
     coverage: Coverage,
-) -> Result<Selection, GeometryError> {
+) -> Result<Selection, Error> {
     s.validate(on)?;
     if to == s.domain() {
         return Ok(s.clone());
@@ -107,7 +105,7 @@ pub fn convert_by(
 ///
 /// # Errors
 /// As [`Selection::validate`].
-pub fn resolve(s: &Selection, on: &dyn Incidence) -> Result<Column<u32>, GeometryError> {
+pub fn resolve(s: &Selection, on: &dyn Incidence) -> Result<Column<u32>, Error> {
     s.validate(on)?;
     Ok(s.members().indices())
 }
@@ -163,7 +161,7 @@ pub fn reresolve(s: &Selection, on: &dyn Incidence) -> Option<Selection> {
 
 /// How many elements of `domain` `on` has, refusing a domain it has none
 /// of as [`Selection::validate`] does.
-fn target(on: &dyn Incidence, domain: Domain) -> Result<usize, GeometryError> {
+fn target(on: &dyn Incidence, domain: Domain) -> Result<usize, Error> {
     on.count(domain).ok_or_else(|| {
         Selection::none(domain, 0)
             .validate(on)

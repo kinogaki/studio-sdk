@@ -13,8 +13,8 @@
 //! bits). Reading is strict: a standard name of another type or domain
 //! refuses the file, with the element's path.
 use super::invalid;
+use crate::Error;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
-use crate::error::Error;
 use kinogaki_geometry::{
     Attribute, AttributeType, Attributes, Column, Domain, Elements, Meaning, Storage, Text, Values,
 };

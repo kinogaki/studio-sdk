@@ -1,5 +1,5 @@
 //! [`Sampled`]: a value over a frame's shutter.
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 use std::sync::Arc;
 
 /// A value at one or more moments around a frame: `values[k]` at
@@ -40,16 +40,12 @@ impl<T> Sampled<T> {
     /// # Errors
     /// No samples, a time for each value missing, or times not finite and
     /// ascending.
-    pub fn new(
-        times: impl Into<Arc<[f32]>>,
-        values: impl Into<Arc<[T]>>,
-    ) -> Result<Self, GeometryError> {
+    pub fn new(times: impl Into<Arc<[f32]>>, values: impl Into<Arc<[T]>>) -> Result<Self, Error> {
         let (times, values) = (times.into(), values.into());
         let ascending = times.windows(2).all(|t| t[0] < t[1]);
         let finite = times.iter().all(|t| t.is_finite());
         if times.is_empty() || times.len() != values.len() || !(ascending && finite) {
-            return Err(GeometryError::whole(
-                ErrorKind::Range,
+            return Err(Error::invalid(
                 "samples need one finite, ascending time a value, and at least one value",
             ));
         }

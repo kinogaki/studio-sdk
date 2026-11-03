@@ -74,9 +74,7 @@ part! {
         }
         /// Its preset after its levels, if it has one (read once, as
         /// [`levels`](Self::levels)).
-        fn preset(&self) -> Option<LevelPreset> {
-            None
-        }
+        fn preset(&self) -> Option<LevelPreset> {None}
         /// Whether its preset is on.
         fn preset_on(&self, s: &S, cx: &dyn Cx) -> bool {
             let _ = (s, cx);

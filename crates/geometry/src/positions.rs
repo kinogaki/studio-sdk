@@ -1,7 +1,7 @@
 //! The rule every value's positions follow: finite, each component at
 //! most [`MAX_COORDINATE`] in magnitude, at most [`MAX_POINTS`] of them.
+use crate::Error;
 use crate::column::Column;
-use crate::error::{ErrorKind, GeometryError};
 use crate::limits::{self, MAX_COORDINATE, MAX_POINTS};
 use crate::parallel;
 use crate::{Bounds, Vec3};
@@ -10,7 +10,7 @@ use crate::{Bounds, Vec3};
 const BLOCK: usize = 65_536;
 
 /// Checks `positions`; the error names the first bad point in order.
-pub(crate) fn check(positions: &Column<[f64; 3]>) -> Result<(), GeometryError> {
+pub(crate) fn check(positions: &Column<[f64; 3]>) -> Result<(), Error> {
     limits::check(positions.len(), MAX_POINTS, "points")?;
     // NaN fails every comparison.
     let fine = |p: &[f64; 3]| {
@@ -19,11 +19,9 @@ pub(crate) fn check(positions: &Column<[f64; 3]>) -> Result<(), GeometryError> {
             & (p[2].abs() <= MAX_COORDINATE)
     };
     match parallel::first_refused(positions, BLOCK, fine) {
-        Some(i) => Err(GeometryError::at(
-            ErrorKind::Position,
-            i,
-            format!("point {i} is not finite or is beyond 1e100"),
-        )),
+        Some(i) => {
+            Err(Error::invalid(format!("point {i} is not finite or is beyond 1e100")).element(i))
+        }
         None => Ok(()),
     }
 }

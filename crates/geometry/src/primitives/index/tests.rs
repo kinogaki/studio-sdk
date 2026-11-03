@@ -32,11 +32,7 @@ fn assert_same(t: &Primitives) {
     );
 }
 
-fn table(
-    points: usize,
-    prims: &[&[u32]],
-    kinds: &[Kind],
-) -> Result<Primitives, crate::GeometryError> {
+fn table(points: usize, prims: &[&[u32]], kinds: &[Kind]) -> Result<Primitives, crate::Error> {
     let mut offsets = vec![0];
     let mut vertices = Vec::new();
     for p in prims {

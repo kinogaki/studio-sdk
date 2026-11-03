@@ -331,8 +331,8 @@ fn attributes_follow_the_body_classes() {
         Attribute::tuples(vec![[1.0f32; 3]; 5], Meaning::Color).unwrap(),
     );
     assert_eq!(
-        b.clone().build(short.unwrap()).unwrap_err().kind(),
-        ErrorKind::Attribute
+        b.clone().build(short.unwrap()).unwrap_err().kind,
+        ErrorKind::Invalid
     );
     let corner = Attributes::new().with(
         Domain::Vertex,
@@ -340,8 +340,8 @@ fn attributes_follow_the_body_classes() {
         Attribute::tuples(vec![0.0; 24], Meaning::None).unwrap(),
     );
     assert_eq!(
-        b.clone().build(corner.unwrap()).unwrap_err().kind(),
-        ErrorKind::Attribute
+        b.clone().build(corner.unwrap()).unwrap_err().kind,
+        ErrorKind::Invalid
     );
     // Instances: one Instance element a placement.
     let names = Attributes::new()
@@ -401,7 +401,7 @@ fn a_value_holds_bodies_curves_and_datums() {
         Attributes::new(),
     )
     .unwrap_err();
-    assert_eq!(e.element(), Some(0));
+    assert_eq!(e.diagnostic.element, Some(0));
     let detail = Attributes::new()
         .with(
             Domain::Primitive,
@@ -415,7 +415,7 @@ fn a_value_holds_bodies_curves_and_datums() {
     let polygon = crate::Geometry::new(vec![[0.0; 3]; 3].into(), tri, Attributes::new()).unwrap();
     let e = value.with_curves(polygon).unwrap_err();
     assert_eq!(
-        (e.element(), e.message()),
+        (e.diagnostic.element, e.message()),
         (Some(0), "free curve 0 is a polygon")
     );
     assert_eq!(Brep::empty(), Brep::default());

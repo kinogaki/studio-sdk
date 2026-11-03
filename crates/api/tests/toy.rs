@@ -3,6 +3,7 @@
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::*;
 use kinogaki_studio_api_testing::Unconverted;
+use kinogaki_studio_api_testing::assert_refused;
 use std::sync::{Arc, LazyLock};
 
 /// The toy kernel's value.
@@ -310,7 +311,7 @@ fn display_prepares_highlights_and_cancels() {
     cancel.cancel();
     assert_eq!(
         display.prepare(&data, None, &request, &cancel).err(),
-        Some(Error::Cancelled)
+        Some(Error::cancelled())
     );
 }
 
@@ -325,7 +326,7 @@ fn data_saves_into_a_project_and_reads_back() {
     assert_eq!(CLOUD.get(&back), CLOUD.get(&data));
     let empty = MemoryElement::new(CLOUD.id().as_str());
     let missing = empty.read(|r| CloudType.codec().read(r, None)).unwrap_err();
-    assert!(matches!(missing, Error::Invalid(m) if m.contains("points")));
+    assert!(missing.kind == ErrorKind::Invalid && missing.message().contains("points"));
 }
 
 #[test]
@@ -423,7 +424,10 @@ fn a_duplicate_id_refuses_the_whole_package() {
     // The same package again.
     assert_eq!(
         registry.register(kernel()).unwrap_err(),
-        RegistryError::DuplicatePackage(PackageId::declared("toy.points"))
+        Error::refused(format_args!(
+            "package {} is already registered",
+            PackageId::declared("toy.points")
+        ))
     );
     // Another package declaring the cloud type again, beside a new slot.
     let copy = Package::new(PackageId::declared("toy.copy"), "Copy")
@@ -431,12 +435,13 @@ fn a_duplicate_id_refuses_the_whole_package() {
         .with_data_type(CloudType);
     assert_eq!(
         registry.register(copy).unwrap_err(),
-        RegistryError::DuplicateId {
-            package: PackageId::declared("toy.copy"),
-            what: "data type",
-            id: "toy.points.cloud",
-            first: PackageId::declared("toy.points"),
-        }
+        Error::refused(format_args!(
+            "{package} declares {what} {id}, which {first} declared",
+            package = PackageId::declared("toy.copy"),
+            what = "data type",
+            id = "toy.points.cloud",
+            first = PackageId::declared("toy.points")
+        ))
     );
     // Nothing of the refused package was kept.
     assert!(
@@ -449,13 +454,7 @@ fn a_duplicate_id_refuses_the_whole_package() {
     let twice = Package::new(PackageId::declared("toy.twice"), "Twice")
         .with_slot::<Selection2>()
         .with_slot::<Selection2>();
-    assert!(matches!(
-        registry.register(twice),
-        Err(RegistryError::DuplicateId {
-            what: "session slot",
-            ..
-        })
-    ));
+    assert_refused(registry.register(twice), &[", which ", "session slot"]);
 }
 
 /// A slot a second package declares.
@@ -477,9 +476,10 @@ fn packages_declare_only_their_vendors_ids() {
         Package::new(PackageId::declared("acme.points"), "Points").with_data_type(CloudType);
     assert_eq!(
         registry.register(foreign).unwrap_err(),
-        RegistryError::ForeignId {
-            package: PackageId::declared("acme.points"),
-            id: "toy.points.cloud",
-        }
+        Error::refused(format_args!(
+            "{package} declares {id}, under another vendor's name",
+            package = PackageId::declared("acme.points"),
+            id = "toy.points.cloud"
+        ))
     );
 }

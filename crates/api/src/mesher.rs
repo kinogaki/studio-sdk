@@ -8,13 +8,13 @@
 //! answer per body and [`Detail`]; with no mesher installed a body shows
 //! grey, without faces.
 use crate::cancel::CancelToken;
-use crate::error::Error;
 use crate::id::{DataTypeId, MesherId};
-use kinogaki_geometry::brep::{Body, FaceId};
+use crate::{Diagnostic, Error};
+use kinogaki_geometry::brep::Body;
 use kinogaki_geometry::{Detail, Geometry, Tolerances};
 
 /// The Primitive i32 attribute naming the B-rep face a polygon of a
-/// [`Meshed`] mesh shows (the [`FaceId`]'s index); `-1` on its polylines.
+/// [`Meshed`] mesh shows (the `FaceId`'s index); `-1` on its polylines.
 pub const FACE: &str = "face";
 
 /// The Primitive i32 attribute naming the B-rep edge a polyline of a
@@ -51,8 +51,8 @@ pub const EDGE: &str = "edge";
 /// **Failures.** A face it can't mesh is left out of the polygons and
 /// listed in [`Meshed::failed`] with a short reason; the rest of the body
 /// still shows. A body it can't mesh at all is an error:
-/// [`Error::Cancelled`] when `cancel` was raised, otherwise
-/// [`Error::Invalid`] saying why.
+/// [`Error::cancelled()`] when `cancel` was raised, otherwise
+/// [`Invalid`](crate::ErrorKind::Invalid) error saying why.
 ///
 /// **State.** `mesh` is a function of its arguments. A mesher may keep
 /// its own state in the derived slots of the body's
@@ -76,7 +76,7 @@ pub trait Mesher: Send + Sync {
     }
 
     /// `body` as polygons and edge polylines at `detail`. Long meshing
-    /// polls `cancel` and stops with [`Error::Cancelled`].
+    /// polls `cancel` and stops with [`Error::cancelled()`].
     ///
     /// # Errors
     /// Cancelled, or a body it can't mesh at all.
@@ -95,16 +95,8 @@ pub struct Meshed {
     /// The faces' polygons, then the edges' polylines, over shared
     /// points ([`Mesher`]).
     pub polygons: Geometry,
-    /// The faces it couldn't mesh, in face order.
-    pub failed: Vec<Failed>,
-}
-
-/// A face a [`Mesher`] couldn't mesh, and why.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Failed {
-    /// The face.
-    pub face: FaceId,
-    /// Why, as a short phrase for the Console ("trim loops cross"): no
-    /// ids or numbers, which the face already names.
-    pub reason: String,
+    /// The faces it couldn't mesh, in face order: a warning for each, its
+    /// element the face's index (`FaceId::index`) and its message a short
+    /// phrase for the Console ("trim loops cross"), naming no id or number.
+    pub failed: Vec<Diagnostic>,
 }

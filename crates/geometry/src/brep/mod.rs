@@ -203,12 +203,12 @@ pub use topology::{
     BodyKind, BrepTopology, Coedge, Counts, Edge, Face, Loop, Names, Sense, Shell, Vertex,
 };
 
+use crate::Error;
 use crate::Frame;
 #[cfg(doc)]
 use crate::Tolerances;
 use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
-use crate::error::GeometryError;
 use crate::limits::MAX_COORDINATE;
 use crate::vec3::Vec3;
 use std::sync::Arc;
@@ -295,7 +295,7 @@ impl Brep {
         curves: crate::Geometry,
         datums: Vec<Datum>,
         detail: Attributes,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let value = Self {
             bodies: bodies.into(),
             curves,
@@ -317,9 +317,9 @@ impl Brep {
         .expect("an empty value is valid")
     }
 
-    fn check(&self) -> Result<(), GeometryError> {
+    fn check(&self) -> Result<(), Error> {
         if self.bodies.len() > MAX_ENTITIES || self.datums.len() > MAX_ENTITIES {
-            return Err(GeometryError::brep(
+            return Err(crate::brep::refused(
                 None,
                 "too many entities",
                 "a B-rep value holds at most the entity limit of bodies and of datums".into(),
@@ -338,7 +338,7 @@ impl Brep {
                 && d.hint.size >= 0.0
                 && d.hint.size <= MAX_COORDINATE;
             if !(kind && hint) {
-                return Err(GeometryError::brep(
+                return Err(crate::brep::refused(
                     Some(Entity::Datum(i)),
                     "datum not finite",
                     "a datum is finite, an axis's direction unit and a hint's size not negative"
@@ -349,11 +349,7 @@ impl Brep {
         let detail = |domain| (domain == Domain::Detail).then_some(1);
         self.detail.check("B-rep values", None, detail)?;
         if let Some(p) = self.curves.primitives().polygons().iter().next() {
-            return Err(GeometryError::at(
-                crate::ErrorKind::Brep,
-                p as usize,
-                format!("free curve {p} is a polygon"),
-            ));
+            return Err(Error::invalid(format!("free curve {p} is a polygon")).element(p as usize));
         }
         Ok(())
     }
@@ -382,7 +378,7 @@ impl Brep {
     ///
     /// # Errors
     /// Too many bodies.
-    pub fn with_bodies(&self, bodies: Vec<Body>) -> Result<Self, GeometryError> {
+    pub fn with_bodies(&self, bodies: Vec<Body>) -> Result<Self, Error> {
         let value = Self {
             bodies: bodies.into(),
             ..self.clone()
@@ -395,7 +391,7 @@ impl Brep {
     ///
     /// # Errors
     /// A polygon among them.
-    pub fn with_curves(&self, curves: crate::Geometry) -> Result<Self, GeometryError> {
+    pub fn with_curves(&self, curves: crate::Geometry) -> Result<Self, Error> {
         let value = Self {
             curves,
             ..self.clone()
@@ -408,7 +404,7 @@ impl Brep {
     ///
     /// # Errors
     /// An attribute of another domain than Detail, or missized.
-    pub fn with_detail(&self, detail: Attributes) -> Result<Self, GeometryError> {
+    pub fn with_detail(&self, detail: Attributes) -> Result<Self, Error> {
         let value = Self {
             detail: Arc::new(detail),
             ..self.clone()
@@ -421,5 +417,15 @@ impl Brep {
 impl Default for Brep {
     fn default() -> Self {
         Self::empty()
+    }
+}
+
+/// A B-rep refusal blaming `entity` when one is at fault: its short
+/// `phrase` ("open loop"), naming no id or number, then the rule broken.
+pub(crate) fn refused(entity: Option<Entity>, phrase: &str, rule: String) -> Error {
+    let error = Error::invalid(format!("{phrase}: {rule}"));
+    match entity {
+        Some(entity) => error.element(entity.index()),
+        None => error,
     }
 }

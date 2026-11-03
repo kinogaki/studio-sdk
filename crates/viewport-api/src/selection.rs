@@ -2,6 +2,7 @@
 //! family of drawn elements, so levels that combine (a sketch's curves and
 //! points, CVs beside hull lines) show their elements selected together.
 use crate::{ElementKind, ElementSet};
+use kinogaki_geometry::Error;
 
 /// The selection shown on the edited surface: faces (or whole objects),
 /// lines and markers, each in its own kind's selected look. A present
@@ -49,7 +50,7 @@ impl<'a> ElementSelection<'a> {
 
     /// Why this selection can't be shown: a set in another kind's slot, or
     /// whole objects beside components.
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), Error> {
         for (slot, set) in [
             (Slot::Faces, self.faces),
             (Slot::Edges, self.edges),
@@ -58,11 +59,14 @@ impl<'a> ElementSelection<'a> {
             if let Some(set) = set
                 && Slot::of(set.kind()) != slot
             {
-                return Err(format!("a {:?} selection in the {slot:?} slot", set.kind()));
+                return Err(Error::invalid(format_args!(
+                    "a {:?} selection in the {slot:?} slot",
+                    set.kind()
+                )));
             }
         }
         if self.objects() && (self.edges.is_some() || self.points.is_some()) {
-            return Err("an object selection shows alone".into());
+            return Err(Error::invalid("an object selection shows alone"));
         }
         Ok(())
     }

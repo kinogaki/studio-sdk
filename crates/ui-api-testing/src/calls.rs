@@ -1,5 +1,5 @@
 //! [`HostCall`]: what a package asked of a [`FakeHost`](super::FakeHost).
-use kinogaki_studio_api::params::Severity;
+use kinogaki_studio_api::Severity;
 use kinogaki_studio_api::{Bounds, RowsFor, SlotId, Time};
 use studio_ui_api::gizmo::{TransformSpace, TransformTool};
 #[cfg(doc)]

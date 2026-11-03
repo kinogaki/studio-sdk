@@ -1,6 +1,6 @@
 //! [`Tolerances`]: the project's modeling tolerances, the contract every
 //! exact body is built to (the project value `kinogaki.tolerances`).
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 use crate::units::Units;
 
 /// The positional tolerance's range, in millimeters.
@@ -57,8 +57,8 @@ impl Tolerances {
         tangent_degrees: f64,
         curvature: f64,
         units: Units,
-    ) -> Result<Self, GeometryError> {
-        let refuse = |m: &str| Err(GeometryError::whole(ErrorKind::Range, m));
+    ) -> Result<Self, Error> {
+        let refuse = |m: &str| Err(Error::invalid(m));
         if !within(positional_mm, POSITIONAL_MM) {
             return refuse("the positional tolerance must be between 0.00001 mm and 1 mm");
         }

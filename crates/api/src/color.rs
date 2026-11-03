@@ -22,6 +22,7 @@
 //! Spaces are named as the host's configuration names them, or by its
 //! aliases (`lin_rec709`, `srgb_texture`, `ACEScg`).
 
+use crate::{Diagnostic, Error};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -35,13 +36,13 @@ pub trait ColorService: Send + Sync + Debug {
     /// # Errors
     /// A space the configuration doesn't name, or no conversion between
     /// them; `rgb` is then unchanged.
-    fn convert(&self, from: &str, to: &str, rgb: &mut [[f64; 3]]) -> Result<(), String>;
+    fn convert(&self, from: &str, to: &str, rgb: &mut [[f64; 3]]) -> Result<(), Error>;
 
     /// Converts `rgb` in place from space `from` to the working space.
     ///
     /// # Errors
     /// As [`convert`](Self::convert).
-    fn to_working(&self, from: &str, rgb: &mut [[f64; 3]]) -> Result<(), String> {
+    fn to_working(&self, from: &str, rgb: &mut [[f64; 3]]) -> Result<(), Error> {
         self.convert(from, self.working(), rgb)
     }
 
@@ -49,7 +50,7 @@ pub trait ColorService: Send + Sync + Debug {
     ///
     /// # Errors
     /// As [`convert`](Self::convert).
-    fn working_to(&self, to: &str, rgb: &mut [[f64; 3]]) -> Result<(), String> {
+    fn working_to(&self, to: &str, rgb: &mut [[f64; 3]]) -> Result<(), Error> {
         self.convert(self.working(), to, rgb)
     }
 
@@ -83,7 +84,7 @@ pub trait ColorService: Send + Sync + Debug {
 
     /// What its configuration got wrong (an unreadable config, a space it
     /// lacks), with what stands in; none by default.
-    fn problem(&self) -> Option<String> {
+    fn problem(&self) -> Option<Diagnostic> {
         None
     }
 }

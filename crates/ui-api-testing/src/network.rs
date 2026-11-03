@@ -8,8 +8,8 @@ use kinogaki_studio_api::network::{
 };
 use kinogaki_studio_api::params::Value;
 use kinogaki_studio_api::{
-    CancelToken, ContextId, CookCx, CookError, Data, DataTypeId, Error, HeldEdit, NodeRef,
-    NodeType, NodeTypeId, Outputs, Package, Parameters, SchemaCx,
+    CancelToken, ContextId, CookCx, Data, DataTypeId, Error, HeldEdit, NodeRef, NodeType,
+    NodeTypeId, Outputs, Package, Parameters, SchemaCx,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -198,11 +198,11 @@ impl FakeNetwork {
     /// # Errors
     /// The first failing node's error; a node `node` doesn't hold, or a
     /// required input left unwired, fails with a message.
-    pub fn cook(&self, node: NodeRef) -> Result<Outputs, CookError> {
+    pub fn cook(&self, node: NodeRef) -> Result<Outputs, Error> {
         let at = self
             .nodes
             .get(&node)
-            .ok_or_else(|| CookError::message(format!("node {} isn't in the network", node.0)))?;
+            .ok_or_else(|| Error::invalid(format!("node {} isn't in the network", node.0)))?;
         if let Some(kept) = &at.kept {
             return Ok(kept.clone());
         }
@@ -210,7 +210,7 @@ impl FakeNetwork {
         if at.flags.contains(Flag::Bypass) {
             return match first {
                 Some(wire) => self.output(*wire).map(Outputs::one),
-                None => Err(CookError::message(format!(
+                None => Err(Error::invalid(format!(
                     "{} is bypassed with nothing wired",
                     at.name
                 ))),
@@ -226,7 +226,7 @@ impl FakeNetwork {
                     true => format!("{} needs its {} input wired", at.name, port.label),
                     false => port.missing.clone(),
                 };
-                return Err(CookError::message(why));
+                return Err(Error::invalid(why));
             }
             for &wire in list {
                 inputs.push(self.output(wire)?);
@@ -239,10 +239,10 @@ impl FakeNetwork {
         match (&at.delta, code.held()) {
             (Some(delta), Some(ty)) => {
                 let held = self.types.held.get(&ty).ok_or_else(|| {
-                    CookError::message(format!("no package brought the held edit of {ty}"))
+                    Error::invalid(format!("no package brought the held edit of {ty}"))
                 })?;
                 let (input, rest) = inputs.split_first().ok_or_else(|| {
-                    CookError::message(format!("{} holds an edit of nothing", at.name))
+                    Error::invalid(format!("{} holds an edit of nothing", at.name))
                 })?;
                 let base = at.base.as_ref().unwrap_or(input);
                 let rest: Vec<Option<Data>> = rest
@@ -261,12 +261,12 @@ impl FakeNetwork {
     }
 
     /// The value `wire` carries.
-    fn output(&self, wire: Wire) -> Result<Data, CookError> {
+    fn output(&self, wire: Wire) -> Result<Data, Error> {
         let mut outputs = self.cook(wire.node)?;
         let count = outputs.data.len();
         (wire.output < count)
             .then(|| outputs.data.swap_remove(wire.output))
-            .ok_or_else(|| CookError::message(format!("output {} of {count}", wire.output)))
+            .ok_or_else(|| Error::invalid(format!("output {} of {count}", wire.output)))
     }
 
     /// `node`'s ports: its type's for its parameters.
@@ -314,7 +314,7 @@ impl FakeNetwork {
                     description.label
                 ))
             })?;
-        declared.check(value).map_err(|d| Error::invalid(d.message))
+        declared.check(value)
     }
 
     /// A name for a new node on `level` as nothing there is called: `name`,

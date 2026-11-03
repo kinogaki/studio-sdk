@@ -57,8 +57,8 @@ pub use description::{
 };
 pub use dirty::Dirty;
 pub use engine::{
-    Deliver, Frame, Outputs, Pending, RenderEngine, RenderError, RenderStats, ViewCamera, ViewDesc,
-    ViewId, ViewMode, Wake, pending,
+    Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
+    ViewMode, Wake, pending,
 };
 pub use exchange::{Extra, ImportedMaterial, PreviewSurface};
 pub use id::{EngineId, IdAllocator, MaterialId, PrimId, TextureId};
@@ -67,16 +67,14 @@ pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.
 pub use kinogaki_geometry::Detail;
 pub use kinogaki_value as value;
-pub use material::{ImageUse, Link, MaterialNetwork, NetworkError, NodeIndex, ShaderNode};
+pub use material::{ImageUse, Link, MaterialNetwork, NodeIndex, ShaderNode};
 pub use prim::{
     AttributeDomain, Camera, Instancer, Material, Mesh, MeshAttribute, Numbers, Prim, PrimKind,
     Projection, TexelFormat, Texture, TextureColorSpace,
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
-pub use settings::{
-    RenderSettings, SettingDescriptor, SettingError, SettingGroup, Textures, Trailing,
-};
+pub use settings::{RenderSettings, SettingDescriptor, SettingGroup, Textures, Trailing};
 pub use source::{Look, PlainTriangles, TriangleSource};
 pub use update::{Change, SceneUpdate};
 pub use vocabulary::{Layout, NodeLayout, NodeType, ParamSpec, SocketKind, SocketSpec};

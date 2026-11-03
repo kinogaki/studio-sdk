@@ -21,7 +21,7 @@
 //!
 //! **Validated values.** Every value's fields are private. It is made only
 //! through a constructor or builder that checks its rules (each type lists
-//! them) and refuses with a [`GeometryError`] naming the element at
+//! them) and refuses with an [`Error`] naming the element at
 //! fault, so code reading a value may rely on them: no invalid value can
 //! exist. Enums are `#[non_exhaustive]`, and each says what a reader does
 //! with a variant it doesn't know.
@@ -100,6 +100,7 @@ mod column;
 mod curve;
 mod derived;
 mod detail;
+mod diagnostic;
 mod elements;
 mod error;
 mod frame;
@@ -131,8 +132,9 @@ pub use bounds::Bounds;
 pub use column::Column;
 pub use curve::{Curve, Span};
 pub use detail::{Detail, DisplayQuality};
+pub use diagnostic::{Diagnostic, Severity, TextSpan};
 pub use elements::Elements;
-pub use error::{ErrorKind, GeometryError};
+pub use error::{Error, ErrorKind};
 pub use frame::Frame;
 pub use geometry::Geometry;
 pub use incidence::Incidence;

@@ -10,6 +10,7 @@
 //! empty) draws every marker in [`PointStyle::POINTS`], the Mesh context's
 //! look.
 use crate::ACCENT;
+use kinogaki_geometry::Error;
 
 /// A class's id, unique within its packet and below
 /// [`PointClassId::LIMIT`] (display options hide classes by a bit mask).
@@ -137,24 +138,30 @@ impl PointClass {
     }
     /// Classes of one packet must hold distinct ids, with distinct class
     /// ids below the limit and valid styles.
-    pub fn validate(classes: &[PointClass]) -> Result<(), String> {
+    pub fn validate(classes: &[PointClass]) -> Result<(), Error> {
         let mut seen = 0u32;
         for (at, c) in classes.iter().enumerate() {
             if c.id.0 >= PointClassId::LIMIT || seen & (1 << c.id.0) != 0 {
-                return Err(format!("point class {} has a repeated or large id", c.name));
+                return Err(Error::invalid(format_args!(
+                    "point class {} has a repeated or large id",
+                    c.name
+                )));
             }
             seen |= 1 << c.id.0;
             if !c.style.valid() {
-                return Err(format!("point class {} has an invalid style", c.name));
+                return Err(Error::invalid(format_args!(
+                    "point class {} has an invalid style",
+                    c.name
+                )));
             }
             let ids = c.first_id as u64..c.first_id as u64 + c.ids as u64;
             for other in &classes[at + 1..] {
                 let o = other.first_id as u64..other.first_id as u64 + other.ids as u64;
                 if ids.start < o.end && o.start < ids.end {
-                    return Err(format!(
+                    return Err(Error::invalid(format_args!(
                         "point classes {} and {} overlap",
                         c.name, other.name
-                    ));
+                    )));
                 }
             }
         }

@@ -1,9 +1,9 @@
 //! [`NetworkEdit`]: the edits a package makes to a network.
 use super::{Flag, NetworkRead, Wire};
+use crate::Error;
 use crate::Key;
 use crate::cook::Outputs;
 use crate::data::Data;
-use crate::error::Error;
 use crate::id::{CreationId, NodeTypeId};
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;

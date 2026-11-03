@@ -14,10 +14,10 @@
 //! exposure, normalize, colorTemperature, visible
 //! ```
 use super::light;
+use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use kinogaki_geometry::{Sampled, Xform};
 use kinogaki_render_api::standard::{Emission, Light, Shape};
 

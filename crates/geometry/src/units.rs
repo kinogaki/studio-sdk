@@ -1,5 +1,5 @@
 //! [`Units`]: the one length unit and up axis.
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 
 /// Which axis points up.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -56,12 +56,9 @@ impl Units {
     ///
     /// # Errors
     /// A length that isn't finite and above zero.
-    pub fn new(meters_per_unit: f64, up: UpAxis) -> Result<Self, GeometryError> {
+    pub fn new(meters_per_unit: f64, up: UpAxis) -> Result<Self, Error> {
         if !(meters_per_unit.is_finite() && meters_per_unit > 0.0) {
-            return Err(GeometryError::whole(
-                ErrorKind::Range,
-                "a unit must be a finite length above zero",
-            ));
+            return Err(Error::invalid("a unit must be a finite length above zero"));
         }
         Ok(Self {
             meters_per_unit,

@@ -12,7 +12,7 @@
 //! The host uploads a packet's shared arrays as they are and, for
 //! a surface [`derived`](Surface::derived) from the one on screen, only the
 //! points that moved.
-use crate::error::Error;
+use crate::Error;
 use crate::render::Ranges;
 use kinogaki_geometry::{Bounds, Vec3};
 use kinogaki_viewport_api::{

@@ -5,6 +5,7 @@
 //! own plan; the package's executor runs the plan (a Comp plan on the GPU,
 //! as the display draws). Core keeps the plan until the network's topology
 //! or a flattened node's parameters change.
+use crate::Error;
 use crate::cook::NodeType;
 use crate::id::{ContextId, NodeTypeId};
 use crate::network::Wire;
@@ -116,33 +117,6 @@ impl fmt::Debug for CompileCx<'_> {
     }
 }
 
-/// Why a network can't be compiled to its target.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CompileError {
-    /// The node it is about, if one.
-    pub node: Option<NodeRef>,
-    /// What is wrong, for the user.
-    pub message: String,
-}
-
-impl CompileError {
-    /// `message` about node `node`.
-    pub fn at(node: NodeRef, message: impl Into<String>) -> Self {
-        Self {
-            node: Some(node),
-            message: message.into(),
-        }
-    }
-}
-
-impl fmt::Display for CompileError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
-    }
-}
-
-impl std::error::Error for CompileError {}
-
 /// What a compile made: the package's plan, opaque to the host (its runner
 /// runs it), and the render outputs it reads, which the host asks the
 /// render for before running it.
@@ -173,18 +147,20 @@ pub trait NetworkCompiler: Send + Sync {
 
     /// `flat`'s plan for showing output `target` (the package's own value,
     /// which its runner downcasts and runs) and what it reads.
-    fn compile(
-        &self,
-        flat: &Flat<'_>,
-        target: Wire,
-        cx: &CompileCx<'_>,
-    ) -> Result<Compiled, CompileError>;
+    ///
+    /// # Errors
+    /// Why the network can't be compiled (a required input unwired, a wire
+    /// of the wrong kind), its element the node at fault (its
+    /// [`NodeRef`]'s number) when one is.
+    fn compile(&self, flat: &Flat<'_>, target: Wire, cx: &CompileCx<'_>)
+    -> Result<Compiled, Error>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cook::{CookCx, CookError, Description, Outputs};
+    use crate::Error;
+    use crate::cook::{CookCx, Description, Outputs};
     use crate::data::Data;
 
     /// A type a compiler knows by its own struct.
@@ -197,8 +173,8 @@ mod tests {
         fn description(&self) -> Description {
             Description::new("Mine")
         }
-        fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
-            Err(CookError::message("compiled"))
+        fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
+            Err(Error::invalid("compiled"))
         }
     }
 

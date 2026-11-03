@@ -29,7 +29,7 @@
 //! [`Attributes::with`]: crate::Attributes::with
 //! [`Attributes::with_group`]: crate::Attributes::with_group
 use super::{AttributeType, Domain, Meaning, Storage};
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 use crate::limits::MAX_NAME;
 
 /// Position. A value's points are its own positions column, never an
@@ -145,8 +145,8 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
 ///
 /// # Errors
 /// Saying what is wrong with it.
-pub fn check_name(name: &str) -> Result<(), GeometryError> {
-    let refuse = |why: String| Err(GeometryError::whole(ErrorKind::Attribute, why));
+pub fn check_name(name: &str) -> Result<(), Error> {
+    let refuse = |why: String| Err(Error::invalid(why));
     let Some(first) = name.chars().next() else {
         return refuse("an attribute needs a name".into());
     };

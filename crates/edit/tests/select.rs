@@ -76,7 +76,7 @@ fn a_selection_is_valid_on_its_own_topology_and_within_its_elements() {
         .validate(&p)
         .unwrap();
     let e = stale(7, &[0]).validate(&p).unwrap_err();
-    assert_eq!((e.kind(), e.element()), (ErrorKind::Selection, None));
+    assert_eq!((e.kind, e.diagnostic.element), (ErrorKind::Invalid, None));
     // A set of another count is refused.
     let wide = Selection::none(Domain::Primitive, 9);
     let e = wide.validate(&p).unwrap_err();
@@ -175,7 +175,7 @@ fn all_stays_all_and_the_same_domain_is_the_selection_itself() {
     let s = on(&p, Domain::Edge, &[0]);
     assert_eq!(select::convert(&s, &p, Domain::Edge).unwrap(), s);
     let e = select::convert(&s, &p, Domain::Instance).unwrap_err();
-    assert_eq!(e.kind(), ErrorKind::Selection);
+    assert_eq!(e.kind, ErrorKind::Invalid);
 }
 
 #[test]

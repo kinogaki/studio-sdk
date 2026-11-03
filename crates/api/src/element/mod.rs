@@ -29,8 +29,8 @@ mod memory;
 
 pub use memory::MemoryElement;
 
+use crate::Error;
 use crate::data::Data;
-use crate::error::Error;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -56,7 +56,7 @@ pub fn is_name(text: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-/// An [`Error::Invalid`] unless `name` [`is_name`].
+/// An [`Invalid`](crate::ErrorKind::Invalid) error unless `name` [`is_name`].
 pub fn check_name(name: &str) -> Result<(), Error> {
     if is_name(name) {
         Ok(())

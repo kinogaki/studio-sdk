@@ -4,6 +4,7 @@
 //! ([`PlanRunner`]). The host gives it the film ([`RunFilm`]) and its
 //! [`ColorService`], whose view transforms come as WGSL (the host keeps the
 //! color maths), and shows the [`RunImage`] it returns.
+use crate::Error;
 use crate::color::ColorService;
 use kinogaki_render_api::Wake;
 use kinogaki_render_api::display::{FilmImage, Referred, wgpu};
@@ -43,7 +44,7 @@ pub trait Runner: Send {
         film: &RunFilm<'_>,
         colors: &dyn ColorService,
         encoder: &mut wgpu::CommandEncoder,
-    ) -> Result<RunImage, String>;
+    ) -> Result<RunImage, Error>;
     /// The host submitted the last run as `index`: what it reads back is
     /// read once that work is done, waking `wake` once.
     fn submitted(&mut self, index: wgpu::SubmissionIndex, wake: Wake);

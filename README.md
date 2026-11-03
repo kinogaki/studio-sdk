@@ -38,8 +38,8 @@ The SDK depends on the Rust standard library, on two crates.io crates at exact v
 
 | Module | What it defines | Studio converts it to and from |
 |---|---|---|
-| `geometry` (re-exported at the root) | the one vocabulary: `Vec3`, `Xform` (f64 affine, column vectors), `Bounds`, `Ray`, `Projective`, `Units`, `Time` (ticks of 1/705,600,000 s), `Rate`, `Sampled` | its maths library |
-| `params` | `Value`, `Parameters`, `Schema` (sections and typed parameters: number with unit and range, integer, toggle, choice, text, code, file, path, reference with its `RefFilter`, color, vector, float or color ramp with `params::ramp`'s encoding, render-api's `ramp` re-exported; whether each can be keyed, `Parameter::animatable`), `Diagnostic` | its inspector's property schemas |
+| `geometry` (re-exported at the root) | the one vocabulary: `Error` (an `ErrorKind` and the `Diagnostic` the user reads: what every fallible call, a kernel's operation and a node's cook alike, returns), `Vec3`, `Xform` (f64 affine, column vectors), `Bounds`, `Ray`, `Projective`, `Units`, `Time` (ticks of 1/705,600,000 s), `Rate`, `Sampled` | its maths library |
+| `params` | `Value`, `Parameters`, `Schema` (sections and typed parameters: number with unit and range, integer, toggle, choice, text, code, file, path, reference with its `RefFilter`, color, vector, float or color ramp with `params::ramp`'s encoding, render-api's `ramp` re-exported; whether each can be keyed, `Parameter::animatable`) | its inspector's property schemas |
 | `element` | `ElementWriter` / `ElementReader` (typed fields, metadata, children, shared values) and `MemoryElement` | its project documents |
 | `viewport` | `Surface` (the simple display packet, a `SurfaceSource` itself) and `Hit`; packets, `ElementKind` and `ElementSet` are `kinogaki-viewport-api`'s, re-exported | its viewport's picks |
 | `render` | `RenderItem`; the source contract (`TriangleSource`, `Ranges`, `Look`, `MeshAttribute`) is `kinogaki-render-api`'s, re-exported | its render scenes |

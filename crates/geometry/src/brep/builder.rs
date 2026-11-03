@@ -8,9 +8,9 @@ use super::{
     CoedgeId, CurveId, EdgeId, Entity, FaceId, LoopId, LumpId, MAX_ENTITIES, PCurveId, ShellId,
     SurfaceId, VertexId,
 };
+use crate::Error;
 use crate::attributes::Attributes;
 use crate::derived::Derived;
-use crate::error::GeometryError;
 use crate::vec3::Vec3;
 use crate::xform::Xform;
 use std::collections::BTreeSet;
@@ -185,10 +185,9 @@ impl BrepBuilder {
     /// The body, with `attributes`, checked ([`super`]'s rules).
     ///
     /// # Errors
-    /// The first rule broken, as [`ErrorKind::Brep`](crate::ErrorKind::Brep)
-    /// naming the entity at fault (or a [`Limit`](crate::ErrorKind::Limit)
-    /// or [`Attribute`](crate::ErrorKind::Attribute) refusal).
-    pub fn build(self, attributes: Attributes) -> Result<Body, GeometryError> {
+    /// The first rule broken, naming the entity at fault (or a count over
+    /// its limit, a misnamed attribute).
+    pub fn build(self, attributes: Attributes) -> Result<Body, Error> {
         let structure = self.structure()?;
         let geometry = Arc::new(Geometry::new(
             self.points,
@@ -215,9 +214,9 @@ impl BrepBuilder {
     }
 
     /// Checks the structure and links rings, shells and lumps.
-    fn structure(&self) -> Result<BrepTopology, GeometryError> {
+    fn structure(&self) -> Result<BrepTopology, Error> {
         let refuse =
-            |entity, phrase, detail: &str| Err(GeometryError::brep(entity, phrase, detail.into()));
+            |entity, phrase, detail: &str| Err(crate::brep::refused(entity, phrase, detail.into()));
         let tables = [
             self.surfaces.len(),
             self.curves.len(),
@@ -532,10 +531,10 @@ impl BrepBuilder {
 }
 
 /// Refuses the first name that repeats, blaming its second holder.
-fn distinct(names: &[Name], entity: impl Fn(usize) -> Entity) -> Result<(), GeometryError> {
+fn distinct(names: &[Name], entity: impl Fn(usize) -> Entity) -> Result<(), Error> {
     let mut seen = BTreeSet::new();
     match names.iter().position(|n| !seen.insert(n)) {
-        Some(i) => Err(GeometryError::brep(
+        Some(i) => Err(crate::brep::refused(
             Some(entity(i)),
             "duplicate name",
             "two faces, edges or vertices of one body share a name".into(),

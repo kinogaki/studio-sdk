@@ -263,15 +263,15 @@ impl NodeType for BoxNode {
                 },
             ))
     }
-    fn cook(&self, cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, Error> {
         let three = |name: &str| {
             Vector::parameter(name)
                 .read(cx.parameters())
-                .ok_or_else(|| CookError::message(format!("the {name} is three numbers")))
+                .ok_or_else(|| Error::invalid(format!("the {name} is three numbers")))
         };
         let (size, center) = (three("size")?.to_array(), three("center")?.to_array());
         if size.iter().any(|&side| side <= 0.0) {
-            return Err(CookError::message("every side must be longer than zero"));
+            return Err(Error::invalid("every side must be longer than zero"));
         }
         Ok(Outputs::one(BOX.wrap(BoxShape { size, center })))
     }

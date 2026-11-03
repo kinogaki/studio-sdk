@@ -7,8 +7,8 @@
 //! - Created (0): the operation, and the kernel's tag as a text;
 //! - Part (1): the name split, the piece's index;
 //! - Merged (2): how many, then each name.
+use crate::Error;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use kinogaki_geometry::brep::{Name, NameNode, OperationId};
 use std::collections::HashMap;
 use std::sync::Arc;

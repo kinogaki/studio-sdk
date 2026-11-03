@@ -1,6 +1,6 @@
 //! [`AttributeType`]: an attribute's storage, width, meaning and whether
 //! each element holds an array.
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 
 /// How an attribute's values are stored.
 ///
@@ -189,8 +189,8 @@ impl AttributeType {
     ///
     /// # Errors
     /// The rule it breaks.
-    pub fn check(self) -> Result<(), GeometryError> {
-        let refuse = |why: String| Err(GeometryError::whole(ErrorKind::Attribute, why));
+    pub fn check(self) -> Result<(), Error> {
+        let refuse = |why: String| Err(Error::invalid(why));
         if self.width == 0 {
             return refuse("an attribute has at least one value an item".into());
         }

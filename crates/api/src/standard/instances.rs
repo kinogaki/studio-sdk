@@ -1,10 +1,10 @@
 //! [`Instances`]: placements of prototypes of any type, the standard value
 //! `kinogaki.core.instances`, and [`InstancesCodec`], how it saves.
 use super::{attributes, instances};
+use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use kinogaki_geometry::{Attributes, Column, Domain, Xform};
 use std::sync::Arc;
 

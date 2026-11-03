@@ -21,9 +21,9 @@ fn the_rules_are_checked() {
     assert!(full.is_all() && full == Elements::all(128));
     let out = Elements::from_indices(4, [4]).unwrap_err();
     assert_eq!(
-        (out.kind(), out.element(), out.message()),
+        (out.kind, out.diagnostic.element, out.message()),
         (
-            ErrorKind::Attribute,
+            ErrorKind::Invalid,
             Some(4),
             "element 4 is past the last of 4"
         )
@@ -31,7 +31,7 @@ fn the_rules_are_checked() {
     assert_eq!(Elements::none(0).words().len(), 0);
     assert!(!Elements::all(0).is_all() && Elements::all(0) == Elements::none(0));
     let refused = Elements::none(3).union(&Elements::none(4)).unwrap_err();
-    assert_eq!(refused.kind(), ErrorKind::Attribute);
+    assert_eq!(refused.kind, ErrorKind::Invalid);
 }
 
 /// A seeded generator (SplitMix64): the same sets every run.

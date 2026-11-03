@@ -99,14 +99,6 @@ pub struct Link {
     pub input: Arc<str>,
 }
 
-/// Why a network's links are not usable (what its engine checks beyond
-/// this is its own).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum NetworkError {
-    /// The links form a cycle through this node.
-    Cycle(NodeIndex),
-}
-
 /// A material: one engine's nodes and the links between them.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaterialNetwork {

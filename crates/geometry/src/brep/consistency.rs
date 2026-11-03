@@ -5,7 +5,7 @@
 use super::geometry::{Geometry, Surface};
 use super::topology::{BrepTopology, Sense};
 use super::{CoedgeId, Entity, SurfaceId};
-use crate::error::GeometryError;
+use crate::Error;
 use crate::vec3::Vec3;
 
 /// The tolerance of a decision involving entities with these precisions:
@@ -34,9 +34,9 @@ pub(super) fn check(
     topology: &BrepTopology,
     geometry: &Geometry,
     tolerance: f64,
-) -> Result<(), GeometryError> {
+) -> Result<(), Error> {
     let refuse = |entity, phrase, detail: &str| {
-        Err(GeometryError::brep(Some(entity), phrase, detail.into()))
+        Err(crate::brep::refused(Some(entity), phrase, detail.into()))
     };
     let counts = [
         geometry.points().len(),
@@ -58,7 +58,7 @@ pub(super) fn check(
             .iter()
             .any(|c| c.pcurve.is_some_and(|p| p.index() >= counts[3]));
     if uses_missing {
-        return Err(GeometryError::brep(
+        return Err(crate::brep::refused(
             None,
             "dangling reference",
             "the geometry has a point for each vertex and every carrier the topology names".into(),

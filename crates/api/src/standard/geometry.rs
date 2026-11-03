@@ -1,10 +1,10 @@
 //! [`GeometryCodec`]: how [`Geometry`] values save.
 use super::{attributes, geometry, invalid, selection};
+use crate::Error;
 use crate::codec::DataCodec;
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use kinogaki_geometry::{CurveData, Geometry, Kind, Knots, Primitives};
 use std::sync::Arc;
 

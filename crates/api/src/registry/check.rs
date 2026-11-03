@@ -1,7 +1,7 @@
 //! Admission: whether a package may register ([`Registry::check`]).
-use super::{Registry, RegistryError, owner};
+use super::{Registry, owner};
+use crate::Error;
 use crate::cook::SPARE;
-use crate::icon::IconError;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
@@ -11,10 +11,13 @@ use std::collections::BTreeSet;
 
 /// Id `text` `package` declares as an id's text, when well formed (a
 /// creation's name, an engine's id: text, not yet an id type).
-fn declared_id(package: PackageId, text: &str) -> Result<&'static str, RegistryError> {
-    crate::id::parse_text(text).ok_or_else(|| RegistryError::MalformedId {
-        package,
-        id: text.to_owned(),
+fn declared_id(package: PackageId, text: &str) -> Result<&'static str, Error> {
+    crate::id::parse_text(text).ok_or_else(|| {
+        Error::refused(format!(
+            "{package} declares {id:?}, which isn't an id",
+            package = package,
+            id = text.to_owned()
+        ))
     })
 }
 
@@ -28,36 +31,41 @@ impl Registry {
     /// registered package's) that has no other, and every data type
     /// it names is registered (by it or an earlier package). Changes
     /// nothing.
-    pub fn check(&self, package: &Package) -> Result<(), RegistryError> {
+    pub fn check(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         if self.packages.iter().any(|(p, _)| *p == id) {
-            return Err(RegistryError::DuplicatePackage(id));
+            return Err(Error::refused(format!(
+                "package {id} is already registered"
+            )));
         }
         // Ids declared so far, per kind, by this package.
         let mut seen: BTreeSet<(&'static str, &'static str)> = BTreeSet::new();
         let mut declare = |what: &'static str,
                            text: &'static str,
                            first: Option<PackageId>|
-         -> Result<(), RegistryError> {
+         -> Result<(), Error> {
             if text.split('.').next() != Some(id.vendor()) {
-                return Err(RegistryError::ForeignId {
-                    package: id,
-                    id: text,
-                });
+                return Err(Error::refused(format!(
+                    "{package} declares {id}, under another vendor's name",
+                    package = id,
+                    id = text
+                )));
             }
             match first {
-                Some(first) => Err(RegistryError::DuplicateId {
-                    package: id,
-                    what,
-                    id: text,
-                    first,
-                }),
-                None if !seen.insert((what, text)) => Err(RegistryError::DuplicateId {
-                    package: id,
-                    what,
-                    id: text,
-                    first: id,
-                }),
+                Some(first) => Err(Error::refused(format!(
+                    "{package} declares {what} {id}, which {first} declared",
+                    package = id,
+                    what = what,
+                    id = text,
+                    first = first
+                ))),
+                None if !seen.insert((what, text)) => Err(Error::refused(format!(
+                    "{package} declares {what} {id}, which {first} declared",
+                    package = id,
+                    what = what,
+                    id = text,
+                    first = id
+                ))),
                 None => Ok(()),
             }
         };
@@ -144,11 +152,12 @@ impl Registry {
                 .parameters()
                 .find(|p| p.name.starts_with(SPARE))
             {
-                return Err(RegistryError::SpareName {
-                    package: id,
-                    node: n.id(),
-                    parameter: p.name.clone(),
-                });
+                return Err(Error::refused(format!(
+                    "{package}'s node type {node} declares parameter {parameter}, a name spares take",
+                    package = id,
+                    node = n.id(),
+                    parameter = p.name.clone()
+                )));
             }
         }
         #[cfg(feature = "wgpu")]
@@ -162,14 +171,15 @@ impl Registry {
     /// Each render engine maker `package` brings makes an engine it
     /// describes.
     #[cfg(feature = "wgpu")]
-    fn check_makers(&self, package: &Package) -> Result<(), RegistryError> {
+    fn check_makers(&self, package: &Package) -> Result<(), Error> {
         for maker in &package.makers {
             let engine = maker.description().id;
             if !package.engines.iter().any(|e| e.id == engine) {
-                return Err(RegistryError::StrayMaker {
-                    package: package.id,
-                    engine,
-                });
+                return Err(Error::refused(format!(
+                    "{package} makes render engine {engine}, which it doesn't describe",
+                    package = package.id,
+                    engine = engine
+                )));
             }
         }
         Ok(())
@@ -180,7 +190,7 @@ impl Registry {
     /// each of its contexts adopts a node type at most once, its icons are well formed ([`Icon::check`](crate::icon::Icon::check)) and named once,
     /// and every package icon it names (`"acme.trees/leaf"`) is one it or
     /// a registered package carries.
-    fn check_names(&self, package: &Package) -> Result<(), RegistryError> {
+    fn check_names(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         let context = |by: &'static str, context: ContextId| {
             if package.contexts.iter().any(|c| c.id == context)
@@ -188,34 +198,36 @@ impl Registry {
             {
                 Ok(())
             } else {
-                Err(RegistryError::UnknownContext {
-                    package: id,
-                    by,
-                    context,
-                })
+                Err(Error::refused(format!(
+                    "{package}'s {by} names context {context}, which no package declares",
+                    package = id,
+                    by = by,
+                    context = context
+                )))
             }
         };
         for c in &package.contexts {
             let mut adopted = BTreeSet::new();
             for a in &c.adopts {
                 if !adopted.insert(a.node_type) {
-                    return Err(RegistryError::Adopted {
-                        package: id,
-                        context: c.id,
-                        node: a.node_type,
-                    });
+                    return Err(Error::refused(format!(
+                        "{package}'s {context} adopts {node} twice",
+                        package = id,
+                        context = c.id,
+                        node = a.node_type
+                    )));
                 }
             }
         }
         let mut names = BTreeSet::new();
         for icon in &package.icons {
             icon.check()
-                .map_err(|error| RegistryError::BadIcon { package: id, error })?;
+                .map_err(|e| Error::refused(format_args!("{id}'s icon: {e}")))?;
             if !names.insert(icon.name.as_str()) {
-                return Err(RegistryError::BadIcon {
-                    package: id,
-                    error: IconError::Twice(icon.name.clone()),
-                });
+                let name = &icon.name;
+                return Err(Error::refused(format_args!(
+                    "{id}'s icon: a second icon is named {name:?}"
+                )));
             }
         }
         let icon = |by: &'static str, name: &str| match name.split_once('/') {
@@ -223,11 +235,12 @@ impl Registry {
             Some((p, n)) if (self.icons.iter()).any(|(q, s)| q.as_str() == p && s.contains(n)) => {
                 Ok(())
             }
-            Some(_) => Err(RegistryError::UnknownIcon {
-                package: id,
-                by,
-                icon: name.to_owned(),
-            }),
+            Some(_) => Err(Error::refused(format!(
+                "{package}'s {by} shows icon {icon}, which no package carries",
+                package = id,
+                by = by,
+                icon = name.to_owned()
+            ))),
             None => Ok(()),
         };
         for n in &package.node_types {
@@ -250,7 +263,7 @@ impl Registry {
     /// it or a registered package declares (core's Comp and Shading), and
     /// no context gets a second of either. A compiled context may have
     /// none: its plans then aren't shown.
-    fn check_compilers(&self, package: &Package) -> Result<(), RegistryError> {
+    fn check_compilers(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         let compiled = |context: ContextId| {
             package
@@ -263,19 +276,21 @@ impl Registry {
         for c in &package.compilers {
             let context = c.context();
             if !compiled(context) {
-                return Err(RegistryError::StrayCompiler {
-                    package: id,
-                    context,
-                });
+                return Err(Error::refused(format!(
+                    "{package} brings a compiler for {context}, which no package declares as a compiled context",
+                    package = id,
+                    context = context
+                )));
             }
             let first =
                 owner(self.compilers.get(&context)).or((!given.insert(context)).then_some(id));
             if let Some(first) = first {
-                return Err(RegistryError::DuplicateCompiler {
-                    package: id,
-                    context,
-                    first,
-                });
+                return Err(Error::refused(format!(
+                    "{package} brings a compiler for {context}, which {first} already brought",
+                    package = id,
+                    context = context,
+                    first = first
+                )));
             }
         }
         #[cfg(feature = "wgpu")]
@@ -284,10 +299,11 @@ impl Registry {
             for (context, _) in &package.runners {
                 let context = *context;
                 if !compiled(context) {
-                    return Err(RegistryError::StrayRunner {
-                        package: id,
-                        context,
-                    });
+                    return Err(Error::refused(format!(
+                        "{package} brings a runner for {context}, which no package declares as a compiled context",
+                        package = id,
+                        context = context
+                    )));
                 }
                 let first = self
                     .runners
@@ -295,11 +311,12 @@ impl Registry {
                     .copied()
                     .or((!run.insert(context)).then_some(id));
                 if let Some(first) = first {
-                    return Err(RegistryError::DuplicateRunner {
-                        package: id,
-                        context,
-                        first,
-                    });
+                    return Err(Error::refused(format!(
+                        "{package} brings a runner for {context}, which {first} already brought",
+                        package = id,
+                        context = context,
+                        first = first
+                    )));
                 }
             }
         }
@@ -310,18 +327,19 @@ impl Registry {
     /// declared context, and no context comes to hold its own networks
     /// through others' (Houdini's nesting stays possible; recursion
     /// doesn't).
-    fn check_insides(&self, package: &Package) -> Result<(), RegistryError> {
+    fn check_insides(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         let new = holds(package);
         for &(_, inside, node) in &new {
             let declared = package.contexts.iter().any(|c| c.id == inside)
                 || self.contexts.contains_key(&inside);
             if !declared {
-                return Err(RegistryError::UnknownContext {
-                    package: id,
-                    by: node.as_str(),
-                    context: inside,
-                });
+                return Err(Error::refused(format!(
+                    "{package}'s {by} names context {context}, which no package declares",
+                    package = id,
+                    by = node.as_str(),
+                    context = inside
+                )));
             }
         }
         let mut edges = self.holds.clone();
@@ -330,29 +348,30 @@ impl Registry {
             if let Some(back) = route(&edges, to, from) {
                 let mut path = vec![from];
                 path.extend(back);
-                return Err(RegistryError::InsideCycle {
-                    package: id,
-                    node,
-                    path,
-                });
+                let path: Vec<&str> = path.iter().map(|c| c.as_str()).collect();
+                return Err(Error::refused(format_args!(
+                    "{id}'s {node} would make contexts hold each other: {}",
+                    path.join(" → ")
+                )));
             }
         }
         Ok(())
     }
 
     /// Every data type `package` names is registered, by it or before it.
-    fn check_references(&self, package: &Package) -> Result<(), RegistryError> {
+    fn check_references(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         let own: BTreeSet<DataTypeId> = package.data_types.iter().map(|t| t.id()).collect();
         let known = |by: &'static str, data: DataTypeId| {
             if own.contains(&data) || self.data_types.contains_key(&data) {
                 Ok(())
             } else {
-                Err(RegistryError::UnknownDataType {
-                    package: id,
-                    by,
-                    data,
-                })
+                Err(Error::refused(format!(
+                    "{package}'s {by} names data type {data}, which isn't registered",
+                    package = id,
+                    by = by,
+                    data = data
+                )))
             }
         };
         let mut deltas = BTreeSet::new();
@@ -362,11 +381,12 @@ impl Registry {
             if let Some(first) =
                 owner(self.held_edits.get(&h.delta())).or((!deltas.insert(h.delta())).then_some(id))
             {
-                return Err(RegistryError::DuplicateHeldEdit {
-                    package: id,
-                    delta: h.delta(),
-                    first,
-                });
+                return Err(Error::refused(format!(
+                    "{package} declares how {delta} deltas apply, which {first} declares",
+                    package = id,
+                    delta = h.delta(),
+                    first = first
+                )));
             }
         }
         for n in &package.node_types {

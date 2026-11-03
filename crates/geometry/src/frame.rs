@@ -1,6 +1,6 @@
 //! [`Frame`]: an origin and right-handed orthonormal axes, checked, and
 //! the unit and finite checks it shares with the B-rep carriers.
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 use crate::limits::MAX_COORDINATE;
 use crate::vec3::Vec3;
 use crate::xform::Xform;
@@ -59,7 +59,7 @@ impl Frame {
     ///
     /// # Errors
     /// A point not finite, or axes not orthonormal and right-handed.
-    pub fn new(origin: Vec3, x: Vec3, y: Vec3, z: Vec3) -> Result<Self, GeometryError> {
+    pub fn new(origin: Vec3, x: Vec3, y: Vec3, z: Vec3) -> Result<Self, Error> {
         let off = x.cross(y) - z;
         let handed = [off.x, off.y, off.z].iter().all(|c| c.abs() <= UNIT_SLACK);
         let [o, x_, y_, z_] = [origin, x, y, z].map(Vec3::to_array);
@@ -67,8 +67,7 @@ impl Frame {
             || x.dot(y).abs() > UNIT_SLACK
             || !handed
         {
-            return Err(GeometryError::whole(
-                ErrorKind::Frame,
+            return Err(Error::invalid(
                 "a frame's axes are not orthonormal and right-handed",
             ));
         }

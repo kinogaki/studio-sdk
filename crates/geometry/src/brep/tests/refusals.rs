@@ -2,16 +2,16 @@
 use super::*;
 use crate::ErrorKind;
 
-/// The refusal's short phrase, and the index of the entity it blames. Its
-/// text names no id and no number.
-fn refused(result: Result<Body, crate::GeometryError>) -> (String, Option<usize>) {
+/// The refusal's short phrase (before the rule it broke), and the index of
+/// the entity it blames. Its text names no id and no number.
+fn refused(result: Result<Body, crate::Error>) -> (String, Option<usize>) {
     let e = result.unwrap_err();
-    assert_eq!(e.kind(), ErrorKind::Brep);
-    for text in [format!("{e}"), format!("{e:#}")] {
-        assert!(!text.chars().any(|c| c.is_ascii_digit()), "{text}");
-    }
-    assert_ne!(format!("{e}"), format!("{e:#}"));
-    (e.message().to_string(), e.element())
+    assert_eq!(e.kind, ErrorKind::Invalid);
+    let text = e.to_string();
+    assert!(!text.chars().any(|c| c.is_ascii_digit()), "{text}");
+    let (phrase, rule) = text.split_once(": ").expect("a phrase, then the rule");
+    assert!(!rule.is_empty());
+    (phrase.to_string(), e.diagnostic.element)
 }
 
 #[test]

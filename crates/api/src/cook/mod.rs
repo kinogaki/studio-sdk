@@ -37,14 +37,14 @@ pub use sheet::{NewCx, PortsCx, RowsFor, SchemaCx};
 /// [`Registry`](crate::Registry) refuses one that does).
 pub const SPARE: &str = "spare-";
 
+use crate::Diagnostic;
+use crate::Error;
 use crate::components::Components;
 use crate::data::Data;
 use crate::data_type::Stamp;
-use crate::error::Error;
 use crate::id::{DataTypeId, NodeTypeId};
-use crate::params::{Diagnostic, Parameters, Schema};
+use crate::params::{Parameters, Schema};
 use std::any::Any;
-use std::fmt;
 
 /// What, besides its inputs and parameters, a node's result depends on.
 /// Core recooks a node when one of these changes, and only then: a node
@@ -175,52 +175,6 @@ impl Outputs {
     }
 }
 
-/// Why a cook produced nothing.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CookError {
-    /// It saw its cancellation raised; core drops the cook.
-    Cancelled,
-    /// It failed; the node shows these (errors first, with spans for code
-    /// rows).
-    Failed(Vec<Diagnostic>),
-}
-
-impl CookError {
-    /// A failure saying `message`.
-    pub fn message(message: impl Into<String>) -> Self {
-        Self::Failed(vec![Diagnostic::error(message)])
-    }
-}
-
-impl From<Diagnostic> for CookError {
-    fn from(diagnostic: Diagnostic) -> Self {
-        Self::Failed(vec![diagnostic])
-    }
-}
-
-impl From<Error> for CookError {
-    fn from(error: Error) -> Self {
-        match error {
-            Error::Cancelled => Self::Cancelled,
-            other => Self::message(other.to_string()),
-        }
-    }
-}
-
-impl fmt::Display for CookError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Cancelled => f.write_str("cancelled"),
-            Self::Failed(diagnostics) => {
-                let messages: Vec<&str> = diagnostics.iter().map(|d| d.message.as_str()).collect();
-                f.write_str(&messages.join("; "))
-            }
-        }
-    }
-}
-
-impl std::error::Error for CookError {}
-
 /// What one node type computes. Cooks run on core's workers, several at
 /// once (different nodes, and the same node for different times), so a
 /// node type holds no per-node state: that is the scratch slot's.
@@ -249,7 +203,7 @@ pub trait NodeType: Any + Send + Sync {
     /// ([`CookCx::port`] says which are whose). Long cooks poll
     /// cancellation and split work with
     /// [`geometry::parallel`](crate::geometry::parallel).
-    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError>;
+    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error>;
 
     /// Its incremental cooking, when it has any (an interactive drag of a
     /// parameter then reuses prepared work).
@@ -362,7 +316,7 @@ pub trait NodeType: Any + Send + Sync {
     /// declare: core checks each declared value first with
     /// [`Parameter::check`](crate::params::Parameter::check) (of its kind,
     /// finite, within a number's or an integer's limits).
-    fn validate(&self, parameters: &Parameters) -> Result<(), Diagnostic> {
+    fn validate(&self, parameters: &Parameters) -> Result<(), Error> {
         let _ = parameters;
         Ok(())
     }

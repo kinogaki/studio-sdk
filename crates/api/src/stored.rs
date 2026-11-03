@@ -28,8 +28,8 @@
 //! the table shares each value.
 //!
 //! [`Package::with_stored`]: crate::Package::with_stored
+use crate::Error;
 use crate::element::{ElementReader, ElementWriter};
-use crate::error::Error;
 use crate::id::StoredId;
 use std::any::Any;
 use std::collections::BTreeMap;

@@ -42,6 +42,7 @@
 //! assert_eq!(icon::split("acme.trees/leaf"), Some(("acme.trees", "leaf")));
 //! assert_eq!(icon::split("cube"), None);
 //! ```
+use crate::Error;
 use std::fmt;
 
 /// The most bytes an icon's SVG document may have.
@@ -78,14 +79,24 @@ impl Icon {
     /// Its document as text, when its name is well formed and its document
     /// is UTF-8 of at most [`MAX_BYTES`] bytes. Studio then reads the
     /// document and checks its `viewBox` (see the [module](self) docs).
-    pub fn check(&self) -> Result<&str, IconError> {
+    ///
+    /// # Errors
+    /// An [`Invalid`](crate::ErrorKind::Invalid) error saying which.
+    pub fn check(&self) -> Result<&str, Error> {
         if !name_well_formed(&self.name) {
-            return Err(IconError::Name(self.name.clone()));
+            return Err(Error::invalid(format_args!(
+                "{:?} is not an icon name: a lowercase letter, then lowercase letters, \
+                 digits and `-`, at most {MAX_NAME} bytes",
+                self.name
+            )));
         }
         if self.svg.len() > MAX_BYTES {
-            return Err(IconError::TooLarge(self.svg.len()));
+            return Err(Error::invalid(format_args!(
+                "its SVG has {} bytes, more than {MAX_BYTES}",
+                self.svg.len()
+            )));
         }
-        std::str::from_utf8(&self.svg).map_err(|_| IconError::NotText)
+        std::str::from_utf8(&self.svg).map_err(|_| Error::invalid("its SVG is not UTF-8 text"))
     }
 }
 
@@ -98,38 +109,6 @@ impl fmt::Debug for Icon {
             .finish()
     }
 }
-
-/// Why an icon was left out.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum IconError {
-    /// Its name is not of the form `name_well_formed` describes.
-    Name(String),
-    /// Its document has this many bytes, more than [`MAX_BYTES`].
-    TooLarge(usize),
-    /// Its document is not UTF-8 text.
-    NotText,
-    /// Its package carries another icon of this name.
-    Twice(String),
-}
-
-impl fmt::Display for IconError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IconError::Name(name) => write!(
-                f,
-                "{name:?} is not an icon name: a lowercase letter, then lowercase letters, \
-                 digits and `-`, at most {MAX_NAME} bytes"
-            ),
-            IconError::TooLarge(bytes) => {
-                write!(f, "its SVG has {bytes} bytes, more than {MAX_BYTES}")
-            }
-            IconError::NotText => f.write_str("its SVG is not UTF-8 text"),
-            IconError::Twice(name) => write!(f, "a second icon is named {name:?}"),
-        }
-    }
-}
-
-impl std::error::Error for IconError {}
 
 /// Whether `name` is a well-formed icon name within a package: a lowercase
 /// ASCII letter followed by lowercase letters, digits and `-`, at most
@@ -176,8 +155,9 @@ mod tests {
             assert!(!name_well_formed(bad), "{bad}");
         }
         assert_eq!(
-            Icon::new("Leaf", SQUARE).check(),
-            Err(IconError::Name("Leaf".into()))
+            Icon::new("Leaf", SQUARE).check().unwrap_err().message(),
+            "\"Leaf\" is not an icon name: a lowercase letter, then lowercase letters, \
+             digits and `-`, at most 64 bytes"
         );
     }
 
@@ -185,12 +165,15 @@ mod tests {
     fn documents_are_bounded_utf8_text() {
         let big = vec![b' '; MAX_BYTES + 1];
         assert_eq!(
-            Icon::new("big", big).check(),
-            Err(IconError::TooLarge(MAX_BYTES + 1))
+            Icon::new("big", big).check().unwrap_err().message(),
+            format!("its SVG has {} bytes, more than {MAX_BYTES}", MAX_BYTES + 1)
         );
         assert_eq!(
-            Icon::new("bytes", vec![0xff, 0xfe]).check(),
-            Err(IconError::NotText)
+            Icon::new("bytes", vec![0xff, 0xfe])
+                .check()
+                .unwrap_err()
+                .message(),
+            "its SVG is not UTF-8 text"
         );
     }
 }

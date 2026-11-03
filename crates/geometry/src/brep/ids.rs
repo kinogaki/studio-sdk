@@ -61,7 +61,7 @@ ids! {
 }
 
 /// One entity of a B-rep value: what a refusal blames
-/// ([`GeometryError::entity`](crate::GeometryError::entity)).
+/// ([`Error::entity`](crate::Error::entity)).
 ///
 /// New kinds may be added; a caller that doesn't know one reports the
 /// refusal without pointing at an entity.

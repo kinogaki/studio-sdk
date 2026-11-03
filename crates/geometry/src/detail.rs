@@ -1,6 +1,6 @@
 //! [`Detail`]: how fine geometry is made for a view or a render; and
 //! [`DisplayQuality`], how fine an interactive view makes it.
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 
 /// How fine to make geometry for a render: a B-rep's tessellation, a
 /// sampled surface. One Render Settings value gives it to every engine;
@@ -103,7 +103,7 @@ impl Detail {
     ///
     /// # Errors
     /// A chord not above 0, or an angle not in (0, 90] degrees.
-    pub fn render(chord: f64, angle: f64) -> Result<Detail, GeometryError> {
+    pub fn render(chord: f64, angle: f64) -> Result<Detail, Error> {
         let detail = Detail::Render { chord, angle };
         detail.check()?;
         Ok(detail)
@@ -114,19 +114,17 @@ impl Detail {
     ///
     /// # Errors
     /// As [`Detail::render`].
-    pub fn check(&self) -> Result<(), GeometryError> {
+    pub fn check(&self) -> Result<(), Error> {
         if let Detail::Render { chord, angle } = *self {
             if !(chord.is_finite() && chord > 0.0) {
-                return Err(GeometryError::whole(
-                    ErrorKind::Range,
-                    format!("a render chord of {chord} is not above 0"),
-                ));
+                return Err(Error::invalid(format!(
+                    "a render chord of {chord} is not above 0"
+                )));
             }
             if !(angle > 0.0 && angle <= 90.0) {
-                return Err(GeometryError::whole(
-                    ErrorKind::Range,
-                    format!("a render angle of {angle}° is not above 0° and at most 90°"),
-                ));
+                return Err(Error::invalid(format!(
+                    "a render angle of {angle}° is not above 0° and at most 90°"
+                )));
             }
         }
         Ok(())

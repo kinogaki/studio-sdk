@@ -3,21 +3,21 @@
 //! reads the handles the node type binds; and adds the node to a Boxes
 //! network, as Tab does, on the SDK's fake host.
 use super::*;
-use kinogaki_studio_api::Vec3;
 use kinogaki_studio_api::cook::{Constraint, Space};
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::network::{NetworkRead, NewNode};
+use kinogaki_studio_api::{ErrorKind, Vec3};
 use studio_ui_api::host::{HostNetwork, HostUndo};
 use studio_ui_api_testing::{FakeHost, FakeNetwork};
 
 /// Cooks the Box node with `width`, `depth` and `height`, centered on the
 /// origin.
-fn cook(width: f64, depth: f64, height: f64) -> Result<Outputs, CookError> {
+fn cook(width: f64, depth: f64, height: f64) -> Result<Outputs, Error> {
     cook_at(width, depth, height, [0.0; 3])
 }
 
 /// Cooks the Box node with `width`, `depth`, `height` and `center`.
-fn cook_at(width: f64, depth: f64, height: f64, center: [f64; 3]) -> Result<Outputs, CookError> {
+fn cook_at(width: f64, depth: f64, height: f64, center: [f64; 3]) -> Result<Outputs, Error> {
     let mut parameters = BoxNode.description().parameters.values();
     parameters.insert("size".into(), vec![width, depth, height].into());
     parameters.insert("center".into(), center.to_vec().into());
@@ -244,7 +244,7 @@ fn the_node_binds_a_box_handle_to_its_center_and_sides() {
 
 #[test]
 fn a_flat_box_is_an_error() {
-    assert!(matches!(cook(1.0, 0.0, 1.0), Err(CookError::Failed(_))));
+    assert!(cook(1.0, 0.0, 1.0).is_err_and(|e| e.kind == ErrorKind::Invalid));
 }
 
 fn codec_stamp(data: &Data) -> Stamp {

@@ -12,7 +12,12 @@ impl ColorService for Unconverted {
     fn working(&self) -> &str {
         kinogaki_render_api::RENDER_SPACE
     }
-    fn convert(&self, _: &str, _: &str, _: &mut [[f64; 3]]) -> Result<(), String> {
+    fn convert(
+        &self,
+        _: &str,
+        _: &str,
+        _: &mut [[f64; 3]],
+    ) -> Result<(), kinogaki_studio_api::Error> {
         Ok(())
     }
     fn view_transform(&self, _: &ViewChoice, _: &str, _: u32, _: u32) -> Option<ViewTransform> {

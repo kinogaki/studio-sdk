@@ -1,7 +1,7 @@
 //! The primitive rules ([`Primitives`](super::Primitives) lists them):
 //! one rule per kind, the curve rules shared with the curves value.
 use super::{Basis, CurveData, Kind, Kinds};
-use crate::error::{ErrorKind, GeometryError};
+use crate::Error;
 use crate::limits::{self, MAX_DEGREE, MAX_POINTS, MAX_PRIMITIVES, MAX_VERTICES};
 use crate::parallel;
 use crate::spline::{self, KnotFault};
@@ -16,11 +16,11 @@ pub(super) fn primitives(
     kinds: &Kinds,
     primitives: usize,
     curves: Option<&CurveData>,
-) -> Result<(), GeometryError> {
+) -> Result<(), Error> {
     limits::check(points, MAX_POINTS, "points")?;
     limits::check(primitives, MAX_PRIMITIVES, "primitives")?;
     limits::check(vertices.len(), MAX_VERTICES, "vertices")?;
-    let whole = |m: String| Err(GeometryError::whole(ErrorKind::Primitive, m));
+    let whole = |m: String| Err(Error::invalid(m));
     if offsets.first() != Some(&0) {
         return whole("the offsets must start at 0".into());
     }
@@ -57,20 +57,15 @@ pub(super) fn primitives(
                 Kind::POLYLINE => "polyline",
                 _ => "curve",
             };
-            let kind = if kind(p).is_linear() {
-                ErrorKind::Primitive
-            } else {
-                ErrorKind::Curve
-            };
-            Err(GeometryError::at(kind, p, format!("{what} {p} {problem}")))
+            Err(Error::invalid(format!("{what} {p} {problem}")).element(p))
         }
         None => Ok(()),
     }
 }
 
 /// The curve data's columns sized to the table.
-fn curve_columns(c: &CurveData, primitives: usize, vertices: usize) -> Result<(), GeometryError> {
-    let whole = |m: String| Err(GeometryError::whole(ErrorKind::Curve, m));
+fn curve_columns(c: &CurveData, primitives: usize, vertices: usize) -> Result<(), Error> {
+    let whole = |m: String| Err(Error::invalid(m));
     if c.degrees().len() != primitives {
         return whole(format!(
             "{} degrees for {primitives} primitives",

@@ -4,6 +4,7 @@
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::network::{NewNode, NodeCreation};
 use kinogaki_studio_api::*;
+use kinogaki_studio_api_testing::assert_refused;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -91,19 +92,12 @@ fn a_kinds_creations_are_its_vendors_and_new() {
     let toys = package("acme.toys").with_object_kind(kind("acme.toys.top", &["acme.toys.top"]));
     registry.register(toys).unwrap();
     let again = package("acme.more").with_object_kind(kind("acme.more.top", &["acme.toys.top"]));
-    assert!(matches!(
+    assert_refused(
         registry.register(again),
-        Err(RegistryError::DuplicateId {
-            what: "object creation",
-            id: "acme.toys.top",
-            ..
-        })
-    ));
+        &[", which ", "object creation", "acme.toys.top"],
+    );
     let foreign = package("acme.odd").with_object_kind(kind("acme.odd.top", &["other.toys.top"]));
-    assert!(matches!(
-        registry.register(foreign),
-        Err(RegistryError::ForeignId { .. })
-    ));
+    assert_refused(registry.register(foreign), &["under another vendor's name"]);
 }
 
 #[test]
@@ -113,25 +107,13 @@ fn node_creations_are_their_vendors_and_new() {
         .register(package("acme.forest").with_creation(node("acme.forest.oak")))
         .unwrap();
     let again = package("acme.more").with_creation(node("acme.forest.oak"));
-    assert!(matches!(
-        registry.register(again),
-        Err(RegistryError::DuplicateId {
-            what: "node creation",
-            ..
-        })
-    ));
+    assert_refused(registry.register(again), &[", which ", "node creation"]);
     let twice = package("acme.twice")
         .with_creation(node("acme.twice.oak"))
         .with_creation(node("acme.twice.oak"));
-    assert!(matches!(
-        registry.register(twice),
-        Err(RegistryError::DuplicateId { .. })
-    ));
+    assert_refused(registry.register(twice), &[", which "]);
     let foreign = package("acme.odd").with_creation(node("other.forest.oak"));
-    assert!(matches!(
-        registry.register(foreign),
-        Err(RegistryError::ForeignId { .. })
-    ));
+    assert_refused(registry.register(foreign), &["under another vendor's name"]);
     // A malformed creation id can't be made: `CreationId` checks it.
     assert!(CreationId::parse("acme.bad").is_none());
     // A node creation and an object creation may share a name: each kind

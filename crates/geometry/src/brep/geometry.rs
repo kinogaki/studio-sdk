@@ -6,9 +6,9 @@
 //! radians. The parameterizations are the contract (see [`super`]).
 use super::nurbs::{NurbsCurve, NurbsSurface};
 use super::{CurveId, Entity, PCurveId, SurfaceId, VertexId};
+use crate::Error;
 use crate::column::Column;
 use crate::derived::Derived;
-use crate::error::GeometryError;
 use crate::frame::{Frame, finite, is_unit, length_squared};
 use crate::limits::MAX_COORDINATE;
 use crate::vec3::Vec3;
@@ -16,11 +16,11 @@ use std::f64::consts::{FRAC_PI_2, TAU};
 use std::fmt;
 use std::sync::Arc;
 
-pub(crate) fn refuse(entity: Option<Entity>, phrase: &'static str, detail: &str) -> GeometryError {
-    GeometryError::brep(entity, phrase, detail.into())
+pub(crate) fn refuse(entity: Option<Entity>, phrase: &'static str, detail: &str) -> Error {
+    crate::brep::refused(entity, phrase, detail.into())
 }
 
-fn positive(value: f64, what: &'static str) -> Result<f64, GeometryError> {
+fn positive(value: f64, what: &'static str) -> Result<f64, Error> {
     if value.is_finite() && value > 0.0 && value <= MAX_COORDINATE {
         Ok(value)
     } else {
@@ -28,7 +28,7 @@ fn positive(value: f64, what: &'static str) -> Result<f64, GeometryError> {
     }
 }
 
-fn point<P: Copy + Into<[f64; N]>, const N: usize>(p: P) -> Result<P, GeometryError> {
+fn point<P: Copy + Into<[f64; N]>, const N: usize>(p: P) -> Result<P, Error> {
     if finite(p.into()) {
         Ok(p)
     } else {
@@ -40,7 +40,7 @@ fn point<P: Copy + Into<[f64; N]>, const N: usize>(p: P) -> Result<P, GeometryEr
     }
 }
 
-fn unit<V: Copy + Into<[f64; N]>, const N: usize>(v: V) -> Result<V, GeometryError> {
+fn unit<V: Copy + Into<[f64; N]>, const N: usize>(v: V) -> Result<V, Error> {
     if is_unit(v.into()) {
         Ok(v)
     } else {
@@ -52,7 +52,7 @@ fn unit<V: Copy + Into<[f64; N]>, const N: usize>(v: V) -> Result<V, GeometryErr
     }
 }
 
-fn nonzero2(v: [f64; 2]) -> Result<[f64; 2], GeometryError> {
+fn nonzero2(v: [f64; 2]) -> Result<[f64; 2], Error> {
     if finite(v) && length_squared(v) > 0.0 {
         Ok(v)
     } else {
@@ -94,7 +94,7 @@ impl Cylinder {
     ///
     /// # Errors
     /// A radius that isn't positive.
-    pub fn new(frame: Frame, radius: f64) -> Result<Self, GeometryError> {
+    pub fn new(frame: Frame, radius: f64) -> Result<Self, Error> {
         Ok(Self {
             frame,
             radius: positive(radius, "radius not positive")?,
@@ -128,7 +128,7 @@ impl Cone {
     ///
     /// # Errors
     /// A negative radius, or a half angle outside `(0, π/2)`.
-    pub fn new(frame: Frame, radius: f64, half_angle: f64) -> Result<Self, GeometryError> {
+    pub fn new(frame: Frame, radius: f64, half_angle: f64) -> Result<Self, Error> {
         if !(0.0..=MAX_COORDINATE).contains(&radius) {
             return Err(refuse(
                 None,
@@ -179,7 +179,7 @@ impl Sphere {
     ///
     /// # Errors
     /// A radius that isn't positive.
-    pub fn new(frame: Frame, radius: f64) -> Result<Self, GeometryError> {
+    pub fn new(frame: Frame, radius: f64) -> Result<Self, Error> {
         Ok(Self {
             frame,
             radius: positive(radius, "radius not positive")?,
@@ -212,7 +212,7 @@ impl Torus {
     ///
     /// # Errors
     /// A negative major radius, or a minor radius that isn't positive.
-    pub fn new(frame: Frame, major: f64, minor: f64) -> Result<Self, GeometryError> {
+    pub fn new(frame: Frame, major: f64, minor: f64) -> Result<Self, Error> {
         if !(0.0..=MAX_COORDINATE).contains(&major) {
             return Err(refuse(
                 None,
@@ -257,7 +257,7 @@ impl Extrusion {
     ///
     /// # Errors
     /// A direction that isn't unit, or a line swept along itself.
-    pub fn new(profile: Arc<Curve>, direction: Vec3) -> Result<Self, GeometryError> {
+    pub fn new(profile: Arc<Curve>, direction: Vec3) -> Result<Self, Error> {
         let direction = unit(direction)?;
         if let Curve::Line(line) = profile.as_ref()
             && line.direction.cross(direction) == Vec3::ZERO
@@ -298,7 +298,7 @@ impl Revolution {
     ///
     /// # Errors
     /// An origin not finite, or an axis that isn't unit.
-    pub fn new(profile: Arc<Curve>, origin: Vec3, axis: Vec3) -> Result<Self, GeometryError> {
+    pub fn new(profile: Arc<Curve>, origin: Vec3, axis: Vec3) -> Result<Self, Error> {
         Ok(Self {
             profile,
             origin: point(origin)?,
@@ -337,7 +337,7 @@ impl Offset {
     ///
     /// # Errors
     /// A distance zero or not finite, or a base that is itself an offset.
-    pub fn new(base: Arc<Surface>, distance: f64) -> Result<Self, GeometryError> {
+    pub fn new(base: Arc<Surface>, distance: f64) -> Result<Self, Error> {
         if !(distance.is_finite() && distance != 0.0 && distance.abs() <= MAX_COORDINATE) {
             return Err(refuse(
                 None,
@@ -408,7 +408,7 @@ impl Line {
     ///
     /// # Errors
     /// An origin not finite, or a direction that isn't unit.
-    pub fn new(origin: Vec3, direction: Vec3) -> Result<Self, GeometryError> {
+    pub fn new(origin: Vec3, direction: Vec3) -> Result<Self, Error> {
         Ok(Self {
             origin: point(origin)?,
             direction: unit(direction)?,
@@ -439,7 +439,7 @@ impl Circle {
     ///
     /// # Errors
     /// A radius that isn't positive.
-    pub fn new(frame: Frame, radius: f64) -> Result<Self, GeometryError> {
+    pub fn new(frame: Frame, radius: f64) -> Result<Self, Error> {
         Ok(Self {
             frame,
             radius: positive(radius, "radius not positive")?,
@@ -471,7 +471,7 @@ impl Ellipse {
     ///
     /// # Errors
     /// A semi-axis that isn't positive.
-    pub fn new(frame: Frame, semi_axes: [f64; 2]) -> Result<Self, GeometryError> {
+    pub fn new(frame: Frame, semi_axes: [f64; 2]) -> Result<Self, Error> {
         Ok(Self {
             frame,
             semi_axes: [
@@ -535,7 +535,7 @@ impl Line2 {
     ///
     /// # Errors
     /// A point not finite, or a direction zero or not finite.
-    pub fn new(origin: [f64; 2], direction: [f64; 2]) -> Result<Self, GeometryError> {
+    pub fn new(origin: [f64; 2], direction: [f64; 2]) -> Result<Self, Error> {
         Ok(Self {
             origin: point(origin)?,
             direction: nonzero2(direction)?,
@@ -575,7 +575,7 @@ impl Circle2 {
         x: [f64; 2],
         radius: f64,
         counter_clockwise: bool,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         Ok(Self {
             center: point(center)?,
             x: unit(x)?,
@@ -632,7 +632,7 @@ impl Ellipse2 {
         x: [f64; 2],
         semi_axes: [f64; 2],
         counter_clockwise: bool,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         Ok(Self {
             center: point(center)?,
             x: unit(x)?,
@@ -727,7 +727,7 @@ impl Geometry {
         surfaces: impl Into<Column<Surface>>,
         curves: impl Into<Column<Curve>>,
         pcurves: impl Into<Column<PCurve>>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let points = points.into();
         if let Some(v) = points.iter().position(|p| !finite(*p)) {
             return Err(refuse(

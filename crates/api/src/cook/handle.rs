@@ -1,6 +1,7 @@
 //! [`Handle`]: a viewport handle a node type binds to its parameters.
 use super::binding::{Scalar, Vector};
 use super::placement::Placement;
+use crate::Error;
 use crate::params::{Parameters, Schema, Value, ValueKind};
 use kinogaki_geometry::Vec3;
 use kinogaki_value::Condition;
@@ -404,13 +405,16 @@ impl Handle {
     ///
     /// # Errors
     /// A parameter it names is missing, or of another kind.
-    pub fn check(&self, parameters: &Schema) -> Result<(), String> {
+    pub fn check(&self, parameters: &Schema) -> Result<(), Error> {
         let kind = |name: &str| {
             (parameters.parameters().find(|p| p.name == name))
                 .map(|p| &p.kind)
-                .ok_or_else(|| format!("{name} is not a parameter of the node"))
+                .ok_or_else(|| {
+                    Error::invalid(format_args!("{name} is not a parameter of the node"))
+                })
         };
-        let wrong = |name: &str, what: &str| Err(format!("{name} is not {what}"));
+        let wrong =
+            |name: &str, what: &str| Err(Error::invalid(format_args!("{name} is not {what}")));
         let number = |scalar: &Scalar| match scalar {
             Scalar::Parameter(name) => match kind(name)? {
                 ValueKind::Number(_) | ValueKind::Integer { .. } => Ok(()),
@@ -574,7 +578,10 @@ mod tests {
             Ok(())
         );
         let missing = distance("height".into()).check(&schema);
-        assert_eq!(missing, Err("height is not a parameter of the node".into()));
+        assert_eq!(
+            missing,
+            Err(Error::invalid("height is not a parameter of the node"))
+        );
         assert!(distance("on".into()).check(&schema).is_err(), "a toggle");
         assert!(
             distance(Scalar::component("size", 2))

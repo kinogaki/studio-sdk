@@ -48,13 +48,13 @@ pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
 pub use light::LightCodec;
 pub use materials::PreviewMaterialsCodec;
 
+use crate::Error;
 use crate::components::Components;
 use crate::data::Typed;
-use crate::error::Error;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
-use kinogaki_geometry::{Domain, Geometry, GeometryError, Selection};
+use kinogaki_geometry::{Domain, Geometry, Selection};
 use kinogaki_render_api::ImportedMaterial;
 
 /// The id of [`Geometry`] values: polygons, polylines and curves.
@@ -133,6 +133,6 @@ pub fn level(domain: Domain) -> ElementKind {
 }
 
 /// A refused value read from `at`, as the API's error.
-fn invalid(at: &str, error: GeometryError) -> Error {
+fn invalid(at: &str, error: Error) -> Error {
     Error::invalid(format_args!("{at}: {error}"))
 }

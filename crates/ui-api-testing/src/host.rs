@@ -5,10 +5,11 @@
 //! back, callbacks queued, never nested).
 use super::{FakeNetwork, HostCall};
 use kinogaki_studio_api::CancelToken;
+use kinogaki_studio_api::Severity;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::geometry::Geometry;
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
-use kinogaki_studio_api::params::{Severity, Unit};
+use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
     Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, ObjectBody, ObjectKindId,
@@ -386,7 +387,7 @@ impl HostDoc for FakeHost {
     fn place(&self) -> Place {
         self.place
     }
-    fn go_to(&mut self, place: Place) -> Result<(), String> {
+    fn go_to(&mut self, place: Place) -> Result<(), Error> {
         self.calls.push(HostCall::GoTo(place));
         if place.context != self.place.context || place.object != self.place.object {
             self.slots.reset_place_bound();
@@ -411,11 +412,13 @@ impl HostDoc for FakeHost {
         object: ObjectRef,
         label: &str,
         body: Arc<dyn ObjectBody>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Error> {
         self.calls.push(HostCall::SetBody(object, label.to_owned()));
-        let found = self.scene.get_mut(&object).ok_or("no such object")?;
+        let found =
+            (self.scene.get_mut(&object)).ok_or_else(|| Error::invalid("no such object"))?;
         if body.kind() != found.kind {
-            return Err(format!("{} is not a {}", object.0, found.kind.as_str()));
+            let (object, kind) = (object.0, found.kind.as_str());
+            return Err(Error::invalid(format_args!("{object} is not a {kind}")));
         }
         found.body = Some(body);
         Ok(())

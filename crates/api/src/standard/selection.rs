@@ -3,9 +3,9 @@
 //! `on` (the 32-byte fingerprint of the value it was made on, or no
 //! bytes) and `ids` (the members' stable ids) when it holds them.
 use super::{attributes, components, invalid};
+use crate::Error;
 use crate::components::Components;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use crate::id::DataTypeId;
 use kinogaki_geometry::{Domain, Selection};
 

@@ -3,6 +3,7 @@
 //! updates) and a held edit that adds an authored delta.
 use kinogaki_studio_api::cook::Arity;
 use kinogaki_studio_api::*;
+use kinogaki_studio_api_testing::assert_refused;
 use std::any::Any;
 use std::sync::{Arc, LazyLock};
 
@@ -21,7 +22,7 @@ thread_local! {
 /// in parallel. Its scratch counts cooks of the node.
 struct Scale;
 impl Scale {
-    fn compute(cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError> {
+    fn compute(cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
         cx.check()?;
         let factor = cx.number("factor")?;
         let mut values: Vec<f64> = inputs[cx.port(0)]
@@ -32,7 +33,7 @@ impl Scale {
             .collect();
         kinogaki_studio_api::geometry::parallel::chunks_mut(&mut values, 4, |_, block| {
             block.iter_mut().for_each(|v| *v *= factor);
-            Ok::<_, CookError>(())
+            Ok::<_, Error>(())
         })?;
         *cx.scratch::<usize>() += 1;
         let mut outputs = Outputs::one(NUMBERS.wrap(values));
@@ -55,7 +56,7 @@ impl NodeType for Scale {
                 1.0,
             )))
     }
-    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
         FULL_COOKS.set(FULL_COOKS.get() + 1);
         Self::compute(cx, inputs)
     }
@@ -64,7 +65,7 @@ impl NodeType for Scale {
     }
 }
 impl Incremental for Scale {
-    fn prepare(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Prepared, CookError> {
+    fn prepare(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Prepared, Error> {
         Ok(Prepared {
             outputs: self.cook(cx, inputs)?,
             plan: Some(Arc::new(ScalePlan {
@@ -79,7 +80,7 @@ struct ScalePlan {
     input: Data,
 }
 impl CookPlan for ScalePlan {
-    fn update(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Option<Outputs>, CookError> {
+    fn update(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Option<Outputs>, Error> {
         if !inputs[0].ptr_eq(&self.input) {
             return Ok(None);
         }
@@ -110,12 +111,12 @@ impl HeldEdit for AddOffsets {
         base: &Data,
         delta: &Data,
         inputs: &[Option<Data>],
-    ) -> Result<Outputs, CookError> {
+    ) -> Result<Outputs, Error> {
         cx.check()?;
         let (base, delta) = NUMBERS
             .get(base)
             .zip(OFFSETS.get(delta))
-            .ok_or_else(|| CookError::message("not numbers and offsets"))?;
+            .ok_or_else(|| Error::invalid("not numbers and offsets"))?;
         let lift = inputs
             .first()
             .and_then(Option::as_ref)
@@ -189,9 +190,8 @@ fn a_cancelled_cook_reports_cancelled() {
     let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
     assert_eq!(
         Scale.cook(&mut cx, &[numbers(&[1.0])]).unwrap_err(),
-        CookError::Cancelled
+        Error::cancelled()
     );
-    assert_eq!(CookError::from(Error::Cancelled), CookError::Cancelled);
 }
 
 #[test]
@@ -315,34 +315,26 @@ fn the_registry_holds_cooks_and_held_edits() {
     let again = Package::new(PackageId::declared("toy.again"), "Again").with_held_edit(AddOffsets);
     assert_eq!(
         registry.register(again).unwrap_err(),
-        RegistryError::DuplicateHeldEdit {
-            package: PackageId::declared("toy.again"),
-            delta: OFFSETS.id(),
-            first: PackageId::declared("toy.numbers"),
-        }
+        Error::refused(format_args!(
+            "{package} declares how {delta} deltas apply, which {first} declares",
+            package = PackageId::declared("toy.again"),
+            delta = OFFSETS.id(),
+            first = PackageId::declared("toy.numbers")
+        ))
     );
     // Nor the same node type.
     let twice = Package::new(PackageId::declared("toy.twice"), "Twice").with_node_type(Scale);
-    assert!(matches!(
-        registry.register(twice),
-        Err(RegistryError::DuplicateId {
-            what: "node type",
-            ..
-        })
-    ));
+    assert_refused(registry.register(twice), &[", which ", "node type"]);
 }
 
 #[test]
 fn held_edits_need_their_types_registered() {
     let mut registry = Registry::new();
     let alone = Package::new(PackageId::declared("toy.alone"), "Alone").with_held_edit(AddOffsets);
-    assert!(matches!(
+    assert_refused(
         registry.register(alone),
-        Err(RegistryError::UnknownDataType {
-            by: "held edit",
-            ..
-        })
-    ));
+        &["which isn't registered", "held edit"],
+    );
 }
 
 /// A node type declaring a parameter named as spares are is refused.
@@ -358,17 +350,18 @@ fn a_parameter_named_as_spares_are_is_refused() {
                 params::Parameter::new("spare-1", "One", params::ValueKind::Toggle, false),
             ))
         }
-        fn cook(&self, _cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, CookError> {
+        fn cook(&self, _cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, Error> {
             Ok(Outputs::default())
         }
     }
     let package = Package::new(PackageId::declared("toy.spare"), "Spare").with_node_type(Spare);
     assert_eq!(
         Registry::new().register(package),
-        Err(RegistryError::SpareName {
-            package: PackageId::declared("toy.spare"),
-            node: NodeTypeId::declared("toy.spare.node"),
-            parameter: "spare-1".into(),
-        })
+        Err(Error::refused(format_args!(
+            "{package}'s node type {node} declares parameter {parameter}, a name spares take",
+            package = PackageId::declared("toy.spare"),
+            node = NodeTypeId::declared("toy.spare.node"),
+            parameter = "spare-1"
+        )))
     );
 }

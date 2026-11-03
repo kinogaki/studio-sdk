@@ -4,8 +4,8 @@
 //! read in order. A carrier holding another (an extrusion's profile, an
 //! offset's base) is followed by it.
 use super::super::invalid;
+use crate::Error;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use kinogaki_geometry::Column;
 use kinogaki_geometry::brep::{
     Circle, Circle2, Cone, Curve, Cylinder, Ellipse, Ellipse2, Extrusion, Line, Line2, NurbsCurve,
@@ -292,7 +292,7 @@ impl<'a> Reader<'a> {
         self.bit(v)
     }
 
-    fn checked<T>(&self, r: Result<T, kinogaki_geometry::GeometryError>) -> Result<T, Error> {
+    fn checked<T>(&self, r: Result<T, kinogaki_geometry::Error>) -> Result<T, Error> {
         r.map_err(|e| invalid(&self.at, e))
     }
 

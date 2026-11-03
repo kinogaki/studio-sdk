@@ -6,8 +6,8 @@ use kinogaki_studio_api::geometry::brep::{Body, Brep, Element, FaceId};
 use kinogaki_studio_api::geometry::{Detail, Domain, Elements, Geometry, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, BrepCodec};
 use kinogaki_studio_api::{
-    CancelToken, Data, DataCodec, DisplayRequest, Error, Meshed, Mesher, MesherId, Package,
-    PackageId, Registry,
+    CancelToken, Data, DataCodec, Diagnostic, DisplayRequest, Error, Meshed, Mesher, MesherId,
+    Package, PackageId, Registry,
 };
 use kinogaki_studio_api_testing::Fixtures;
 
@@ -148,10 +148,13 @@ impl Mesher for Nothing {
         cancel.check()?;
         Ok(Meshed {
             polygons: Geometry::empty(),
-            failed: vec![kinogaki_studio_api::Failed {
-                face: FaceId::from_index(&fixture("box").bodies()[0], 0).unwrap(),
-                reason: "not meshed".into(),
-            }],
+            failed: vec![
+                Diagnostic::warning("not meshed").element(
+                    FaceId::from_index(&fixture("box").bodies()[0], 0)
+                        .unwrap()
+                        .index(),
+                ),
+            ],
         })
     }
 }
@@ -181,7 +184,7 @@ fn meshers_register_once_under_their_vendor_in_order() {
         &Tolerances::default(),
         &CancelToken::default(),
     );
-    assert_eq!(meshed.unwrap().failed[0].reason, "not meshed");
+    assert_eq!(meshed.unwrap().failed[0].message, "not meshed");
 }
 
 #[test]

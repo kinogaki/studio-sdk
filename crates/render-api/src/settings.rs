@@ -11,7 +11,7 @@
 //! as its file's path; an engine receives the Texture prim the host decoded
 //! it to, in the prim's or node's [`Textures`].
 
-use kinogaki_geometry::Units;
+use kinogaki_geometry::{Error, Units};
 use kinogaki_value::{Condition, Parameters, Value, ValueKind};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -190,24 +190,6 @@ impl SettingDescriptor {
     }
 }
 
-/// Why setting values do not fit their descriptors.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SettingError {
-    /// No descriptor has this name.
-    Unknown(Arc<str>),
-    /// The value is of another kind or out of range.
-    Invalid(Arc<str>),
-}
-
-impl std::fmt::Display for SettingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SettingError::Unknown(n) => write!(f, "unknown setting {n:?}"),
-            SettingError::Invalid(n) => write!(f, "setting {n:?} is out of range"),
-        }
-    }
-}
-
 /// Every descriptor's default.
 pub fn defaults(descriptors: &[SettingDescriptor]) -> Parameters {
     (descriptors.iter())
@@ -230,16 +212,16 @@ pub fn fit(descriptors: &[SettingDescriptor], values: &Parameters) -> Parameters
 }
 
 /// Check `values` against `descriptors`: each names one and fits it.
-pub fn validate(
-    descriptors: &[SettingDescriptor],
-    values: &Parameters,
-) -> Result<(), SettingError> {
+pub fn validate(descriptors: &[SettingDescriptor], values: &Parameters) -> Result<(), Error> {
     for (name, value) in values {
         let d = (descriptors.iter())
             .find(|d| *d.name == **name)
-            .ok_or_else(|| SettingError::Unknown(Arc::from(name.as_str())))?;
+            .ok_or_else(|| Error::invalid(format_args!("unknown setting {name:?}")))?;
         if !d.accepts(value) {
-            return Err(SettingError::Invalid(d.name.clone()));
+            let name = &d.name;
+            return Err(Error::invalid(format_args!(
+                "setting {name:?} is out of range"
+            )));
         }
     }
     Ok(())

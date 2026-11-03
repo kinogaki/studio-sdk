@@ -2,10 +2,10 @@
 //! restarting a gesture, render views, Console records, the clipboard,
 //! latest-wins jobs, the inspector's row hooks, the vocabulary's node
 //! edit, a held node's base and result, and a library's viewport chrome.
+use kinogaki_studio_api::Severity;
 use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire};
-use kinogaki_studio_api::params::Severity;
 use kinogaki_studio_api::{
-    ContextId, CookCx, CookError, Data, DataTypeId, Description, HeldEdit, NodeRef, NodeType,
+    ContextId, CookCx, Data, DataTypeId, Description, Error, HeldEdit, NodeRef, NodeType,
     NodeTypeId, Outputs, Package, PackageId, Port, Slot, SlotId, Typed,
 };
 use std::sync::LazyLock;
@@ -242,7 +242,7 @@ impl NodeType for One {
             NUMBER.id(),
         ))
     }
-    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Ok(Outputs::one(NUMBER.wrap(1.0)))
     }
 }
@@ -263,7 +263,7 @@ impl NodeType for Edit {
     fn held(&self) -> Option<DataTypeId> {
         Some(OFFSET.id())
     }
-    fn cook(&self, _: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, _: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
         Ok(Outputs::one(inputs[0].clone()))
     }
 }
@@ -283,7 +283,7 @@ impl HeldEdit for AddOffset {
         base: &Data,
         delta: &Data,
         _: &[Option<Data>],
-    ) -> Result<Outputs, CookError> {
+    ) -> Result<Outputs, Error> {
         let sum = NUMBER.get(base).unwrap() + OFFSET.get(delta).unwrap();
         Ok(Outputs::one(NUMBER.wrap(sum)))
     }

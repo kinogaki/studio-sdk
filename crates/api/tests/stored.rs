@@ -3,9 +3,10 @@
 //! and copied on write, and written and read through the element traits.
 use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::{
-    ElementReader, ElementWriter, Error, Field, Package, PackageId, Registry, RegistryError, Scope,
-    Stored, StoredId, StoredValue, StoredValues,
+    ElementReader, ElementWriter, Error, Field, Package, PackageId, Registry, Scope, Stored,
+    StoredId, StoredValue, StoredValues,
 };
+use kinogaki_studio_api_testing::assert_refused;
 
 /// A toy project value: how dense a forest is.
 #[derive(Clone, Debug, PartialEq)]
@@ -70,29 +71,27 @@ fn a_stored_id_is_declared_once_among_the_installed_packages() {
     let woods = PackageId::declared("acme.woods");
     assert_eq!(
         registry.register(Package::new(woods, "Woods").with_stored::<Forest>()),
-        Err(RegistryError::DuplicateId {
-            package: woods,
-            what: "stored value",
-            id: "acme.trees.forest",
-            first: trees,
-        })
+        Err(Error::refused(format_args!(
+            "{package} declares {what} {id}, which {first} declared",
+            package = woods,
+            what = "stored value",
+            id = "acme.trees.forest",
+            first = trees
+        )))
     );
     let twice = Package::new(woods, "Woods")
         .with_stored::<Forest>()
         .with_stored::<Forest>();
-    assert!(matches!(
+    assert_refused(
         Registry::new().register(twice),
-        Err(RegistryError::DuplicateId { first, .. }) if first == woods
-    ));
+        &[&format!(", which {woods} declared")],
+    );
     let foreign =
         Package::new(PackageId::declared("other.trees"), "Trees").with_stored::<Density>();
-    assert!(matches!(
+    assert_refused(
         Registry::new().register(foreign),
-        Err(RegistryError::ForeignId {
-            id: "acme.trees.forest",
-            ..
-        })
-    ));
+        &["under another vendor's name", "acme.trees.forest"],
+    );
 }
 
 #[test]

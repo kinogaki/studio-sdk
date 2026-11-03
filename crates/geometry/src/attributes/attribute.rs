@@ -2,8 +2,8 @@
 //! types its values are read and adopted as.
 use super::text::Text;
 use super::types::{AttributeType, Meaning, Storage};
+use crate::Error;
 use crate::column::Column;
-use crate::error::{ErrorKind, GeometryError};
 
 /// An attribute's values, flat: `width` values an item, items in element
 /// order (interleaved, so a `[f32; 3]` normal column uploads and indexes
@@ -122,7 +122,7 @@ impl Attribute {
     ///
     /// # Errors
     /// A rule broken, or `ty` an array type.
-    pub fn new(ty: AttributeType, values: Values) -> Result<Self, GeometryError> {
+    pub fn new(ty: AttributeType, values: Values) -> Result<Self, Error> {
         if ty.array {
             return Err(refused(
                 "an array attribute is made by Attribute::arrays".into(),
@@ -136,11 +136,7 @@ impl Attribute {
     ///
     /// # Errors
     /// A rule broken, or `ty` not an array type.
-    pub fn arrays(
-        ty: AttributeType,
-        offsets: Column<u32>,
-        values: Values,
-    ) -> Result<Self, GeometryError> {
+    pub fn arrays(ty: AttributeType, offsets: Column<u32>, values: Values) -> Result<Self, Error> {
         if !ty.array {
             return Err(refused(
                 "an attribute of one item an element is made by Attribute::new".into(),
@@ -154,7 +150,7 @@ impl Attribute {
     ///
     /// # Errors
     /// A width `meaning` doesn't have, or a real that isn't finite.
-    pub fn tuples<T: Tuple>(values: Vec<T>, meaning: Meaning) -> Result<Self, GeometryError> {
+    pub fn tuples<T: Tuple>(values: Vec<T>, meaning: Meaning) -> Result<Self, Error> {
         let ty = AttributeType::new(T::Scalar::STORAGE, T::WIDTH, meaning);
         let flat = bytemuck::allocation::try_cast_vec::<T, T::Scalar>(values)
             .unwrap_or_else(|(_, v)| bytemuck::cast_slice(&v).to_vec());
@@ -174,7 +170,7 @@ impl Attribute {
         ty: AttributeType,
         values: Values,
         offsets: Option<Column<u32>>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         ty.check()?;
         if values.storage() != ty.storage {
             return Err(refused(format!(
@@ -191,11 +187,7 @@ impl Attribute {
             )));
         }
         if let Some(i) = values.first_not_finite() {
-            return Err(GeometryError::at(
-                ErrorKind::Attribute,
-                i / width,
-                format!("value {i} is not finite"),
-            ));
+            return Err(Error::invalid(format!("value {i} is not finite")).element(i / width));
         }
         if let Some(offsets) = &offsets {
             check_offsets(offsets, values.len() / width)?;
@@ -254,17 +246,15 @@ impl Attribute {
     }
 }
 
-fn check_offsets(offsets: &Column<u32>, items: usize) -> Result<(), GeometryError> {
+fn check_offsets(offsets: &Column<u32>, items: usize) -> Result<(), Error> {
     match offsets.first() {
         Some(0) => {}
         _ => return Err(refused("an array attribute's offsets start at 0".into())),
     }
     if let Some(e) = offsets.windows(2).position(|w| w[1] < w[0]) {
-        return Err(GeometryError::at(
-            ErrorKind::Attribute,
-            e,
-            format!("element {e}'s array ends before it starts"),
-        ));
+        return Err(
+            Error::invalid(format!("element {e}'s array ends before it starts")).element(e),
+        );
     }
     let end = *offsets.last().unwrap_or(&0) as usize;
     if end != items {
@@ -275,8 +265,8 @@ fn check_offsets(offsets: &Column<u32>, items: usize) -> Result<(), GeometryErro
     Ok(())
 }
 
-fn refused(why: String) -> GeometryError {
-    GeometryError::whole(ErrorKind::Attribute, why)
+fn refused(why: String) -> Error {
+    Error::invalid(why)
 }
 
 mod sealed {

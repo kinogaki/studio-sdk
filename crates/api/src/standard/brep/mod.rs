@@ -4,12 +4,11 @@ mod names;
 
 use super::geometry::{read_geometry, write_geometry};
 use super::{attributes, brep, invalid, selection};
+use crate::Error;
 use crate::codec::DataCodec;
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
-use kinogaki_geometry::GeometryError;
 use kinogaki_geometry::brep::{
     Body, Brep, BrepBuilder, CoedgeSpec, Datum, DatumHint, DatumKind, EdgeSpec, FaceSpec, Sense,
 };
@@ -479,7 +478,7 @@ fn read_body(element: &dyn ElementReader, names: &names::Table) -> Result<Body, 
         }
         b.lump(ids);
     }
-    let body: Result<Body, GeometryError> = b.build(attributes::read(element)?);
+    let body: Result<Body, Error> = b.build(attributes::read(element)?);
     body.map_err(|e| invalid(&at, e))
 }
 

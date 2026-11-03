@@ -3,9 +3,9 @@ use super::consistency;
 use super::geometry::Geometry;
 use super::names::Name;
 use super::topology::{BodyKind, BrepTopology, Names};
+use crate::Error;
 use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
-use crate::error::GeometryError;
 use crate::xform::Xform;
 use std::sync::Arc;
 
@@ -50,9 +50,9 @@ impl Body {
         topology: Arc<BrepTopology>,
         names: Arc<Names>,
         attributes: Arc<Attributes>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         if !(tolerance.is_finite() && tolerance > 0.0) {
-            return Err(GeometryError::brep(
+            return Err(crate::brep::refused(
                 None,
                 "tolerance not positive",
                 "a body's positional tolerance must be finite and positive".into(),
@@ -75,12 +75,12 @@ impl Body {
 
     /// Its placements rigid ([`Xform::is_rigid`]), the attributes
     /// `previous` doesn't hold as they are sized.
-    fn check_attributes(&self, previous: Option<&Attributes>) -> Result<(), GeometryError> {
+    fn check_attributes(&self, previous: Option<&Attributes>) -> Result<(), Error> {
         if !std::iter::once(&self.placement)
             .chain(self.instances.iter())
             .all(Xform::is_rigid)
         {
-            return Err(GeometryError::brep(
+            return Err(crate::brep::refused(
                 None,
                 "placement not rigid",
                 "a placement must be a rotation and a translation".into(),
@@ -162,18 +162,14 @@ impl Body {
     ///
     /// # Errors
     /// A table of another size, or a consistency rule broken.
-    pub fn with_geometry(&self, geometry: Geometry) -> Result<Self, GeometryError> {
+    pub fn with_geometry(&self, geometry: Geometry) -> Result<Self, Error> {
         let (a, b) = (&self.geometry, &geometry);
         if a.points().len() != b.points().len()
             || a.surfaces().len() != b.surfaces().len()
             || a.curves().len() != b.curves().len()
             || a.pcurves().len() != b.pcurves().len()
         {
-            return Err(GeometryError::brep(
-                None,
-                "geometry resized",
-                "a body's new geometry has the same number of points, surfaces, curves and p-curves".into(),
-            ));
+            return Err(crate::brep::refused(None, "geometry resized", "a body's new geometry has the same number of points, surfaces, curves and p-curves".into()));
         }
         consistency::check(&self.topology, &geometry, self.tolerance)?;
         Ok(Self {
@@ -187,7 +183,7 @@ impl Body {
     ///
     /// # Errors
     /// A missized or misplaced attribute.
-    pub fn with_attributes(&self, attributes: Attributes) -> Result<Self, GeometryError> {
+    pub fn with_attributes(&self, attributes: Attributes) -> Result<Self, Error> {
         let body = Self {
             attributes: Arc::new(attributes),
             ..self.clone()
@@ -205,7 +201,7 @@ impl Body {
         &self,
         placement: Xform,
         instances: Column<Xform>,
-    ) -> Result<Self, GeometryError> {
+    ) -> Result<Self, Error> {
         let body = Self {
             placement,
             instances,

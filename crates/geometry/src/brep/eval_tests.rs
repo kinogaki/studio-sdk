@@ -235,7 +235,12 @@ fn rational_nurbs_hold_arcs_exactly() {
         )
     };
     assert!(flat(25).is_ok());
-    assert_eq!(flat(26).unwrap_err().message(), "degree out of range");
+    assert!(
+        flat(26)
+            .unwrap_err()
+            .message()
+            .starts_with("degree out of range: ")
+    );
     let knots = |k: Vec<f64>| NurbsCurve::new(1, k, vec![[0.0; 2]; 3], None);
     assert!(knots(vec![0.0, 0.0, 0.5, 1.0, 1.0]).is_ok());
     assert!(knots(vec![0.0, 0.0, 1.0, 0.5, 1.0]).is_err(), "decreasing");

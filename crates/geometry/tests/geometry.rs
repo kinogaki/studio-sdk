@@ -70,7 +70,10 @@ fn positions_must_be_finite_and_one_a_point() {
             Attributes::new(),
         )
         .unwrap_err();
-        assert_eq!((e.kind(), e.element()), (ErrorKind::Position, Some(3)));
+        assert_eq!(
+            (e.kind, e.diagnostic.element),
+            (ErrorKind::Invalid, Some(3))
+        );
         assert_eq!(e.message(), "point 3 is not finite or is beyond 1e100");
     }
     let e = with(|p| {
@@ -91,7 +94,7 @@ fn the_first_bad_position_is_reported_on_large_values() {
     p[200_001][1] = f64::INFINITY;
     let t = Primitives::of_polygons(300_000, vec![0].into(), Vec::new().into()).unwrap();
     let e = Geometry::new(p.into(), t, Attributes::new()).unwrap_err();
-    assert_eq!(e.element(), Some(200_001));
+    assert_eq!(e.diagnostic.element, Some(200_001));
 }
 
 #[test]
@@ -113,7 +116,7 @@ fn the_first_bad_attribute_value_is_reported_on_large_values() {
     ];
     for (attribute, element, value) in refused {
         let e = attribute.unwrap_err();
-        assert_eq!(e.element(), Some(element));
+        assert_eq!(e.diagnostic.element, Some(element));
         assert_eq!(e.message(), format!("value {value} is not finite"));
     }
 }
@@ -121,7 +124,7 @@ fn the_first_bad_attribute_value_is_reported_on_large_values() {
 #[test]
 fn one_past_the_point_limit_is_refused() {
     let t = Primitives::of_polygons(MAX_POINTS + 1, vec![0].into(), Vec::new().into());
-    assert_eq!(t.unwrap_err().kind(), ErrorKind::Limit);
+    assert_eq!(t.unwrap_err().kind, ErrorKind::Invalid);
 }
 
 #[test]

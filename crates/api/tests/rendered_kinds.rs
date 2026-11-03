@@ -263,9 +263,7 @@ impl ObjectCodec for Lamps {
     ) -> Result<Arc<dyn ObjectBody>, Error> {
         let ty = element.text("type")?;
         if cx.engines().iter().all(|e| e.prim_type(ty).is_none()) {
-            return Err(Error::NotInstalled(format!(
-                "light type {ty} isn't installed"
-            )));
+            return Err(Error::missing(format!("light type {ty} isn't installed")));
         }
         Ok(Arc::new(Lamp {
             intensity: element.float("intensity")?,
@@ -291,7 +289,7 @@ fn a_codec_reads_what_is_installed_and_says_what_isnt() {
             .unwrap_err();
         assert_eq!(
             error,
-            Error::NotInstalled(format!(
+            Error::missing(format!(
                 "light type {} isn't installed",
                 standard::AREA_LIGHT
             ))

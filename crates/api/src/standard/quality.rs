@@ -1,6 +1,6 @@
 //! The project's display quality as a stored project value.
+use crate::Error;
 use crate::element::{ElementReader, ElementWriter, Field};
-use crate::error::Error;
 use crate::id::StoredId;
 use crate::stored::{Scope, Stored};
 use kinogaki_geometry::DisplayQuality;

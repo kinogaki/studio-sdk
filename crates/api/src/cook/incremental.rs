@@ -1,7 +1,8 @@
 //! [`Incremental`] cooking: a node prepares reusable work once and updates
 //! from it while only light parameters change (an Extrude's distance
 //! during a drag), as a node capability.
-use crate::cook::{CookCx, CookError, Outputs};
+use crate::Error;
+use crate::cook::{CookCx, Outputs};
 use crate::data::Data;
 use std::sync::Arc;
 
@@ -19,7 +20,7 @@ pub trait Incremental: Send + Sync {
     /// Cooks in full, keeping what later updates can reuse. Core calls
     /// this instead of [`NodeType::cook`](crate::NodeType::cook) when it
     /// expects updates (the user started dragging a parameter).
-    fn prepare(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Prepared, CookError>;
+    fn prepare(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Prepared, Error>;
 }
 
 /// Prepared, immutable work. Plans belong to core's per-node cache, never
@@ -31,15 +32,11 @@ pub trait CookPlan: Send + Sync {
     /// when the plan no longer applies (core then rebuilds it, through
     /// [`reprepare`](Self::reprepare) or a new
     /// [`Incremental::prepare`]).
-    fn update(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Option<Outputs>, CookError>;
+    fn update(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Option<Outputs>, Error>;
 
     /// A new plan after a structural change, keeping what of this one still
     /// holds (an unchanged spatial index); `Ok(None)`: prepare anew.
-    fn reprepare(
-        &self,
-        cx: &mut CookCx<'_>,
-        inputs: &[Data],
-    ) -> Result<Option<Prepared>, CookError> {
+    fn reprepare(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Option<Prepared>, Error> {
         let _ = (cx, inputs);
         Ok(None)
     }

@@ -7,14 +7,15 @@
 //! nodes.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::network::{
-    CompileCx, CompileError, Compiled, Flag, Flags, Flat, FlatNode, NetworkCompiler,
-    NetworkContext, NetworkKind, NewNode, NodeCreation, Wire,
+    CompileCx, Compiled, Flag, Flags, Flat, FlatNode, NetworkCompiler, NetworkContext, NetworkKind,
+    NewNode, NodeCreation, Wire,
 };
 use kinogaki_studio_api::value::Condition;
 use kinogaki_studio_api::{
-    ContextId, CookCx, CookError, CreationId, Data, DataTypeId, NodeRef, NodeType, NodeTypeId,
-    Outputs, Package, PackageId, Parameters, Registry, RegistryError, Value,
+    ContextId, CookCx, CreationId, Data, DataTypeId, Error, NodeRef, NodeType, NodeTypeId, Outputs,
+    Package, PackageId, Parameters, Registry, Value,
 };
+use kinogaki_studio_api_testing::assert_refused;
 use std::sync::Arc;
 
 fn context(id: &'static str) -> NetworkContext {
@@ -34,7 +35,7 @@ impl NodeType for Grow {
     fn held(&self) -> Option<DataTypeId> {
         Some(DataTypeId::declared("acme.trees.growth"))
     }
-    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Ok(Outputs::default())
     }
 }
@@ -47,29 +48,14 @@ fn a_context_registers_once_under_its_vendor() {
     registry.register(trees).unwrap();
     let again = Package::new(PackageId::declared("acme.more"), "More")
         .with_context(context("acme.trees.network"));
-    assert!(matches!(
-        registry.register(again),
-        Err(RegistryError::DuplicateId {
-            what: "network context",
-            ..
-        })
-    ));
+    assert_refused(registry.register(again), &[", which ", "network context"]);
     let foreign = Package::new(PackageId::declared("other.trees"), "Other")
         .with_context(context("acme.other.network"));
-    assert!(matches!(
-        registry.register(foreign),
-        Err(RegistryError::ForeignId { .. })
-    ));
+    assert_refused(registry.register(foreign), &["under another vendor's name"]);
     let twice = Package::new(PackageId::declared("acme.twice"), "Twice")
         .with_context(context("acme.twice.network"))
         .with_context(context("acme.twice.network"));
-    assert!(matches!(
-        registry.register(twice),
-        Err(RegistryError::DuplicateId {
-            what: "network context",
-            ..
-        })
-    ));
+    assert_refused(registry.register(twice), &[", which ", "network context"]);
     assert!(!Flags::NONE.contains(Flag::Bypass));
 }
 
@@ -120,10 +106,7 @@ fn a_held_node_type_names_a_registered_delta() {
     let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(context("acme.trees.network"))
         .with_node_type(Grow);
-    assert!(matches!(
-        registry.register(trees),
-        Err(RegistryError::UnknownDataType { .. })
-    ));
+    assert_refused(registry.register(trees), &["which isn't registered"]);
 }
 
 #[test]
@@ -155,13 +138,13 @@ impl NetworkCompiler for Chain {
         flat: &Flat<'_>,
         target: Wire,
         cx: &CompileCx<'_>,
-    ) -> Result<Compiled, CompileError> {
+    ) -> Result<Compiled, Error> {
         let mut names = Vec::new();
         let mut at = Some(target);
         while let Some(source) = at {
             let node = flat
                 .node(source.node)
-                .ok_or_else(|| CompileError::at(source.node, "no such node"))?;
+                .ok_or_else(|| Error::invalid("no such node").element(source.node.0 as usize))?;
             if !node.bypass {
                 names.push(node.name.to_owned());
             }
@@ -188,18 +171,12 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
     let stray = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(context("acme.trees.network"))
         .with_compiler(Chain);
-    assert!(matches!(
-        r.register(stray),
-        Err(RegistryError::StrayCompiler { .. })
-    ));
+    assert_refused(r.register(stray), &["brings a compiler for"]);
     let twice = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(compiled())
         .with_compiler(Chain)
         .with_compiler(Chain);
-    assert!(matches!(
-        r.register(twice),
-        Err(RegistryError::DuplicateCompiler { .. })
-    ));
+    assert_refused(r.register(twice), &["already brought"]);
     let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(compiled())
         .with_compiler(Chain);
@@ -261,8 +238,8 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
         )
         .unwrap_err();
     assert_eq!(
-        (missing.node, missing.to_string()),
-        (Some(NodeRef(9)), "no such node".into())
+        (missing.diagnostic.element, missing.message()),
+        (Some(9), "no such node")
     );
 }
 
@@ -298,14 +275,14 @@ fn a_runner_runs_a_compiled_context_its_package_declares() {
             .register(trees(&["acme.trees.network"]))
             .is_ok()
     );
-    assert!(matches!(
+    assert_refused(
         Registry::new().register(trees(&["acme.rocks.network"])),
-        Err(RegistryError::StrayRunner { .. })
-    ));
-    assert!(matches!(
+        &["brings a runner for"],
+    );
+    assert_refused(
         Registry::new().register(trees(&["acme.trees.network", "acme.trees.network"])),
-        Err(RegistryError::DuplicateRunner { .. })
-    ));
+        &["already brought"],
+    );
 }
 
 /// A compiled context one package declares (Studio's Comp) takes its
@@ -327,10 +304,7 @@ fn a_compiled_context_takes_its_compiler_from_another_package() {
             .is_some()
     );
     let again = Package::new(PackageId::declared("acme.grove"), "Grove").with_compiler(Chain);
-    assert!(matches!(
-        r.register(again),
-        Err(RegistryError::DuplicateCompiler { first, .. }) if first == PackageId::declared("acme.forest")
-    ));
+    assert_refused(r.register(again), &["which acme.forest already brought"]);
 }
 
 /// A node type `id`, offered in context `offered`, holding a network of
@@ -350,7 +324,7 @@ impl NodeType for Holder {
             .context(ContextId::declared(self.offered))
             .holding(ContextId::declared(self.inside))
     }
-    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, CookError> {
+    fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Ok(Outputs::default())
     }
 }
@@ -374,10 +348,10 @@ fn nodes_hold_networks_of_declared_contexts_without_loops() {
             "acme.trees.grove",
             "acme.trees.nowhere",
         ));
-    assert!(matches!(
+    assert_refused(
         Registry::new().register(stray),
-        Err(RegistryError::UnknownContext { .. })
-    ));
+        &["which no package declares"],
+    );
     // A context holding its own.
     let own = Package::new(PackageId::declared("acme.trees"), "Trees")
         .with_context(context("acme.trees.grove"))
@@ -386,10 +360,10 @@ fn nodes_hold_networks_of_declared_contexts_without_loops() {
             "acme.trees.grove",
             "acme.trees.grove",
         ));
-    assert!(matches!(
+    assert_refused(
         Registry::new().register(own),
-        Err(RegistryError::InsideCycle { .. })
-    ));
+        &["would make contexts hold each other"],
+    );
     // Grove holds Leaves, Leaves hold Veins: nesting is fine.
     let mut r = Registry::new();
     let trees = Package::new(PackageId::declared("acme.trees"), "Trees")
@@ -413,19 +387,12 @@ fn nodes_hold_networks_of_declared_contexts_without_loops() {
         "acme.trees.veins",
         "acme.trees.grove",
     ));
-    let Err(RegistryError::InsideCycle { node, path, .. }) = r.register(loop_) else {
-        panic!("the loop is refused");
-    };
-    assert_eq!(node, NodeTypeId::declared("acme.moss.spore"));
-    let path: Vec<&str> = path.iter().map(|c| c.as_str()).collect();
-    assert_eq!(
-        path,
-        [
-            "acme.trees.veins",
-            "acme.trees.grove",
-            "acme.trees.leaves",
-            "acme.trees.veins"
-        ]
+    assert_refused(
+        r.register(loop_),
+        &[
+            "acme.moss's acme.moss.spore would make contexts hold each other: \
+           acme.trees.veins → acme.trees.grove → acme.trees.leaves → acme.trees.veins",
+        ],
     );
 }
 
@@ -454,25 +421,25 @@ fn an_engine_id_is_declared_once_under_its_vendor() {
             .register(package("acme.glow", &["acme.glow.engine"]))
             .is_ok()
     );
-    assert!(matches!(
+    assert_refused(
         registry.register(package("acme.sparks", &["acme.glow.engine"])),
-        Err(RegistryError::DuplicateId { what: "render engine", first, .. }) if first.as_str() == "acme.glow"
-    ));
-    assert!(matches!(
-        registry.register(package("twice.glow", &["twice.glow.spark", "twice.glow.spark"])),
-        Err(RegistryError::DuplicateId { first, .. }) if first.as_str() == "twice.glow"
-    ));
-    assert!(matches!(
+        &["render engine", "which acme.glow declared"],
+    );
+    assert_refused(
+        registry.register(package(
+            "twice.glow",
+            &["twice.glow.spark", "twice.glow.spark"],
+        )),
+        &["which twice.glow declared"],
+    );
+    assert_refused(
         registry.register(package("rival.glow", &["acme.glow.spark"])),
-        Err(RegistryError::ForeignId {
-            id: "acme.glow.spark",
-            ..
-        })
-    ));
-    assert!(matches!(
+        &["under another vendor's name", "acme.glow.spark"],
+    );
+    assert_refused(
         registry.register(package("rival.glow", &["glow"])),
-        Err(RegistryError::MalformedId { .. })
-    ));
+        &["which isn't an id"],
+    );
     assert!(
         registry
             .register(package("rival.glow", &["rival.glow.spark"]))
@@ -494,7 +461,7 @@ impl kinogaki_render_api::display::Engine for Glow {
         _: &kinogaki_render_api::display::wgpu::Queue,
         _: kinogaki_render_api::Wake,
         _: &kinogaki_render_api::display::Options,
-    ) -> Result<kinogaki_render_api::display::Made, String> {
+    ) -> Result<kinogaki_render_api::display::Made, Error> {
         unreachable!("not made in this test")
     }
 }
@@ -507,8 +474,8 @@ fn a_package_makes_the_engines_it_describes() {
     assert!(Registry::new().register(glow.clone()).is_ok());
     let mut stray = glow;
     stray.engines.clear();
-    assert!(matches!(
+    assert_refused(
         Registry::new().register(stray),
-        Err(RegistryError::StrayMaker { engine, .. }) if engine.as_str() == "acme.glow.engine"
-    ));
+        &["render engine acme.glow.engine, which it doesn't describe"],
+    );
 }

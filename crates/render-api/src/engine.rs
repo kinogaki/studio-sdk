@@ -13,6 +13,7 @@ use crate::description::EngineDescription;
 use crate::id::PrimId;
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
+use kinogaki_geometry::{Error, ErrorKind};
 
 /// Called once per published result (a frame, a final read). An editor's
 /// is a repaint request.
@@ -125,33 +126,11 @@ impl Default for Outputs {
     }
 }
 
-/// Why a [`Pending`] result never came.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RenderError {
-    /// The engine couldn't produce it, saying why (a readback failed, the
-    /// device was lost).
-    Failed(Arc<str>),
-    /// The engine let the request go without answering: it dropped the
-    /// [`Deliver`] (a view removed under it, the engine shut down).
-    Abandoned,
-}
-
-impl std::fmt::Display for RenderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RenderError::Failed(why) => f.write_str(why),
-            RenderError::Abandoned => f.write_str("the engine dropped the request"),
-        }
-    }
-}
-
-impl std::error::Error for RenderError {}
-
 /// What a pending result holds: nothing yet, its outcome, or its outcome
 /// taken.
 enum Slot<T> {
     Waiting,
-    Resolved(Result<T, RenderError>),
+    Resolved(Result<T, Error>),
     Taken,
 }
 
@@ -165,7 +144,9 @@ pub struct Pending<T> {
 
 /// The producing side of a [`Pending`]. Dropped without
 /// [`deliver`](Self::deliver) or [`fail`](Self::fail), it resolves the
-/// result as [`RenderError::Abandoned`].
+/// result as a [`Cancelled`](ErrorKind::Cancelled) error: the engine let
+/// the request go without answering (a view removed under it, the engine
+/// shut down).
 pub struct Deliver<T> {
     slot: Arc<Mutex<Slot<T>>>,
     wake: Wake,
@@ -190,14 +171,15 @@ impl<T> Deliver<T> {
         self.resolve(Ok(value));
     }
 
-    /// Resolve the result as failed, saying `why`, and wake the host.
-    pub fn fail(self, why: impl Into<Arc<str>>) {
-        self.resolve(Err(RenderError::Failed(why.into())));
+    /// Resolve the result as failed, saying `why` (a readback failed, the
+    /// device was lost), and wake the host.
+    pub fn fail(self, why: impl std::fmt::Display) {
+        self.resolve(Err(Error::invalid(why)));
     }
 
     /// Resolves the result as `outcome` unless it is resolved already, and
     /// wakes the host when it was.
-    fn resolve(&self, outcome: Result<T, RenderError>) {
+    fn resolve(&self, outcome: Result<T, Error>) {
         let resolved = {
             let mut slot = self.slot.lock().unwrap_or_else(|e| e.into_inner());
             let waiting = matches!(*slot, Slot::Waiting);
@@ -212,15 +194,18 @@ impl<T> Deliver<T> {
     }
 }
 
+/// What a result whose producer was dropped unanswered says.
+const ABANDONED: &str = "the engine let the request go";
+
 impl<T> Drop for Deliver<T> {
     fn drop(&mut self) {
-        self.resolve(Err(RenderError::Abandoned));
+        self.resolve(Err(Error::new(ErrorKind::Cancelled, ABANDONED)));
     }
 }
 
 impl<T> Pending<T> {
     /// The outcome, the first time it is asked for after it was resolved.
-    pub fn take(&self) -> Option<Result<T, RenderError>> {
+    pub fn take(&self) -> Option<Result<T, Error>> {
         let mut slot = self.slot.lock().unwrap_or_else(|e| e.into_inner());
         match std::mem::replace(&mut *slot, Slot::Taken) {
             Slot::Resolved(outcome) => Some(outcome),
@@ -274,7 +259,10 @@ mod tests {
             .join()
             .expect("the producer runs");
         assert_eq!(wakes.load(Ordering::SeqCst), 1);
-        assert_eq!(result.take(), Some(Err(RenderError::Abandoned)));
+        assert_eq!(
+            result.take(),
+            Some(Err(Error::new(ErrorKind::Cancelled, ABANDONED)))
+        );
         assert_eq!(result.take(), None);
     }
 
@@ -288,7 +276,7 @@ mod tests {
             1,
             "failing wakes; the drop after it doesn't"
         );
-        let failed = RenderError::Failed(Arc::from("the device was lost"));
+        let failed = Error::invalid("the device was lost");
         assert_eq!(result.take(), Some(Err(failed)));
     }
 }
