@@ -11,7 +11,7 @@
 //! | [`Polygons`] | polygons and polylines over shared points ([`Topology`]), with [`Attributes`] |
 //! | [`Curves`] | linear, Bézier, B-spline, Catmull-Rom and NURBS curves ([`Basis`]) |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
-//! | [`Attributes`] | named [`Attribute`] columns and [`Group`]s per [`Class`]; [`Text`] is indexed; [standard names](names) |
+//! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and [`Group`]s per [`Domain`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`] | selected elements of one class, with the active one |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
 //! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
@@ -30,7 +30,8 @@
 //! **Shared and immutable.** Arrays are [`Column`]s: shared buffers that
 //! adopt a `Vec` without copying it. A value is never changed in place: an
 //! edit (`with_positions`, `with_attributes`, [`Attributes::with`]) makes a
-//! new value sharing every column it didn't touch. Polygons keep their
+//! new value sharing every column it didn't touch, and checks only what it
+//! replaced. Polygons keep their
 //! primitives in one shared `Arc<Topology>`, so moving points keeps the
 //! topology, its edges and every cache built on it.
 //!
@@ -123,7 +124,8 @@ mod xform;
 
 pub use attributes::names;
 pub use attributes::{
-    Attribute, AttributeKind, AttributeValues, Attributes, Class, Group, Text, TypeInfo, check_name,
+    Attribute, AttributeType, Attributes, Domain, Group, Meaning, Storage, Text, Tuple, Values,
+    check_name,
 };
 pub use bounds::Bounds;
 pub use column::Column;

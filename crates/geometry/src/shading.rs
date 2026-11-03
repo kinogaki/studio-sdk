@@ -1,5 +1,5 @@
 //! [`ShadingNormals`]: the one rule polygons are shaded by, everywhere.
-use crate::attributes::Class;
+use crate::attributes::{Attribute, Domain};
 use crate::column::Column;
 use crate::kept::Kept;
 use crate::names;
@@ -18,8 +18,8 @@ const CUSP_COSINE: f64 = 0.5;
 
 /// A polygons value's shading normals, unit length (f32).
 ///
-/// **The rule.** An authored [`N`](names::N) (a Vector attribute, read
-/// from the first class that has one: Vertex, Point, Primitive, Piece)
+/// **The rule.** An authored [`N`](names::N) (read from the first domain
+/// that has one: Vertex, Point, Primitive)
 /// gives each polygon vertex its normal. Otherwise each vertex averages
 /// the normals of the polygons around its point, weighted by each
 /// polygon's angle there: the polygons reached from its own across edges
@@ -58,7 +58,7 @@ impl ShadingNormals {
 /// compares by identity while kept.
 struct Inputs {
     topology: Arc<Topology>,
-    authored: Option<(Class, Column<[f64; 3]>)>,
+    authored: Option<(Domain, Arc<Attribute>)>,
     sharp: Option<Column<u64>>,
     smooth: Option<Column<u64>>,
 }
@@ -66,12 +66,12 @@ struct Inputs {
 impl Inputs {
     fn of(value: &Polygons) -> Self {
         let attributes = value.attributes();
-        let authored = [Class::Vertex, Class::Point, Class::Primitive, Class::Piece]
+        let authored = [Domain::Vertex, Domain::Point, Domain::Primitive]
             .into_iter()
-            .find_map(|class| Some((class, attributes.vector(class, names::N)?.clone())));
+            .find_map(|d| Some((d, attributes.get_shared(d, names::N)?.clone())));
         let group = |name| {
             attributes
-                .group(Class::Edge, name)
+                .group(Domain::Edge, name)
                 .map(|g| g.words().clone())
         };
         Self {
@@ -85,7 +85,7 @@ impl Inputs {
     fn same(&self, other: &Inputs) -> bool {
         Arc::ptr_eq(&self.topology, &other.topology)
             && match (&self.authored, &other.authored) {
-                (Some((a, x)), Some((b, y))) => a == b && x.ptr_eq(y),
+                (Some((a, x)), Some((b, y))) => a == b && Arc::ptr_eq(x, y),
                 (None, None) => true,
                 _ => false,
             }
@@ -308,13 +308,15 @@ impl Fan {
         visited.resize(incident.len(), false);
         for (i, &(face, at, own, _)) in local.iter().enumerate() {
             let vertex = topology.offsets()[face as usize] + at as u32;
-            if let Some((class, values)) = &inputs.authored {
-                let at = match class {
-                    Class::Vertex => vertex as usize,
-                    Class::Point => point,
+            if let Some((domain, authored)) = &inputs.authored {
+                let at = match domain {
+                    Domain::Vertex => vertex as usize,
+                    Domain::Point => point,
                     _ => face as usize,
                 };
-                let n = vector::normalize_or_zero(values[at]);
+                // A standard N is f32 × 3 (the names table).
+                let values: &[[f32; 3]] = authored.as_tuples().unwrap_or_default();
+                let n = vector::normalize_or_zero(values[at].map(f64::from));
                 out.push((
                     vertex,
                     vector::to_f32(if vector::dot(n, n) > 0.0 { n } else { own }),

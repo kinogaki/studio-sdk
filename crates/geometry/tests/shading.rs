@@ -1,7 +1,7 @@
 //! Shading normals: the cusp angle, sharp edges, authored normals first,
 //! the cache following N and sharp, and the refresh after a drag matching
 //! a whole build.
-use kinogaki_geometry::{Attribute, Attributes, Class, Group, Polygons, Topology, TypeInfo, names};
+use kinogaki_geometry::{Attribute, Attributes, Domain, Group, Meaning, Polygons, Topology, names};
 use std::f64::consts::{FRAC_PI_2, FRAC_PI_6, PI};
 use std::sync::Arc;
 
@@ -37,13 +37,16 @@ fn folded(angle: f64) -> Polygons {
 
 /// `v` with every edge in edge group `name` (`all`), or none of them.
 fn edges(v: &Polygons, name: &str, all: bool) -> Polygons {
-    let count = v.count(Class::Edge).unwrap();
+    let count = v.count(Domain::Edge).unwrap();
     let group = if all {
         Group::from_indices(count, 0..count as u32).unwrap()
     } else {
         Group::none(count)
     };
-    let attributes = v.attributes().with_group(Class::Edge, name, group).unwrap();
+    let attributes = v
+        .attributes()
+        .with_group(Domain::Edge, name, group)
+        .unwrap();
     v.with_attributes(attributes).unwrap()
 }
 
@@ -86,12 +89,12 @@ fn sharp_edges_split_fans_and_authored_normals_come_first() {
     );
     // Authored N on vertices overrides sharp edges and the cusp.
     let marked = sharp(&folded(FRAC_PI_6), true);
-    let n = Attribute::vector(vec![[1.0, 0.0, 0.0]; 6], TypeInfo::Normal);
+    let n = Attribute::tuples(vec![[1.0f32, 0.0, 0.0]; 6], Meaning::Normal).unwrap();
     let authored = marked
         .with_attributes(
             marked
                 .attributes()
-                .with(Class::Vertex, names::N, n)
+                .with(Domain::Vertex, names::N, n)
                 .unwrap(),
         )
         .unwrap();
@@ -103,12 +106,12 @@ fn sharp_edges_split_fans_and_authored_normals_come_first() {
             .all(|&n| n == [1.0, 0.0, 0.0])
     );
     // Vertex N before Point N; a zero-length N takes the polygon's normal.
-    let point = Attribute::vector(vec![[0.0, 1.0, 0.0]; 4], TypeInfo::Normal);
+    let point = Attribute::tuples(vec![[0.0f32, 1.0, 0.0]; 4], Meaning::Normal).unwrap();
     let both = authored
         .with_attributes(
             authored
                 .attributes()
-                .with(Class::Point, names::N, point.clone())
+                .with(Domain::Point, names::N, point.clone())
                 .unwrap(),
         )
         .unwrap();
@@ -118,12 +121,12 @@ fn sharp_edges_split_fans_and_authored_normals_come_first() {
             .iter()
             .all(|&n| n == [1.0, 0.0, 0.0])
     );
-    let zero = Attribute::vector(vec![[0.0; 3]; 4], TypeInfo::Normal);
+    let zero = Attribute::tuples(vec![[0.0f32; 3]; 4], Meaning::Normal).unwrap();
     let flat = folded(FRAC_PI_2);
     let flat = flat
         .with_attributes(
             flat.attributes()
-                .with(Class::Point, names::N, zero)
+                .with(Domain::Point, names::N, zero)
                 .unwrap(),
         )
         .unwrap();
@@ -247,15 +250,15 @@ fn the_refresh_after_a_drag_matches_a_whole_build() {
     for with_sharp in [false, true] {
         let mut before = grid(100);
         if with_sharp {
-            let edges = before.count(Class::Edge).unwrap();
+            let edges = before.count(Domain::Edge).unwrap();
             let group = Group::from_indices(edges, (0..edges as u32).step_by(7)).unwrap();
             let smooth = Group::from_indices(edges, (3..edges as u32).step_by(5)).unwrap();
             let attributes = before.attributes();
             let attributes = attributes
-                .with_group(Class::Edge, names::SHARP, group)
+                .with_group(Domain::Edge, names::SHARP, group)
                 .unwrap();
             let attributes = attributes
-                .with_group(Class::Edge, names::SMOOTH, smooth)
+                .with_group(Domain::Edge, names::SMOOTH, smooth)
                 .unwrap();
             before = before.with_attributes(attributes).unwrap();
         }
@@ -321,30 +324,25 @@ fn smooth_edges_join_past_the_cusp_and_sharp_edges_win() {
 }
 
 #[test]
-fn a_piece_normal_is_each_primitives_own_after_primitive() {
-    // Piece values are one a primitive (`count(Piece)` is the primitives):
-    // a polygon's corners read the Piece `N` at its own index when there
-    // is no Primitive `N`.
+fn a_primitive_normal_is_each_primitives_own() {
+    // A polygon's corners read the Primitive `N` at its own index.
     let v = folded(FRAC_PI_2);
-    assert_eq!(v.count(Class::Piece), Some(2));
-    let ups = Attribute::vector(vec![[0.0, 0.0, 1.0], [1.0, 0.0, 0.0]], TypeInfo::Normal);
-    let a = v.attributes().with(Class::Piece, names::N, ups).unwrap();
-    let pieces = v.with_attributes(a).unwrap();
-    let n = pieces.shading_normals();
+    let ups = vec![[0.0f32, 0.0, 1.0], [1.0, 0.0, 0.0]];
+    let ups = Attribute::tuples(ups, Meaning::Normal).unwrap();
+    let a = v
+        .attributes()
+        .with(Domain::Primitive, names::N, ups)
+        .unwrap();
+    let n = v.with_attributes(a).unwrap().shading_normals();
     for corner in 0..3 {
         close(n.vertices()[corner], [0.0, 0.0, 1.0]);
         close(n.vertices()[3 + corner], [1.0, 0.0, 0.0]);
     }
-    // A Primitive `N` comes first.
-    let down = Attribute::vector(vec![[0.0, -1.0, 0.0]; 2], TypeInfo::Normal);
-    let a = pieces
+    // One value for two primitives is refused, not read.
+    let one = Attribute::tuples(vec![[0.0f32, 0.0, 1.0]], Meaning::Normal).unwrap();
+    let short = v
         .attributes()
-        .with(Class::Primitive, names::N, down)
+        .with(Domain::Primitive, names::N, one)
         .unwrap();
-    let both = pieces.with_attributes(a).unwrap().shading_normals();
-    close(both.vertices()[0], [0.0, -1.0, 0.0]);
-    // One Piece value for two primitives is refused, not read.
-    let one = Attribute::vector(vec![[0.0, 0.0, 1.0]], TypeInfo::Normal);
-    let short = v.attributes().with(Class::Piece, names::N, one).unwrap();
     assert!(v.with_attributes(short).is_err());
 }

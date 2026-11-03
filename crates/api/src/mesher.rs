@@ -13,11 +13,11 @@ use crate::id::MesherId;
 use kinogaki_geometry::brep::{Body, FaceId};
 use kinogaki_geometry::{Detail, Polygons, Tolerances};
 
-/// The Primitive Integer attribute naming the B-rep face a polygon of a
+/// The Primitive i32 attribute naming the B-rep face a polygon of a
 /// [`Meshed`] mesh shows (the [`FaceId`]'s index); `-1` on its polylines.
 pub const FACE: &str = "face";
 
-/// The Primitive Integer attribute naming the B-rep edge a polyline of a
+/// The Primitive i32 attribute naming the B-rep edge a polyline of a
 /// [`Meshed`] mesh shows (the edge id's index); `-1` on its polygons.
 pub const EDGE: &str = "edge";
 

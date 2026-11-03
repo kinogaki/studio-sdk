@@ -6,7 +6,7 @@
 //! cargo run --release -p kinogaki-geometry --example measure
 //! ```
 use kinogaki_geometry::{
-    Attribute, Attributes, Class, Column, Polygons, Text, Topology, TypeInfo, names,
+    Attribute, Attributes, Column, Domain, Meaning, Polygons, Text, Topology, names,
 };
 use std::hint::black_box;
 use std::time::{Duration, Instant};
@@ -42,25 +42,25 @@ fn attributes(points: usize, vertices: usize, faces: usize) -> Attributes {
     }));
     Attributes::new()
         .with(
-            Class::Point,
+            Domain::Point,
             names::N,
-            Attribute::vector(vec![[0.0, 0.0, 1.0]; points], TypeInfo::Normal),
+            Attribute::tuples(vec![[0.0f32, 0.0, 1.0]; points], Meaning::Normal).unwrap(),
         )
         .and_then(|a| {
             a.with(
-                Class::Vertex,
+                Domain::Vertex,
                 names::UV,
-                Attribute::vector(vec![[0.5; 3]; vertices], TypeInfo::TextureCoord),
+                Attribute::tuples(vec![[0.5f32; 3]; vertices], Meaning::TextureCoord).unwrap(),
             )
         })
         .and_then(|a| {
             a.with(
-                Class::Primitive,
+                Domain::Primitive,
                 names::CD,
-                Attribute::vector(vec![[1.0; 3]; faces], TypeInfo::Color),
+                Attribute::tuples(vec![[1.0f32; 3]; faces], Meaning::Color).unwrap(),
             )
         })
-        .and_then(|a| a.with(Class::Primitive, names::MATERIAL, Attribute::text(text)))
+        .and_then(|a| a.with(Domain::Primitive, names::MATERIAL, Attribute::text(text)))
         .expect("standard attributes")
 }
 

@@ -2,7 +2,7 @@
 //! edit keeps.
 use kinogaki_geometry::limits::MAX_POINTS;
 use kinogaki_geometry::{
-    Attribute, Attributes, Bounds, Class, ErrorKind, Group, Polygons, Text, Topology, TypeInfo,
+    Attribute, Attributes, Bounds, Domain, ErrorKind, Group, Meaning, Polygons, Text, Topology,
     Vec3, names,
 };
 use std::sync::Arc;
@@ -35,28 +35,19 @@ fn value() -> Polygons {
 }
 
 #[test]
-fn counts_are_the_classes_elements() {
+fn counts_are_the_domains_elements() {
     let p = value();
-    let counts = Class::ALL.map(|c| p.count(c));
+    let counts = Domain::ALL.map(|c| p.count(c));
     assert_eq!(
         counts,
-        [
-            Some(1),
-            None,
-            None,
-            Some(3),
-            Some(3),
-            Some(6),
-            Some(5),
-            Some(8)
-        ]
+        [Some(1), None, None, Some(3), Some(6), Some(5), Some(8)]
     );
     assert_eq!(
         p.bounds(),
         Bounds::of([Vec3::ZERO, Vec3::new(1.0, 2.0, 1.0)])
     );
     assert_eq!(Polygons::empty().bounds(), None);
-    assert_eq!(Polygons::empty().count(Class::Point), Some(0));
+    assert_eq!(Polygons::empty().count(Domain::Point), Some(0));
 }
 
 #[test]
@@ -105,27 +96,24 @@ fn the_first_bad_position_is_reported_on_large_values() {
 #[test]
 fn the_first_bad_attribute_value_is_reported_on_large_values() {
     let n = 300_000;
-    let t = Topology::new(n, vec![0].into(), Vec::new().into(), 0).unwrap();
-    let p = Polygons::new(vec![[0.0; 3]; n].into(), t, Attributes::new()).unwrap();
     let mut w = vec![0.0; n];
     w[250_000] = f64::NAN;
     w[200_001] = f64::NEG_INFINITY;
-    let mut dir = vec![[0.0; 3]; n];
-    dir[299_999][2] = f64::INFINITY;
-    dir[131_072][1] = f64::NAN;
-    for (name, attribute, first) in [
-        ("w", Attribute::float(w), 200_001),
-        ("dir", Attribute::vector(dir, TypeInfo::None), 131_072),
-    ] {
-        let table = Attributes::new()
-            .with(Class::Point, name, attribute)
-            .unwrap();
-        let e = p.with_attributes(table).unwrap_err();
-        assert_eq!(e.element(), Some(first), "{name}");
-        assert_eq!(
-            e.message(),
-            format!("point attribute {name}'s value {first} is not finite")
-        );
+    let mut dir = vec![[0.0f32; 3]; n];
+    dir[299_999][2] = f32::INFINITY;
+    dir[131_072][1] = f32::NAN;
+    let refused = [
+        (Attribute::tuples(w, Meaning::None), 200_001, 200_001),
+        (
+            Attribute::tuples(dir, Meaning::None),
+            131_072,
+            131_072 * 3 + 1,
+        ),
+    ];
+    for (attribute, element, value) in refused {
+        let e = attribute.unwrap_err();
+        assert_eq!(e.element(), Some(element));
+        assert_eq!(e.message(), format!("value {value} is not finite"));
     }
 }
 
@@ -136,94 +124,85 @@ fn one_past_the_point_limit_is_refused() {
 }
 
 #[test]
-fn attributes_are_sized_to_their_class() {
+fn attributes_are_sized_to_their_domain() {
     let p = value();
     let sized = Attributes::new()
         .with(
-            Class::Point,
+            Domain::Point,
             names::CD,
-            Attribute::vector(vec![[1.0; 3]; 5], TypeInfo::Color),
+            Attribute::tuples(vec![[1.0f32; 3]; 5], Meaning::Color).unwrap(),
         )
         .unwrap()
         .with(
-            Class::Vertex,
+            Domain::Vertex,
             names::UV,
-            Attribute::vector(vec![[0.0; 3]; 8], TypeInfo::TextureCoord),
+            Attribute::tuples(vec![[0.0f32; 2]; 8], Meaning::TextureCoord).unwrap(),
         )
         .unwrap()
         .with(
-            Class::Primitive,
+            Domain::Primitive,
             names::MATERIAL,
             Attribute::text(Text::from_strs(["/A", "", "/B"])),
         )
         .unwrap()
-        .with(Class::Piece, "piece", Attribute::integer(vec![0, 0, 1]))
+        .with(
+            Domain::Primitive,
+            "piece",
+            Attribute::tuples::<i64>(vec![0, 0, 1], Meaning::None).unwrap(),
+        )
         .unwrap()
-        .with(Class::Edge, "crease", Attribute::float(vec![0.0; 6]))
+        .with(
+            Domain::Edge,
+            "crease",
+            Attribute::tuples(vec![0.0; 6], Meaning::None).unwrap(),
+        )
         .unwrap()
-        .with(Class::Detail, "scale", Attribute::float(vec![1.0]))
+        .with(
+            Domain::Detail,
+            "factor",
+            Attribute::tuples(vec![1.0], Meaning::None).unwrap(),
+        )
         .unwrap()
         .with_group(
-            Class::Edge,
+            Domain::Edge,
             names::SHARP,
             Group::from_indices(6, [1]).unwrap(),
         )
         .unwrap()
-        .with_group(Class::Primitive, names::HIDDEN, Group::none(3))
+        .with_group(Domain::Primitive, names::HIDDEN, Group::none(3))
         .unwrap();
     let ok = p.with_attributes(sized).unwrap();
     assert!(Arc::ptr_eq(ok.topology(), p.topology()) && ok.positions().ptr_eq(p.positions()));
     let wrong = Attributes::new()
-        .with(Class::Vertex, "w", Attribute::float(vec![0.0; 7]))
+        .with(
+            Domain::Vertex,
+            "w",
+            Attribute::tuples(vec![0.0; 7], Meaning::None).unwrap(),
+        )
         .unwrap();
     assert_eq!(
         p.with_attributes(wrong).unwrap_err().message(),
         "vertex attribute w has 7 values for 8 elements"
     );
     let group = Attributes::new()
-        .with_group(Class::Edge, names::SHARP, Group::none(5))
+        .with_group(Domain::Edge, names::SHARP, Group::none(5))
         .unwrap();
     assert_eq!(
         p.with_attributes(group).unwrap_err().message(),
         "edge group sharp has 5 values for 6 elements"
     );
-    let nan = Attributes::new()
-        .with(
-            Class::Point,
-            "w",
-            Attribute::float(vec![0.0, f64::NAN, 0.0, 0.0, 0.0]),
-        )
-        .unwrap();
-    let e = p.with_attributes(nan).unwrap_err();
-    assert_eq!((e.kind(), e.element()), (ErrorKind::Attribute, Some(1)));
-    assert_eq!(e.message(), "point attribute w's value 1 is not finite");
-    let infinite = Attributes::new()
-        .with(
-            Class::Edge,
-            "dir",
-            Attribute::vector(
-                vec![
-                    [0.0; 3],
-                    [0.0; 3],
-                    [0.0, f64::INFINITY, 0.0],
-                    [0.0; 3],
-                    [0.0; 3],
-                    [0.0; 3],
-                ],
-                TypeInfo::None,
-            ),
-        )
-        .unwrap();
-    assert_eq!(p.with_attributes(infinite).unwrap_err().element(), Some(2));
-    // Integer and Text values have no non-finite value to refuse.
-    for class in [Class::Object, Class::Instance] {
+    for domain in [Domain::Object, Domain::Instance] {
         let refused = Attributes::new()
-            .with(class, "x", Attribute::float(vec![0.0]))
+            .with(
+                domain,
+                "x",
+                Attribute::tuples(vec![0.0], Meaning::None).unwrap(),
+            )
             .unwrap();
         let e = p.with_attributes(refused).unwrap_err();
         assert_eq!(
             e.message(),
-            format!("polygons have no {} class", class.name())
+            format!("polygons have no {} domain", domain.name())
         );
     }
 }
@@ -231,7 +210,11 @@ fn attributes_are_sized_to_their_class() {
 #[test]
 fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
     let attributes = Attributes::new()
-        .with(Class::Point, "w", Attribute::float(vec![1.0; 5]))
+        .with(
+            Domain::Point,
+            "w",
+            Attribute::tuples(vec![1.0; 5], Meaning::None).unwrap(),
+        )
         .unwrap();
     let a = value().with_attributes(attributes).unwrap();
     let builds = AtomicUsize::new(0);
@@ -272,7 +255,11 @@ fn with_topology_reuses_a_checked_topology() {
     assert!(Arc::ptr_eq(a.topology(), b.topology()));
     let wrong = Arc::new(
         Attributes::new()
-            .with(Class::Primitive, "w", Attribute::float(vec![0.0; 2]))
+            .with(
+                Domain::Primitive,
+                "w",
+                Attribute::tuples(vec![0.0; 2], Meaning::None).unwrap(),
+            )
             .unwrap(),
     );
     assert!(Polygons::with_topology(positions().into(), a.topology().clone(), wrong).is_err());

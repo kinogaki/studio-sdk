@@ -1,7 +1,7 @@
 //! [`Curves::from_polylines`]: a [`Polygons`] value's polylines as linear
 //! curves, sharing its buffers.
 use super::{Basis, Curves};
-use crate::attributes::{Attributes, Class};
+use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
 use crate::polygons::Polygons;
 use std::sync::Arc;
@@ -12,9 +12,8 @@ impl Curves {
     /// point index is a view of the polylines' part of the vertices.
     ///
     /// Point and Detail attributes and groups are shared as they are;
-    /// Vertex and Primitive ones are views of the polylines' part (a
-    /// Primitive value missing is read from Piece, as every primitive
-    /// reader does). Edge attributes and groups don't carry over. Only the
+    /// Vertex and Primitive ones are views of the polylines' part. Edge
+    /// attributes and groups don't carry over. Only the
     /// offsets (one a curve), the degrees and the Primitive groups' bits
     /// are new.
     ///
@@ -41,40 +40,36 @@ impl Curves {
         let points = topology.vertices().slice(vertex_range.clone());
         let source = polygons.attributes();
         let mut attributes = Attributes::new();
-        let mut add = |class: Class, name: &str, attribute| {
+        let mut add = |domain: Domain, name: &str, attribute| {
             attributes = attributes
-                .with_shared(class, name, attribute)
+                .with_shared(domain, name, attribute)
                 .expect("a checked attribute stays valid");
         };
-        for (class, name, attribute) in source.iter() {
-            match class {
-                Class::Point | Class::Detail => add(
-                    class,
+        for (domain, name, attribute) in source.iter() {
+            match domain {
+                Domain::Point | Domain::Detail => add(
+                    domain,
                     name,
-                    source.get_shared(class, name).expect("listed").clone(),
+                    source.get_shared(domain, name).expect("listed").clone(),
                 ),
-                Class::Vertex => add(class, name, Arc::new(attribute.slice(vertex_range.clone()))),
-                Class::Primitive => add(class, name, Arc::new(attribute.slice(lines.clone()))),
-                Class::Piece if source.get(Class::Primitive, name).is_none() => add(
-                    Class::Primitive,
+                Domain::Vertex => add(
+                    domain,
                     name,
-                    Arc::new(attribute.slice(lines.clone())),
+                    Arc::new(attribute.slice(vertex_range.clone())),
                 ),
+                Domain::Primitive => add(domain, name, Arc::new(attribute.slice(lines.clone()))),
                 _ => {}
             }
         }
-        for (class, name, group) in source.groups() {
-            let (class, group) = match class {
-                Class::Point | Class::Detail => (class, group.clone()),
-                Class::Vertex => (class, group.slice(vertex_range.clone())),
-                Class::Primitive => (class, group.slice(lines.clone())),
-                Class::Piece if source.group(Class::Primitive, name).is_none() => {
-                    (Class::Primitive, group.slice(lines.clone()))
-                }
+        for (domain, name, group) in source.groups() {
+            let (domain, group) = match domain {
+                Domain::Point | Domain::Detail => (domain, group.clone()),
+                Domain::Vertex => (domain, group.slice(vertex_range.clone())),
+                Domain::Primitive => (domain, group.slice(lines.clone())),
                 _ => continue,
             };
             attributes = attributes
-                .with_group(class, name, group)
+                .with_group(domain, name, group)
                 .expect("a checked group stays valid");
         }
         Curves::builder(Basis::Linear, polygons.positions().clone(), offsets)

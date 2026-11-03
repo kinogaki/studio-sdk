@@ -2,8 +2,8 @@
 //! zero-copy view of a polygons value's polylines.
 use kinogaki_geometry::limits::MAX_DEGREE;
 use kinogaki_geometry::{
-    Attribute, Attributes, Basis, Class, Column, Curves, CurvesBuilder, ErrorKind, Group, Polygons,
-    Text, Topology, TypeInfo, names,
+    Attribute, Attributes, Basis, Column, Curves, CurvesBuilder, Domain, ErrorKind, Group, Meaning,
+    Polygons, Text, Topology, names,
 };
 use std::sync::Arc;
 
@@ -23,7 +23,7 @@ fn refused(builder: CurvesBuilder) -> String {
 fn linear_curves_are_degree_one_with_two_points() {
     let c = one(Basis::Linear, 2).build().unwrap();
     assert_eq!(
-        (c.curves(), c.degree(0), c.count(Class::Vertex)),
+        (c.curves(), c.degree(0), c.count(Domain::Vertex)),
         (1, 1, Some(2))
     );
     assert_eq!(
@@ -184,26 +184,30 @@ fn offsets_points_degrees_and_periodic_cover_the_curves() {
 #[test]
 fn attributes_are_sized_to_points_vertices_and_curves() {
     let widths = Attributes::new()
-        .with(Class::Point, names::WIDTH, Attribute::float(vec![0.1; 4]))
+        .with(
+            Domain::Point,
+            names::WIDTH,
+            Attribute::tuples(vec![0.1f32; 4], Meaning::None).unwrap(),
+        )
         .unwrap()
         .with(
-            Class::Primitive,
+            Domain::Primitive,
             names::CD,
-            Attribute::vector(vec![[1.0; 3]], TypeInfo::Color),
+            Attribute::tuples(vec![[1.0f32; 3]], Meaning::Color).unwrap(),
         )
         .unwrap();
     let c = one(Basis::BSpline, 4).attributes(widths).build().unwrap();
     assert_eq!(
         c.attributes()
-            .float(Class::Point, names::WIDTH)
+            .tuples::<f32>(Domain::Point, names::WIDTH)
             .map(|w| w.len()),
         Some(4)
     );
     let wrong = Attributes::new()
         .with(
-            Class::Primitive,
+            Domain::Primitive,
             names::WIDTH,
-            Attribute::float(vec![0.1; 2]),
+            Attribute::tuples(vec![0.1f32; 2], Meaning::None).unwrap(),
         )
         .unwrap();
     assert_eq!(
@@ -211,11 +215,15 @@ fn attributes_are_sized_to_points_vertices_and_curves() {
         "primitive attribute width has 2 values for 1 elements"
     );
     let edges = Attributes::new()
-        .with(Class::Edge, "e", Attribute::float(vec![0.0]))
+        .with(
+            Domain::Edge,
+            "e",
+            Attribute::tuples(vec![0.0], Meaning::None).unwrap(),
+        )
         .unwrap();
     assert_eq!(
         c.with_attributes(edges).unwrap_err().message(),
-        "curves have no edge class"
+        "curves have no edge domain"
     );
     let moved = c.with_positions(vec![[1.0; 3]; 4].into()).unwrap();
     assert!(Arc::ptr_eq(moved.attributes(), c.attributes()) && moved.degrees().ptr_eq(c.degrees()));
@@ -234,26 +242,32 @@ fn from_polylines_shares_the_buffers() {
     .unwrap();
     let positions: Vec<[f64; 3]> = (0..7).map(|i| [i as f64, 0.0, 0.0]).collect();
     let attributes = Attributes::new()
-        .with(Class::Point, names::WIDTH, Attribute::float(vec![0.5; 7]))
-        .unwrap()
         .with(
-            Class::Vertex,
-            "t",
-            Attribute::float((0..9).map(f64::from).collect::<Vec<_>>()),
+            Domain::Point,
+            names::WIDTH,
+            Attribute::tuples(vec![0.5f32; 7], Meaning::None).unwrap(),
         )
         .unwrap()
         .with(
-            Class::Primitive,
+            Domain::Vertex,
+            "t",
+            Attribute::tuples((0..9).map(f64::from).collect::<Vec<_>>(), Meaning::None).unwrap(),
+        )
+        .unwrap()
+        .with(
+            Domain::Primitive,
             names::NAME,
             Attribute::text(Text::from_strs(["quad", "a", "b"])),
         )
         .unwrap()
-        .with(Class::Piece, "piece", Attribute::integer(vec![7, 8, 9]))
-        .unwrap()
-        .with(Class::Edge, "crease", Attribute::float(vec![0.0; 7]))
+        .with(
+            Domain::Edge,
+            "crease",
+            Attribute::tuples(vec![0.0; 7], Meaning::None).unwrap(),
+        )
         .unwrap()
         .with_group(
-            Class::Primitive,
+            Domain::Primitive,
             names::HIDDEN,
             Group::from_indices(3, [2]).unwrap(),
         )
@@ -275,25 +289,23 @@ fn from_polylines_shares_the_buffers() {
     assert_eq!(&**curves.offsets(), &[0, 3, 5]);
     let a = curves.attributes();
     assert!(std::ptr::eq(
-        a.get(Class::Point, names::WIDTH).unwrap(),
+        a.get(Domain::Point, names::WIDTH).unwrap(),
         polygons
             .attributes()
-            .get(Class::Point, names::WIDTH)
+            .get(Domain::Point, names::WIDTH)
             .unwrap()
     ));
-    let t = a.float(Class::Vertex, "t").unwrap();
-    assert_eq!(&**t, &[4.0, 5.0, 6.0, 7.0, 8.0]);
-    let shared = polygons.attributes().float(Class::Vertex, "t").unwrap();
+    let t = a.tuples::<f64>(Domain::Vertex, "t").unwrap();
+    assert_eq!(t, &[4.0, 5.0, 6.0, 7.0, 8.0]);
+    let shared = polygons
+        .attributes()
+        .tuples::<f64>(Domain::Vertex, "t")
+        .unwrap();
     assert!(shared.as_ptr_range().contains(&t.as_ptr()));
-    let names = a.text(Class::Primitive, names::NAME).unwrap();
+    let names = a.text(Domain::Primitive, names::NAME).unwrap();
     assert_eq!((names.get(0), names.get(1)), (Some("a"), Some("b")));
-    assert_eq!(
-        &**a.integer(Class::Primitive, "piece").unwrap(),
-        &[8, 9],
-        "Piece read as Primitive"
-    );
-    assert!(a.get(Class::Edge, "crease").is_none());
-    let hidden = a.group(Class::Primitive, names::HIDDEN).unwrap();
+    assert!(a.get(Domain::Edge, "crease").is_none());
+    let hidden = a.group(Domain::Primitive, names::HIDDEN).unwrap();
     assert_eq!(hidden.iter().collect::<Vec<_>>(), [1]);
     assert_eq!(Curves::from_polylines(&Polygons::empty()).curves(), 0);
 }

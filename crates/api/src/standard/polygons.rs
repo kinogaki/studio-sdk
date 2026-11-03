@@ -96,6 +96,6 @@ impl DataCodec for PolygonsCodec {
         let value = polygons()
             .get(data)
             .ok_or_else(|| Error::invalid("not polygons"))?;
-        selection::read(element, data.ty(), |class| value.count(class))
+        selection::read(element, data.ty(), |domain| value.count(domain))
     }
 }

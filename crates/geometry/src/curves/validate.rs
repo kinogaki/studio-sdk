@@ -110,7 +110,7 @@ pub(super) fn curves(c: &Curves) -> Result<(), GeometryError> {
             }
         }
     }
-    check_attributes(&c.attributes, |class| c.count(class))
+    check_attributes(&c.attributes, None, |d| c.count(d))
 }
 
 /// What is wrong with `degree` for `basis`, if anything.

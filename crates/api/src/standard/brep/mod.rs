@@ -105,7 +105,7 @@ impl DataCodec for BrepCodec {
         let value = brep()
             .get(data)
             .ok_or_else(|| Error::invalid("not a B-rep"))?;
-        selection::read(element, data.ty(), |class| value.count(class))
+        selection::read(element, data.ty(), |domain| value.count(domain))
     }
 }
 

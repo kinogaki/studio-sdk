@@ -67,7 +67,7 @@ impl DataCodec for CurvesCodec {
         let value = curves()
             .get(data)
             .ok_or_else(|| Error::invalid("not curves"))?;
-        selection::read(element, data.ty(), |class| value.count(class))
+        selection::read(element, data.ty(), |domain| value.count(domain))
     }
 }
 

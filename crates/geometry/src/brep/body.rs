@@ -3,7 +3,7 @@ use super::consistency;
 use super::geometry::Geometry;
 use super::names::Name;
 use super::topology::{BodyKind, BrepTopology, Names};
-use crate::attributes::{Attributes, Class};
+use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
 use crate::error::GeometryError;
 use crate::xform::Xform;
@@ -14,10 +14,10 @@ use std::sync::Arc;
 /// built to. Made by [`BrepBuilder`](super::BrepBuilder); the rules are
 /// [`super`]'s.
 ///
-/// **Classes** ([`count`](Self::count)): Object (the body: one element),
+/// **Domains** ([`count`](Self::count)): Object (the body: one element),
 /// Instance (each placement, the first included), Primitive (each face,
 /// in face order), Edge (each edge, in edge order) and Point (each
-/// vertex). Piece and Vertex (a polygon's corner) aren't used. Standard
+/// vertex). Vertex (a polygon's corner) isn't used. Standard
 /// names: `name` (Instance: the occurrence path), `part` (Object), `Cd`
 /// and `material` (Object and Primitive).
 ///
@@ -69,12 +69,13 @@ impl Body {
             names,
             attributes,
         };
-        body.check_attributes()?;
+        body.check_attributes(None)?;
         Ok(body)
     }
 
-    /// Its placements rigid ([`Xform::is_rigid`]), its attributes sized.
-    fn check_attributes(&self) -> Result<(), GeometryError> {
+    /// Its placements rigid ([`Xform::is_rigid`]), the attributes
+    /// `previous` doesn't hold as they are sized.
+    fn check_attributes(&self, previous: Option<&Attributes>) -> Result<(), GeometryError> {
         if !std::iter::once(&self.placement)
             .chain(self.instances.iter())
             .all(Xform::is_rigid)
@@ -85,7 +86,8 @@ impl Body {
                 "a placement must be a rotation and a translation".into(),
             ));
         }
-        self.attributes.check("bodies", |class| self.count(class))
+        (self.attributes).check("bodies", previous, |domain| self.count(domain))?;
+        Ok(())
     }
 
     /// The body's persistent name.
@@ -138,17 +140,17 @@ impl Body {
         &self.attributes
     }
 
-    /// How many elements `class` has: 1 for Object, the placements for
+    /// How many elements `domain` has: 1 for Object, the placements for
     /// Instance, the faces for Primitive, the edges for Edge, the vertices
-    /// for Point; `None` for a class a body doesn't have.
-    pub fn count(&self, class: Class) -> Option<usize> {
+    /// for Point; `None` for a domain a body doesn't have.
+    pub fn count(&self, domain: Domain) -> Option<usize> {
         let t = &self.topology;
-        Some(match class {
-            Class::Object => 1,
-            Class::Instance => 1 + self.instances.len(),
-            Class::Primitive => t.faces.len(),
-            Class::Edge => t.edges.len(),
-            Class::Point => t.vertices.len(),
+        Some(match domain {
+            Domain::Object => 1,
+            Domain::Instance => 1 + self.instances.len(),
+            Domain::Primitive => t.faces.len(),
+            Domain::Edge => t.edges.len(),
+            Domain::Point => t.vertices.len(),
             _ => return None,
         })
     }
@@ -180,7 +182,8 @@ impl Body {
         })
     }
 
-    /// This body with `attributes`, sharing the rest.
+    /// This body with `attributes`, sharing the rest. Only the entries
+    /// this body doesn't already hold are checked.
     ///
     /// # Errors
     /// A missized or misplaced attribute.
@@ -189,7 +192,7 @@ impl Body {
             attributes: Arc::new(attributes),
             ..self.clone()
         };
-        body.check_attributes()?;
+        body.check_attributes(Some(&self.attributes))?;
         Ok(body)
     }
 
@@ -208,7 +211,7 @@ impl Body {
             instances,
             ..self.clone()
         };
-        body.check_attributes()?;
+        body.check_attributes(None)?;
         Ok(body)
     }
 

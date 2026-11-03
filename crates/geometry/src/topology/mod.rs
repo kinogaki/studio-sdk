@@ -183,7 +183,7 @@ impl Topology {
     /// The unique edges in canonical order: polygon sides (each vertex to
     /// the next, wrapping) and polyline segments, once each, ascending by
     /// `(low point, high point)`. An edge's position here is its id, and
-    /// [`Class::Edge`](crate::Class::Edge) attributes follow this order.
+    /// [`Domain::Edge`](crate::Domain::Edge) attributes follow this order.
     pub fn edges(&self) -> &[Edge] {
         self.index().edges()
     }

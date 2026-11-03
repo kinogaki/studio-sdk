@@ -1,7 +1,7 @@
 //! The standard data types: handles, codecs, the tolerances and display
 //! quality values and the conformance suite.
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::{Class, Polygons, Selection, Tolerances};
+use kinogaki_studio_api::geometry::{Domain, Polygons, Selection, Tolerances};
 use kinogaki_studio_api::standard::{self, PolygonsCodec};
 use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue, Units, UpAxis};
 use kinogaki_studio_api_testing as conformance;
@@ -114,10 +114,10 @@ fn a_saved_value_breaking_a_rule_does_not_read() {
 #[test]
 fn components_hold_a_standard_selection() {
     let data = standard::polygons().wrap(grid());
-    let s = Selection::new(Class::Primitive, vec![3, 1], Some(3), None).unwrap();
+    let s = Selection::new(Domain::Primitive, vec![3, 1], Some(3), None).unwrap();
     let c = standard::components(data.ty(), s.clone(), 16);
     assert_eq!((c.len(), c.selection()), (2, Some(&s)));
-    let all = standard::components(data.ty(), Selection::all(Class::Point, None), 25);
+    let all = standard::components(data.ty(), Selection::all(Domain::Point, None), 25);
     assert_eq!(all.len(), 25);
 }
 
@@ -179,7 +179,7 @@ fn equal_texts_save_alike_whatever_their_tables() {
         )
         .unwrap();
         let attributes = Attributes::new()
-            .with(Class::Point, "label", Attribute::text(text))
+            .with(Domain::Point, "label", Attribute::text(text))
             .unwrap();
         standard::polygons().wrap(Polygons::new(vec![[0.0; 3]; 4].into(), t, attributes).unwrap())
     };
@@ -194,4 +194,120 @@ fn equal_texts_save_alike_whatever_their_tables() {
     let compact = Text::from_strs(["a", "b", "a", ""]);
     assert_eq!(gathered, compact);
     assert_eq!(save(&quad(gathered)), save(&quad(compact)));
+}
+
+/// A quad saved with one attribute element written by hand: `fields` on
+/// `a0`, read back.
+fn read_quad_with(fields: &[(&str, Field)]) -> Result<Polygons, String> {
+    let quad = kinogaki_studio_api::geometry::Topology::new(
+        4,
+        vec![0, 4].into(),
+        vec![0, 1, 2, 3].into(),
+        1,
+    )
+    .unwrap();
+    let value = Polygons::new(vec![[0.0; 3]; 4].into(), quad, Default::default()).unwrap();
+    let data = standard::polygons().wrap(value);
+    let mut saved = MemoryElement::new("result");
+    saved
+        .write(|w| {
+            PolygonsCodec.write(&data, None, w)?;
+            let mut a = w.child("a0", "attribute")?;
+            for (name, field) in fields {
+                a.set(name, field.clone())?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let read = saved.read(|r| PolygonsCodec.read(r, None));
+    let read = read.map_err(|e| e.to_string())?;
+    Ok(standard::polygons().get(&read).unwrap().clone())
+}
+
+#[test]
+fn attributes_read_by_storage_width_and_meaning_strictly() {
+    use kinogaki_studio_api::geometry::Meaning;
+    let text = |s: &str| Field::Text(s.into());
+    let element = |name: &str, storage: &str, width: i64, meaning: &str, values: Field| {
+        vec![
+            ("name", text(name)),
+            ("domain", text("point")),
+            ("storage", text(storage)),
+            ("width", Field::Int(width)),
+            ("meaning", text(meaning)),
+            ("values", values),
+        ]
+    };
+    // Ids past 2^53 read exactly.
+    let big = (1i64 << 53) + 1;
+    let ids = Field::I64s(vec![big, -big, 0, i64::MAX]);
+    let read = read_quad_with(&element("id", "i64", 1, "none", ids)).unwrap();
+    let id = read
+        .attributes()
+        .tuples::<i64>(Domain::Point, "id")
+        .unwrap();
+    assert_eq!(id, [big, -big, 0, i64::MAX]);
+    // A color of four f32s.
+    let rgba = Field::F32s(vec![0.25; 16]);
+    let read = read_quad_with(&element("tint", "f32", 4, "color", rgba)).unwrap();
+    let tint = read.attributes().get(Domain::Point, "tint").unwrap();
+    assert_eq!((tint.ty().width, tint.ty().meaning), (4, Meaning::Color));
+    // Arrays read their offsets.
+    let mut lists = element("w", "f64", 1, "none", Field::F64s(vec![1.0, 2.0, 3.0]));
+    lists.push(("offsets", Field::U32s(vec![0, 0, 1, 1, 3])));
+    let read = read_quad_with(&lists).unwrap();
+    let w = read.attributes().get(Domain::Point, "w").unwrap();
+    assert_eq!((w.ty().array, w.items_of(3)), (true, 1..3));
+    // Refused, naming the element.
+    let refused = [
+        (
+            element("w", "f16", 1, "none", Field::F32s(vec![0.0; 4])),
+            "no storage \"f16\"",
+        ),
+        (
+            element("w", "f32", 2, "color", Field::F32s(vec![0.0; 8])),
+            "color attributes have width 3 or 4, not 2",
+        ),
+        (
+            element("w", "f32", 1, "smell", Field::F32s(vec![0.0; 4])),
+            "no meaning \"smell\"",
+        ),
+        (
+            element("w", "f32", 1, "none", Field::F64s(vec![0.0; 4])),
+            "values is not an array of f32",
+        ),
+        (
+            element("w", "f32", 0, "none", Field::F32s(vec![0.0; 4])),
+            "at least one value an item",
+        ),
+        (
+            element("w", "f32", 300, "none", Field::F32s(vec![0.0; 4])),
+            "width is not 1 to 255",
+        ),
+        // An array's values without its offsets are items, one too many.
+        (
+            element(
+                "w",
+                "f64",
+                1,
+                "none",
+                Field::F64s(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+            ),
+            "has 5 values for 4 elements",
+        ),
+        (
+            element("Cd", "f64", 3, "color", Field::F64s(vec![0.0; 12])),
+            "Cd is f32 × 3 color, not f64 × 3 color",
+        ),
+        (
+            element("P", "f64", 3, "point", Field::F64s(vec![0.0; 12])),
+            "never an attribute",
+        ),
+    ];
+    for (fields, message) in refused {
+        let error = read_quad_with(&fields).unwrap_err();
+        assert!(error.contains(message), "{error}");
+    }
+    let path = read_quad_with(&element("w", "f16", 1, "none", Field::F32s(vec![0.0; 4])));
+    assert!(path.unwrap_err().contains("a0"), "the element is named");
 }

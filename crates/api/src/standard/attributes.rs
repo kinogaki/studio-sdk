@@ -1,51 +1,64 @@
 //! Saving an [`Attributes`] table: one child element per attribute
-//! (`attribute-0`, `attribute-1`…, kind `attribute`) and per group
-//! (`group-0`…, kind `group`), in the table's order.
+//! (`a0`, `a1`…, kind `attribute`) and per group (`g0`…, kind `group`),
+//! in the table's order.
 //!
-//! An attribute's element has `name`, `class`, `kind` and `info` (their
-//! names: [`Class::name`], [`AttributeKind::name`], [`TypeInfo::name`]) and
-//! its `values`: reals, whole numbers, vectors as rows of 3, or text as
-//! `values` (indices, `u32::MAX` for no value) plus `table`, the strings
-//! used in the order of first use ([`Text::compacted`]). A group's
-//! element has `name`, `class`, `elements` and its bit `words` (each `u64`
-//! as the `i64` with the same bits).
+//! An attribute's element has `name`, `domain`, `storage`, `meaning`
+//! (their names: [`Domain::name`], [`Storage::name`], [`Meaning::name`]),
+//! `width` and its `values` in the storage's array (`F32s`, `F64s`,
+//! `I32s`, `I64s`; rows of `width`), or for text `values` as indices
+//! (`u32::MAX` for no value) plus `table`, the strings used in the order of
+//! first use ([`Text::compacted`]). An array attribute adds `offsets`
+//! (`U32s`); one without has none. A group's element has `name`, `domain`,
+//! `elements` and its bit `words` (each `u64` as the `i64` with the same
+//! bits). Reading is strict: a standard name of another type or domain
+//! refuses the file, with the element's path.
 use super::invalid;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::error::Error;
 use kinogaki_geometry::{
-    Attribute, AttributeValues, Attributes, Class, Column, Group, Text, TypeInfo,
+    Attribute, AttributeType, Attributes, Column, Domain, Group, Meaning, Storage, Text, Values,
 };
 use std::sync::Arc;
 
 pub(super) fn write(attributes: &Attributes, out: &mut dyn ElementWriter) -> Result<(), Error> {
-    for (i, (class, name, attribute)) in attributes.iter().enumerate() {
-        let mut child = out.child(&format!("attribute-{i}"), "attribute")?;
+    for (k, (domain, name, attribute)) in attributes.iter().enumerate() {
+        let mut child = out.child(&format!("a{k}"), "attribute")?;
+        let ty = attribute.ty();
         child.set("name", Field::Text(name.into()))?;
-        child.set("class", Field::Text(class.name().into()))?;
-        child.set("kind", Field::Text(attribute.kind().name().into()))?;
-        child.set("info", Field::Text(attribute.info().name().into()))?;
-        match attribute.values() {
-            AttributeValues::Float(c) => child.set("values", Field::F64s(c.to_vec()))?,
-            AttributeValues::Integer(c) => child.set("values", Field::I64s(c.to_vec()))?,
-            AttributeValues::Vector(c) => child.set_rows("values", 3, Field::F64s(flat(c)))?,
-            AttributeValues::Text(t) => {
+        child.set("domain", Field::Text(domain.name().into()))?;
+        child.set("storage", Field::Text(ty.storage.name().into()))?;
+        child.set("width", Field::Int(i64::from(ty.width)))?;
+        child.set("meaning", Field::Text(ty.meaning.name().into()))?;
+        let values = match attribute.values() {
+            Values::F32(c) => Field::F32s(c.to_vec()),
+            Values::F64(c) => Field::F64s(c.to_vec()),
+            Values::I32(c) => Field::I32s(c.to_vec()),
+            Values::I64(c) => Field::I64s(c.to_vec()),
+            Values::Text(t) => {
                 // The canonical table, so equal texts save alike.
                 let t = t.compacted();
-                child.set("values", Field::U32s(t.indices().to_vec()))?;
                 let table = t.table().iter().map(|s| s.to_string()).collect();
                 child.set("table", Field::Texts(table))?;
+                Field::U32s(t.indices().to_vec())
             }
             _ => {
                 return Err(Error::invalid(format_args!(
-                    "attribute {name} is of a kind this version can't save"
+                    "attribute {name} is of a storage this version can't save"
                 )));
             }
+        };
+        match ty.width {
+            1 => child.set("values", values)?,
+            width => child.set_rows("values", u32::from(width), values)?,
+        }
+        if let Some(offsets) = attribute.offsets() {
+            child.set("offsets", Field::U32s(offsets.to_vec()))?;
         }
     }
-    for (i, (class, name, group)) in attributes.groups().enumerate() {
-        let mut child = out.child(&format!("group-{i}"), "group")?;
+    for (k, (domain, name, group)) in attributes.groups().enumerate() {
+        let mut child = out.child(&format!("g{k}"), "group")?;
         child.set("name", Field::Text(name.into()))?;
-        child.set("class", Field::Text(class.name().into()))?;
+        child.set("domain", Field::Text(domain.name().into()))?;
         child.set("elements", Field::Int(group.elements() as i64))?;
         let words = group.words().iter().map(|&w| w as i64).collect();
         child.set("words", Field::I64s(words))?;
@@ -62,20 +75,20 @@ pub(super) fn read(from: &dyn ElementReader) -> Result<Attributes, Error> {
         let at = child.location();
         match child.kind() {
             "attribute" => {
-                let (class, name) = (class(&*child)?, child.text("name")?);
+                let (domain, name) = (domain(&*child)?, child.text("name")?);
                 let attribute = read_attribute(&*child)?;
                 attributes = attributes
-                    .with(class, name, attribute)
+                    .with(domain, name, attribute)
                     .map_err(|e| invalid(&at, e))?;
             }
             "group" => {
-                let (class, name) = (class(&*child)?, child.text("name")?);
+                let (domain, name) = (domain(&*child)?, child.text("name")?);
                 let elements = count(&*child, "elements")?;
                 let words: Vec<u64> = i64s(&*child, "words")?.iter().map(|&w| w as u64).collect();
                 let group =
                     Group::new(elements, Column::new(words)).map_err(|e| invalid(&at, e))?;
                 attributes = attributes
-                    .with_group(class, name, group)
+                    .with_group(domain, name, group)
                     .map_err(|e| invalid(&at, e))?;
             }
             _ => {}
@@ -86,35 +99,54 @@ pub(super) fn read(from: &dyn ElementReader) -> Result<Attributes, Error> {
 
 fn read_attribute(child: &dyn ElementReader) -> Result<Attribute, Error> {
     let at = child.location();
-    let info_name = child.text("info")?;
-    let info = TypeInfo::from_name(info_name)
-        .ok_or_else(|| Error::invalid(format_args!("{at}: no type info {info_name:?}")))?;
-    let values = match child.text("kind")? {
-        "float" => AttributeValues::Float(child.f64s("values")?.to_vec().into()),
-        "integer" => AttributeValues::Integer(i64s(child, "values")?.to_vec().into()),
-        "vector" => AttributeValues::Vector(rows(child, "values")?.into()),
-        "text" => {
-            let table: Arc<[Arc<str>]> = child
-                .texts("table")?
-                .iter()
+    let unknown = |field: &str| {
+        let name = child.text(field).unwrap_or_default();
+        Error::invalid(format_args!("{at}: no {field} {name:?}"))
+    };
+    let storage = Storage::from_name(child.text("storage")?).ok_or_else(|| unknown("storage"))?;
+    let meaning = Meaning::from_name(child.text("meaning")?).ok_or_else(|| unknown("meaning"))?;
+    let width = u8::try_from(child.int("width")?)
+        .map_err(|_| Error::invalid(format_args!("{at}: width is not 1 to 255")))?;
+    let offsets = match child.field("offsets") {
+        Some(_) => Some(Column::new(child.u32s("offsets")?.to_vec())),
+        None => None,
+    };
+    let ty = AttributeType {
+        storage,
+        width,
+        meaning,
+        array: offsets.is_some(),
+    };
+    let wrong = || {
+        Error::invalid(format_args!(
+            "{at}: values is not an array of {}",
+            storage.name()
+        ))
+    };
+    let values = match (storage, child.required("values")?) {
+        (Storage::F32, FieldRef::F32s(v)) => Values::F32(v.to_vec().into()),
+        (Storage::F64, FieldRef::F64s(v)) => Values::F64(v.to_vec().into()),
+        (Storage::I32, FieldRef::I32s(v)) => Values::I32(v.to_vec().into()),
+        (Storage::I64, FieldRef::I64s(v)) => Values::I64(v.to_vec().into()),
+        (Storage::Text, FieldRef::U32s(v)) => {
+            let table: Arc<[Arc<str>]> = (child.texts("table")?.iter())
                 .map(|s| Arc::from(s.as_str()))
                 .collect();
-            let indices = child.u32s("values")?.to_vec().into();
-            AttributeValues::Text(Text::new(indices, table).map_err(|e| invalid(&at, e))?)
+            Values::Text(Text::new(v.to_vec().into(), table).map_err(|e| invalid(&at, e))?)
         }
-        other => {
-            return Err(Error::invalid(format_args!(
-                "{at}: no attribute kind {other:?}"
-            )));
-        }
+        _ => return Err(wrong()),
     };
-    Ok(Attribute::new(values, info))
+    match offsets {
+        Some(offsets) => Attribute::arrays(ty, offsets, values),
+        None => Attribute::new(ty, values),
+    }
+    .map_err(|e| invalid(&at, e))
 }
 
-fn class(child: &dyn ElementReader) -> Result<Class, Error> {
-    let name = child.text("class")?;
-    Class::from_name(name)
-        .ok_or_else(|| Error::invalid(format_args!("{}: no class {name:?}", child.location())))
+fn domain(child: &dyn ElementReader) -> Result<Domain, Error> {
+    let name = child.text("domain")?;
+    Domain::from_name(name)
+        .ok_or_else(|| Error::invalid(format_args!("{}: no domain {name:?}", child.location())))
 }
 
 /// Vectors as a flat array, three reals each.

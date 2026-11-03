@@ -8,7 +8,7 @@ mod validate;
 pub use build::CurvesBuilder;
 pub use display::CurveDisplay;
 
-use crate::attributes::{Attributes, Class, Group};
+use crate::attributes::{Attributes, Domain, Group};
 use crate::column::Column;
 use crate::error::GeometryError;
 use crate::positions;
@@ -102,8 +102,8 @@ impl Knots {
 /// [`Polygons`](crate::Polygons) value, [`Curves::from_polylines`]), else
 /// vertex `v` is point `v`.
 ///
-/// **Classes** ([`count`](Self::count)): Point, Vertex, Primitive (each
-/// curve) and Detail. The standard `width` is a Point or Primitive Float.
+/// **Domains** ([`count`](Self::count)): Point, Vertex, Primitive (each
+/// curve) and Detail. The standard `width` is a Point or Primitive f32.
 ///
 /// **Rules** ([`CurvesBuilder::build`] checks them):
 /// - positions finite and at most 1e100 in each component;
@@ -117,7 +117,7 @@ impl Knots {
 /// - knots exactly for NURBS: `count + degree + 1` a curve, finite, never
 ///   decreasing, spanning an interval; weights only for NURBS, one a
 ///   vertex, finite and above 0;
-/// - `periodic` covers the curves; attributes are sized to their class.
+/// - `periodic` covers the curves; attributes are sized to their domain.
 ///
 /// ```
 /// use kinogaki_geometry::{Basis, Curves};
@@ -235,14 +235,14 @@ impl Curves {
         }
     }
 
-    /// How many elements `class` has: points, vertices, curves (for
-    /// Primitive), 1 for Detail; `None` for a class it doesn't have.
-    pub fn count(&self, class: Class) -> Option<usize> {
+    /// How many elements `domain` has: points, vertices, curves (for
+    /// Primitive), 1 for Detail; `None` for a domain it doesn't have.
+    pub fn count(&self, domain: Domain) -> Option<usize> {
         count(
             self.positions.len(),
             *self.offsets.last().expect("offsets"),
             self.curves(),
-            class,
+            domain,
         )
     }
 
@@ -275,14 +275,14 @@ impl Curves {
         })
     }
 
-    /// This value with `attributes`, sharing the rest. Only the attributes
-    /// are checked.
+    /// This value with `attributes`, sharing the rest. Only the entries
+    /// this value doesn't already hold are checked.
     ///
     /// # Errors
     /// A missized or misplaced attribute.
     pub fn with_attributes(&self, attributes: Attributes) -> Result<Self, GeometryError> {
         let attributes = Arc::new(attributes);
-        check_attributes(&attributes, |class| self.count(class))?;
+        check_attributes(&attributes, Some(&self.attributes), |d| self.count(d))?;
         Ok(Self {
             attributes,
             ..self.clone()
@@ -296,19 +296,21 @@ impl Default for Curves {
     }
 }
 
-fn count(points: usize, vertices: u32, curves: usize, class: Class) -> Option<usize> {
-    Some(match class {
-        Class::Point => points,
-        Class::Vertex => vertices as usize,
-        Class::Primitive => curves,
-        Class::Detail => 1,
+fn count(points: usize, vertices: u32, curves: usize, domain: Domain) -> Option<usize> {
+    Some(match domain {
+        Domain::Point => points,
+        Domain::Vertex => vertices as usize,
+        Domain::Primitive => curves,
+        Domain::Detail => 1,
         _ => return None,
     })
 }
 
 fn check_attributes(
     attributes: &Attributes,
-    count: impl FnMut(Class) -> Option<usize>,
+    previous: Option<&Attributes>,
+    count: impl FnMut(Domain) -> Option<usize>,
 ) -> Result<(), GeometryError> {
-    attributes.check("curves", count)
+    attributes.check("curves", previous, count)?;
+    Ok(())
 }

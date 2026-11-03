@@ -1,77 +1,127 @@
 //! The standard attribute and group names, and the rule every name
 //! follows ([`check_name`]).
 //!
-//! A standard name always has its standard type: [`Attributes::with`] and
-//! [`Attributes::with_group`] refuse it written otherwise, so every reader
-//! can rely on it. A kernel's own attributes use names in its namespace
-//! (`acme:weight`) or conventions its documentation states.
+//! A standard name fixes its whole type and the domains it may live on
+//! (the table below): [`Attributes::with`] and [`Attributes::with_group`]
+//! refuse it written otherwise, so every reader can rely on it. A
+//! kernel's own attributes use names in its namespace (`acme:weight`) or
+//! conventions its documentation states.
+//!
+//! | Name | Domains | Type |
+//! |---|---|---|
+//! | [`P`] | none | the value's own positions column, `[f64; 3]` (never an attribute) |
+//! | [`N`] | Point, Vertex, Primitive | f32 × 3 normal |
+//! | [`UV`] | Point, Vertex | f32 × 2 texture coordinate |
+//! | [`CD`] | any | f32 × 3 color (scene-linear, working space) |
+//! | [`ALPHA`] | any | f32 |
+//! | [`V`] | Point, Instance | f32 × 3 vector, units per second |
+//! | [`ID`] | Point, Primitive, Instance | i64 |
+//! | [`PSCALE`] | Point, Instance | f32 |
+//! | [`SCALE`] | Point, Instance | f32 × 3 |
+//! | [`ORIENT`] | Point, Instance | f32 × 4 rotation |
+//! | [`UP`] | Point | f32 × 3 vector |
+//! | [`REST`] | Point | f64 × 3 point (positions' precision) |
+//! | [`WIDTH`] | Point, Primitive | f32 |
+//! | [`MATERIAL`], [`NAME`], [`PART`] | any | text |
+//! | groups [`SHARP`], [`SMOOTH`] / [`HIDDEN`] | Edge / Primitive | group |
 //!
 //! [`Attributes::with`]: crate::Attributes::with
 //! [`Attributes::with_group`]: crate::Attributes::with_group
-use super::{AttributeKind, Class, TypeInfo};
+use super::{AttributeType, Domain, Meaning, Storage};
 use crate::error::{ErrorKind, GeometryError};
 use crate::limits::MAX_NAME;
 
-/// Position (Vector, [`TypeInfo::Point`]). A value's points are its own
-/// positions column, never a Point attribute named `P`.
+/// Position. A value's points are its own positions column, never an
+/// attribute named `P`.
 pub const P: &str = "P";
-/// Authored normal (Vector, [`TypeInfo::Normal`]). Shading normals follow
-/// one rule everywhere: authored `N`, else by the [`SHARP`] edges and angle.
+/// Authored normal. Shading normals follow one rule everywhere: authored
+/// `N`, else by the [`SHARP`] edges and angle.
 pub const N: &str = "N";
-/// Velocity, in scene units per second, for motion blur (Vector,
-/// [`TypeInfo::Vector`]).
+/// Velocity, in scene units per second, for motion blur.
 pub const V: &str = "v";
-/// Texture coordinates (Vector, [`TypeInfo::TextureCoord`]).
+/// Texture coordinates.
 pub const UV: &str = "uv";
-/// Color (Vector, [`TypeInfo::Color`]), scene-linear in the project's
-/// working space.
+/// Color, scene-linear in the project's working space.
 pub const CD: &str = "Cd";
-/// Opacity, 0 to 1 (Float).
-pub(crate) const ALPHA: &str = "Alpha";
-/// A curve's or point's width, in scene units (Float).
+/// Opacity, 0 to 1.
+pub const ALPHA: &str = "Alpha";
+/// A stable id, unique within its domain.
+pub const ID: &str = "id";
+/// A uniform scale (copies, instances, point sizes).
+pub const PSCALE: &str = "pscale";
+/// A scale per axis (copies, instances).
+pub const SCALE: &str = "scale";
+/// An orientation (copies, instances), a unit quaternion x y z w.
+pub const ORIENT: &str = "orient";
+/// The up direction a copy aims its y axis along.
+pub const UP: &str = "up";
+/// Rest positions, as precise as positions.
+pub const REST: &str = "rest";
+/// A curve's or point's width, in scene units.
 pub const WIDTH: &str = "width";
-/// The Material a primitive renders with, by its path (Text).
+/// The Material a primitive renders with, by its path.
 pub const MATERIAL: &str = "material";
-/// A name (Text): an element's, or an instance's occurrence path.
+/// A name: an element's, or an instance's occurrence path.
 pub const NAME: &str = "name";
-/// The part an element belongs to (Text).
+/// The part an element belongs to.
 pub const PART: &str = "part";
-/// The hard edges (an [`Class::Edge`] group): shading always breaks
+/// The hard edges (an [`Domain::Edge`] group): shading always breaks
 /// across them, whatever the angle between their faces. An edge in both
 /// this and [`SMOOTH`] is sharp. An edge in neither follows the 60° cusp
 /// rule ([`ShadingNormals`](crate::ShadingNormals)).
 pub const SHARP: &str = "sharp";
-/// The soft edges (an [`Class::Edge`] group): shading always joins the
+/// The soft edges (an [`Domain::Edge`] group): shading always joins the
 /// two faces of such an edge, whatever the angle between them (Soft
 /// Edges). Only an edge with exactly two faces joins; open and
 /// non-manifold edges stay split. [`SHARP`] wins over it.
 pub const SMOOTH: &str = "smooth";
-/// The hidden primitives (a [`Class::Primitive`] group): Hide.
+/// The hidden primitives (a [`Domain::Primitive`] group): Hide.
 pub const HIDDEN: &str = ".hidden";
 
 /// What a standard name must be.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Standard {
-    /// An attribute of this kind and type info, on any class.
-    Attribute(AttributeKind, TypeInfo),
-    /// A group of this class only.
-    Group(Class),
+    /// An attribute of this type, on these domains only (empty: it is
+    /// never an attribute, as [`P`]; `ANY`: every one).
+    Attribute(AttributeType, &'static [Domain]),
+    /// A group on this domain only.
+    Group(Domain),
 }
 
-/// The standard meaning of `name`, if it has one.
+/// Every domain: a standard attribute that may live anywhere.
+pub(crate) const ANY: &[Domain] = &Domain::ALL;
+
+/// The standard meaning of `name`, if it has one: the one table every
+/// reader and writer follows.
 pub(crate) fn standard(name: &str) -> Option<Standard> {
-    use AttributeKind::{Float, Text, Vector};
-    Some(match name {
-        P => Standard::Attribute(Vector, TypeInfo::Point),
-        N => Standard::Attribute(Vector, TypeInfo::Normal),
-        V => Standard::Attribute(Vector, TypeInfo::Vector),
-        UV => Standard::Attribute(Vector, TypeInfo::TextureCoord),
-        CD => Standard::Attribute(Vector, TypeInfo::Color),
-        ALPHA | WIDTH => Standard::Attribute(Float, TypeInfo::None),
-        MATERIAL | NAME | PART => Standard::Attribute(Text, TypeInfo::None),
-        SHARP | SMOOTH => Standard::Group(Class::Edge),
-        HIDDEN => Standard::Group(Class::Primitive),
-        _ => return None,
-    })
+    use Domain::{Edge, Instance, Point, Primitive, Vertex};
+    let f32s = |width, meaning| AttributeType::new(Storage::F32, width, meaning);
+    let attribute = |ty, domains| Some(Standard::Attribute(ty, domains));
+    match name {
+        P => attribute(AttributeType::new(Storage::F64, 3, Meaning::Point), &[]),
+        N => attribute(f32s(3, Meaning::Normal), &[Point, Vertex, Primitive]),
+        UV => attribute(f32s(2, Meaning::TextureCoord), &[Point, Vertex]),
+        CD => attribute(f32s(3, Meaning::Color), ANY),
+        ALPHA => attribute(f32s(1, Meaning::None), ANY),
+        V => attribute(f32s(3, Meaning::Vector), &[Point, Instance]),
+        ID => attribute(
+            AttributeType::new(Storage::I64, 1, Meaning::None),
+            &[Point, Primitive, Instance],
+        ),
+        PSCALE => attribute(f32s(1, Meaning::None), &[Point, Instance]),
+        SCALE => attribute(f32s(3, Meaning::None), &[Point, Instance]),
+        ORIENT => attribute(f32s(4, Meaning::Rotation), &[Point, Instance]),
+        UP => attribute(f32s(3, Meaning::Vector), &[Point]),
+        REST => attribute(
+            AttributeType::new(Storage::F64, 3, Meaning::Point),
+            &[Point],
+        ),
+        WIDTH => attribute(f32s(1, Meaning::None), &[Point, Primitive]),
+        MATERIAL | NAME | PART => attribute(AttributeType::TEXT, ANY),
+        SHARP | SMOOTH => Some(Standard::Group(Edge)),
+        HIDDEN => Some(Standard::Group(Primitive)),
+        _ => None,
+    }
 }
 
 /// Whether `name` may name an attribute or a group: a letter, `_` or `.`

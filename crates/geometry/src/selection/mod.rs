@@ -1,6 +1,6 @@
-//! [`Selection`]: which elements of one class of a standard value are
+//! [`Selection`]: which elements of one domain of a standard value are
 //! selected — the standard component selection.
-use crate::attributes::Class;
+use crate::attributes::Domain;
 use crate::column::Column;
 use crate::error::{ErrorKind, GeometryError};
 use crate::topology::Topology;
@@ -8,7 +8,7 @@ use crate::topology::Topology;
 mod polygons;
 pub use polygons::SelectionCounts;
 
-/// Selected elements of one class: all of them, or a sorted set of
+/// Selected elements of one domain: all of them, or a sorted set of
 /// indices; the active one (the last picked, which tools that need one
 /// element start from); and the topology it was made on.
 ///
@@ -19,20 +19,19 @@ pub use polygons::SelectionCounts;
 /// **Staleness.** A selection made on a topology keeps its
 /// [fingerprint](Topology::fingerprint); once the topology changes the
 /// indices mean other elements, so the holder resets it
-/// (`is_stale`). A Piece selection selects primitives
-/// by their indices, as Primitive does.
+/// (`is_stale`).
 ///
 /// ```
-/// use kinogaki_geometry::{Class, Selection};
+/// use kinogaki_geometry::{Domain, Selection};
 ///
-/// let s = Selection::new(Class::Point, vec![7, 3, 7, 1], Some(3), None).unwrap();
+/// let s = Selection::new(Domain::Point, vec![7, 3, 7, 1], Some(3), None).unwrap();
 /// assert_eq!(&**s.indices(), &[1, 3, 7]);
 /// assert!(s.contains(7) && !s.contains(2));
-/// assert!(Selection::new(Class::Point, vec![1], Some(2), None).is_err());
+/// assert!(Selection::new(Domain::Point, vec![1], Some(2), None).is_err());
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct Selection {
-    class: Class,
+    domain: Domain,
     all: bool,
     indices: Column<u32>,
     active: Option<u32>,
@@ -40,24 +39,24 @@ pub struct Selection {
 }
 
 impl Selection {
-    /// The elements `indices` of `class` (sorted and deduplicated here),
+    /// The elements `indices` of `domain` (sorted and deduplicated here),
     /// `active` among them, made on the topology whose fingerprint is
     /// `topology` (`None`: on no particular one).
     ///
     /// # Errors
     /// When `active` is not selected.
     pub fn new(
-        class: Class,
+        domain: Domain,
         mut indices: Vec<u32>,
         active: Option<u32>,
         topology: Option<[u8; 32]>,
     ) -> Result<Self, GeometryError> {
         indices.sort_unstable();
         indices.dedup();
-        Self::from_ascending(class, Column::new(indices), active, topology)
+        Self::from_ascending(domain, Column::new(indices), active, topology)
     }
 
-    /// The elements `indices` of `class`, already strictly ascending, kept
+    /// The elements `indices` of `domain`, already strictly ascending, kept
     /// as given: a selection made from another's
     /// [`indices`](Self::indices) shares them.
     ///
@@ -65,7 +64,7 @@ impl Selection {
     /// When `indices` are not strictly ascending, or `active` is not
     /// selected.
     pub(crate) fn from_ascending(
-        class: Class,
+        domain: Domain,
         indices: Column<u32>,
         active: Option<u32>,
         topology: Option<[u8; 32]>,
@@ -76,7 +75,7 @@ impl Selection {
                 i + 1,
                 format!(
                     "the selected {} indices are not strictly ascending at {}",
-                    class.name(),
+                    domain.name(),
                     i + 1
                 ),
             ));
@@ -87,11 +86,11 @@ impl Selection {
             return Err(GeometryError::at(
                 ErrorKind::Selection,
                 a as usize,
-                format!("the active {} {a} is not selected", class.name()),
+                format!("the active {} {a} is not selected", domain.name()),
             ));
         }
         Ok(Self {
-            class,
+            domain,
             all: false,
             indices,
             active,
@@ -99,11 +98,11 @@ impl Selection {
         })
     }
 
-    /// Every element of `class`, made on the topology whose fingerprint is
+    /// Every element of `domain`, made on the topology whose fingerprint is
     /// `topology`; none active.
-    pub fn all(class: Class, topology: Option<[u8; 32]>) -> Self {
+    pub fn all(domain: Domain, topology: Option<[u8; 32]>) -> Self {
         Self {
-            class,
+            domain,
             all: true,
             indices: Column::default(),
             active: None,
@@ -111,10 +110,10 @@ impl Selection {
         }
     }
 
-    /// Nothing of `class`.
-    pub fn none(class: Class) -> Self {
+    /// Nothing of `domain`.
+    pub fn none(domain: Domain) -> Self {
         Self {
-            class,
+            domain,
             all: false,
             indices: Column::default(),
             active: None,
@@ -122,9 +121,9 @@ impl Selection {
         }
     }
 
-    /// The class selected.
-    pub fn class(&self) -> Class {
-        self.class
+    /// The domain selected.
+    pub fn domain(&self) -> Domain {
+        self.domain
     }
 
     /// Whether every element is selected (then [`indices`](Self::indices)

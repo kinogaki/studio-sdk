@@ -54,7 +54,7 @@ use crate::error::Error;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
-use kinogaki_geometry::{Class, Curves, GeometryError, Polygons, Selection};
+use kinogaki_geometry::{Curves, Domain, GeometryError, Polygons, Selection};
 use kinogaki_render_api::ImportedMaterial;
 
 /// The id of [`Polygons`] values.
@@ -113,20 +113,20 @@ pub fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
 }
 
 /// `selection` of a value of data type `ty` with `count` elements of its
-/// class, as the [`Components`] the host keeps, shows and counts.
+/// domain, as the [`Components`] the host keeps, shows and counts.
 pub fn components(ty: DataTypeId, selection: Selection, count: usize) -> Components {
-    let level = level(selection.class());
+    let level = level(selection.domain());
     Components::new(ty, level, selection.len(count), selection)
 }
 
-/// The viewport's element kind that shows elements of `class`: Primitive
-/// and Piece are faces, Detail and Object whole objects.
-pub fn level(class: Class) -> ElementKind {
-    match class {
-        Class::Point => ElementKind::Point,
-        Class::Edge => ElementKind::Edge,
-        Class::Vertex => ElementKind::Vertex,
-        Class::Primitive | Class::Piece => ElementKind::Face,
+/// The viewport's element kind that shows elements of `domain`: Primitive
+/// is faces, Detail and Object whole objects.
+pub fn level(domain: Domain) -> ElementKind {
+    match domain {
+        Domain::Point => ElementKind::Point,
+        Domain::Edge => ElementKind::Edge,
+        Domain::Vertex => ElementKind::Vertex,
+        Domain::Primitive => ElementKind::Face,
         _ => ElementKind::Object,
     }
 }

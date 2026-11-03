@@ -1,6 +1,6 @@
 //! The kernel's bodies read back, edited and fingerprinted.
 use super::*;
-use crate::{Attribute, Class, ErrorKind, TypeInfo};
+use crate::{Attribute, Domain, ErrorKind, Meaning};
 use std::f64::consts::FRAC_PI_4;
 // ---------------------------------------------------------------------------
 // The kernel's bodies.
@@ -254,7 +254,7 @@ fn fingerprints_name_datums_and_free_curves_in_order() {
         ];
         let named = Attributes::new()
             .with(
-                Class::Primitive,
+                Domain::Primitive,
                 crate::names::NAME,
                 Attribute::text(crate::Text::from_strs(names)),
             )
@@ -294,43 +294,63 @@ fn attributes_follow_the_body_classes() {
     let b = cuboid([0.0; 3], [1.0; 3]);
     let faces = Attributes::new()
         .with(
-            Class::Primitive,
+            Domain::Primitive,
             "Cd",
-            Attribute::vector(vec![[1.0, 0.0, 0.0]; 6], TypeInfo::Color),
+            Attribute::tuples(vec![[1.0f32, 0.0, 0.0]; 6], Meaning::Color).unwrap(),
         )
         .unwrap()
-        .with(Class::Edge, "cad:weight", Attribute::float(vec![1.0; 12]))
+        .with(
+            Domain::Edge,
+            "cad:weight",
+            Attribute::tuples(vec![1.0; 12], Meaning::None).unwrap(),
+        )
         .unwrap()
-        .with(Class::Point, "cad:weight", Attribute::float(vec![1.0; 8]))
+        .with(
+            Domain::Point,
+            "cad:weight",
+            Attribute::tuples(vec![1.0; 8], Meaning::None).unwrap(),
+        )
         .unwrap()
-        .with(Class::Object, "cad:output_by", Attribute::integer(vec![7]))
+        .with(
+            Domain::Object,
+            "cad:output_by",
+            Attribute::tuples::<i64>(vec![7], Meaning::None).unwrap(),
+        )
         .unwrap();
     let body = b.clone().build(faces.clone()).unwrap();
-    assert_eq!(body.count(Class::Instance), Some(1));
-    assert_eq!(body.count(Class::Vertex), None);
+    assert_eq!(body.count(Domain::Instance), Some(1));
+    assert_eq!(body.count(Domain::Vertex), None);
     let short = faces.with(
-        Class::Primitive,
+        Domain::Primitive,
         "Cd",
-        Attribute::vector(vec![[1.0; 3]; 5], TypeInfo::Color),
+        Attribute::tuples(vec![[1.0f32; 3]; 5], Meaning::Color).unwrap(),
     );
     assert_eq!(
         b.clone().build(short.unwrap()).unwrap_err().kind(),
         ErrorKind::Attribute
     );
-    let corner = Attributes::new().with(Class::Vertex, "w", Attribute::float(vec![0.0; 24]));
+    let corner = Attributes::new().with(
+        Domain::Vertex,
+        "w",
+        Attribute::tuples(vec![0.0; 24], Meaning::None).unwrap(),
+    );
     assert_eq!(
         b.clone().build(corner.unwrap()).unwrap_err().kind(),
         ErrorKind::Attribute
     );
     // Instances: one Instance element a placement.
     let names = Attributes::new()
-        .with(Class::Instance, "instance", Attribute::integer(vec![0, 1]))
+        .with(
+            Domain::Instance,
+            "instance",
+            Attribute::tuples::<i64>(vec![0, 1], Meaning::None).unwrap(),
+        )
         .unwrap();
     let mut placed = b.clone();
     let up = crate::Xform::translation(crate::Vec3::new(0.0, 0.0, 3.0));
     placed.placement(crate::Xform::IDENTITY, vec![up]);
     let body = placed.build(names.clone()).unwrap();
-    assert_eq!(body.count(Class::Instance), Some(2));
+    assert_eq!(body.count(Domain::Instance), Some(2));
     assert!(body.with_placement(up, Column::default()).is_err());
     assert_eq!(
         body.with_placement(up, vec![up].into())
@@ -372,7 +392,11 @@ fn a_value_holds_bodies_curves_and_datums() {
     let e = Brep::new(Vec::new(), Curves::empty(), vec![skew], Attributes::new()).unwrap_err();
     assert_eq!(e.element(), Some(0));
     let detail = Attributes::new()
-        .with(Class::Primitive, "w", Attribute::float(vec![0.0]))
+        .with(
+            Domain::Primitive,
+            "w",
+            Attribute::tuples(vec![0.0], Meaning::None).unwrap(),
+        )
         .unwrap();
     assert!(value.with_detail(detail).is_err());
     assert_eq!(Brep::empty(), Brep::default());

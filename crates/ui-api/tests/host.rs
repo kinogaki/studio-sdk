@@ -660,18 +660,18 @@ fn the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor() {
 /// sharing them; none for an object it draws no polygons for.
 #[test]
 fn shown_polygons_are_the_ones_the_object_draws() {
-    use kinogaki_studio_api::geometry::{Attribute, Class};
+    use kinogaki_studio_api::geometry::{Attribute, Domain, Meaning};
     let mut host = host();
     let (_, grid) = (kinogaki_studio_api_testing::Fixtures::default().polygons())
         .into_iter()
         .next()
         .unwrap();
-    let faces: Vec<i64> = (0..grid.topology().polygons() as i64).rev().collect();
+    let faces: Vec<i32> = (0..grid.topology().polygons() as i32).rev().collect();
     let named = (grid.attributes())
         .with(
-            Class::Primitive,
+            Domain::Primitive,
             kinogaki_studio_api::mesher::FACE,
-            Attribute::integer(faces.clone()),
+            Attribute::tuples(faces.clone(), Meaning::None).unwrap(),
         )
         .unwrap();
     let joined = grid.with_attributes(named).unwrap();
@@ -690,8 +690,8 @@ fn shown_polygons_are_the_ones_the_object_draws() {
     assert!(shown.positions().ptr_eq(joined.positions()));
     let face = shown
         .attributes()
-        .integer(Class::Primitive, kinogaki_studio_api::mesher::FACE);
-    assert_eq!(face.unwrap().as_slice(), faces.as_slice());
+        .tuples::<i32>(Domain::Primitive, kinogaki_studio_api::mesher::FACE);
+    assert_eq!(face.unwrap(), faces.as_slice());
     assert!(host.shown_polygons(ObjectRef(8)).is_none());
 }
 

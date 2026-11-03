@@ -1,6 +1,6 @@
 //! The SDK's consumers: [`Codecs`] and [`Invariants`].
 use super::Consumer;
-use kinogaki_geometry::{Class, Curves, Polygons, Selection, Topology};
+use kinogaki_geometry::{Curves, Domain, Polygons, Selection, Topology};
 use kinogaki_studio_api::codec::DataCodec;
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::element::MemoryElement;
@@ -18,11 +18,11 @@ impl Consumer for Codecs {
     fn check(&self, _fixture: &str, data: &Data) -> Result<(), String> {
         let (codec, count): (&dyn DataCodec, Option<usize>) =
             if let Some(p) = standard::polygons().get(data) {
-                (&PolygonsCodec, p.count(Class::Point))
+                (&PolygonsCodec, p.count(Domain::Point))
             } else if let Some(c) = standard::curves().get(data) {
-                (&CurvesCodec, c.count(Class::Point))
+                (&CurvesCodec, c.count(Domain::Point))
             } else if let Some(b) = standard::brep().get(data) {
-                (&BrepCodec, b.count(Class::Point))
+                (&BrepCodec, b.count(Domain::Point))
             } else {
                 return Ok(());
             };
@@ -40,7 +40,7 @@ impl Consumer for Codecs {
         let picked: Vec<u32> = (0..points as u32).step_by(2).collect();
         let active = picked.last().copied();
         let selection =
-            Selection::new(Class::Point, picked, active, None).map_err(|e| e.to_string())?;
+            Selection::new(Domain::Point, picked, active, None).map_err(|e| e.to_string())?;
         let components = standard::components(data.ty(), selection, points);
         let mut saved = MemoryElement::new("components");
         saved

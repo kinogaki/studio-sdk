@@ -1,16 +1,16 @@
 //! [`Fixtures`]: hand-built standard values covering every shape the
-//! types allow and every attribute kind on every class.
+//! types allow and every attribute type on every domain.
 use super::Producer;
 use kinogaki_geometry::{
-    Attribute, Attributes, Basis, Class, Column, Curves, Group, Polygons, Text, Topology, TypeInfo,
-    names,
+    Attribute, AttributeType, Attributes, Basis, Column, Curves, Domain, Group, Meaning, Polygons,
+    Storage, Text, Topology, Values, names,
 };
 use kinogaki_studio_api::data::Data;
 use kinogaki_studio_api::standard;
 
 /// The SDK's fixtures: polygons (a quad grid; mixed triangles, quads and
 /// n-gons; concave polygons; polylines only; polygons and polylines
-/// sharing points; points only; every attribute kind on every class;
+/// sharing points; points only; every attribute type on every domain;
 /// groups with `.hidden` and `sharp`), curves of every basis, and B-reps
 /// (a box, a cylinder, a cone, a sphere, a trimmed NURBS patch, and a
 /// value with every part the type has). With
@@ -56,7 +56,11 @@ impl Fixtures {
         };
         let build = |b: kinogaki_geometry::CurvesBuilder| b.build().expect("a valid fixture");
         let widths = Attributes::new()
-            .with(Class::Point, names::WIDTH, Attribute::float(vec![0.1; 7]))
+            .with(
+                Domain::Point,
+                names::WIDTH,
+                Attribute::tuples(vec![0.1f32; 7], Meaning::None).unwrap(),
+            )
             .expect("width");
         vec![
             (
@@ -230,40 +234,112 @@ fn points_only() -> Polygons {
     value(vec![[0.0; 3], [1.0, 2.0, 3.0], [-1.0, 0.5, 2.0]], &[], 0)
 }
 
+/// `values` as an attribute (a fixture's: always valid).
+fn tuples<T: kinogaki_geometry::Tuple>(values: Vec<T>, meaning: Meaning) -> Attribute {
+    Attribute::tuples(values, meaning).expect("a valid fixture attribute")
+}
+
+/// Element `e` holds `e % 4` reals (empty arrays among them).
+fn reals_lists(n: usize) -> Attribute {
+    let offsets: Vec<u32> = (0..=n)
+        .map(|e| (0..e).map(|k| (k % 4) as u32).sum())
+        .collect();
+    let items = *offsets.last().unwrap_or(&0) as usize;
+    let ty = AttributeType {
+        array: true,
+        ..AttributeType::new(Storage::F64, 1, Meaning::None)
+    };
+    let values = Values::F64(Column::new((0..items).map(|i| i as f64 - 0.5).collect()));
+    Attribute::arrays(ty, offsets.into(), values).expect("a valid fixture attribute")
+}
+
+/// Element `e` holds `e % 3` names.
+fn text_lists(n: usize) -> Attribute {
+    let offsets: Vec<u32> = (0..=n)
+        .map(|e| (0..e).map(|k| (k % 3) as u32).sum())
+        .collect();
+    let items = *offsets.last().unwrap_or(&0) as usize;
+    let ty = AttributeType {
+        array: true,
+        ..AttributeType::TEXT
+    };
+    let text = Text::from_strs((0..items).map(|i| ["x", "y", ""][i % 3]));
+    Attribute::arrays(ty, offsets.into(), Values::Text(text)).expect("a valid fixture attribute")
+}
+
 fn every_attribute() -> Polygons {
     let base = mixed();
     let mut a = Attributes::new();
-    for class in [
-        Class::Detail,
-        Class::Primitive,
-        Class::Piece,
-        Class::Edge,
-        Class::Point,
-        Class::Vertex,
+    for domain in [
+        Domain::Detail,
+        Domain::Primitive,
+        Domain::Edge,
+        Domain::Point,
+        Domain::Vertex,
     ] {
-        let n = base.count(class).expect("a polygons class");
-        let floats: Vec<f64> = (0..n).map(|i| i as f64 * 0.5).collect();
-        let ints: Vec<i64> = (0..n as i64).map(|i| i - 2).collect();
-        let vectors: Vec<[f64; 3]> = (0..n).map(|i| [i as f64, 1.0, -1.0]).collect();
-        let texts: Vec<&str> = (0..n).map(|i| ["a", "", "b"][i % 3]).collect();
-        a = a
-            .with(class, "f", Attribute::float(floats))
-            .and_then(|a| a.with(class, "i", Attribute::integer(ints)))
-            .and_then(|a| {
-                a.with(
-                    class,
-                    "v",
-                    Attribute::vector(vectors.clone(), TypeInfo::Vector),
-                )
-            })
-            .and_then(|a| a.with(class, "c", Attribute::vector(vectors, TypeInfo::Color)))
-            .and_then(|a| a.with(class, "t", Attribute::text(Text::from_strs(texts))))
-            .expect("fixture attributes");
+        let n = base.count(domain).expect("a polygons domain");
+        let at = |i: usize| i as f32 * 0.5;
+        let typed = [
+            ("f", tuples((0..n).map(at).collect(), Meaning::None)),
+            (
+                "d",
+                tuples((0..n).map(|i| i as f64 / 3.0).collect(), Meaning::None),
+            ),
+            (
+                "i",
+                tuples((0..n as i32).map(|i| i - 2).collect(), Meaning::None),
+            ),
+            (
+                "l",
+                tuples(
+                    (0..n as i64).map(|i| (i << 40) - 3).collect(),
+                    Meaning::None,
+                ),
+            ),
+            (
+                "pair",
+                tuples((0..n as i32).map(|i| [i, -i]).collect(), Meaning::None),
+            ),
+            (
+                "dir",
+                tuples(
+                    (0..n).map(|i| [i as f64, 1.0, -1.0]).collect(),
+                    Meaning::Vector,
+                ),
+            ),
+            (
+                "c",
+                tuples(
+                    (0..n).map(|i| [at(i), 1.0, 0.25, 0.5]).collect(),
+                    Meaning::Color,
+                ),
+            ),
+            (
+                "q",
+                tuples(
+                    (0..n).map(|i| [0.0, at(i), 0.0, 1.0]).collect(),
+                    Meaning::Rotation,
+                ),
+            ),
+            (
+                "m",
+                tuples((0..n).map(|i| [i as f64; 16]).collect(), Meaning::Transform),
+            ),
+            (
+                "t",
+                Attribute::text(Text::from_strs((0..n).map(|i| ["a", "", "b"][i % 3]))),
+            ),
+            ("list", reals_lists(n)),
+            ("names", text_lists(n)),
+        ];
+        for (name, attribute) in typed {
+            a = a.with(domain, name, attribute).expect("fixture attributes");
+        }
     }
-    let n = base.count(Class::Primitive).expect("primitives");
+    let n = base.count(Domain::Primitive).expect("primitives");
     a = a
         .with(
-            Class::Primitive,
+            Domain::Primitive,
             names::MATERIAL,
             Attribute::text(Text::from_strs((0..n).map(|i| ["/M/A", "/M/B"][i % 2]))),
         )
@@ -273,23 +349,23 @@ fn every_attribute() -> Polygons {
 
 fn groups() -> Polygons {
     let base = grid(3);
-    let edges = base.count(Class::Edge).expect("edges");
+    let edges = base.count(Domain::Edge).expect("edges");
     let a = Attributes::new()
         .with_group(
-            Class::Primitive,
+            Domain::Primitive,
             names::HIDDEN,
             Group::from_indices(9, [4]).expect("hidden"),
         )
         .and_then(|a| {
             a.with_group(
-                Class::Edge,
+                Domain::Edge,
                 names::SHARP,
                 Group::from_indices(edges, [0, 1, 2]).expect("sharp"),
             )
         })
         .and_then(|a| {
             a.with_group(
-                Class::Point,
+                Domain::Point,
                 "corners",
                 Group::from_indices(16, [0, 3, 12, 15]).expect("corners"),
             )

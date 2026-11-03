@@ -1,8 +1,8 @@
 //! A [`Selection`] over a [`Polygons`] value: what it holds there, and the
-//! same selection as another class. One meaning for core and every plugin
+//! same selection as another domain. One meaning for core and every plugin
 //! (the status bar's counts, a selection's box, a level change).
 use super::Selection;
-use crate::attributes::Class;
+use crate::attributes::Domain;
 use crate::column::Column;
 use crate::error::{ErrorKind, GeometryError};
 use crate::polygons::Polygons;
@@ -20,9 +20,8 @@ pub(crate) enum Coverage {
     Whole,
 }
 
-/// What a selection holds on a value, per level. Its own class counts its
-/// elements; the other levels count those whose points it holds wholly. A
-/// Piece selection counts as the primitives it names.
+/// What a selection holds on a value, per level. Its own domain counts its
+/// elements; the other levels count those whose points it holds wholly.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SelectionCounts {
@@ -39,7 +38,7 @@ impl Selection {
     /// every index is one of its elements.
     ///
     /// # Errors
-    /// A stale selection ([`ErrorKind::Selection`], no element), a class
+    /// A stale selection ([`ErrorKind::Selection`], no element), a domain
     /// `on` has none of, or the first index past the end (at it).
     pub fn validate(&self, on: &Polygons) -> Result<(), GeometryError> {
         if self.is_stale(on.topology()) {
@@ -48,10 +47,10 @@ impl Selection {
                 "the selection was made on another topology",
             ));
         }
-        let Some(count) = on.count(self.class()) else {
+        let Some(count) = on.count(self.domain()) else {
             return Err(GeometryError::whole(
                 ErrorKind::Selection,
-                format!("polygons have no {} class", self.class().name()),
+                format!("polygons have no {} domain", self.domain().name()),
             ));
         };
         let indices = self.indices();
@@ -62,7 +61,7 @@ impl Selection {
                 Err(GeometryError::at(
                     ErrorKind::Selection,
                     i as usize,
-                    format!("{} {i} is past the last of {count}", self.class().name()),
+                    format!("{} {i} is past the last of {count}", self.domain().name()),
                 ))
             }
             _ => Ok(()),
@@ -77,59 +76,59 @@ impl Selection {
     pub fn resolved(&self, on: &Polygons) -> Result<Column<u32>, GeometryError> {
         self.validate(on)?;
         Ok(if self.is_all() {
-            let count = on.count(self.class()).unwrap_or(0) as u32;
+            let count = on.count(self.domain()).unwrap_or(0) as u32;
             Column::new((0..count).collect())
         } else {
             self.indices().clone()
         })
     }
 
-    /// The selection as `class` by the standard rule: `Coverage::Whole`
-    /// into Primitive and Piece, and from Point into Edge;
+    /// The selection as `domain` by the standard rule: `Coverage::Whole`
+    /// into Primitive, and from Point into Edge;
     /// `Coverage::Any` otherwise. An all-selection stays all; the same
-    /// class is the selection itself. Elements related to nothing selected
+    /// domain is the selection itself. Elements related to nothing selected
     /// are never added.
     ///
     /// # Errors
-    /// As [`validate`](Self::validate), or a class `on` has none of.
-    pub fn converted(&self, on: &Polygons, class: Class) -> Result<Selection, GeometryError> {
+    /// As [`validate`](Self::validate), or a domain `on` has none of.
+    pub fn converted(&self, on: &Polygons, domain: Domain) -> Result<Selection, GeometryError> {
         self.validate(on)?;
-        if class == self.class() {
+        if domain == self.domain() {
             return Ok(self.clone());
         }
         if self.is_all() {
-            target(on, class)?;
-            return Ok(Selection::all(class, Some(on.topology().fingerprint())));
+            target(on, domain)?;
+            return Ok(Selection::all(domain, Some(on.topology().fingerprint())));
         }
-        let whole = matches!(class, Class::Primitive | Class::Piece)
-            || (class == Class::Edge && self.class() == Class::Point);
+        let whole = domain == Domain::Primitive
+            || (domain == Domain::Edge && self.domain() == Domain::Point);
         let coverage = if whole {
             Coverage::Whole
         } else {
             Coverage::Any
         };
-        self.converted_by(on, class, coverage)
+        self.converted_by(on, domain, coverage)
     }
 
-    /// The selection as `class`, each target element selected by
+    /// The selection as `domain`, each target element selected by
     /// `coverage` of the elements it relates to directly (a polygon's
     /// points, edges and vertices; an edge's points and the polygons and
-    /// vertices along it). The same class is the selection itself.
+    /// vertices along it). The same domain is the selection itself.
     ///
     /// # Errors
     /// As [`converted`](Self::converted).
     pub(crate) fn converted_by(
         &self,
         on: &Polygons,
-        class: Class,
+        domain: Domain,
         coverage: Coverage,
     ) -> Result<Selection, GeometryError> {
         self.validate(on)?;
-        if class == self.class() {
+        if domain == self.domain() {
             return Ok(self.clone());
         }
-        let targets = target(on, class)?;
-        let sources = on.count(self.class()).unwrap_or(0);
+        let targets = target(on, domain)?;
+        let sources = on.count(self.domain()).unwrap_or(0);
         let mut chosen = vec![self.is_all(); sources];
         for &i in self.indices().iter() {
             chosen[i as usize] = true;
@@ -148,41 +147,33 @@ impl Selection {
                 missing[target] = true;
             }
         };
-        // Pieces select primitives by their indices.
-        let primitive = |c: Class| {
-            if c == Class::Piece {
-                Class::Primitive
-            } else {
-                c
-            }
-        };
-        let (from, to) = (primitive(self.class()), primitive(class));
+        let (from, to) = (self.domain(), domain);
         let topology = on.topology();
         if matches!(
             (from, to),
-            (Class::Point, Class::Edge) | (Class::Edge, Class::Point)
+            (Domain::Point, Domain::Edge) | (Domain::Edge, Domain::Point)
         ) {
             for (edge, e) in topology.edges().iter().enumerate() {
                 for point in e.points {
                     match from {
-                        Class::Point => relate(point as usize, edge),
+                        Domain::Point => relate(point as usize, edge),
                         _ => relate(edge, point as usize),
                     }
                 }
             }
         } else {
-            let index = (from == Class::Edge || to == Class::Edge).then(|| topology.index());
+            let index = (from == Domain::Edge || to == Domain::Edge).then(|| topology.index());
             let polygons = topology.polygons();
             for p in 0..topology.primitives() {
                 let start = topology.offsets()[p] as usize;
                 for (corner, &point) in topology.primitive(p).iter().enumerate() {
-                    let element = |c: Class| match c {
-                        Class::Point => Some(point as usize),
-                        Class::Primitive => Some(p),
-                        Class::Vertex => Some(start + corner),
+                    let element = |c: Domain| match c {
+                        Domain::Point => Some(point as usize),
+                        Domain::Primitive => Some(p),
+                        Domain::Vertex => Some(start + corner),
                         // Every element belongs to the one detail.
-                        Class::Detail => Some(0),
-                        Class::Edge => {
+                        Domain::Detail => Some(0),
+                        Domain::Edge => {
                             let index = index.expect("an edge conversion builds the index");
                             if p < polygons {
                                 Some(index.face_edges().row(p)[corner] as usize)
@@ -207,7 +198,7 @@ impl Selection {
             .filter(|&i| touched[i] && (!whole || !missing[i]))
             .map(|i| i as u32)
             .collect();
-        Selection::from_ascending(class, ids.into(), None, Some(topology.fingerprint()))
+        Selection::from_ascending(domain, ids.into(), None, Some(topology.fingerprint()))
     }
 
     /// The box around the points the selected elements touch, in `on`'s
@@ -233,26 +224,23 @@ impl Selection {
         let polygons = topology.polygons();
         let own = |n: usize| self.len(n);
         let wholly = |ids: &[u32]| ids.iter().all(|&p| points[p as usize]);
-        let class = match self.class() {
-            Class::Piece => Class::Primitive,
-            c => c,
-        };
+        let domain = self.domain();
         SelectionCounts {
-            points: match class {
-                Class::Point => own(topology.points()),
+            points: match domain {
+                Domain::Point => own(topology.points()),
                 _ => points.iter().filter(|&&p| p).count(),
             },
-            edges: match class {
-                Class::Edge => own(topology.edges().len()),
+            edges: match domain {
+                Domain::Edge => own(topology.edges().len()),
                 _ => topology
                     .edges()
                     .iter()
                     .filter(|e| wholly(&e.points))
                     .count(),
             },
-            polygons: match class {
-                Class::Primitive if self.is_all() => polygons,
-                Class::Primitive => self.indices().partition_point(|&p| (p as usize) < polygons),
+            polygons: match domain {
+                Domain::Primitive if self.is_all() => polygons,
+                Domain::Primitive => self.indices().partition_point(|&p| (p as usize) < polygons),
                 _ => (0..polygons)
                     .filter(|&p| wholly(topology.primitive(p)))
                     .count(),
@@ -269,19 +257,17 @@ impl Selection {
         let mut mask = vec![false; topology.points()];
         let mut mark = |p: u32| mask[p as usize] = true;
         let ids: Box<dyn Iterator<Item = u32>> = if self.is_all() {
-            Box::new(0..on.count(self.class()).unwrap_or(0) as u32)
+            Box::new(0..on.count(self.domain()).unwrap_or(0) as u32)
         } else {
             Box::new(self.indices().iter().copied())
         };
         for id in ids {
             let id = id as usize;
-            match self.class() {
-                Class::Point => mark(id as u32),
-                Class::Edge => topology.edges()[id].points.into_iter().for_each(&mut mark),
-                Class::Primitive | Class::Piece => {
-                    topology.primitive(id).iter().copied().for_each(&mut mark)
-                }
-                Class::Vertex => mark(topology.vertices()[id]),
+            match self.domain() {
+                Domain::Point => mark(id as u32),
+                Domain::Edge => topology.edges()[id].points.into_iter().for_each(&mut mark),
+                Domain::Primitive => topology.primitive(id).iter().copied().for_each(&mut mark),
+                Domain::Vertex => mark(topology.vertices()[id]),
                 _ => topology.vertices().iter().copied().for_each(&mut mark),
             }
         }
@@ -289,12 +275,12 @@ impl Selection {
     }
 }
 
-/// How many elements of `class` `on` has, refusing a class it has none of.
-fn target(on: &Polygons, class: Class) -> Result<usize, GeometryError> {
-    on.count(class).ok_or_else(|| {
+/// How many elements of `domain` `on` has, refusing a domain it has none of.
+fn target(on: &Polygons, domain: Domain) -> Result<usize, GeometryError> {
+    on.count(domain).ok_or_else(|| {
         GeometryError::whole(
             ErrorKind::Selection,
-            format!("polygons have no {} class", class.name()),
+            format!("polygons have no {} domain", domain.name()),
         )
     })
 }

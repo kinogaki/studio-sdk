@@ -2,14 +2,14 @@
 //! [`Brep::element`], [`Brep::id`]) and its fingerprint
 //! ([`Brep::fingerprint`]), which a selection made on it keeps.
 use super::{Brep, Datum, DatumKind};
-use crate::attributes::{Class, Text};
+use crate::attributes::{Domain, Text};
 use crate::kept::Kept;
 use std::sync::Arc;
 
 /// One element of a B-rep value as [`Brep::element`] names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Element {
-    /// Element `index` of its class in body `body`: a face, an edge or a
+    /// Element `index` of its domain in body `body`: a face, an edge or a
     /// vertex.
     Body {
         /// The body, in body order.
@@ -24,99 +24,103 @@ pub enum Element {
     Datum(usize),
 }
 
-/// The class a datum of `kind` is numbered in.
-fn datum_class(kind: &DatumKind) -> Class {
+/// The domain a datum of `kind` is numbered in.
+fn datum_domain(kind: &DatumKind) -> Domain {
     match kind {
-        DatumKind::Plane(_) => Class::Primitive,
-        DatumKind::Axis { .. } => Class::Edge,
-        DatumKind::Point(_) => Class::Point,
+        DatumKind::Plane(_) => Domain::Primitive,
+        DatumKind::Axis { .. } => Domain::Edge,
+        DatumKind::Point(_) => Domain::Point,
     }
 }
 
-/// Whether [`Brep::element`] numbers `class`'s elements.
-fn numbered(class: Class) -> bool {
-    matches!(class, Class::Primitive | Class::Edge | Class::Point)
+/// Whether [`Brep::element`] numbers `domain`'s elements.
+fn numbered(domain: Domain) -> bool {
+    matches!(domain, Domain::Primitive | Domain::Edge | Domain::Point)
 }
 
 impl Brep {
-    /// How many elements of `class` it holds, as one numbering across the
+    /// How many elements of `domain` it holds, as one numbering across the
     /// value: Detail one; Object its bodies and Instance their placements;
     /// Primitive the bodies' faces, then the datum planes; Edge the bodies'
     /// edges, then the free curves, then the datum axes; Point the bodies'
     /// vertices, then the datum points. Bodies count in body order (a
     /// body's faces follow the faces of the bodies before it), datums in
-    /// datum order. `None` for a class it doesn't have.
-    pub fn count(&self, class: Class) -> Option<usize> {
-        match class {
-            Class::Detail => return Some(1),
-            Class::Object | Class::Instance | Class::Primitive | Class::Edge | Class::Point => {}
+    /// datum order. `None` for a domain it doesn't have.
+    pub fn count(&self, domain: Domain) -> Option<usize> {
+        match domain {
+            Domain::Detail => return Some(1),
+            Domain::Object
+            | Domain::Instance
+            | Domain::Primitive
+            | Domain::Edge
+            | Domain::Point => {}
             _ => return None,
         }
         let bodies: usize = (self.bodies.iter())
-            .map(|b| b.count(class))
+            .map(|b| b.count(domain))
             .sum::<Option<usize>>()?;
-        let curves = if class == Class::Edge {
+        let curves = if domain == Domain::Edge {
             self.curves.curves()
         } else {
             0
         };
-        Some(bodies + curves + self.datums_of(class).count())
+        Some(bodies + curves + self.datums_of(domain).count())
     }
 
-    /// What element `id` of `class` is ([`count`](Self::count)'s order);
-    /// `None` past the count or for another class.
-    pub fn element(&self, class: Class, id: u32) -> Option<Element> {
-        if !numbered(class) {
+    /// What element `id` of `domain` is ([`count`](Self::count)'s order);
+    /// `None` past the count or for another domain.
+    pub fn element(&self, domain: Domain, id: u32) -> Option<Element> {
+        if !numbered(domain) {
             return None;
         }
         let mut id = id as usize;
         for (body, b) in self.bodies.iter().enumerate() {
-            let n = b.count(class)?;
+            let n = b.count(domain)?;
             if id < n {
                 return Some(Element::Body { body, index: id });
             }
             id -= n;
         }
-        if class == Class::Edge {
+        if domain == Domain::Edge {
             if id < self.curves.curves() {
                 return Some(Element::Curve(id));
             }
             id -= self.curves.curves();
         }
-        self.datums_of(class).nth(id).map(Element::Datum)
+        self.datums_of(domain).nth(id).map(Element::Datum)
     }
 
-    /// The id of `element` in `class` ([`element`](Self::element)'s
-    /// inverse); `None` when it isn't one of the value's of that class.
-    pub fn id(&self, class: Class, element: Element) -> Option<u32> {
+    /// The id of `element` in `domain` ([`element`](Self::element)'s
+    /// inverse); `None` when it isn't one of the value's of that domain.
+    pub fn id(&self, domain: Domain, element: Element) -> Option<u32> {
         let bodies = |upto: usize| -> Option<usize> {
             (self.bodies.get(..upto)?.iter())
-                .map(|b| b.count(class))
+                .map(|b| b.count(domain))
                 .sum::<Option<usize>>()
         };
-        if !numbered(class) {
+        if !numbered(domain) {
             return None;
         }
         let all = bodies(self.bodies.len())?;
         let curves = self.curves.curves();
         let id = match element {
-            Element::Body { body, index } if index < self.bodies.get(body)?.count(class)? => {
+            Element::Body { body, index } if index < self.bodies.get(body)?.count(domain)? => {
                 bodies(body)? + index
             }
-            Element::Curve(index) if class == Class::Edge && index < curves => all + index,
-            Element::Datum(index) if datum_class(&self.datums.get(index)?.kind) == class => {
-                let before = self.datums_of(class).take_while(|&d| d < index).count();
-                all + if class == Class::Edge { curves } else { 0 } + before
+            Element::Curve(index) if domain == Domain::Edge && index < curves => all + index,
+            Element::Datum(index) if datum_domain(&self.datums.get(index)?.kind) == domain => {
+                let before = self.datums_of(domain).take_while(|&d| d < index).count();
+                all + if domain == Domain::Edge { curves } else { 0 } + before
             }
             _ => return None,
         };
         u32::try_from(id).ok()
     }
 
-    /// The datums numbered in `class`, by index, in datum order.
-    fn datums_of(&self, class: Class) -> impl Iterator<Item = usize> + '_ {
+    /// The datums numbered in `domain`, by index, in datum order.
+    fn datums_of(&self, domain: Domain) -> impl Iterator<Item = usize> + '_ {
         (self.datums.iter().enumerate())
-            .filter(move |(_, d)| datum_class(&d.kind) == class)
+            .filter(move |(_, d)| datum_domain(&d.kind) == domain)
             .map(|(i, _)| i)
     }
 
@@ -142,7 +146,7 @@ impl Brep {
             h.update(&body.names().fingerprint());
         }
         h.update(&(self.curves.curves() as u64).to_le_bytes());
-        let names = (self.curves.attributes()).text(Class::Primitive, crate::names::NAME);
+        let names = (self.curves.attributes()).text(Domain::Primitive, crate::names::NAME);
         h.update(&names.map_or([0; 32], text_hash));
         h.update(
             &self
@@ -159,8 +163,8 @@ struct DatumNames([u8; 32]);
 
 fn datums_hash(datums: &[Datum]) -> [u8; 32] {
     let mut h = blake3::Hasher::new();
-    for class in [Class::Primitive, Class::Edge, Class::Point] {
-        let of = || datums.iter().filter(|d| datum_class(&d.kind) == class);
+    for domain in [Domain::Primitive, Domain::Edge, Domain::Point] {
+        let of = || datums.iter().filter(|d| datum_domain(&d.kind) == domain);
         h.update(&(of().count() as u64).to_le_bytes());
         for datum in of() {
             super::fingerprint::hash_name(&mut h, &datum.name);

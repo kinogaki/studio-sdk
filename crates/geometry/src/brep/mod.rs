@@ -124,7 +124,7 @@
 //!   one shell and each shell in one lump; rings as above; intervals
 //!   finite with `t0 < t1`; pole edges well formed; precisions finite and
 //!   not negative; names distinct; placements rigid; attributes sized to
-//!   their classes.
+//!   their domains.
 //! - **Consistency, within P:** each edge's carrier at `t0` and `t1` is at
 //!   its vertices; each coedge's p-curve, at its edge's ends, maps through
 //!   the surface onto the edge there (onto its vertex for a pole);
@@ -206,7 +206,7 @@ pub use topology::{
 use crate::Frame;
 #[cfg(doc)]
 use crate::Tolerances;
-use crate::attributes::{Attributes, Class};
+use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
 use crate::curves::Curves;
 use crate::error::GeometryError;
@@ -340,9 +340,9 @@ impl Brep {
                 ));
             }
         }
-        self.detail.check("B-rep values", |class| {
-            (class == Class::Detail).then_some(1)
-        })
+        let detail = |domain| (domain == Domain::Detail).then_some(1);
+        self.detail.check("B-rep values", None, detail)?;
+        Ok(())
     }
 
     /// The bodies.
@@ -389,7 +389,7 @@ impl Brep {
     /// This value with `detail` attributes, sharing the rest.
     ///
     /// # Errors
-    /// An attribute of another class than Detail, or missized.
+    /// An attribute of another domain than Detail, or missized.
     pub fn with_detail(&self, detail: Attributes) -> Result<Self, GeometryError> {
         let value = Self {
             detail: Arc::new(detail),

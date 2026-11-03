@@ -1,6 +1,6 @@
 //! [`Polygons`]: polygons and polylines over shared points, with
 //! attributes — the standard value `kinogaki.polygons`.
-use crate::attributes::{Attributes, Class};
+use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
 use crate::error::GeometryError;
 use crate::positions;
@@ -10,32 +10,31 @@ use std::sync::Arc;
 /// Polygons and polylines in one value: positions, a shared [`Topology`]
 /// and [`Attributes`].
 ///
-/// **Classes** ([`count`](Self::count)): Point (each position), Vertex
-/// (each corner), Primitive and Piece (each polygon or polyline), Edge
-/// (each canonical edge), Detail (one). It has no Object or Instance
-/// class.
+/// **Domains** ([`count`](Self::count)): Point (each position), Vertex
+/// (each corner), Primitive (each polygon or polyline), Edge (each
+/// canonical edge), Detail (one). It has no Object or Instance domain.
 ///
 /// **Rules** ([`Polygons::new`] checks them, beside the topology's own):
 /// - one position per point of the topology, each finite and at most
 ///   1e100 in each component;
-/// - every attribute and group has one entry per element of its class,
-///   and every Float and Vector attribute value is finite;
+/// - every attribute and group has one entry per element of its domain
+///   (its values checked themselves when it was made);
 /// - no Object or Instance attributes.
 ///
 /// **Sharing.** A value is immutable and cheap to clone. The `with_*`
 /// edits return a new value sharing everything they don't replace, so a
 /// points-only edit keeps the topology and every cache derived from it
-/// (the crate's cache rule). Conventions: `.hidden` (a Primitive group)
-/// hides primitives; a primitive's value is read from Primitive, then
-/// Piece.
+/// (the crate's cache rule), and [`with_attributes`](Self::with_attributes)
+/// checks only the entries it replaced. Conventions: `.hidden` (a
+/// Primitive group) hides primitives.
 ///
 /// ```
-/// use kinogaki_geometry::{Attributes, Class, Polygons, Topology};
+/// use kinogaki_geometry::{Attributes, Domain, Polygons, Topology};
 ///
 /// let quad = Topology::new(4, vec![0, 4].into(), vec![0, 1, 2, 3].into(), 1).unwrap();
 /// let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]];
 /// let square = Polygons::new(positions.into(), quad, Attributes::new()).unwrap();
-/// assert_eq!(square.count(Class::Edge), Some(4));
+/// assert_eq!(square.count(Domain::Edge), Some(4));
 ///
 /// // Move a point: the topology is shared, not checked or rebuilt.
 /// let mut moved = square.positions().to_vec();
@@ -77,7 +76,7 @@ impl Polygons {
         attributes: Arc<Attributes>,
     ) -> Result<Self, GeometryError> {
         check_positions(&positions, &topology)?;
-        check_attributes(&attributes, &topology)?;
+        check_attributes(&attributes, None, &topology)?;
         Ok(Self {
             positions,
             topology,
@@ -100,7 +99,9 @@ impl Polygons {
     }
 
     /// This value with `attributes`, sharing the positions and the
-    /// topology. Only the attributes are checked.
+    /// topology. Only the entries this value doesn't already hold (the
+    /// same shared attribute or group under the same name) are checked, so
+    /// replacing one column checks that column alone.
     ///
     /// # Errors
     /// A missized or misplaced attribute.
@@ -117,7 +118,7 @@ impl Polygons {
         &self,
         attributes: Arc<Attributes>,
     ) -> Result<Self, GeometryError> {
-        check_attributes(&attributes, &self.topology)?;
+        check_attributes(&attributes, Some(&self.attributes), &self.topology)?;
         Ok(Self {
             positions: self.positions.clone(),
             topology: self.topology.clone(),
@@ -149,11 +150,11 @@ impl Polygons {
         &self.attributes
     }
 
-    /// How many elements `class` has: points, vertices, primitives (for
-    /// Primitive and Piece), edges (the canonical edges, derived once from
-    /// the topology), 1 for Detail; `None` for a class it doesn't have.
-    pub fn count(&self, class: Class) -> Option<usize> {
-        count(&self.topology, class)
+    /// How many elements `domain` has: points, vertices, primitives,
+    /// edges (the canonical edges, derived once from the topology), 1 for
+    /// Detail; `None` for a domain it doesn't have.
+    pub fn count(&self, domain: Domain) -> Option<usize> {
+        count(&self.topology, domain)
     }
 
     /// The smallest box holding every position; `None`
@@ -190,13 +191,13 @@ impl Default for Polygons {
     }
 }
 
-fn count(topology: &Topology, class: Class) -> Option<usize> {
-    Some(match class {
-        Class::Point => topology.points(),
-        Class::Vertex => topology.vertex_count(),
-        Class::Primitive | Class::Piece => topology.primitives(),
-        Class::Edge => topology.edges().len(),
-        Class::Detail => 1,
+fn count(topology: &Topology, domain: Domain) -> Option<usize> {
+    Some(match domain {
+        Domain::Point => topology.points(),
+        Domain::Vertex => topology.vertex_count(),
+        Domain::Primitive => topology.primitives(),
+        Domain::Edge => topology.edges().len(),
+        Domain::Detail => 1,
         _ => return None,
     })
 }
@@ -215,6 +216,11 @@ fn check_positions(positions: &Column<[f64; 3]>, topology: &Topology) -> Result<
     positions::check(positions)
 }
 
-fn check_attributes(attributes: &Attributes, topology: &Topology) -> Result<(), GeometryError> {
-    attributes.check("polygons", |class| count(topology, class))
+fn check_attributes(
+    attributes: &Attributes,
+    previous: Option<&Attributes>,
+    topology: &Topology,
+) -> Result<(), GeometryError> {
+    attributes.check("polygons", previous, |domain| count(topology, domain))?;
+    Ok(())
 }

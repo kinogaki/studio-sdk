@@ -7,7 +7,7 @@ use kinogaki_geometry::brep::{
     DatumHint, DatumKind, EdgeId, EdgeSpec, FaceSpec, Line, Line2, Name, NurbsCurve, NurbsSurface,
     OperationId, PCurve, PCurveId, Plane, Sense, Sphere, Surface, SurfaceId, VertexId,
 };
-use kinogaki_geometry::{Attribute, Attributes, Basis, Class, Column, Curves, Text, TypeInfo};
+use kinogaki_geometry::{Attribute, Attributes, Basis, Column, Curves, Domain, Meaning, Text};
 use kinogaki_geometry::{Frame, Vec3, Xform};
 use std::f64::consts::TAU;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ pub(super) fn breps() -> Vec<(String, Brep)> {
 }
 
 /// A value with every part: two bodies (one placed twice, with
-/// precisions and attributes on every class), free curves, a datum of
+/// precisions and attributes on every domain), free curves, a datum of
 /// each kind (named by names of every node: made, a part, merged) and
 /// Detail attributes.
 fn every_part() -> Brep {
@@ -41,14 +41,36 @@ fn every_part() -> Brep {
     let up = Xform::translation(Vec3::new(0.0, 0.0, 3.0));
     b.placement(Xform::IDENTITY, vec![up]);
     let attributes = Attributes::new()
-        .with(Class::Object, "cad:output_by", Attribute::integer(vec![7]))
-        .and_then(|a| a.with(Class::Instance, "instance", Attribute::integer(vec![0, 1])))
+        .with(
+            Domain::Object,
+            "cad:output_by",
+            Attribute::tuples::<i64>(vec![7], Meaning::None).unwrap(),
+        )
         .and_then(|a| {
-            let red = Attribute::vector(vec![[1.0, 0.0, 0.0]; 6], TypeInfo::Color);
-            a.with(Class::Primitive, "Cd", red)
+            a.with(
+                Domain::Instance,
+                "instance",
+                Attribute::tuples::<i64>(vec![0, 1], Meaning::None).unwrap(),
+            )
         })
-        .and_then(|a| a.with(Class::Edge, "cad:weight", Attribute::float(vec![0.5; 12])))
-        .and_then(|a| a.with(Class::Point, "cad:weight", Attribute::float(vec![0.25; 8])))
+        .and_then(|a| {
+            let red = Attribute::tuples(vec![[1.0f32, 0.0, 0.0]; 6], Meaning::Color).unwrap();
+            a.with(Domain::Primitive, "Cd", red)
+        })
+        .and_then(|a| {
+            a.with(
+                Domain::Edge,
+                "cad:weight",
+                Attribute::tuples(vec![0.5; 12], Meaning::None).unwrap(),
+            )
+        })
+        .and_then(|a| {
+            a.with(
+                Domain::Point,
+                "cad:weight",
+                Attribute::tuples(vec![0.25; 8], Meaning::None).unwrap(),
+            )
+        })
         .expect("sized attributes");
     let boxed = b.build(attributes).expect("a fixture body is valid");
     let patch = patch(0.5, [0.25, 0.75])
@@ -93,7 +115,7 @@ fn every_part() -> Brep {
     ];
     let detail = Attributes::new()
         .with(
-            Class::Detail,
+            Domain::Detail,
             "name",
             Attribute::text(Text::from_strs(["parts"])),
         )

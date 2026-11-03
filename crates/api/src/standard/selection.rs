@@ -1,4 +1,4 @@
-//! Saving a standard [`Selection`]: the fields `class`, `all`, `indices`,
+//! Saving a standard [`Selection`]: the fields `domain`, `all`, `indices`,
 //! `active` (−1 for none) and `topology` (the 32-byte fingerprint it was
 //! made on, or no bytes).
 use super::{attributes, components, invalid};
@@ -6,7 +6,7 @@ use crate::components::Components;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::error::Error;
 use crate::id::DataTypeId;
-use kinogaki_geometry::{Class, Selection};
+use kinogaki_geometry::{Domain, Selection};
 
 pub(super) fn write(components: &Components, out: &mut dyn ElementWriter) -> Result<bool, Error> {
     let Some(s) = components.selection() else {
@@ -14,7 +14,7 @@ pub(super) fn write(components: &Components, out: &mut dyn ElementWriter) -> Res
             "a standard type's components are a Selection",
         ));
     };
-    out.set("class", Field::Text(s.class().name().into()))?;
+    out.set("domain", Field::Text(s.domain().name().into()))?;
     out.set("all", Field::Bool(s.is_all()))?;
     out.set("indices", Field::U32s(s.indices().to_vec()))?;
     out.set("active", Field::Int(s.active().map_or(-1, i64::from)))?;
@@ -26,14 +26,14 @@ pub(super) fn write(components: &Components, out: &mut dyn ElementWriter) -> Res
 pub(super) fn read(
     from: &dyn ElementReader,
     ty: DataTypeId,
-    count: impl Fn(Class) -> Option<usize>,
+    count: impl Fn(Domain) -> Option<usize>,
 ) -> Result<Components, Error> {
     let at = from.location();
-    let name = from.text("class")?;
-    let class = Class::from_name(name)
-        .ok_or_else(|| Error::invalid(format_args!("{at}: no class {name:?}")))?;
-    let elements = count(class)
-        .ok_or_else(|| Error::invalid(format_args!("{at}: the value has no {name} class")))?;
+    let name = from.text("domain")?;
+    let domain = Domain::from_name(name)
+        .ok_or_else(|| Error::invalid(format_args!("{at}: no domain {name:?}")))?;
+    let elements = count(domain)
+        .ok_or_else(|| Error::invalid(format_args!("{at}: the value has no {name} domain")))?;
     let topology = match attributes::u8s(from, "topology")? {
         [] => None,
         bytes => Some(
@@ -42,7 +42,7 @@ pub(super) fn read(
         ),
     };
     let selection = if from.bool("all")? {
-        Selection::all(class, topology)
+        Selection::all(domain, topology)
     } else {
         let active =
             match from.int("active")? {
@@ -57,7 +57,7 @@ pub(super) fn read(
                 "{at}: selected {name} {past} is past the {elements} elements"
             )));
         }
-        Selection::new(class, indices, active, topology).map_err(|e| invalid(&at, e))?
+        Selection::new(domain, indices, active, topology).map_err(|e| invalid(&at, e))?
     };
     Ok(components(ty, selection, elements))
 }
