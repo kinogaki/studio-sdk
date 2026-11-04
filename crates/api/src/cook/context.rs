@@ -1,7 +1,7 @@
 //! [`CookCx`]: everything one cook may read besides its inputs.
 use crate::cancel::CancelToken;
 use crate::components::Components;
-use crate::cook::{Error, Inside, Project, Resolved};
+use crate::cook::{Error, Inside, Iteration, Project, Resolved};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, Value};
@@ -35,6 +35,8 @@ pub struct CookCx<'a> {
     project: Option<&'a Project<'a>>,
     context: Option<ContextId>,
     inside: Option<Inside<'a>>,
+    iteration: Option<&'a Iteration>,
+    current: Option<&'a Data>,
     scratch: &'a mut Option<Box<dyn Any + Send>>,
 }
 
@@ -67,6 +69,8 @@ impl<'a> CookCx<'a> {
             project: None,
             context: None,
             inside: None,
+            iteration: None,
+            current: None,
             scratch,
         }
     }
@@ -83,6 +87,32 @@ impl<'a> CookCx<'a> {
     /// ([`Reads::inside`](crate::cook::Reads::inside)); `None` otherwise.
     pub fn inside(&self) -> Option<Inside<'a>> {
         self.inside
+    }
+
+    /// In pass `iteration` of a loop
+    /// ([`Reads::iteration`](crate::cook::Reads::iteration)).
+    pub fn with_iteration(mut self, iteration: &'a Iteration) -> Self {
+        self.iteration = Some(iteration);
+        self
+    }
+
+    /// Which pass of a loop it cooks in, when it reads that and there is a
+    /// loop around it.
+    pub fn iteration(&self) -> Option<&'a Iteration> {
+        self.iteration
+    }
+
+    /// Working on `current`, a loop's pass's
+    /// ([`Reads::current`](crate::cook::Reads::current)).
+    pub fn with_current(mut self, current: &'a Data) -> Self {
+        self.current = Some(current);
+        self
+    }
+
+    /// What the pass of a loop it cooks in works on, when it reads that and
+    /// there is a loop around it.
+    pub fn current(&self) -> Option<&'a Data> {
+        self.current
     }
 
     /// In a network of `context`.

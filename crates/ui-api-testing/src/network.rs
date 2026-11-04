@@ -435,7 +435,7 @@ impl NetworkEdit for FakeNetwork {
                 outputs: description.outputs.clone(),
             },
         };
-        let inside = match description.inside {
+        let inside = match description.held_in(self.context.id) {
             Some(context) => Some(self.types.contexts.get(&context).cloned().ok_or_else(|| {
                 Error::invalid(format_args!("no package declares context {context}"))
             })?),

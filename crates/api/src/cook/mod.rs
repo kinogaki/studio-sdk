@@ -37,13 +37,17 @@ pub use sheet::{NewCx, PortsCx, RowsFor, SchemaCx};
 /// [`Registry`](crate::Registry) refuses one that does).
 pub const SPARE: &str = "spare-";
 
+/// Core's loop node types, For Each and Loop Input, which a context offers
+/// with [`NetworkContext::with_loops`](crate::network::NetworkContext::with_loops).
+pub const LOOPS: [&str; 2] = ["kinogaki.core.for_each", "kinogaki.core.loop_input"];
+
 use crate::Diagnostic;
 use crate::Error;
 use crate::components::Components;
 use crate::data::Data;
 use crate::data_type::Stamp;
 use crate::id::{DataTypeId, NodeTypeId};
-use crate::params::{Parameters, Schema};
+use crate::params::{Parameters, Schema, Value};
 use std::any::Any;
 
 /// What, besides its inputs and parameters, a node's result depends on.
@@ -78,17 +82,74 @@ pub struct Reads {
     /// cooks the inside first and recooks the node when it changes;
     /// otherwise the node neither waits for its inside nor recooks with it.
     pub inside: bool,
+    /// With [`inside`](Self::inside): core doesn't cook the network first,
+    /// and gives the node [`Inside::Passes`] to cook it once per
+    /// [`Pass`], as often as it asks (a loop).
+    pub passes: bool,
+    /// Which pass of a loop it cooks in ([`CookCx::iteration`]): another
+    /// number, count or value recooks it; otherwise it sees none.
+    pub iteration: bool,
+    /// What the pass it cooks in works on ([`CookCx::current`]): another
+    /// value recooks it; otherwise it sees none.
+    pub current: bool,
 }
 
 /// What a holder's cook reads of the network it holds ([`Reads::inside`]).
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub enum Inside<'a> {
     /// A walked context's displayed node's outputs (empty when it displays
     /// nothing).
     Walked(&'a Outputs),
     /// A compiled context's plan for its displayed node.
     Compiled(&'a crate::network::Compiled),
+    /// The network, to cook once per pass ([`Reads::passes`]).
+    Passes(&'a dyn Passes),
+}
+
+impl std::fmt::Debug for Inside<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Inside::Walked(outputs) => f.debug_tuple("Walked").field(outputs).finish(),
+            Inside::Compiled(plan) => f.debug_tuple("Compiled").field(plan).finish(),
+            Inside::Passes(_) => f.write_str("Passes"),
+        }
+    }
+}
+
+/// Which pass of a loop a node cooks in.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Iteration {
+    /// Its number, from 0.
+    pub index: usize,
+    /// How many passes the loop makes.
+    pub count: usize,
+    /// What it stands for, unique in the loop: a piece's attribute value, an
+    /// element's number. Core keeps each pass's cooks by it, so a pass
+    /// whose value and input stay the same doesn't cook when others do.
+    pub value: Value,
+}
+
+/// One cook of a holder's network: which pass, and what it works on.
+#[derive(Clone, Debug)]
+pub struct Pass {
+    /// Which pass it is.
+    pub iteration: Iteration,
+    /// What it works on: what a node reading [`Reads::current`] sees.
+    pub current: Data,
+}
+
+/// A holder's network, to cook once per pass (a loop's body). Core keeps
+/// each pass's cooks, polls the holder's cancellation and fails the holder,
+/// naming the inner node, when a pass fails.
+pub trait Passes: Sync {
+    /// What the network yields for each of `passes`, in their order, which
+    /// cook at once as workers allow. Passes that depend on one another (a
+    /// feedback) come one call at a time.
+    ///
+    /// # Errors
+    /// The first pass failing, or cancellation.
+    fn run(&self, passes: Vec<Pass>) -> Result<Vec<std::sync::Arc<Outputs>>, Error>;
 }
 
 /// What core resolved one of a node's path parameters to
@@ -301,6 +362,13 @@ pub trait NodeType: Any + Send + Sync {
     fn created(&self, parameters: Parameters, cx: &NewCx<'_>) -> Parameters {
         let _ = cx;
         parameters
+    }
+
+    /// What a new node's network starts with
+    /// ([`Description::holding`]): core plants it wherever a node is added;
+    /// paste and load keep what they bring. Nothing by default.
+    fn seed(&self) -> crate::network::NetworkSeed {
+        crate::network::NetworkSeed::default()
     }
 
     /// The parameters pressing button `button` of its rows leaves (Fit to

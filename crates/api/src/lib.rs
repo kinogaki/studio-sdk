@@ -117,8 +117,9 @@ pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
 pub use cook::{
-    Category, CookCx, CookPlan, Description, Incremental, Inside, Listing, NewCx, NodeRole,
-    NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, RowsFor, SchemaCx,
+    Category, CookCx, CookPlan, Description, Incremental, Inside, Iteration, Listing, NewCx,
+    NodeRole, NodeType, Outputs, Pass, Passes, Port, Ports, PortsCx, Prepared, Project, Reads,
+    Resolved, RowsFor, SchemaCx,
 };
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp, stamp_of};

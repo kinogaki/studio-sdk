@@ -62,6 +62,7 @@
 //! ```
 mod carry;
 mod change;
+mod extract;
 mod finish;
 mod gather;
 mod layout;
@@ -71,6 +72,7 @@ mod split;
 
 pub use carry::{Rule, default_item, rule};
 pub use change::{Change, Numbers};
+pub use extract::extract;
 pub use finish::place;
 pub use gather::{NOTHING, Placed, gather, gather_table, picked, spread};
 

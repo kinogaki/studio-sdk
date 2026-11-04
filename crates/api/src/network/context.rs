@@ -92,6 +92,13 @@ impl NetworkContext {
         self
     }
 
+    /// Offering core's loops (For Each, Loop Input): a context whose
+    /// networks carry geometry and cook.
+    pub fn with_loops(self) -> Self {
+        let loops = crate::cook::LOOPS.map(NodeTypeId::declared);
+        (loops.into_iter()).fold(self, |context, id| context.adopts(id, "Loops"))
+    }
+
     /// Its nodes drawn as `layout` says.
     pub fn layout(mut self, layout: NodeLayout) -> Self {
         self.layout = layout;

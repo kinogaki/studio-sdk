@@ -60,6 +60,9 @@ pub struct Description {
     /// context's levels). A new node gets it empty; core keeps, saves,
     /// copies and navigates it, and the type's own cook doesn't read it.
     pub inside: Option<ContextId>,
+    /// A node of this type holds a network of the context it is in (a
+    /// loop's body): [`holding_own`](Self::holding_own).
+    inside_own: bool,
     /// Which networks offer and keep its nodes beyond its
     /// [`contexts`](Self::contexts).
     pub reach: Reach,
@@ -101,6 +104,7 @@ impl Description {
             role: NodeRole::Plain,
             listing: None,
             inside: None,
+            inside_own: false,
             reach: Reach::Contexts,
         }
     }
@@ -158,6 +162,18 @@ impl Description {
     pub fn holding(mut self, context: ContextId) -> Self {
         self.inside = Some(context);
         self
+    }
+
+    /// Holding a network of the context each node is in (a loop its body).
+    pub fn holding_own(mut self) -> Self {
+        self.inside_own = true;
+        self
+    }
+
+    /// The context of the network a node of this type holds in a network of
+    /// `here`.
+    pub fn held_in(&self, here: ContextId) -> Option<ContextId> {
+        self.inside.or(self.inside_own.then_some(here))
     }
 
     /// Listed in Tab, menus and shelves under `section` ("Filter", its
