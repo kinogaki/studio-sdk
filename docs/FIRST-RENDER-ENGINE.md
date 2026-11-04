@@ -59,7 +59,7 @@ Any batch restarts a view's film unless it changes nothing the view sees.
 | `Primitive` | triangle or curve | constant |
 | `Detail` | the whole shape | constant |
 
-`Shape::primvar(name)` finds it, whichever its domain. Storage (F32, F64, I32, I64, Text), width (1 to 255) and arrays are the attribute's own: nothing narrows on the way, an integer never blends, and colors (`Meaning::Color`) are linear ACEScg. Sent: `N` (shading normals; none: flat), `uv`, `v` when `Motion::velocities`, a curve's `width` (none: your thinnest), and what the shape's materials read (`MaterialNetwork::primvars`).
+`Shape::primvar(name)` finds it, whichever its domain. Storage (F32, F64, I32, I64, Text), width (1 to 255) and arrays are the attribute's own: nothing narrows on the way, an integer never blends, and colors (`Meaning::Color`) are linear ACEScg. Sent: `N` (shading normals; none: flat), `uv` (`v` 0 is an image's bottom row, as USD lays them out), `v` when `Motion::velocities`, a curve's `width` (none: your thinnest), and what the shape's materials read (`MaterialNetwork::primvars`).
 
 `Subsets::of(primitive)` is the material a primitive renders with; none is your default material. `Visibility { visible: false }` removes a prim; `camera: false` keeps it lighting, shadowing and reflecting.
 
