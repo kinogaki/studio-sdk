@@ -23,7 +23,9 @@ mod render;
 mod snap;
 mod table;
 
-pub use canvas::{Canvas, CanvasPiece, Picture, PieceSource, Probe, TextAlign, TextFace};
+pub use canvas::{
+    Canvas, CanvasPiece, LiveResult, Picture, PieceSource, Probe, TextAlign, TextFace,
+};
 pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally};
 pub use glyph::{GlyphScale, Glyphs};
 pub use object::{Look, Marquee, Materials, ObjectPicking};

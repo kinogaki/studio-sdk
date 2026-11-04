@@ -19,6 +19,16 @@ use kinogaki_geometry::Xform;
 use kinogaki_geometry::image::{Image, Rect};
 use std::sync::Arc;
 
+/// What a surface chooses to show live: an object's result, or one node of the
+/// network it holds. What renders for it, and what runs on that, is the host's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct LiveResult {
+    /// The object.
+    pub object: crate::ObjectRef,
+    /// The node of its network; none: the object's own result.
+    pub node: Option<crate::NodeRef>,
+}
+
 /// One piece a [`Picture`] paints.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
