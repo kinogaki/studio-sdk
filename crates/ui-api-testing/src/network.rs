@@ -715,7 +715,7 @@ impl NetworkEdit for FakeNetwork {
                 .data
                 .iter()
                 .zip(&ports.outputs)
-                .all(|(d, p)| d.ty() == p.data);
+                .all(|(d, p)| p.holds(d.ty()));
         if !self.context.flags.contains(Flag::Frozen) || !fits {
             return Err(Error::invalid(format_args!(
                 "{} can't freeze with those outputs",

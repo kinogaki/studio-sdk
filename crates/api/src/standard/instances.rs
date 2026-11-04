@@ -6,8 +6,12 @@ use crate::codec::DataCodec;
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use kinogaki_geometry::{Attributes, Column, Domain, Xform};
+use kinogaki_edit::editor::{Placed, gather, gather_table, spread};
+use kinogaki_geometry::{Attribute, Attributes, Column, Domain, Geometry, Meaning, Xform, names};
 use std::sync::Arc;
+
+/// The Primitive integer a realize numbers each copy's primitives by.
+pub const COPYNUM: &str = "copynum";
 
 /// How deep instances of instances nest: a value holding instances of
 /// itself this many times over is refused.
@@ -153,6 +157,137 @@ impl Instances {
             attributes: Arc::new(attributes),
             ..self.clone()
         })
+    }
+
+    /// `values` as one value: each of Instances as it is, and the rest (each
+    /// [`geometry`](super::geometry)'s gathered first) as one instance where
+    /// it is. Attributes gather as a Merge's do; each prototype is held once,
+    /// shared.
+    ///
+    /// ```
+    /// use kinogaki_studio_api::geometry::{Attributes, Geometry, Xform};
+    /// use kinogaki_studio_api::standard::{self, Instances};
+    ///
+    /// let leaf = standard::geometry().wrap(Geometry::empty());
+    /// let at = vec![Xform::IDENTITY; 2].into();
+    /// let leaves = Instances::new(vec![leaf], at, None, Attributes::new()).unwrap();
+    /// let trunk = standard::geometry().wrap(Geometry::empty());
+    /// let tree = Instances::gathered(&[trunk, standard::instances().wrap(leaves)]).unwrap();
+    /// assert_eq!((tree.len(), tree.prototypes().len()), (3, 2));
+    /// assert_eq!(tree.prototype_index(2), 1);
+    /// ```
+    ///
+    /// # Errors
+    /// Ids past the largest, or nesting too deep.
+    pub fn gathered(values: &[Data]) -> Result<Self, Error> {
+        let (mut prototypes, mut which, mut xforms) = (Vec::<Data>::new(), Vec::new(), Vec::new());
+        let plain = Self::loose(values)?;
+        let parts: Vec<&Instances> = (plain.iter())
+            .chain(values.iter().filter_map(|d| instances().get(d)))
+            .collect();
+        for part in &parts {
+            let at = prototypes.len() as u32;
+            prototypes.extend(part.prototypes.iter().cloned());
+            xforms.extend(part.xforms.iter().copied());
+            which.extend((0..part.len()).map(|i| at + part.prototype_index(i) as u32));
+        }
+        let tables: Vec<_> = (parts.iter()).map(|p| (&*p.attributes, p.len())).collect();
+        let mut table = gather_table(&tables, Domain::Instance)?;
+        let details: Vec<_> = (parts.iter()).map(|p| (&*p.attributes, 1)).collect();
+        for (_, name, a) in gather_table(&details, Domain::Detail)?.iter() {
+            table = table.with(Domain::Detail, name, a.clone())?;
+        }
+        Self::new(prototypes, xforms.into(), Some(which.into()), table)
+    }
+
+    /// One instance holding `values`' other than Instances where they are.
+    fn loose(values: &[Data]) -> Result<Vec<Instances>, Error> {
+        let geometries: Vec<Placed<'_>> = (values.iter())
+            .filter_map(|d| super::geometry().get(d).map(Placed::new))
+            .collect();
+        let mut loose = Vec::new();
+        if !geometries.is_empty() {
+            loose.push(super::geometry().wrap(gather(&geometries)?));
+        }
+        let other = |d: &&Data| instances().get(d).is_none() && super::geometry().get(d).is_none();
+        loose.extend(values.iter().filter(other).cloned());
+        (loose.into_iter())
+            .map(|one| {
+                let at = vec![Xform::IDENTITY].into();
+                Self::new(vec![one], at, None, Attributes::new())
+            })
+            .collect()
+    }
+
+    /// These instances as one [`Geometry`]: each its prototype's elements at
+    /// its placement ([`gather`]), instances of instances followed, what
+    /// isn't [`Geometry`] made polygons by `polygons`. An Instance attribute
+    /// lands on the copy's points, under its name (its placing ones, used
+    /// up, stay out), and the Primitive integer `copynum` numbers the
+    /// instances. Instances `polygons` makes nothing of give nothing, and
+    /// the count of them is the second value.
+    ///
+    /// # Errors
+    /// What [`gather`] refuses.
+    pub fn realized(
+        &self,
+        polygons: &dyn Fn(&Data) -> Option<Geometry>,
+    ) -> Result<(Geometry, usize), Error> {
+        let mut left_out = 0;
+        let made: Vec<Option<Geometry>> = (self.prototypes.iter())
+            .map(|p| match (super::geometry().get(p), instances().get(p)) {
+                (Some(value), _) => Some(value.clone()),
+                (None, Some(nested)) => {
+                    let (value, nested_out) = nested.realized(polygons).ok()?;
+                    left_out += nested_out;
+                    Some(value)
+                }
+                (None, None) => polygons(p),
+            })
+            .collect();
+        let mut placed = Vec::with_capacity(self.len());
+        let mut kept = Vec::with_capacity(self.len());
+        let (mut points, mut primitives) = (Vec::new(), Vec::new());
+        for i in 0..self.len() {
+            let value = made[self.prototype_index(i)].as_ref();
+            let (p, q) = value.map_or((0, 0), |v| (v.positions().len(), v.primitives().len()));
+            points.push(p);
+            primitives.push(q);
+            match value {
+                Some(value) => {
+                    placed.push(Placed {
+                        value,
+                        at: self.xforms[i],
+                    });
+                    kept.push(i);
+                }
+                None => left_out += 1,
+            }
+        }
+        let value = gather(&placed)?;
+        let numbers: Vec<i32> = (0..self.len())
+            .flat_map(|i| std::iter::repeat_n(i as i32, primitives[i]))
+            .collect();
+        let copynum = Attribute::tuples(numbers, Meaning::None)?;
+        let mut table = value
+            .attributes()
+            .with(Domain::Primitive, COPYNUM, copynum)?;
+        for (domain, name, a) in self.attributes.iter() {
+            let placing = [
+                names::ID,
+                names::PSCALE,
+                names::SCALE,
+                names::ORIENT,
+                names::TRANSFORM,
+            ];
+            if domain == Domain::Instance
+                && !placing.contains(&name)
+                && let Some(column) = spread(a, &points)?
+            {
+                table = table.with(Domain::Point, name, column)?;
+            }
+        }
+        Ok((value.with_attributes(table)?, left_out))
     }
 
     /// How many instances there are.

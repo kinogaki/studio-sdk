@@ -1,5 +1,5 @@
 use super::*;
-use kinogaki_geometry::{Attribute, Basis, Kind, Vec3};
+use kinogaki_geometry::{Attribute, Basis, Incidence, Kind, Vec3};
 
 fn triangle() -> Geometry {
     let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();

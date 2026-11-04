@@ -247,6 +247,9 @@ pub struct Port {
     pub label: String,
     /// The data type an input takes or an output carries.
     pub data: DataTypeId,
+    /// The others it takes or may carry ([`also`](Self::also)): a node that
+    /// passes on or gathers what it is given.
+    pub also: Vec<DataTypeId>,
     /// How many wires an input takes.
     pub arity: Arity,
     /// Whether an input needs a wire ([`required`](Self::required)).
@@ -268,12 +271,31 @@ impl Port {
             name: name.into(),
             label: label.into(),
             data,
+            also: Vec::new(),
             arity: Arity::One,
             need: Need::Required,
             missing: String::new(),
             unwired: Unwired::Nothing,
             operand: false,
         }
+    }
+
+    /// Taking or carrying `data` too. A wire joins ports with a type in
+    /// common, and a cook finds which type it was handed; an output of
+    /// several types saves which one it holds.
+    pub fn also(mut self, data: DataTypeId) -> Self {
+        self.also.push(data);
+        self
+    }
+
+    /// Every type it takes or may carry, its first the [`data`](Self::data).
+    pub fn types(&self) -> impl Iterator<Item = DataTypeId> + '_ {
+        std::iter::once(self.data).chain(self.also.iter().copied())
+    }
+
+    /// Whether it takes or may carry `data`.
+    pub fn holds(&self, data: DataTypeId) -> bool {
+        self.types().any(|t| t == data)
     }
 
     /// Taking many wires.

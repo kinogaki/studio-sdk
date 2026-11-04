@@ -413,7 +413,9 @@ impl Registry {
             }
             let d = n.description();
             for port in d.inputs.iter().chain(&d.outputs) {
-                known(n.id().as_str(), port.data)?;
+                for data in port.types() {
+                    known(n.id().as_str(), data)?;
+                }
             }
         }
         for k in &package.object_kinds {

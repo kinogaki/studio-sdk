@@ -4,9 +4,9 @@ use super::carry::default_item;
 use crate::ids::{self, Input};
 use kinogaki_geometry::{
     Attribute, AttributeType, Attributes, Column, CurveData, Domain, Elements, Error, Geometry,
-    Incidence, Knots, Meaning, Primitives, Storage, Text, Values, Xform, names,
+    Knots, Meaning, Primitives, Storage, Text, Values, Xform, names,
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 /// One value of a [`gather`] and where it goes.
@@ -81,7 +81,14 @@ pub fn gather(values: &[Placed<'_>]) -> Result<Geometry, Error> {
     let table = table(values)?;
     let mut attributes = Attributes::new();
     for domain in DOMAINS {
-        attributes = gather_domain(attributes, domain, values)?;
+        let sources: Vec<Source<'_>> = (values.iter())
+            .map(|v| Source {
+                attributes: v.value.attributes(),
+                count: v.value.count(domain).unwrap_or(0),
+                at: v.at,
+            })
+            .collect();
+        attributes = gather_domain(attributes, domain, &sources)?;
     }
     Geometry::new(positions.into(), table, attributes)
 }
@@ -153,52 +160,131 @@ fn curve_data(values: &[Placed<'_>]) -> CurveData {
     CurveData::new(degrees.into(), knots, rational.then(|| weights.into()))
 }
 
-/// `attributes` with `values`' attributes and groups of `domain` gathered.
+/// One input's table on one domain: how many elements it has there, and
+/// where it goes.
+#[derive(Clone, Copy)]
+struct Source<'a> {
+    attributes: &'a Attributes,
+    count: usize,
+    at: Xform,
+}
+
+/// `tables` (each an attributes table and its element count on `domain`) as
+/// one table, by [`gather`]'s rules: what gathers Instance attributes.
+///
+/// ```
+/// use kinogaki_edit::editor::gather_table;
+/// use kinogaki_geometry::{Attribute, Attributes, Domain, Meaning};
+///
+/// let sizes = Attribute::tuples(vec![2.0f32], Meaning::None).unwrap();
+/// let some = Attributes::new().with(Domain::Instance, "size", sizes).unwrap();
+/// let none = Attributes::new();
+/// let table = gather_table(&[(&none, 2), (&some, 1)], Domain::Instance).unwrap();
+/// let got = table.tuples::<f32>(Domain::Instance, "size").unwrap();
+/// assert_eq!(got, [0.0, 0.0, 2.0]);
+/// ```
+///
+/// # Errors
+/// Ids past the largest.
+pub fn gather_table(tables: &[(&Attributes, usize)], domain: Domain) -> Result<Attributes, Error> {
+    let sources: Vec<Source<'_>> = (tables.iter())
+        .map(|&(attributes, count)| Source {
+            attributes,
+            count,
+            at: Xform::IDENTITY,
+        })
+        .collect();
+    gather_domain(Attributes::new(), domain, &sources)
+}
+
+/// `attribute`, one value an element, with element `e` held by `counts[e]`
+/// elements: an instance's value over its copy's points. An array stays out.
+///
+/// ```
+/// use kinogaki_edit::editor::spread;
+/// use kinogaki_geometry::{Attribute, Meaning};
+///
+/// let a = Attribute::tuples(vec![[1.0f32, 0.0], [0.0, 1.0]], Meaning::None).unwrap();
+/// let got = spread(&a, &[1, 2]).unwrap().unwrap();
+/// assert_eq!(got.as_tuples::<[f32; 2]>().unwrap(), [[1.0, 0.0], [0.0, 1.0], [0.0, 1.0]]);
+/// ```
+///
+/// # Errors
+/// What the attribute refuses.
+pub fn spread(attribute: &Attribute, counts: &[usize]) -> Result<Option<Attribute>, Error> {
+    fn each<T: Copy>(column: &Column<T>, width: usize, counts: &[usize]) -> Column<T> {
+        let mut out = Vec::with_capacity(counts.iter().sum::<usize>() * width);
+        for (e, &n) in counts.iter().enumerate() {
+            for _ in 0..n {
+                out.extend((e * width..(e + 1) * width).map(|at| column[at]));
+            }
+        }
+        out.into()
+    }
+    let ty = attribute.ty();
+    if ty.array {
+        return Ok(None);
+    }
+    let width = usize::from(ty.width);
+    let values = match attribute.values() {
+        Values::F32(c) => Values::F32(each(c, width, counts)),
+        Values::F64(c) => Values::F64(each(c, width, counts)),
+        Values::I32(c) => Values::I32(each(c, width, counts)),
+        Values::I64(c) => Values::I64(each(c, width, counts)),
+        Values::Text(t) => {
+            return Ok(Some(Attribute::text(t.with_indices(each(
+                t.indices(),
+                1,
+                counts,
+            ))?)));
+        }
+        _ => return Ok(None),
+    };
+    attribute.with_values(values).map(Some)
+}
+
+/// `attributes` with `sources`' attributes and groups of `domain` gathered.
 fn gather_domain(
     mut attributes: Attributes,
     domain: Domain,
-    values: &[Placed<'_>],
+    sources: &[Source<'_>],
 ) -> Result<Attributes, Error> {
     let mut types: BTreeMap<&str, AttributeType> = BTreeMap::new();
-    let mut groups: BTreeMap<&str, ()> = BTreeMap::new();
-    for Placed { value, .. } in values {
-        let held = value.attributes();
-        for (d, name, a) in held.iter().filter(|e| e.0 == domain) {
-            debug_assert_eq!(d, domain);
+    let mut groups: BTreeSet<&str> = BTreeSet::new();
+    for source in sources {
+        for (_, name, a) in source.attributes.iter().filter(|e| e.0 == domain) {
             types.entry(name).or_insert(a.ty());
         }
-        for (_, name, _) in held.groups().filter(|e| e.0 == domain) {
-            groups.insert(name, ());
-        }
+        let held = source.attributes.groups().filter(|e| e.0 == domain);
+        groups.extend(held.map(|g| g.1));
     }
     for (name, ty) in types {
         let column = match domain {
-            Domain::Detail => first_detail(values, name),
-            _ if name == names::ID => merged_ids(values, domain)?,
-            _ => gather_column(values, domain, name, ty)?,
+            Domain::Detail => first_detail(sources, name),
+            _ if name == names::ID => merged_ids(sources, domain)?,
+            _ => gather_column(sources, domain, name, ty)?,
         };
         attributes = attributes.with(domain, name, column)?;
     }
-    for name in groups.into_keys() {
-        attributes = attributes.with_group(domain, name, gather_group(values, domain, name))?;
+    for name in groups {
+        attributes = attributes.with_group(domain, name, gather_group(sources, domain, name))?;
     }
     Ok(attributes)
 }
 
 /// The first holder's Detail value of `name`.
-fn first_detail(values: &[Placed<'_>], name: &str) -> Attribute {
-    (values.iter())
-        .find_map(|v| v.value.attributes().get(Domain::Detail, name))
+fn first_detail(sources: &[Source<'_>], name: &str) -> Attribute {
+    (sources.iter())
+        .find_map(|s| s.attributes.get(Domain::Detail, name))
         .expect("a type comes from a holder")
         .clone()
 }
 
-fn merged_ids(values: &[Placed<'_>], domain: Domain) -> Result<Attribute, Error> {
-    let held: Vec<_> = values.iter().map(|v| v.value.ids(domain)).collect();
-    let each: Vec<Input<'_>> = (held.iter().zip(values))
-        .map(|(ids, v)| match ids {
-            Some(ids) => Input::Ids(ids.as_slice()),
-            None => Input::Without(v.value.count(domain).unwrap_or(0)),
+fn merged_ids(sources: &[Source<'_>], domain: Domain) -> Result<Attribute, Error> {
+    let each: Vec<Input<'_>> = (sources.iter())
+        .map(|s| match s.attributes.tuples::<i64>(domain, names::ID) {
+            Some(ids) => Input::Ids(ids),
+            None => Input::Without(s.count),
         })
         .collect();
     let merged =
@@ -206,13 +292,13 @@ fn merged_ids(values: &[Placed<'_>], domain: Domain) -> Result<Attribute, Error>
     Attribute::tuples(merged, Meaning::None)
 }
 
-fn gather_group(values: &[Placed<'_>], domain: Domain, name: &str) -> Elements {
+fn gather_group(sources: &[Source<'_>], domain: Domain, name: &str) -> Elements {
     let (mut at, mut members) = (0u32, Vec::new());
-    for Placed { value, .. } in values {
-        if let Some(group) = value.attributes().group(domain, name) {
+    for source in sources {
+        if let Some(group) = source.attributes.group(domain, name) {
             members.extend(group.iter().map(|m| m + at));
         }
-        at += value.count(domain).unwrap_or(0) as u32;
+        at += source.count as u32;
     }
     Elements::from_indices(at as usize, members).expect("members of the gathered elements")
 }
@@ -226,16 +312,16 @@ struct Share<'a> {
 }
 
 fn gather_column(
-    values: &[Placed<'_>],
+    sources: &[Source<'_>],
     domain: Domain,
     name: &str,
     ty: AttributeType,
 ) -> Result<Attribute, Error> {
-    let shares: Vec<Share<'_>> = (values.iter())
-        .map(|v| Share {
-            held: (v.value.attributes().get(domain, name)).filter(|a| a.ty() == ty),
-            elements: v.value.count(domain).unwrap_or(0),
-            at: v.at,
+    let shares: Vec<Share<'_>> = (sources.iter())
+        .map(|s| Share {
+            held: (s.attributes.get(domain, name)).filter(|a| a.ty() == ty),
+            elements: s.count,
+            at: s.at,
         })
         .collect();
     let default = default_item(ty);
