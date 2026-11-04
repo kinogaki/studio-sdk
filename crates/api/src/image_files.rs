@@ -15,12 +15,30 @@ pub enum FileImage {
     Failed(String),
 }
 
-/// The host's image files.
+/// The host's image files. A UI's or a runner's never wait; a cook's
+/// ([`Project::files`](crate::cook::Project::files)) waits on its worker and
+/// answers [`Read`](FileImage::Read) or [`Failed`](FileImage::Failed). Asked
+/// again, a file that hasn't changed answers with the same tiles, so what shows
+/// it uploads nothing.
 pub trait ImageFiles: Send + Sync {
-    /// The file at `path` (relative to the project's folder unless absolute):
-    /// asking starts reading it, and never waits.
+    /// The file at `path` (relative to the project's folder unless absolute).
     fn image(&self, path: &str) -> FileImage;
 
     /// Moves whenever a file's answer does.
     fn revision(&self) -> u64;
+}
+
+/// No image files: where nothing can read them (a project read outside the
+/// editor).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NoFiles;
+
+impl ImageFiles for NoFiles {
+    fn image(&self, _: &str) -> FileImage {
+        FileImage::Failed("nothing reads image files here".to_owned())
+    }
+
+    fn revision(&self) -> u64 {
+        0
+    }
 }

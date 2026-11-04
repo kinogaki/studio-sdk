@@ -87,6 +87,7 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
             K::Text
             | K::Code
             | K::File
+            | K::SaveFile
             | K::Path
             | K::Reference(_)
             | K::Attribute { .. }

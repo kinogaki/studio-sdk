@@ -167,7 +167,7 @@ pub enum Resolved {
 }
 
 /// The project a cook reads ([`Reads::project`]).
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Project<'a> {
     /// The project's units.
     pub units: kinogaki_geometry::Units,
@@ -181,6 +181,17 @@ pub struct Project<'a> {
     pub stored: &'a crate::StoredValues,
     /// The user's stored values ([`Scope::User`](crate::Scope::User)).
     pub user: &'a crate::StoredValues,
+    /// The host's image files: a cook waits for what it asks.
+    pub files: &'a dyn crate::image_files::ImageFiles,
+}
+
+impl std::fmt::Debug for Project<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Project")
+            .field("units", &self.units)
+            .field("directory", &self.directory)
+            .finish_non_exhaustive()
+    }
 }
 
 /// What a cook produced.
@@ -383,6 +394,17 @@ pub trait NodeType: Any + Send + Sync {
         cx: &SchemaCx<'_>,
     ) -> Option<Parameters> {
         let _ = (button, parameters, cx);
+        None
+    }
+
+    /// Where pressing button `button` of its rows writes the node's value as
+    /// a picture (a File Out: its Canvas facet's pieces composited at the
+    /// picture's size, in the file's format, through the color service's
+    /// pinned sRGB ACES 2.0 SDR view), as the row holds it; `None`: it writes
+    /// nothing. Core runs the write off the UI thread and says on the status
+    /// line how it went.
+    fn writes(&self, button: &str, parameters: &Parameters) -> Option<String> {
+        let _ = (button, parameters);
         None
     }
 

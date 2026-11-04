@@ -40,6 +40,9 @@ pub enum ValueKind {
     /// [`Value::Text`]: a file's path, as typed (empty: none). An image a
     /// render reads is sent as its texture, never as the path.
     File,
+    /// [`Value::Text`]: the path of a file to write, as typed (empty: none):
+    /// the panel asks for a new name.
+    SaveFile,
     /// [`Value::Text`]: a free path to any node or object of the scene.
     Path,
     /// [`Value::Text`]: a path to what the filter says fits; the host
@@ -169,6 +172,7 @@ impl ValueKind {
             Self::Text
             | Self::Code
             | Self::File
+            | Self::SaveFile
             | Self::Path
             | Self::Reference(_)
             | Self::Attribute { .. }
@@ -194,6 +198,7 @@ impl ValueKind {
                 Self::Text
                 | Self::Code
                 | Self::File
+                | Self::SaveFile
                 | Self::Path
                 | Self::Reference(_)
                 | Self::Attribute { .. }

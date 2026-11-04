@@ -1,10 +1,20 @@
 //! [`Canvas`]: what the 2D canvas pane paints of a value, a list of pieces
-//! in canvas units, back to front: images under a placement, and text.
+//! in canvas units, back to front: images and text under a placement.
 //! Pieces share their tiles with the value, never copying them; core uploads
-//! and derives the levels it shows, and applies the view transform.
+//! and derives the levels it shows, sets text, composites in linear light and
+//! applies the view transform.
+//!
+//! **Arranging.** A piece that says which node placed it ([`PieceSource`]) can
+//! be selected and arranged on the canvas with no package code: clicks and
+//! boxes pick its node, and core's gizmo writes the parameters of the node
+//! type's declared [`HandleKind::Translate`](crate::cook::HandleKind::Translate),
+//! [`Rotate`](crate::cook::HandleKind::Rotate) (the Z of `angles`, degrees,
+//! clockwise as Y runs down) and [`Scale`](crate::cook::HandleKind::Scale)
+//! (the X and Y of `factors`) handles.
 use crate::color::ColorService;
 use crate::data::Data;
-use crate::data_type::{Color, InfoRow};
+use crate::data_type::InfoRow;
+use crate::refs::NodeRef;
 use kinogaki_geometry::Xform;
 use kinogaki_geometry::image::{Image, Rect};
 use std::sync::Arc;
@@ -24,18 +34,94 @@ pub enum CanvasPiece {
         placed: Xform,
         /// How much it covers what lies under it, 0 to 1.
         opacity: f32,
+        /// The node that placed it, when one did and it can be arranged.
+        source: Option<PieceSource>,
     },
-    /// A line of text, over every image of the picture.
+    /// A block of text, composited with the images in its place among the
+    /// pieces. Its plane has X 0 at the alignment point of its lines and
+    /// Y 0 at the block's top, in the units `size` is in; `placed` puts it on
+    /// the canvas. Core sets it at the size `placed` shows it, one pixel a
+    /// canvas unit: what a file written at the picture's size shows.
     Text {
-        /// The text.
+        /// The text; a line feed starts a line.
         text: Arc<str>,
-        /// A line's height, in canvas units.
-        height: f64,
-        /// Its color, display-referred.
-        color: Color,
-        /// Where its top left is: the origin to canvas units.
+        /// The face it is set in.
+        face: TextFace,
+        /// The em, in its plane's units.
+        size: f64,
+        /// How its lines sit against the alignment point.
+        align: TextAlign,
+        /// Its color, linear in the working space.
+        color: [f64; 3],
+        /// Its plane to canvas units.
         placed: Xform,
+        /// How much it covers what lies under it, 0 to 1.
+        opacity: f32,
+        /// The node that placed it, when one did and it can be arranged.
+        source: Option<PieceSource>,
     },
+}
+
+impl CanvasPiece {
+    /// Its plane to canvas units.
+    pub fn placed(&self) -> &Xform {
+        match self {
+            Self::Image { placed, .. } | Self::Text { placed, .. } => placed,
+        }
+    }
+
+    /// The same piece with its plane put on the canvas by `new`.
+    pub fn replaced(&self, new: Xform) -> Self {
+        let mut piece = self.clone();
+        match &mut piece {
+            Self::Image { placed, .. } | Self::Text { placed, .. } => *placed = new,
+        }
+        piece
+    }
+
+    /// The node that placed it.
+    pub fn source(&self) -> Option<PieceSource> {
+        match self {
+            Self::Image { source, .. } | Self::Text { source, .. } => *source,
+        }
+    }
+}
+
+/// The node that placed a piece, which arranging it edits.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PieceSource {
+    /// The node ([`CookCx::node`](crate::CookCx::node)): one of the open
+    /// network's top level, for the piece to be picked there.
+    pub node: NodeRef,
+    /// The point of its plane the node's Translate handle moves, and that
+    /// its Rotate and Scale values turn and scale about.
+    pub pivot: [f64; 2],
+}
+
+/// A face [`CanvasPiece::Text`] is set in: those every Studio carries, so a
+/// picture reads the same on every machine.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum TextFace {
+    /// A proportional face (Ubuntu Light).
+    #[default]
+    Sans,
+    /// A monospaced face (Hack).
+    Mono,
+    /// The interface's own face (MEK Sans).
+    Interface,
+}
+
+/// How a [`CanvasPiece::Text`]'s lines sit against its alignment point.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TextAlign {
+    /// Each line starts there.
+    #[default]
+    Left,
+    /// Each line's middle is there.
+    Center,
+    /// Each line ends there.
+    Right,
 }
 
 /// What a value paints.
