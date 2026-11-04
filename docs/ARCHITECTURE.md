@@ -62,6 +62,7 @@ Each kind of thing has its own id type:
 - `SlotId`
 - `StoredId`
 - `MesherId`
+- `VerbId`
 - `PackageId` (two segments only)
 
 Every id is interned in one table and is a `Copy` pointer to its text. Packages are never unloaded, so the table never needs to free anything.
@@ -153,6 +154,10 @@ If a type does not provide a facet, the surface that needs it simply leaves the 
 `Components` is a component selection described in the data type's own terms. A mesh uses element indices. A CAD body uses persistent topology names. The environment stores, undoes and counts a selection, but only the data type that made it reads what is inside.
 
 A `Mesher` (`Package::with_mesher`) is a kernel's display mesh of a B-rep body (`takes` names the data type it meshes, the B-rep's, which the host shows at a display quality while it is installed): its faces' polygons in face order (`face`), then one polyline per edge over the same shared points (`edge`), at a `Detail` (in a view, `Viewport` of the object's display quality, one mesher preset a step) and the project's `Tolerances`, with the faces it couldn't mesh and why. The B-rep value holds no triangles; core caches each body's mesh, and draws, picks, renders and exports from it. `Registry::meshers` lists them in registration order; which one meshes is the host's choice (a user setting), never a vendor's. With none installed a body shows grey, without faces.
+
+## Kernels
+
+A kernel is a heavy, shared algorithm library (Mesh: booleans, subdivision, remeshing, solvers, UVs; CAD: surface maths, B-rep booleans, a sketch solver). It is a package of `Verb`s (`Package::with_verb`): functions by id over `Data` and `Parameters`, returning `Outputs`. Core offers an admitted package's verbs to the whole process (`kernel::offer`), and any package's cook, render or worker reaches one by its id alone (`kernel::find`, `kernel::run`), with `None` or a `Missing` error while the kernel isn't loaded. A kernel's types never enter the SDK and no consumer links its crate: what a consumer needs is the kernel's documentation (its verbs' ids, inputs, rows and results), as plugins' other crossings need only standard values. A run is a cook's shape: rows through a `CookCx`, the caller's cancellation, the process's workers; nothing of it is kept.
 
 ## Cooking
 

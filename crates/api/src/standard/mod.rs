@@ -80,6 +80,15 @@ pub const fn instances() -> Typed<Instances> {
     Typed::new(DataTypeId::declared(INSTANCES))
 }
 
+/// The id of a [`Selection`] passed by value: an input of a kernel's verb
+/// saying which elements it works on.
+pub(crate) const SELECTION: &str = "kinogaki.core.selection";
+
+/// The handle on a [`Selection`] passed by value (`SELECTION`).
+pub const fn selection() -> Typed<Selection> {
+    Typed::new(DataTypeId::declared(SELECTION))
+}
+
 /// The id of camera values: an unplaced lens ([`lens`], [`CameraCodec`]).
 pub const CAMERA: &str = "kinogaki.core.camera";
 

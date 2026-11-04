@@ -24,6 +24,8 @@
 //!   [`CookCx`], optional [`Incremental`] cooking); Studio's core owns the
 //!   cooking DAG, the caches and the workers ([`geometry::parallel`]). [`HeldEdit`]s
 //!   apply a held node's authored delta to a data type.
+//! - **Kernels** ([`kernel`]): heavy algorithm libraries one package offers
+//!   the others as verbs, reached through core while they are loaded.
 //! - **Objects** ([`ObjectKindSpec`], [`ObjectBody`]): kinds of scene
 //!   objects a package adds and their package-owned state.
 //! - **Networks** ([`network`]): the contexts a package declares
@@ -76,6 +78,7 @@ pub mod facets;
 pub mod format;
 pub mod held;
 pub mod icon;
+pub mod kernel;
 pub mod mesher;
 pub mod network;
 pub mod object;
@@ -129,7 +132,7 @@ pub use held::HeldEdit;
 pub use icon::Icon;
 pub use id::{
     ContextId, CreationId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
-    SlotId, StoredId,
+    SlotId, StoredId, VerbId,
 };
 pub use mesher::{Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};

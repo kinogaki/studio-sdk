@@ -189,6 +189,12 @@ declare_id!(
     "mesher"
 );
 declare_id!(
+    /// A verb: a function a kernel offers every other package
+    /// (`kinogaki.mesh_kernel.boolean`). Registered by a `Verb`.
+    VerbId,
+    "verb"
+);
+declare_id!(
     /// A creation: one way menus, keys and shelves make a node
     /// (`NodeCreation`) or an object
     /// (`KindCreation`), under its package's vendor

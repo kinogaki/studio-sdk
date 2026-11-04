@@ -16,7 +16,7 @@ use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::id::{
-    ContextId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId, StoredId,
+    ContextId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId, StoredId, VerbId,
 };
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
@@ -66,6 +66,8 @@ pub struct Registry {
     runners: BTreeMap<ContextId, PackageId>,
     /// Further ways to make nodes, in registration order.
     creations: Vec<Entry<NodeCreation>>,
+    /// The package offering each verb.
+    verbs: BTreeMap<VerbId, PackageId>,
     /// B-rep meshers, in registration order.
     meshers: Vec<Entry<dyn Mesher>>,
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
@@ -124,6 +126,9 @@ impl Registry {
         }
         for creation in package.creations {
             self.creations.push(Entry::new(id, Arc::new(creation)));
+        }
+        for verb in package.verbs {
+            self.verbs.insert(verb.id(), id);
         }
         for mesher in package.meshers {
             self.meshers.push(Entry::new(id, mesher));

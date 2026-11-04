@@ -6,6 +6,7 @@ use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::icon::Icon;
 use crate::id::{ContextId, PackageId};
+use crate::kernel::Verb;
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation};
 use crate::object::ObjectKindSpec;
@@ -47,6 +48,8 @@ pub struct Package {
     pub held_edits: Vec<Arc<dyn HeldEdit>>,
     /// How it meshes B-rep bodies for display, rendering and export.
     pub meshers: Vec<Arc<dyn Mesher>>,
+    /// The functions it offers every other package, as a kernel.
+    pub verbs: Vec<Verb>,
     /// What its node types compute.
     pub node_types: Vec<Arc<dyn NodeType>>,
     /// The network contexts it declares, whose networks core keeps in the
@@ -142,6 +145,7 @@ impl Package {
             data_types: Vec::new(),
             held_edits: Vec::new(),
             meshers: Vec::new(),
+            verbs: Vec::new(),
             node_types: Vec::new(),
             contexts: Vec::new(),
             compilers: Vec::new(),
@@ -208,6 +212,12 @@ impl Package {
     /// With B-rep mesher `mesher` too.
     pub fn with_mesher(mut self, mesher: impl Mesher + 'static) -> Self {
         self.meshers.push(Arc::new(mesher));
+        self
+    }
+
+    /// With verb `verb` too.
+    pub fn with_verb(mut self, verb: Verb) -> Self {
+        self.verbs.push(verb);
         self
     }
 
@@ -284,6 +294,10 @@ impl fmt::Debug for Package {
             .field("label", &self.label)
             .field("data_types", &ids(&self.data_types, |t| t.id().as_str()))
             .field("held_edits", &ids(&self.held_edits, |h| h.delta().as_str()))
+            .field(
+                "verbs",
+                &self.verbs.iter().map(|v| v.id()).collect::<Vec<_>>(),
+            )
             .field("node_types", &ids(&self.node_types, |n| n.id().as_str()))
             .field(
                 "contexts",

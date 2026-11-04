@@ -92,6 +92,9 @@ impl Registry {
                 owner(self.contexts.get(&c.id)),
             )?;
         }
+        for v in &package.verbs {
+            declare("verb", v.id().as_str(), self.verbs.get(&v.id()).copied())?;
+        }
         for m in &package.meshers {
             let first = self.meshers.iter().find(|e| e.item.id() == m.id());
             declare("mesher", m.id().as_str(), owner(first))?;
