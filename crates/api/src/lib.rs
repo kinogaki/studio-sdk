@@ -80,6 +80,7 @@ pub mod facets;
 pub mod format;
 pub mod held;
 pub mod icon;
+pub mod image_files;
 pub mod kernel;
 pub mod mesher;
 pub mod network;
