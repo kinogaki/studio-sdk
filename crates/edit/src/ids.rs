@@ -1,9 +1,9 @@
 //! Stable ids: the one rule kernels keep the standard `id` attribute by.
 //!
 //! Kept elements keep their ids; new or copied elements take
-//! [`fresh`] ones, above every id the value holds; a Merge keeps its first
-//! input's ids and gives later inputs' colliding (or missing) ids fresh
-//! ones ([`merged`]). So an id names one element for as long as it lives,
+//! [`fresh`] ones, above every id the value holds; a
+//! [`gather`](crate::editor::gather) keeps its first input's ids and gives
+//! later inputs' colliding (or missing) ids fresh ones. So an id names one element for as long as it lives,
 //! whatever is inserted or removed around it, and a selection holding ids
 //! is found again after a change upstream ([`reresolve`](crate::select::reresolve)).
 use kinogaki_geometry::{
@@ -87,7 +87,7 @@ pub fn fresh(existing: &Column<i64>, count: usize) -> Option<Range<i64>> {
 
 /// One Merge input's elements of a domain, for [`merged`].
 #[derive(Clone, Copy, Debug)]
-pub enum Input<'a> {
+pub(crate) enum Input<'a> {
     /// Elements carrying these ids.
     Ids(&'a [i64]),
     /// This many elements without ids.
@@ -108,14 +108,7 @@ impl Input<'_> {
 /// colliding ones (and the elements without ids) given fresh ids above
 /// all of them, in element order. `None` when the fresh ids would pass
 /// `i64::MAX`.
-///
-/// ```
-/// use kinogaki_edit::ids::{self, Input};
-///
-/// let merged = ids::merged(&[Input::Ids(&[0, 1, 2]), Input::Ids(&[2, 7]), Input::Without(1)]);
-/// assert_eq!(merged.unwrap(), [0, 1, 2, 8, 7, 9]);
-/// ```
-pub fn merged(inputs: &[Input<'_>]) -> Option<Vec<i64>> {
+pub(crate) fn merged(inputs: &[Input<'_>]) -> Option<Vec<i64>> {
     let total = inputs.iter().map(Input::len).sum();
     let every: Vec<i64> = inputs
         .iter()
@@ -147,4 +140,26 @@ pub fn merged(inputs: &[Input<'_>]) -> Option<Vec<i64>> {
         }
     }
     Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merge_keeps_the_first_inputs_ids_and_renames_later_collisions() {
+        let got = merged(&[
+            Input::Ids(&[5, 6, 7]),
+            Input::Without(2),
+            Input::Ids(&[7, 1, 1]),
+        ])
+        .unwrap();
+        assert_eq!(got, [5, 6, 7, 8, 9, 10, 1, 11]);
+        // Unique, and the first input's untouched.
+        let mut sorted = got.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), got.len());
+        assert_eq!(merged(&[Input::Ids(&[i64::MAX]), Input::Without(1)]), None);
+    }
 }

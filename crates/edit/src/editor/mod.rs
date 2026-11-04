@@ -22,6 +22,8 @@
 //!   ([`reresolve`](crate::select::reresolve)).
 //! - **It reports what it did** ([`Change`]), so a display patches what moved
 //!   and a tool knows where its elements ended up.
+//! - **Values gather** ([`gather`]): several values into one, each at a
+//!   placement, by the same attribute rules.
 //!
 //! Numbers stay put during an edit: a base element keeps its number, a new
 //! one takes the next, and a removal takes effect at the finish
@@ -58,11 +60,13 @@
 mod carry;
 mod change;
 mod finish;
+mod gather;
 mod layout;
 mod split;
 
 pub use carry::{Rule, rule};
 pub use change::{Change, Numbers};
+pub use gather::{Placed, gather};
 
 use crate::deform::Deform;
 use kinogaki_geometry::{Basis, Error, Geometry, Kind};

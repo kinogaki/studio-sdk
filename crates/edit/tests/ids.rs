@@ -1,6 +1,6 @@
 //! The stable-id rule: unique ids, fresh ones above the maximum, and how
 //! a Merge keeps them.
-use kinogaki_edit::ids::{self, Input};
+use kinogaki_edit::ids;
 use kinogaki_geometry::{Attribute, Attributes, Domain, Meaning, names};
 
 #[test]
@@ -31,24 +31,4 @@ fn a_repeated_id_is_refused_and_fresh_ids_are_above_the_maximum() {
     );
     let fresh = ids::fresh(&many.clone().into(), 2).unwrap();
     assert!(fresh.start > *many.iter().max().unwrap() && fresh.end - fresh.start == 2);
-}
-
-#[test]
-fn merge_keeps_the_first_inputs_ids_and_renames_later_collisions() {
-    let merged = ids::merged(&[
-        Input::Ids(&[5, 6, 7]),
-        Input::Without(2),
-        Input::Ids(&[7, 1, 1]),
-    ])
-    .unwrap();
-    assert_eq!(merged, [5, 6, 7, 8, 9, 10, 1, 11]);
-    // Unique, and the first input's untouched.
-    let mut sorted = merged.clone();
-    sorted.sort_unstable();
-    sorted.dedup();
-    assert_eq!(sorted.len(), merged.len());
-    assert_eq!(
-        ids::merged(&[Input::Ids(&[i64::MAX]), Input::Without(1)]),
-        None
-    );
 }

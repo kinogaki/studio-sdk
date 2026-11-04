@@ -250,6 +250,13 @@ impl<'a> CookCx<'a> {
             .ok_or_else(|| Error::invalid(format!("parameter {name:?} is not {what}")))
     }
 
+    /// The name of the node behind input `wire` (an index into the inputs),
+    /// when the node reads them (`Reads::input_names`); blank when it has
+    /// none.
+    pub fn input_name(&self, wire: usize) -> &'a str {
+        self.names.get(wire).map_or("", String::as_str)
+    }
+
     /// The range of `inputs` wired into port `port` (empty when nothing
     /// is).
     pub fn port(&self, port: usize) -> Range<usize> {
