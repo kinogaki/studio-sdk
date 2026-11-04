@@ -51,7 +51,8 @@ pub use network::HostNetwork;
 use crate::Pos;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::params::Unit;
-use kinogaki_studio_api::{CancelToken, RowsFor};
+use kinogaki_studio_api::viewport::ElementKind;
+use kinogaki_studio_api::{CancelToken, Components, RowsFor};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -207,6 +208,13 @@ pub trait ViewCx: Cx {
     /// snap at all (the user's [`HostTransform::snapping`], Command) is
     /// the tool's to decide.
     fn snap(&mut self, at: Pos, targets: SnapTargets, radius: f64, on: SnapOn) -> Option<SnapHit>;
+    /// What a pick at `levels` takes at screen point `at` in this view, of the
+    /// open object's shown value: a point within reach before an edge before
+    /// the face the pointer's ray meets; what the surface hides doesn't count.
+    /// A tool asks where it needs (a drag's two ends); the view's own hover
+    /// and picks are the context's `Levels`. `None`: nothing there, or nothing
+    /// shown.
+    fn element_at(&mut self, at: Pos, levels: &[ElementKind]) -> Option<Components>;
     /// Display option `id`'s value in this view: as the user set it (this
     /// view's, or the context's for a
     /// [`Context`](crate::package::DisplayScope::Context) option), else its

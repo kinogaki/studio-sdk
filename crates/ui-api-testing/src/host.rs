@@ -669,6 +669,14 @@ impl Cx for FakeHost {
 }
 
 impl ViewCx for FakeHost {
+    /// Nothing: a fake shows nothing to pick.
+    fn element_at(
+        &mut self,
+        _: Pos,
+        _: &[kinogaki_studio_api::viewport::ElementKind],
+    ) -> Option<kinogaki_studio_api::Components> {
+        None
+    }
     fn view(&self) -> &View {
         self.view
             .as_ref()
