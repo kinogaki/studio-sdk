@@ -34,12 +34,9 @@ pub enum ValueKind {
     },
     /// [`Value::Text`], one line, committed when the edit ends.
     Text,
-    /// [`Value::Text`]: code, many lines in a code editor.
-    Code {
-        /// The language its text is in, as the host's code editor names it;
-        /// `None`: plain text.
-        language: Option<String>,
-    },
+    /// [`Value::Text`]: code, many lines in a code editor; its node type
+    /// names the language.
+    Code,
     /// [`Value::Text`]: a file's path, as typed (empty: none). An image a
     /// render reads is sent as its texture, never as the path.
     File,
@@ -170,7 +167,7 @@ impl ValueKind {
             | Self::Ramp { .. }
             | Self::ToneCurves { .. } => true,
             Self::Text
-            | Self::Code { .. }
+            | Self::Code
             | Self::File
             | Self::Path
             | Self::Reference(_)
@@ -195,7 +192,7 @@ impl ValueKind {
             }
             (
                 Self::Text
-                | Self::Code { .. }
+                | Self::Code
                 | Self::File
                 | Self::Path
                 | Self::Reference(_)
@@ -530,7 +527,7 @@ mod tests {
     fn kinds_give_the_animatable_default() {
         assert!(ValueKind::Number(Number::plain()).animatable());
         assert!(ValueKind::choice(vec![Choice::new("a", "A")]).animatable());
-        assert!(!ValueKind::Code { language: None }.animatable());
+        assert!(!ValueKind::Code.animatable());
         assert!(!ValueKind::Texts.animatable());
         let ramp = ValueKind::Ramp {
             color: true,

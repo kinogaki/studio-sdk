@@ -116,6 +116,12 @@ The topology's `Index` (edges in canonical order, polygons and polylines per edg
 
 **Saving.** The SDK defines how the standard types save: `standard::GeometryCodec`, `standard::BrepCodec`, `standard::CameraCodec` and `standard::LightCodec` are the codecs core registers (core's Camera and Light objects save their lens and light through them too; a light value is unplaced and names a dome's image by its file: the Texture prim a host decodes it to is one scene's, as an Image Texture node's is), writing each topology once per save for every value sharing it and reading every rule again. Projects save only frozen and held results; everything else is cooked again on load.
 
+## Scripts
+
+A code node runs code over a standard value through the host's script engine (`kinogaki_studio_api::script`): `script::engine()?.run(ScriptRun { code, over, on, inputs, parameters, time, rate, cancel })`. `Over` says what it runs once for (each element of a `Domain`, or a count of numbers), and the engine's binding of the value says what code may name on it. The node holds rows: a `ValueKind::Code` row for the text, and it answers `NodeType::spares` and `reads` from `ScriptEngine::facts`, `NodeType::language` from `ScriptEngine::language`. A fault is an `Error` whose `Diagnostic` holds its line, column and lowest failing element; nothing partial is kept. Core's own package brings the engine (`Package::with_script_engine`), and a new standard value gains its binding with it.
+
+A `NodeType::language` serves its node's code field through `params::code::CodeLanguage`: colors, completion, hover and `check`. While `check` finds an error the host keeps the row's text from the node's parameters, so the node goes on cooking the last text that held none.
+
 ## Edit contracts
 
 Core owns the geometric values; kernels bring the operations and the maths; plugins bring tools and nodes. What core and a kernel must agree on when a value is selected and changed is `kinogaki-edit` (re-exported as `kinogaki_studio_api::edit`), so `kinogaki-geometry` stays pure values:

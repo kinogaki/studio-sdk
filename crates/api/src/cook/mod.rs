@@ -266,6 +266,20 @@ pub trait NodeType: Any + Send + Sync {
         rows
     }
 
+    /// The language of a node's code rows, for the code field that shows
+    /// them, from its `parameters` and what `cx` says it reads (a script's
+    /// names follow what runs and the input's attributes); plain text by
+    /// default. Core asks while the node's rows are built, and keeps the
+    /// answer with them.
+    fn language(
+        &self,
+        parameters: &Parameters,
+        cx: &SchemaCx<'_>,
+    ) -> Option<std::sync::Arc<dyn crate::params::code::CodeLanguage>> {
+        let _ = (parameters, cx);
+        None
+    }
+
     /// The parameters an edit from `before` to `after` leaves, when the
     /// type answers it; `after` by default. It must be pure and
     /// deterministic: core calls it inside the edit's own transaction

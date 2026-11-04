@@ -47,7 +47,7 @@ pub fn rule(ty: AttributeType) -> Rule {
 /// A new element's value when it has no sources: zero and no text, but
 /// white for a color and the identity for a rotation or a matrix, as a
 /// Merge fills what an input lacks (docs/ATTRIBUTES.md).
-pub(super) fn default_item(ty: AttributeType) -> Vec<f64> {
+pub fn default_item(ty: AttributeType) -> Vec<f64> {
     let width = usize::from(ty.width);
     let mut item = vec![0.0; width];
     match ty.meaning {

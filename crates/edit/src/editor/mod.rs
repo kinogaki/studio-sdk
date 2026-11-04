@@ -69,7 +69,7 @@ mod place;
 mod settle;
 mod split;
 
-pub use carry::{Rule, rule};
+pub use carry::{Rule, default_item, rule};
 pub use change::{Change, Numbers};
 pub use finish::place;
 pub use gather::{NOTHING, Placed, gather, gather_table, picked, spread};

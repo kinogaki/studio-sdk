@@ -5,6 +5,7 @@
 //! These are the API's own types. Studio draws a [`Schema`] with its
 //! inspector and stores [`Value`]s in projects; a package never sees the
 //! host's UI types.
+pub mod code;
 mod schema;
 
 pub use kinogaki_value::{

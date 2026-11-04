@@ -50,6 +50,9 @@ pub struct Package {
     pub meshers: Vec<Arc<dyn Mesher>>,
     /// The functions it offers every other package, as a kernel.
     pub verbs: Vec<Verb>,
+    /// The script engine it brings ([`script`](crate::script)): core's own
+    /// package does.
+    pub script_engine: Option<Arc<dyn crate::script::ScriptEngine>>,
     /// What its node types compute.
     pub node_types: Vec<Arc<dyn NodeType>>,
     /// The network contexts it declares, whose networks core keeps in the
@@ -146,6 +149,7 @@ impl Package {
             held_edits: Vec::new(),
             meshers: Vec::new(),
             verbs: Vec::new(),
+            script_engine: None,
             node_types: Vec::new(),
             contexts: Vec::new(),
             compilers: Vec::new(),
@@ -212,6 +216,15 @@ impl Package {
     /// With B-rep mesher `mesher` too.
     pub fn with_mesher(mut self, mesher: impl Mesher + 'static) -> Self {
         self.meshers.push(Arc::new(mesher));
+        self
+    }
+
+    /// With `engine` as the process's script engine.
+    pub fn with_script_engine(
+        mut self,
+        engine: impl crate::script::ScriptEngine + 'static,
+    ) -> Self {
+        self.script_engine = Some(Arc::new(engine));
         self
     }
 

@@ -1,6 +1,9 @@
 //! What a code field knows of its language: a [`CodeLanguage`] colors the
-//! text by [`Token`]s, offers [`Completions`] at the cursor and explains
-//! what the pointer rests on. The host's code editor knows no language.
+//! text by [`Token`]s, offers [`Completions`] at the cursor, explains what
+//! the pointer rests on and says what is wrong with the text. The host's
+//! code editor knows no language; a node type names its own
+//! ([`NodeType::language`](crate::NodeType::language)).
+use crate::Diagnostic;
 use std::ops::Range;
 
 /// What a run of code is, for its color.
@@ -75,6 +78,14 @@ pub trait CodeLanguage {
     /// shown while the pointer rests there.
     fn hover(&self, _text: &str, _at: usize) -> Option<String> {
         None
+    }
+
+    /// What is wrong with `text`, errors and warnings, each at its place.
+    /// The host keeps a code row's text from its node while it holds an
+    /// error: the node goes on cooking the last text that held none, and
+    /// the row underlines these.
+    fn check(&self, _text: &str) -> Vec<Diagnostic> {
+        Vec::new()
     }
 }
 

@@ -22,7 +22,6 @@
 //! scene's tree, references the host fills, float and color ramps
 //! ([`ramp`]), tone curves and material inputs' connection
 //! buttons ([`Socket`]).
-mod code;
 mod edits;
 mod from_params;
 mod keyed;
@@ -33,11 +32,13 @@ pub use kinogaki_studio_api::params::tone_curve;
 
 pub use kinogaki_studio_api::params::ramp;
 
-pub use code::{CodeLanguage, Completion, Completions, PlainText, Token, TokenClass};
 pub use edits::{Action, Edits};
 pub use keyed::{FieldKey, Keyed};
 pub use kind::{
     Chip, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing, segments,
+};
+pub use kinogaki_studio_api::params::code::{
+    CodeLanguage, Completion, Completions, PlainText, Token, TokenClass,
 };
 pub use kinogaki_studio_api::params::{Choice, CurveChannel};
 pub use number::{Number, NumberStyle};

@@ -117,7 +117,7 @@ impl From<&ValueKind> for Kind {
                 unavailable: unavailable.clone(),
             },
             ValueKind::Text => Kind::Text,
-            ValueKind::Code { .. } => Kind::Code {
+            ValueKind::Code => Kind::Code {
                 diagnostics: Vec::new(),
                 fill: false,
                 lines: None,

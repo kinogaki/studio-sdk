@@ -26,6 +26,8 @@
 //!   apply a held node's authored delta to a data type.
 //! - **Kernels** ([`kernel`]): heavy algorithm libraries one package offers
 //!   the others as verbs, reached through core while they are loaded.
+//! - **Scripts** ([`script`]): code a node runs over a standard value on the
+//!   host's script engine, reached through core.
 //! - **Objects** ([`ObjectKindSpec`], [`ObjectBody`]): kinds of scene
 //!   objects a package adds and their package-owned state.
 //! - **Networks** ([`network`]): the contexts a package declares
@@ -87,6 +89,7 @@ pub mod params;
 pub mod refs;
 pub mod registry;
 pub mod render;
+pub mod script;
 pub mod session;
 pub mod standard;
 pub mod stored;
