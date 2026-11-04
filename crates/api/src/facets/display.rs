@@ -136,6 +136,11 @@ pub struct Piece {
     /// instances themselves in order (several prototypes, a prototype
     /// placing its own piece many times).
     pub instances: Option<Column<u32>>,
+    /// One color a placement ([`pack_linear`](crate::viewport::pack_linear):
+    /// linear, in the working space) multiplying its shaded look; `None`:
+    /// no tint. An allocation kept as long as the colors stay, so a move of
+    /// the placements writes none of them again.
+    pub tints: Option<Arc<[u32]>>,
     /// What it is to its object.
     pub role: Role,
 }
@@ -148,6 +153,7 @@ impl Piece {
             packet,
             placements: None,
             instances: None,
+            tints: None,
             role: Role::Own {
                 edges: true,
                 wires: false,
