@@ -21,7 +21,7 @@ pub struct Camera {
     pub focal_length: f32,
     /// The film back's width, in mm; orthographic: the view's width, a
     /// length in mm on the scene's scale (the render settings'
-    /// [`units`](crate::RenderSettings::units) turn mm into scene units).
+    /// [`units`](crate::SceneSettings::units) turn mm into scene units).
     pub horizontal_aperture: f32,
     /// The film back's height, in mm (orthographic: the view's height).
     pub vertical_aperture: f32,

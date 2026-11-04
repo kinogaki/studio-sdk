@@ -12,7 +12,7 @@ use crate::engine::{Outputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pend
 use crate::id::{EngineId, PrimId};
 use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::{Prim, PrimKind, Topology};
-use crate::settings::RenderSettings;
+use crate::settings::SceneSettings;
 use crate::update::SceneUpdate;
 
 /// What a [`RecordingEngine`] was sent.
@@ -43,9 +43,11 @@ pub struct RecordingEngine {
     /// The prims, by id.
     pub prims: BTreeMap<PrimId, Prim>,
     /// The scene's settings.
-    pub settings: RenderSettings,
+    pub settings: SceneSettings,
     /// The views.
     pub views: BTreeMap<ViewId, (ViewDesc, bool)>,
+    /// The view last named the one the user works with.
+    pub focused: Option<ViewId>,
     /// What it was sent.
     pub counts: Counts,
     /// The previews it was asked for.
@@ -59,7 +61,8 @@ impl RecordingEngine {
         RecordingEngine {
             description: Arc::new(description()),
             prims: BTreeMap::new(),
-            settings: RenderSettings::default(),
+            settings: SceneSettings::default(),
+            focused: None,
             views: BTreeMap::new(),
             counts: Counts::default(),
             previews: Vec::new(),
@@ -155,6 +158,14 @@ impl RenderEngine for RecordingEngine {
         if let Some(entry) = self.views.get_mut(&view) {
             entry.1 = paused;
         }
+    }
+
+    fn focus(&mut self, view: ViewId) {
+        self.focused = Some(view);
+    }
+
+    fn problem(&self, _view: ViewId) -> Option<Arc<str>> {
+        None
     }
 
     /// Delivers black outputs of the view's size at once.

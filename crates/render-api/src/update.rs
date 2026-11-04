@@ -14,7 +14,7 @@ use crate::dirty::Dirty;
 use crate::id::PrimId;
 use crate::prim::Prim;
 use crate::ranges::Ranges;
-use crate::settings::RenderSettings;
+use crate::settings::SceneSettings;
 
 /// A changed prim: what changed, its new payload, and for a POINTS change
 /// the points that moved.
@@ -79,8 +79,8 @@ pub struct SceneUpdate {
     pub removed: Vec<PrimId>,
     /// Prims changed.
     pub changed: Vec<Change>,
-    /// New render settings (the scene's), if they changed.
-    pub settings: Option<RenderSettings>,
+    /// New scene settings, if they changed.
+    pub settings: Option<SceneSettings>,
     /// A drag ended: meshes refitted during it may now be rebuilt.
     pub settled: bool,
 }

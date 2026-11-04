@@ -49,7 +49,7 @@ pub struct Motion {
     /// ([`Sampled`](crate::geometry::Sampled) with more than one sample).
     pub transforms: bool,
     /// Points and instances moving by their velocities (the `v` primvar,
-    /// scene units a second; [`crate::RenderSettings::rate`] says how long
+    /// scene units a second; [`crate::SceneSettings::rate`] says how long
     /// a frame is).
     pub velocities: bool,
 }
@@ -125,7 +125,7 @@ impl EngineBuilder {
         self
     }
 
-    /// Its settings beyond [`crate::RenderSettings`]'s own fields, and their
+    /// Its settings ([`crate::ViewDesc::values`]), and their
     /// groups in order.
     pub fn settings(mut self, groups: Vec<SettingGroup>, settings: Vec<SettingDescriptor>) -> Self {
         self.0.setting_groups = groups;
@@ -192,7 +192,7 @@ impl EngineDescription {
         &self.setting_groups
     }
 
-    /// Its settings beyond [`crate::RenderSettings`]'s own fields.
+    /// Its settings ([`crate::ViewDesc::values`]).
     pub fn settings(&self) -> &[SettingDescriptor] {
         &self.settings
     }

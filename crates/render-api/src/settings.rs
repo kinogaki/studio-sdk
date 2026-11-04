@@ -1,4 +1,4 @@
-//! Settings: the fields every render reads ([`RenderSettings`]) and the
+//! Settings: what every view shares ([`SceneSettings`]) and the
 //! values an engine describes itself ([`SettingDescriptor`]s, kept by
 //! name). The same descriptors describe the parameters of the prim types an
 //! engine declares ([`crate::PrimType`]): a light's size, a fog's density.
@@ -24,14 +24,13 @@ use crate::prim::{Camera, Texture};
 /// missing: no image, or one not read yet).
 pub type Textures = BTreeMap<String, Id<Texture>>;
 
-/// What a render reads: the fields every engine needs, and the engine's
-/// own values by name.
+/// What every view of an engine shares. What differs between views travels
+/// with the view ([`crate::ViewDesc::values`]).
 #[derive(Clone, Debug, PartialEq)]
-pub struct RenderSettings {
-    /// Final-frame width and height, in pixels.
-    pub resolution: [u32; 2],
-    /// The Camera prim final frames render through (none: the view's camera).
-    pub camera: Option<Id<Camera>>,
+pub struct SceneSettings {
+    /// The Camera prim whose shutter placements blur across (none: nothing
+    /// blurs).
+    pub shutter: Option<Id<Camera>>,
     /// The scene's units: what real sizes (a lens's millimetres, an
     /// anodized part's grain) are measured against, and the axis that is
     /// up to sky light and height fog.
@@ -39,19 +38,14 @@ pub struct RenderSettings {
     /// The scene's frames a second: how long a frame is, which sample times
     /// (in frames) and velocities (in scene units a second) meet at.
     pub rate: Rate,
-    /// The engine's settings, by its descriptors' names; one missing takes
-    /// its descriptor's default.
-    pub values: Parameters,
 }
 
-impl Default for RenderSettings {
-    fn default() -> RenderSettings {
-        RenderSettings {
-            resolution: [1920, 1080],
-            camera: None,
+impl Default for SceneSettings {
+    fn default() -> SceneSettings {
+        SceneSettings {
+            shutter: None,
             units: Units::METERS,
             rate: Rate::FILM,
-            values: Parameters::new(),
         }
     }
 }
@@ -90,7 +84,7 @@ impl SettingGroup {
 /// A setting an engine publishes, so a UI can show it without knowing it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SettingDescriptor {
-    /// The key in [`RenderSettings::values`] and in files.
+    /// The key in [`crate::ViewDesc::values`] and in files.
     pub name: Arc<str>,
     /// What a UI labels it.
     pub label: Arc<str>,

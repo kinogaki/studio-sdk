@@ -29,7 +29,7 @@ A host sends nothing the capabilities don't name: no prim of another kind, no li
 
 ## The scene: batches of prims
 
-`RenderEngine::update(SceneUpdate)` never blocks: an engine queues the batch and applies it at a pass boundary, folding batches it hasn't applied with `SceneUpdate::merge`. A batch holds `added`, `removed`, `changed`, new `settings`, and `settled` when a drag ended and refitted acceleration structures may be rebuilt. What a prim names comes before it: textures, then materials, then shapes, then Instancers.
+`RenderEngine::update(SceneUpdate)` never blocks: an engine queues the batch and applies it at a pass boundary, folding batches it hasn't applied with `SceneUpdate::merge`. A batch holds `added`, `removed`, `changed`, new `settings` (what every view shares: units, frame rate, the Camera whose shutter placements blur across), and `settled` when a drag ended and refitted acceleration structures may be rebuilt. What a prim names comes before it: textures, then materials, then shapes, then Instancers.
 
 A `Change` carries the prim whole; `dirty` says what differs from what you hold:
 
@@ -69,7 +69,7 @@ Any batch restarts a view's film unless it changes nothing the view sees.
 
 ## Time
 
-Sample times are frames from the frame rendered. `Camera::shutter` says when it opens and closes; `Sampled<Xform>` carries placements across it (`is_still` for most): blend the two neighbouring samples, component by component. Deformation is the `v` primvar in scene units a second, on points and on instances; `RenderSettings::rate` says how long a frame is (`Shape::point_at`). Topology never changes across a shutter.
+Sample times are frames from the frame rendered. `Camera::shutter` says when it opens and closes; `Sampled<Xform>` carries placements across it (`is_still` for most): blend the two neighbouring samples, component by component. Deformation is the `v` primvar in scene units a second, on points and on instances; `SceneSettings::rate` says how long a frame is (`Shape::point_at`). Topology never changes across a shutter.
 
 ## Materials
 
@@ -98,7 +98,9 @@ An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a
 
 ## Views, results and being polite
 
-- `view` sets a view's camera, film and `ViewMode`; `drop_view` ends it; `pause` holds its refinement. `Interactive` refines progressively, `Navigating` keeps one short pass in flight, `Final` runs to the settings' samples. A `realtime` engine's every pass is a whole frame, and it never gets a shrunken film.
+- `view` sets a view's camera, film, `ViewMode` and settings (`values`, by your descriptors' names); `drop_view` ends it, stopping its passes; `pause` holds its refinement. `Interactive` refines progressively, `Navigating` keeps one short pass in flight, `Final` runs to the settings' samples. A `realtime` engine's every pass is a whole frame, and it never gets a shrunken film.
+- One engine holds one scene and any number of views over it: two views of different settings and cameras share every prim. Views take turns: render one for a few samples, then the next that still needs them, a `Navigating` one ahead of any turn. After a restart the view last named by `focus` goes first. `focus` itself restarts nothing.
+- A view that can't render says why through `problem` and wakes the host once. The other views render on.
 - Publish each whole pass as a `Frame` (`latest`), and call the `Wake` **once**. Nothing else may wake the host.
 - `finish` returns a `Pending<Outputs>`: the requested AOVs once its samples are done. Every `Pending` is yours to resolve with its `Deliver`; drop one you won't answer and the host sees `Cancelled`.
 - A host cancels by dropping the `Pending`: `Deliver::wanted` turns false. Ask it between passes and stop.

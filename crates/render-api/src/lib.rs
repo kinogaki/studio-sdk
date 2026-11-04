@@ -78,7 +78,7 @@ pub use prim::{
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
-pub use settings::{RenderSettings, SettingDescriptor, SettingGroup, Textures};
+pub use settings::{SceneSettings, SettingDescriptor, SettingGroup, Textures};
 pub use source::{PlainTriangles, ShapeSource};
 pub use update::{Change, SceneUpdate};
 

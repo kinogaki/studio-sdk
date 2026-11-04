@@ -7,7 +7,6 @@
 use crate::id::{Id, IdAllocator, PrimId};
 use crate::material::MaterialNetwork;
 use crate::prim::{Camera, Material, Prim, Shape, Subsets, Texture, Topology};
-use crate::settings::RenderSettings;
 use crate::standard;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::{Attribute, Domain, Meaning, Sampled, Vec3, Xform, names};
@@ -63,7 +62,7 @@ pub struct PreviewImage {
 /// A request as prims: what a scene of its own takes to show it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreviewScene {
-    /// Every prim and the settings, to apply to an empty scene.
+    /// Every prim, to apply to an empty scene.
     pub update: SceneUpdate,
     /// The camera it is seen through.
     pub camera: Id<Camera>,
@@ -99,14 +98,8 @@ impl PreviewRequest {
             ..Camera::default()
         };
         added.push((camera.prim(), Prim::Camera(lens)));
-        let settings = RenderSettings {
-            resolution: [self.side, self.side],
-            camera: Some(camera),
-            ..RenderSettings::default()
-        };
         let update = SceneUpdate {
             added,
-            settings: Some(settings),
             ..SceneUpdate::default()
         };
         PreviewScene { update, camera }
@@ -285,11 +278,6 @@ mod tests {
         assert_eq!(count(PrimKind::Triangles), 2);
         assert_eq!(count(PrimKind::Declared), 2);
         assert_eq!(count(PrimKind::Camera), 1);
-        let settings = scene.update.settings.as_ref().unwrap();
-        assert_eq!(
-            (settings.camera, settings.resolution),
-            (Some(scene.camera), [64, 64])
-        );
         let mut slots: Vec<u32> = scene.update.added.iter().map(|(id, _)| id.slot).collect();
         slots.sort_unstable();
         slots.dedup();

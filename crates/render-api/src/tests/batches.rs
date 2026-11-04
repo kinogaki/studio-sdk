@@ -181,6 +181,7 @@ fn the_recording_engine_counts_what_it_was_sent() {
             width: 4,
             height: 2,
             mode: ViewMode::Final,
+            values: Default::default(),
         },
     );
     let result = engine.finish(

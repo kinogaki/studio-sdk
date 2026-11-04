@@ -9,7 +9,7 @@
 //! shutter ([`Sampled`](crate::geometry::Sampled): one sample for a prim that
 //! doesn't move), in the SDK's one convention; an engine converts them to its
 //! own single-precision layout where it uploads them. Positions and lengths
-//! are in scene units (the [`RenderSettings`](crate::RenderSettings)' units
+//! are in scene units (the [`SceneSettings`](crate::SceneSettings)' units
 //! say what one is); camera lens and film back are in millimetres.
 mod camera;
 mod instancer;

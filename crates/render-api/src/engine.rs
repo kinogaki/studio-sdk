@@ -15,6 +15,7 @@ use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::{Error, ErrorKind};
+use kinogaki_value::Parameters;
 
 /// Called once per published result (a frame, a final read). An editor's
 /// is a repaint request.
@@ -46,7 +47,7 @@ pub enum ViewMode {
     Final,
 }
 
-/// A view's camera, film size and mode.
+/// A view's camera, film size, mode and settings.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ViewDesc {
     /// Where it looks from.
@@ -57,6 +58,9 @@ pub struct ViewDesc {
     pub height: u32,
     /// How it is used.
     pub mode: ViewMode,
+    /// The engine's settings for this film, by its descriptors' names; one
+    /// missing takes its descriptor's default.
+    pub values: Arc<Parameters>,
 }
 
 /// What a pass cost and found.
@@ -239,6 +243,12 @@ pub trait RenderEngine: Send {
     fn latest(&self, view: ViewId) -> Option<Arc<Frame>>;
     /// Pause or resume a view's refinement.
     fn pause(&mut self, view: ViewId, paused: bool);
+    /// Name the view the user works with: after a restart it takes the
+    /// first turn. Restarts nothing.
+    fn focus(&mut self, view: ViewId);
+    /// Why the view can't render, once it failed (it wakes the host once
+    /// when it does); its neighbours render on.
+    fn problem(&self, view: ViewId) -> Option<Arc<str>>;
     /// Read a view's outputs once its samples are done. The result
     /// resolves once: the outputs, or why there are none (a failed read,
     /// or the request dropped with the view or the engine).
