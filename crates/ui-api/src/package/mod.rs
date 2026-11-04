@@ -77,8 +77,8 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, Ended, GizmoUse, LevelPreset, LevelSpec, NumericFields, Panel,
-    PanelScope, Takes, TimeDomain, TimeMark, TimeUnits,
+    BarField, BarValue, Candidate, Ended, GizmoUse, LevelPreset, LevelSpec, LiveHandles,
+    NumericFields, Panel, PanelScope, Takes, TimeDomain, TimeMark, TimeUnits,
 };
 pub use display::{DisplayKind, DisplayOption, DisplayScope};
 pub use edited::{Edited, Ghost, GhostTone};

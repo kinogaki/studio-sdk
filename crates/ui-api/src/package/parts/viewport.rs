@@ -9,11 +9,12 @@
 use super::part;
 use crate::gizmo::{TransformPhase, TransformStep};
 use crate::host::{Cx, NodeRef, ViewCx};
-use crate::package::data::{Ended, GizmoUse, NumericFields, Panel, Takes, TimeDomain};
+use crate::package::data::{Ended, GizmoUse, LiveHandles, NumericFields, Panel, Takes, TimeDomain};
 use crate::package::edited::Edited;
 use crate::package::view::{Holds, KeyPress};
 use crate::sheet::{Edits, Schema};
 use crate::{Painter, Ui};
+use kinogaki_studio_api::Parameters;
 use kinogaki_studio_api::geometry::Geometry;
 
 part! {
@@ -57,6 +58,20 @@ part! {
         fn live_node(&self, s: &S, cx: &dyn Cx) -> Option<NodeRef> {
             let _ = (s, cx);
             None
+        }
+        /// The handles over a live tool that keeps its rows itself (Extrude's
+        /// arrow, in a held edit's step), and those rows now: core shows and
+        /// drags them as a node's, and hands each move to
+        /// [`set_rows`](Self::set_rows) in the tool's gesture. Asked once a
+        /// frame. `None`: none; the live node shows none of its own.
+        fn handles(&self, s: &S, cx: &dyn Cx) -> Option<LiveHandles> {
+            let _ = (s, cx);
+            None
+        }
+        /// A drag of a [`handles`](Self::handles) handle moved the tool's rows
+        /// to `values`.
+        fn set_rows(&self, s: &mut S, cx: &mut dyn Cx, values: &Parameters) {
+            let _ = (s, cx, values);
         }
         /// The open object's own snap targets beyond its shown value (a
         /// curve's control points, a sketch's points and lines), in its

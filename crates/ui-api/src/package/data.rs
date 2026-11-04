@@ -4,6 +4,8 @@
 //! draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
 use crate::{Id, Rect};
+use kinogaki_studio_api::Parameters;
+use kinogaki_studio_api::cook::Handle;
 use kinogaki_studio_api::edit::select::{Expand, Mode};
 use kinogaki_studio_api::params::Unit;
 use std::sync::Arc;
@@ -88,6 +90,16 @@ impl Takes {
         wheel: true,
         menu: true,
     };
+}
+
+/// A live tool's handles and the rows they read and write
+/// ([`LiveTools::handles`](super::LiveTools::handles)).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LiveHandles {
+    /// The handles, placed in the open object's space.
+    pub handles: Vec<Handle>,
+    /// The rows now.
+    pub values: Arc<Parameters>,
 }
 
 /// Which transform gizmo the views show for a context's selection
