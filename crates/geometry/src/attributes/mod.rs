@@ -190,6 +190,14 @@ impl Attributes {
         out
     }
 
+    /// The table without group `name` of `domain` (nothing changes when there
+    /// is none).
+    pub fn without_group(&self, domain: Domain, name: &str) -> Attributes {
+        let mut out = self.clone();
+        remove(&mut out.groups, domain, name);
+        out
+    }
+
     /// The table with group `name` of `domain` set to `group`.
     ///
     /// # Errors
