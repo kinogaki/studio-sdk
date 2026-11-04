@@ -83,9 +83,8 @@ impl Values {
             old: &Column<T>,
             finite: impl Fn(T) -> bool,
         ) -> Option<usize> {
-            new.unshared(old)
-                .filter(|r| r.start < new.len())
-                .find_map(|r| (r.start..r.end.min(new.len())).find(|&i| !finite(new[i])))
+            new.written_since(old)
+                .find_map(|r| r.into_iter().find(|&i| !finite(new[i])))
         }
         match (self, base) {
             (Values::F32(new), Values::F32(old)) => first(new, old, f32::is_finite),

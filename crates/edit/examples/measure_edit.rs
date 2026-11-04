@@ -134,6 +134,8 @@ fn extrude_face(edit: &mut Editor, value: &Geometry, f: u32) {
 
 fn main() {
     let bare = sheet(1000);
+    // What every tool has: the index, patched by the edit.
+    bare.primitives().index();
     let full = attributed(&bare);
     println!(
         "{} points, {} quads, {} vertices",
@@ -191,10 +193,8 @@ fn main() {
             |e| extrude_face(e, value, 500),
         );
         row("remove one face", value, |e| e.remove_primitive(500));
-        row("remove one point (compaction)", value, |e| {
-            e.remove_point(500)
-        });
-        row("weld two points (compaction)", value, |e| e.weld(0, 1));
+        row("remove one point", value, |e| e.remove_point(500));
+        row("weld two points", value, |e| e.weld(0, 1));
         row("split one edge", value, |e| {
             e.split_edge(0, 1, 0.5);
         });

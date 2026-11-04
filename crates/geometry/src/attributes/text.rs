@@ -78,14 +78,12 @@ impl Text {
     /// An index past the table.
     pub fn with_indices(&self, indices: Column<u32>) -> Result<Self, Error> {
         let size = self.table.len() as u32;
-        let bad = (indices.unshared(&self.indices))
-            .filter(|r| r.start < indices.len())
-            .find_map(|r| {
-                (r.start..r.end.min(indices.len())).find(|&i| {
-                    let index = indices[i];
-                    index >= size && index != Self::NONE
-                })
-            });
+        let bad = (indices.written_since(&self.indices)).find_map(|r| {
+            r.into_iter().find(|&i| {
+                let index = indices[i];
+                index >= size && index != Self::NONE
+            })
+        });
         if let Some(at) = bad {
             return Err(Error::invalid(format!(
                 "element {at}'s text index {} is past the table of {size}",

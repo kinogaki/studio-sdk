@@ -293,6 +293,33 @@ fn a_patched_index_is_the_whole_one() {
     }
 }
 
+/// Points taken off the end: the rows on them written, the block they end in
+/// cut, the blocks past it gone.
+#[test]
+fn fewer_points_patch_the_index_and_cut_its_last_block() {
+    let row = |r: u32, points: u32| [r % points, (r + 1) % points, (r + 2) % points];
+    let rows = 1000u32;
+    let mut vertices = Vec::new();
+    (0..rows).for_each(|r| vertices.extend(row(r * 3, 3000)));
+    let offsets: Vec<u32> = (0..=rows).map(|r| 3 * r).collect();
+    let t = Primitives::of_polygons(3000, offsets.into(), vertices.into()).unwrap();
+    t.index();
+    // Rows through point 2400 and on are written anew below it.
+    let first = 800;
+    let mut writer = t.rewrite(2400);
+    writer.keep(0..first as usize);
+    (first..rows).for_each(|r| {
+        writer.write(Kind::POLYGON, &row(r * 3, 2400)).unwrap();
+    });
+    let edited = writer.finish(None).unwrap();
+    assert!(edited.index.get().is_some(), "patched, not left to build");
+    assert_same(&edited);
+    // A kept row naming a point past the new count is refused.
+    let mut writer = t.rewrite(2400);
+    writer.keep(0..rows as usize);
+    assert!(writer.finish(None).is_err());
+}
+
 /// A table with a row taken from the middle renumbers the rows after it: its
 /// index is built when asked, as what it is.
 #[test]

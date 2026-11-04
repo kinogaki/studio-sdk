@@ -26,7 +26,9 @@
 //!   placement, by the same attribute rules.
 //!
 //! Numbers stay put during an edit: a base element keeps its number, a new
-//! one takes the next, and a removal takes effect at the finish
+//! one takes the next, and a removal takes effect at the finish: the last
+//! kept elements of the base fill the holes, so every other element keeps its
+//! number and a removal costs what it reaches, and the new ones follow
 //! ([`Numbers::of`] says where a number went). Sources always mean the base
 //! value's data, whatever else the same edit changes. A bad number is
 //! remembered and reported by [`finish`](Editor::finish), so a tool's loops
@@ -62,6 +64,7 @@ mod change;
 mod finish;
 mod gather;
 mod layout;
+mod settle;
 mod split;
 
 pub use carry::{Rule, rule};
@@ -303,7 +306,9 @@ impl Editor {
         }
     }
 
-    /// At the finish, removes every point no primitive names then.
+    /// At the finish, removes the points this edit leaves unnamed: those of
+    /// the rows it removed or changed, and its new ones. Points no row named
+    /// before it stay; finding those is a tool's choice to scan for them.
     pub fn remove_loose_points(&mut self) {
         self.loose_go = true;
     }

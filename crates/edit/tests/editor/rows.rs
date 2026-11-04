@@ -146,7 +146,7 @@ fn rewiring_with_a_corners_own_vertex_keeps_its_values_shared() {
 }
 
 #[test]
-fn removing_primitives_compacts_their_values_and_keeps_the_points() {
+fn a_removed_primitive_takes_its_values_and_the_last_row_fills_its_number() {
     let value = ruled(2, 2);
     let mut edit = Editor::new(&value);
     edit.remove_primitive(1);
@@ -156,19 +156,20 @@ fn removing_primitives_compacts_their_values_and_keeps_the_points() {
     assert_eq!(change.primitives.removed, [1]);
     assert_eq!(change.primitives.of(0), Some(0));
     assert_eq!(change.primitives.of(1), None);
-    assert_eq!(change.primitives.of(3), Some(2));
+    assert_eq!(change.primitives.of(2), Some(2));
+    assert_eq!(change.primitives.of(3), Some(1));
     assert!(!change.primitives.same_numbers());
     let ids = column::<i64>(&out, Domain::Primitive, names::ID);
-    assert_eq!(ids, [500, 502, 503]);
+    assert_eq!(ids, [500, 503, 502]);
     let name = out.attributes().text(Domain::Primitive, names::NAME);
-    assert_eq!(name.unwrap().get(1), Some("f2"));
+    assert_eq!(name.unwrap().get(1), Some("f3"));
     assert_eq!(
         members(&out, Domain::Primitive, "even"),
-        [0, 1],
-        "0 and the old 2"
+        [0, 2],
+        "0 and 2, in their places"
     );
     let corner = column::<i32>(&out, Domain::Vertex, "corner");
-    assert_eq!(&corner[..8], &[0, 1, 2, 3, 8, 9, 10, 11]);
+    assert_eq!(&corner[..8], &[0, 1, 2, 3, 12, 13, 14, 15]);
     assert_eq!(out.positions().key(), value.positions().key());
     let tag = |v: &Geometry| key(v, Domain::Point, "tag");
     assert_eq!(tag(&out), tag(&value));
@@ -179,14 +180,66 @@ fn removing_primitives_compacts_their_values_and_keeps_the_points() {
     let (out, change) = edit.finish().unwrap();
     assert_eq!(change.points.removed, [0]);
     assert_eq!(change.points.of(0), None);
-    assert_eq!(change.points.of(1), Some(0));
+    assert_eq!(change.points.of(1), Some(1));
+    assert_eq!(change.points.of(8), Some(0), "the last point fills it");
     assert_eq!(out.positions().len(), 8);
-    assert_eq!(column::<i64>(&out, Domain::Point, names::ID)[0], 101);
+    assert_eq!(column::<i64>(&out, Domain::Point, names::ID)[0], 108);
     assert_eq!(
         out.primitives().primitive(0),
-        [0, 1, 4, 3],
-        "the old 1 2 5 4"
+        [4, 5, 0, 7],
+        "the last row, which names that point"
     );
+    // Points no row named before the edit stay.
+    let lone = Geometry::new(
+        vec![[0.0; 3]; 5].into(),
+        Primitives::of_polygons(5, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap(),
+        Attributes::new(),
+    )
+    .unwrap();
+    let mut edit = Editor::new(&lone);
+    edit.remove_primitive(0);
+    edit.remove_loose_points();
+    let (out, _) = edit.finish().unwrap();
+    assert_eq!(out.positions().len(), 2);
+}
+
+/// A removal on a value whose index is built: the new index answers as one
+/// built whole, past the blocks a shorter table leaves.
+#[test]
+fn a_removal_patches_the_index_to_what_a_whole_build_makes() {
+    let value = sheet(40, 40);
+    let last_block = 1024;
+    let points = value.primitives().points() as u32;
+    value.primitives().index();
+    value.primitives().fingerprint();
+    let mut edit = Editor::new(&value);
+    (last_block..points - 1)
+        .step_by(7)
+        .for_each(|p| edit.remove_point(p));
+    edit.weld(0, 1);
+    edit.remove_primitive(3);
+    edit.remove_loose_points();
+    let (out, _) = edit.finish().unwrap();
+    let t = out.primitives();
+    let whole = Primitives::of_polygons(t.points(), t.offsets().clone(), t.vertices().clone());
+    let whole = whole.unwrap();
+    assert_eq!(t.fingerprint(), whole.fingerprint());
+    assert_eq!(t.edge_count(), whole.edge_count());
+    for p in 0..t.points() {
+        assert_eq!(
+            t.index().point_faces(p),
+            whole.index().point_faces(p),
+            "point {p}"
+        );
+    }
+    for e in 0..t.edge_count() {
+        assert_eq!(t.edge(e), whole.edge(e), "edge {e}");
+        assert_eq!(
+            t.index().edge_faces(e),
+            whole.index().edge_faces(e),
+            "edge {e}"
+        );
+    }
 }
 
 #[test]
@@ -204,13 +257,13 @@ fn removing_a_point_takes_its_corners_and_a_row_too_short_goes() {
     let mut edit = Editor::new(&value);
     edit.remove_point(1);
     let (out, change) = edit.finish().unwrap();
-    assert_eq!(out.primitives().primitive(0), [0, 3, 2], "the old 0 4 3");
-    assert_eq!(out.primitives().primitive(1), [1, 4, 3], "the old 2 5 4");
+    assert_eq!(out.primitives().primitive(0), [0, 4, 3], "the old 0 4 3");
+    assert_eq!(out.primitives().primitive(1), [2, 1, 4], "the old 2 5 4");
     assert_eq!(change.rewired, [0, 1]);
     let corner = column::<i32>(&out, Domain::Vertex, "corner");
     assert_eq!(corner, [0, 2, 3, 5, 6, 7]);
     let ids = column::<i64>(&out, Domain::Point, names::ID);
-    assert_eq!(ids, [100, 102, 103, 104, 105]);
+    assert_eq!(ids, [100, 105, 102, 103, 104]);
 }
 
 #[test]
@@ -221,16 +274,17 @@ fn welding_joins_points_and_collapses_what_became_one() {
     edit.weld(0, 1);
     let (out, change) = edit.finish().unwrap();
     assert_eq!(out.positions().len(), 5);
-    assert_eq!(out.primitives().primitive(0), [0, 3, 2], "the old 0 4 3");
+    assert_eq!(out.primitives().primitive(0), [0, 4, 3], "the old 0 4 3");
     assert_eq!(
         out.primitives().primitive(1),
-        [0, 1, 4, 3],
+        [0, 2, 1, 4],
         "the old 1 2 5 4"
     );
     assert_eq!(change.points.of(1), Some(0), "where the survivor is");
-    assert_eq!(change.points.of(2), Some(1));
+    assert_eq!(change.points.of(2), Some(2));
+    assert_eq!(change.points.of(5), Some(1), "the last point fills it");
     let ids = column::<i64>(&out, Domain::Point, names::ID);
-    assert_eq!(ids, [100, 102, 103, 104, 105]);
+    assert_eq!(ids, [100, 105, 102, 103, 104]);
     let corner = column::<i32>(&out, Domain::Vertex, "corner");
     assert_eq!(corner, [0, 2, 3, 4, 5, 6, 7]);
     assert_eq!(change.rewired, [0, 1]);
@@ -394,15 +448,15 @@ fn curves_stay_as_they_are_around_what_changes() {
     edit.add_primitive(Kind::POLYGON, &corners(&[0, 1, 2]), &[]);
     let (out, _) = edit.finish().unwrap();
     let table = out.primitives();
-    assert_eq!(table.kind(0), Kind::curve(Basis::Nurbs, false));
-    assert_eq!(table.kind(1), Kind::POLYLINE);
+    assert_eq!(table.kind(0), Kind::POLYLINE);
+    assert_eq!(table.kind(1), Kind::curve(Basis::Nurbs, false));
     assert_eq!(table.kind(2), Kind::POLYGON);
     let data = table.curves().unwrap();
-    assert_eq!(data.degrees().as_slice(), &[3, 1, 1]);
-    assert_eq!(data.knots().of(0).len(), 8);
+    assert_eq!(data.degrees().as_slice(), &[1, 3, 1]);
+    assert_eq!(data.knots().of(1).len(), 8);
     assert!(data.knots().of(2).is_empty());
     let weights = data.weights().unwrap();
-    assert_eq!(&weights.as_slice()[..4], &[2.0, 3.0, 4.0, 5.0]);
+    assert_eq!(&weights.as_slice()[2..6], &[2.0, 3.0, 4.0, 5.0]);
     assert_eq!(&weights.as_slice()[6..], &[1.0, 1.0, 1.0]);
     // The curve removed: no curve data.
     let mut edit = Editor::new(&value);

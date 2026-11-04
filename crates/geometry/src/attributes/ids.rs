@@ -8,37 +8,39 @@ const BLOCK: usize = 65_536;
 /// Hash buckets the values are sorted in, each checked on its own.
 const BUCKETS: usize = 64;
 
-/// Whether `new` is some of `old`'s ids in `old`'s order, then ascending
-/// ids above all of them: names each element once if `old` does, and tells
-/// so in one pass. What a kept column with fresh ids is, so an edit adding
-/// a few elements doesn't check a million again.
+/// Whether `new` is `old` with the ids of its other cells rearranged, some
+/// gone, and new ones above all of them: names each element once if `old`
+/// does, and tells so from the cells it doesn't share. What an edit's column
+/// is (kept ids where they were, the last ones filling holes, fresh ids
+/// after), so an edit doesn't check a million again.
 pub(super) fn kept_or_above(new: &Column<i64>, old: &Column<i64>) -> bool {
     let Some(top) = highest_id(old) else {
         return false;
     };
-    // The common case, an edit's: every old id where it was, new ones after.
-    let same = old.len() <= new.len()
-        && new.unshared(old).all(|r| {
-            let r = r.start..r.end.min(old.len());
-            r.clone().all(|i| new[i] == old[i])
-        });
-    let kept = if same {
-        old.len()
-    } else {
-        let mut rest = old.iter();
-        new.iter().take_while(|&id| rest.any(|o| o == id)).count()
+    let shared = old.len().min(new.len());
+    let differing = || (new.unshared(old)).map(|r| r.start.min(shared)..r.end.min(shared));
+    let of = |ids: &Column<i64>| -> Vec<i64> {
+        let mut list: Vec<i64> = differing().flatten().map(|i| ids[i]).collect();
+        list.extend((shared..ids.len()).map(|i| ids[i]));
+        list.sort_unstable();
+        list
     };
-    let mut before = top;
-    let fresh = (kept..new.len()).all(|i| {
-        let ascending = new[i] > before;
-        before = new[i];
-        ascending
+    let (was, now) = (of(old), of(new));
+    // Each id at most once, below the top from those the old cells held.
+    let mut held = was.iter().peekable();
+    let fine = now.iter().enumerate().all(|(i, &id)| {
+        let once = i == 0 || now[i - 1] != id;
+        once && (id > top || {
+            while held.next_if(|&&h| h < id).is_some() {}
+            held.peek() == Some(&&id)
+        })
     });
-    if fresh {
+    if fine {
         // What a later edit's check and fresh ids would look for.
-        new.derived(|_| Highest(Some(before)));
+        let highest = now.last().map_or(top, |&last| last.max(top));
+        new.derived(|_| Highest(Some(highest)));
     }
-    fresh
+    fine
 }
 
 /// The highest id of a column: its cache.

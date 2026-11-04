@@ -31,6 +31,12 @@ pub struct Numbers {
     /// The points welded away and those they became, by their numbers in
     /// the edit, ascending (never for primitives).
     pub(super) welded: Vec<(u32, u32)>,
+    /// The kept elements that took the number of one gone, and those
+    /// numbers, ascending. Every other kept element of the base keeps its
+    /// number.
+    pub(super) filled: Vec<(u32, u32)>,
+    /// How many elements the base had: those past them are new.
+    pub(super) base: u32,
 }
 
 impl Numbers {
@@ -42,10 +48,17 @@ impl Numbers {
             Ok(at) => self.welded[at].1,
             Err(_) => element,
         };
-        match self.removed.binary_search(&element) {
-            Ok(_) => None,
-            Err(before) => Some(element - before as u32),
+        let before = match self.removed.binary_search(&element) {
+            Ok(_) => return None,
+            Err(before) => before as u32,
+        };
+        if element >= self.base {
+            return Some(element - before);
         }
+        Some(match self.filled.binary_search_by_key(&element, |f| f.0) {
+            Ok(at) => self.filled[at].1,
+            Err(_) => element,
+        })
     }
 
     /// Whether every kept element kept its number.

@@ -1,59 +1,61 @@
 //! The table's fingerprint: BLAKE3 of the point and primitive counts and the
-//! digest of every cell of the offsets and the vertices (BLAKE3 of the
-//! cell's little-endian bytes); a table that isn't all polygons hashes that
-//! again with its kinds and curve data.
+//! digest of every block of [`ROWS`] rows (BLAKE3 of each row's length and
+//! corners, little-endian); a table that isn't all polygons hashes that again
+//! with its kinds and curve data.
 //!
 //! The digests are [`Digests`], kept with the table, so a table an edit made
-//! hashes only the cells it doesn't share with the table it came from. Cells
-//! fall at fixed places, so equal tables hash equal whatever made them.
+//! hashes only the blocks of the rows it wrote: a row of another length moves
+//! the vertices after it, and their rows' digests stay. Blocks fall at fixed
+//! rows, so equal tables hash equal whatever made them.
 use super::{Kind, Kinds, Primitives};
-use crate::column::Column;
 use crate::parallel;
 
 /// A hash.
 type Hash = [u8; 32];
 
-/// The digest of every cell of a table's two row columns.
+/// The rows a digest covers.
+const ROWS: usize = 4096;
+
+/// The digest of every block of a table's rows.
 #[derive(Clone, Debug)]
-pub(super) struct Digests {
-    offsets: Vec<Hash>,
-    vertices: Vec<Hash>,
-}
+pub(super) struct Digests(Vec<Hash>);
 
 impl Digests {
-    /// Every cell of `t` hashed.
+    /// Every block of `t` hashed.
     fn of(t: &Primitives) -> Self {
-        Self {
-            offsets: digests(&t.offsets, None),
-            vertices: digests(&t.vertices, None),
-        }
+        Self::after(t, &[], None)
     }
 
-    /// `t`'s digests, read from `base`'s (those of `of`) for the cells they
-    /// share.
-    pub(super) fn after(t: &Primitives, of: &Primitives, base: &Digests) -> Self {
-        Self {
-            offsets: digests(&t.offsets, Some((&of.offsets, &base.offsets))),
-            vertices: digests(&t.vertices, Some((&of.vertices, &base.vertices))),
-        }
+    /// `t`'s digests: read from `base`, the digests of a table of the same
+    /// rows but for `changed` (ascending), for the blocks holding none of
+    /// them.
+    pub(super) fn after(t: &Primitives, changed: &[u32], base: Option<&Digests>) -> Self {
+        let blocks = parallel::map(t.len().div_ceil(ROWS), 1, |blocks| {
+            (blocks.map(|b| {
+                let first = changed.partition_point(|&row| (row as usize) < b * ROWS);
+                let touched = changed
+                    .get(first)
+                    .is_some_and(|&row| (row as usize) < (b + 1) * ROWS);
+                match base.and_then(|base| base.0.get(b)).filter(|_| !touched) {
+                    Some(&digest) => digest,
+                    None => block(t, b),
+                }
+            }))
+            .collect::<Vec<_>>()
+        });
+        Self(blocks.into_iter().flatten().collect())
     }
 }
 
-/// `column`'s cell digests; a cell shared with `base`'s column is its digest.
-fn digests(column: &Column<u32>, base: Option<(&Column<u32>, &Vec<Hash>)>) -> Vec<Hash> {
-    let blocks = parallel::map(column.cell_count(), 1, |cells| {
-        cells
-            .map(|c| match base {
-                Some((from, hashes)) if column.shares_cell(from, c) => hashes[c],
-                _ => {
-                    let mut hash = blake3::Hasher::new();
-                    little_endian(&mut hash, column.cell(c));
-                    *hash.finalize().as_bytes()
-                }
-            })
-            .collect::<Vec<_>>()
-    });
-    blocks.into_iter().flatten().collect()
+/// Block `b`'s digest.
+fn block(t: &Primitives, b: usize) -> Hash {
+    let mut hash = blake3::Hasher::new();
+    for p in b * ROWS..((b + 1) * ROWS).min(t.len()) {
+        let row = t.primitive(p);
+        hash.update(&(row.len() as u32).to_le_bytes());
+        little_endian(&mut hash, row);
+    }
+    *hash.finalize().as_bytes()
 }
 
 pub(super) fn of(t: &Primitives) -> Hash {
@@ -61,7 +63,7 @@ pub(super) fn of(t: &Primitives) -> Hash {
     let mut hash = blake3::Hasher::new();
     hash.update(&(t.points as u64).to_le_bytes());
     hash.update(&(t.len() as u64).to_le_bytes());
-    for digest in digests.offsets.iter().chain(&digests.vertices) {
+    for digest in &digests.0 {
         hash.update(digest);
     }
     match &t.kinds {

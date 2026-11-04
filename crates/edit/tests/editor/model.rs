@@ -93,13 +93,17 @@ fn seeded_edits_agree_with_a_model_kept_by_ids() {
             }
         }
         let (out, change) = edit.finish().unwrap();
-        let kept: Vec<_> = model.iter().filter(|r| !r.1.is_empty()).collect();
         let t = out.primitives();
-        assert_eq!(t.len(), kept.len(), "seed {seed}");
+        let kept = model.iter().filter(|r| !r.1.is_empty()).count();
+        assert_eq!(t.len(), kept, "seed {seed}");
         let new_ids = column::<i64>(&out, Domain::Primitive, names::ID);
         let new_points = column::<i64>(&out, Domain::Point, names::ID);
         let corner = column::<i32>(&out, Domain::Vertex, "corner");
-        for (p, (id, row)) in kept.iter().enumerate() {
+        for (number, (id, row)) in model.iter().enumerate() {
+            if row.is_empty() {
+                continue;
+            }
+            let p = change.primitives.of(number as u32).unwrap() as usize;
             if let Some(id) = id {
                 assert_eq!(new_ids[p], *id, "seed {seed}");
             }

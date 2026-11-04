@@ -63,13 +63,12 @@ impl TableWriter<'_> {
     /// The base's `rows` next, as they are.
     ///
     /// # Panics
-    /// When `rows` are past the base's, or the writer's points are fewer
-    /// than the base's (a kept row may name any of them).
+    /// When `rows` are past the base's. With fewer points than the base's,
+    /// the [finish](Self::finish) refuses a kept row naming one past them.
     pub fn keep(&mut self, rows: Range<usize>) {
         if rows.is_empty() {
             return;
         }
-        assert!(self.points >= self.base.points, "a kept row names a point");
         let base = self.base;
         if rows.start != self.len() {
             self.written = None;
@@ -98,10 +97,15 @@ impl TableWriter<'_> {
             if self.offsets.is_empty() {
                 self.offsets.push(0);
             }
+            let mut moved = Vec::with_capacity(1024);
             for o in rows.start + 1..=rows.end {
-                self.offsets
-                    .push((i64::from(base.offsets[o]) + shift) as u32);
+                moved.push((i64::from(base.offsets[o]) + shift) as u32);
+                if moved.len() == moved.capacity() {
+                    self.offsets.extend_from_slice(&moved);
+                    moved.clear();
+                }
             }
+            self.offsets.extend_from_slice(&moved);
         }
     }
 
@@ -160,7 +164,7 @@ impl TableWriter<'_> {
     /// The new table, `curves` being its curve data when a row is a curve:
     /// only then is every row checked again. Its index, when the base's is
     /// built and few rows changed, is that index's with those rows' points
-    /// made again; its fingerprint likewise, by the cells it doesn't share.
+    /// made again; its fingerprint likewise, by those rows' blocks.
     ///
     /// # Errors
     /// A count past the limits, or the rule a table with curves breaks.
@@ -174,6 +178,7 @@ impl TableWriter<'_> {
         limits::check(offsets.len() - 1, limits::MAX_PRIMITIVES, "primitives")?;
         limits::check(vertices.len(), limits::MAX_VERTICES, "vertices")?;
         let rows = offsets.len() - 1;
+        check_kept(base, self.points, self.written.as_deref(), &vertices, rows)?;
         let table = if curves.is_some() || base.curves.is_some() {
             let kinds = match self.uniform {
                 Some(kind) => Column::new(vec![kind; rows]),
@@ -191,16 +196,57 @@ impl TableWriter<'_> {
             };
             Primitives::unchecked(self.points, offsets, vertices, kinds, None)
         };
-        if let Some(digests) = base.digests.get() {
-            let _ = table.digests.set(Digests::after(&table, base, digests));
-        }
         // Rows past the new table's are gone: their points' rows change.
-        if let (Some(index), Some(mut changed)) = (base.index.get(), self.written) {
+        let changed = self.written.map(|mut changed| {
             changed.extend(rows as u32..base.len() as u32);
+            changed
+        });
+        if let Some(digests) = base.digests.get() {
+            let digests = match &changed {
+                Some(changed) => Digests::after(&table, changed, Some(digests)),
+                None => Digests::after(&table, &[], None),
+            };
+            let _ = table.digests.set(digests);
+        }
+        if let (Some(index), Some(changed)) = (base.index.get(), &changed) {
             let _ = table
                 .index
-                .set(index::patched(index, base, &table, &changed));
+                .set(index::patched(index, base, &table, changed));
         }
         Ok(table)
     }
+}
+
+/// With fewer points than `base`: that rows kept don't name those past them.
+/// Costs those points' rows, or a look at every vertex when too many rows
+/// were `written` to list.
+fn check_kept(
+    base: &Primitives,
+    points: usize,
+    written: Option<&[u32]>,
+    vertices: &Column<u32>,
+    rows: usize,
+) -> Result<(), Error> {
+    if points >= base.points {
+        return Ok(());
+    }
+    let Some(written) = written else {
+        return match vertices.iter().position(|&p| p as usize >= points) {
+            Some(at) => Err(Error::invalid(format!(
+                "vertex {at} references a missing point"
+            ))),
+            None => Ok(()),
+        };
+    };
+    for p in points..base.points {
+        for row in base.index().point_primitives(p) {
+            if (row as usize) < rows && written.binary_search(&row).is_err() {
+                return Err(
+                    Error::invalid(format!("primitive {row} references a missing point"))
+                        .element(row as usize),
+                );
+            }
+        }
+    }
+    Ok(())
 }

@@ -183,19 +183,6 @@ impl<T> Column<T> {
         }
     }
 
-    /// How many cells it holds.
-    pub(crate) fn cell_count(&self) -> usize {
-        self.0.cells.len()
-    }
-
-    /// Whether cell `c` of `self` and of `other` are one cell.
-    pub(crate) fn shares_cell(&self, other: &Self, c: usize) -> bool {
-        match (self.0.cells.get(c), other.0.cells.get(c)) {
-            (Some(a), Some(b)) => a.same(b) && self.cell(c).len() == other.cell(c).len(),
-            _ => false,
-        }
-    }
-
     /// Cell `c`'s values.
     #[inline]
     pub(crate) fn cell(&self, c: usize) -> &[T] {
@@ -341,6 +328,28 @@ impl<T> Column<T> {
         let longer = self.0.len.max(other.0.len);
         let past = (shorter < longer).then_some(shorter..longer);
         differing.chain(past)
+    }
+
+    /// The ranges of values in cells of buffers `other` doesn't hold, in
+    /// order: what an edit of `other` wrote, wherever a kept run of it fell.
+    /// So checking what an edit made reads what it wrote, even past a row
+    /// that changed length. Read at the cost of the cell counts.
+    pub(crate) fn written_since<'a>(
+        &'a self,
+        other: &Self,
+    ) -> impl Iterator<Item = Range<usize>> + 'a {
+        let held: std::collections::HashSet<*const Vec<T>> = other
+            .0
+            .cells
+            .iter()
+            .map(|c| Arc::as_ptr(&c.buffer))
+            .collect();
+        (self.0.cells.iter().enumerate())
+            .filter(move |(_, cell)| !held.contains(&Arc::as_ptr(&cell.buffer)))
+            .map(|(c, _)| {
+                let start = c << Self::SHIFT;
+                start..(start + Self::CELL).min(self.0.len)
+            })
     }
 
     /// This column's values to change: nothing is copied until a value is

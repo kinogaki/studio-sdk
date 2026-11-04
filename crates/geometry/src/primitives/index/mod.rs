@@ -245,21 +245,20 @@ impl Index {
     }
 
     /// Walks this index's edges in order against `base`'s: `each` gets runs
-    /// of `base`'s numbers for edges both have, and each edge only this one
-    /// has. Blocks they share cost nothing per edge.
+    /// of `base`'s numbers for the blocks they share, at no cost per edge,
+    /// and every other edge, which the caller looks up as its numbering asks.
     pub fn compare_edges(&self, base: &Index, mut each: impl FnMut(Result<Range<u32>, Edge>)) {
         for (b, block) in self.blocks.iter().enumerate() {
-            let first = base.first_edge.get(b).copied().unwrap_or(0);
-            let was = base.blocks.get(b);
-            if was.is_some_and(|was| Arc::ptr_eq(was, block)) {
+            if base
+                .blocks
+                .get(b)
+                .is_some_and(|was| Arc::ptr_eq(was, block))
+            {
+                let first = base.first_edge[b];
                 each(Ok(first..first + block.edge_count()));
                 continue;
             }
-            for edge in block.edges(b << SHIFT) {
-                let [low, high] = edge.points;
-                let found = was.and_then(|was| was.edge_at(low as usize & (POINTS - 1), high));
-                each(found.map(|e| first + e..first + e + 1).ok_or(edge));
-            }
+            block.edges(b << SHIFT).for_each(|edge| each(Err(edge)));
         }
     }
 
@@ -332,7 +331,8 @@ fn atomics(len: usize) -> Vec<AtomicU32> {
 /// `index` over `t`, a table with the rows of `index`'s table `base` but for
 /// `changed` (ascending; rows of `t`, of `base` or of both, whose corners
 /// differ, and the rest keep their numbers): the blocks of the points those
-/// rows name are made again, the others shared.
+/// rows name are made again, the others shared. Fewer points: those past the
+/// new count are named only by those rows, and the block they end in is cut.
 pub(super) fn patched(index: &Index, base: &Primitives, t: &Primitives, changed: &[u32]) -> Index {
     let was = |r: u32| (r as usize) < base.len();
     let is = |r: u32| (r as usize) < t.len();
@@ -352,12 +352,17 @@ pub(super) fn patched(index: &Index, base: &Primitives, t: &Primitives, changed:
     touched.extend(named.iter().map(|n| n.0));
     touched.sort_unstable();
     touched.dedup();
+    touched.truncate(touched.partition_point(|&p| (p as usize) < t.points));
+    let cut = t.points < base.points && !t.points.is_multiple_of(POINTS);
     let mut blocks = index.blocks.clone();
     blocks.resize(t.points.div_ceil(POINTS), Arc::default());
     let mut corners = Corners::default();
     let mut at = 0;
-    while at < touched.len() {
-        let b = touched[at] as usize >> SHIFT;
+    let last = t.points >> SHIFT;
+    let mut patched_last = false;
+    while at < touched.len() || (cut && !patched_last) {
+        let b = touched.get(at).map_or(last, |&p| p as usize >> SHIFT);
+        patched_last |= b == last;
         let end = at + touched[at..].partition_point(|&p| p as usize >> SHIFT == b);
         let points = b << SHIFT..((b + 1) << SHIFT).min(t.points);
         let inside = &touched[at..end];

@@ -191,14 +191,14 @@ fn numbers_stay_put_during_an_edit_and_the_change_says_where_they_went() {
     assert_eq!(change.points.of(0), None);
     assert_eq!(change.points.of(removed_new), None);
     assert_eq!(change.points.added, 8..9);
-    assert_eq!(change.moved, [7], "point 8 is 7 now");
-    assert_eq!(out.positions()[7], [8.0; 3]);
+    assert_eq!(change.moved, [0], "point 8 fills 0");
+    assert_eq!(out.positions()[0], [8.0; 3]);
     assert_eq!(out.positions()[8], [7.0; 3]);
     assert_eq!(change.primitives.of(f), Some(4));
     assert_eq!(change.primitives.of(gone), None);
     assert_eq!(change.primitives.added, 4..5);
     assert_eq!(change.primitives.removed, [gone]);
-    assert_eq!(out.primitives().primitive(4), [7, 6, 8]);
+    assert_eq!(out.primitives().primitive(4), [0, 7, 8]);
     let ids = column::<i64>(&out, Domain::Point, names::ID);
     assert_eq!(ids.last(), Some(&109), "the survivor's");
     assert_eq!(column::<i32>(&out, Domain::Point, "tag")[8], 8);
@@ -207,16 +207,16 @@ fn numbers_stay_put_during_an_edit_and_the_change_says_where_they_went() {
 #[test]
 fn selections_find_their_elements_again_through_ids() {
     let value = ruled(2, 2);
-    let members = Elements::from_indices(9, [3, 5]).unwrap();
-    let s = Selection::on(&value, Domain::Point, members, Some(5)).unwrap();
+    let members = Elements::from_indices(9, [3, 8]).unwrap();
+    let s = Selection::on(&value, Domain::Point, members, Some(8)).unwrap();
     let mut edit = Editor::new(&value);
     edit.remove_point(0);
     edit.add_point([0.0; 3], &[(5, 1.0)]);
     let (out, _) = edit.finish().unwrap();
     assert!(s.validate(&out).is_err(), "numbers mean others now");
     let found = select::reresolve(&s, &out).unwrap();
-    assert_eq!(found.members().iter().collect::<Vec<_>>(), [2, 4]);
-    assert_eq!(found.active(), Some(4));
+    assert_eq!(found.members().iter().collect::<Vec<_>>(), [0, 3]);
+    assert_eq!(found.active(), Some(0));
     // A points-only edit leaves the selection itself valid.
     let mut edit = Editor::new(&value);
     edit.set_position(3, [1.0; 3]);
