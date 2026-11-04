@@ -22,8 +22,8 @@ use std::ops::Range;
 /// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
 /// let bare = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
 /// let numbered = ids::numbered(&bare).unwrap();
-/// assert_eq!(numbered.ids(Domain::Point).unwrap().as_ref(), [0, 1, 2]);
-/// assert_eq!(numbered.ids(Domain::Primitive).unwrap().as_ref(), [0]);
+/// assert_eq!(numbered.ids(Domain::Point).unwrap().to_vec(), [0, 1, 2]);
+/// assert_eq!(numbered.ids(Domain::Primitive).unwrap().to_vec(), [0]);
 /// ```
 ///
 /// # Errors
