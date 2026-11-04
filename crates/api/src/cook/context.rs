@@ -1,7 +1,7 @@
 //! [`CookCx`]: everything one cook may read besides its inputs.
 use crate::cancel::CancelToken;
 use crate::components::Components;
-use crate::cook::{Error, Inside, Iteration, Project, Resolved};
+use crate::cook::{Error, Inside, Iteration, Project, Resolved, Written};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, Value};
@@ -200,6 +200,15 @@ impl<'a> CookCx<'a> {
     pub fn path(&self, name: &str) -> Option<&str> {
         self.resolved.iter().find_map(|(n, r)| match r {
             Resolved::Path(path) if n == name => Some(path.as_str()),
+            _ => None,
+        })
+    }
+
+    /// What row `name`, fitting [`Fits::Written`](crate::params::Fits::Written),
+    /// names; `None` when it names nothing, which core warns about on the node.
+    pub fn written(&self, name: &str) -> Option<&Written> {
+        self.resolved.iter().find_map(|(n, r)| match r {
+            Resolved::Written(written) if n == name => Some(written),
             _ => None,
         })
     }

@@ -46,6 +46,9 @@ pub enum CanvasPiece {
         opacity: f32,
         /// The node that placed it, when one did and it can be arranged.
         source: Option<PieceSource>,
+        /// What shows over its plane while it is live; `image` shows when it
+        /// isn't.
+        live: Option<LiveResult>,
     },
     /// A block of text, composited with the images in its place among the
     /// pieces. Its plane has X 0 at the alignment point of its lines and

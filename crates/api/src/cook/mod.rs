@@ -162,10 +162,20 @@ pub enum Resolved {
     /// What the path names: an object's result, or a node's.
     Object(Data),
     /// The path itself, as core resolved it from the node (absolute), for
-    /// a path the node writes rather than reads (a Material's); or the file
-    /// what it names writes ([`Fits::Written`](crate::params::Fits::Written)),
-    /// present on disk.
+    /// a path the node writes rather than reads (a Material's).
     Path(String),
+    /// What a row fitting [`Fits::Written`](crate::params::Fits::Written) names.
+    Written(Written),
+}
+
+/// What a row fitting [`Fits::Written`](crate::params::Fits::Written) names:
+/// what it wrote, and what shows it live.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Written {
+    /// The file it wrote, present on disk.
+    pub file: Option<String>,
+    /// The result that shows it live, of this many pixels, when it can be.
+    pub live: Option<(crate::facets::LiveResult, [u32; 2])>,
 }
 
 /// The project a cook reads ([`Reads::project`]).
