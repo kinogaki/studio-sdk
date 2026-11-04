@@ -20,7 +20,8 @@ use kinogaki_viewport_api::{
     BufferRanges, Column, DrawUpdate, LineClass, LineClassId, LineStyle, Vertex,
 };
 pub use kinogaki_viewport_api::{
-    ElementKind, ElementSet, OverlayVertex, SurfaceSource, pack_linear, packet_as,
+    ElementKind, ElementSet, GuideDraw, LineLayer, OverlayLine, OverlayVertex, SurfaceSource,
+    pack_linear, packet_as,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
