@@ -84,7 +84,14 @@ pub fn convert_by(
         return Ok(s.clone());
     }
     let targets = target(on, to)?;
-    let mut chosen = vec![false; on.count(s.domain()).unwrap_or(0)];
+    let sources = on.count(s.domain()).unwrap_or(0);
+    // A few elements cost what they touch, not what the value holds.
+    if s.members().len().saturating_mul(FEW) < sources
+        && let Some(members) = few_elements(s, on, to, coverage, targets)?
+    {
+        return Selection::on(on, to, members, None);
+    }
+    let mut chosen = vec![false; sources];
     for i in s.members().iter() {
         chosen[i as usize] = true;
     }
@@ -103,6 +110,43 @@ pub fn convert_by(
         touched[i as usize] && (!whole || !missing[i as usize])
     });
     Selection::on(on, to, members, None)
+}
+
+/// A selection this many times smaller than its domain converts by
+/// [`few_elements`].
+const FEW: usize = 8;
+
+/// What [`convert_by`] makes of `s` through its elements alone; `None` when
+/// `on` has no such way for this pair of domains.
+fn few_elements(
+    s: &Selection,
+    on: &dyn Incidence,
+    to: Domain,
+    coverage: Coverage,
+    targets: usize,
+) -> Result<Option<Elements>, Error> {
+    let mut touched = Vec::new();
+    let asked = &mut s.members().iter();
+    if !on.incident_of(s.domain(), to, asked, &mut |_, target| touched.push(target)) {
+        return Ok(None);
+    }
+    touched.sort_unstable();
+    touched.dedup();
+    if coverage == Coverage::Whole {
+        let mut missing = Vec::new();
+        let asked = &mut touched.iter().copied();
+        let known = on.incident_of(to, s.domain(), asked, &mut |target, source| {
+            if !s.members().contains(source) {
+                missing.push(target);
+            }
+        });
+        if !known {
+            return Ok(None);
+        }
+        missing.sort_unstable();
+        touched.retain(|target| missing.binary_search(target).is_err());
+    }
+    Elements::from_indices(targets, touched).map(Some)
 }
 
 /// The selected elements of `on`, ascending (shared when the selection

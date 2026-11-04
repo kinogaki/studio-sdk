@@ -431,3 +431,67 @@ fn a_boundary_is_a_regions_outline() {
     let other = sheet(1, 1);
     assert!(select::boundary(&region, &other).is_err());
 }
+
+/// A few elements convert through the index as the whole value does: every
+/// pair of domains, every one element alone, a grid of quads with a polyline
+/// off its corner.
+#[test]
+fn a_few_elements_convert_as_the_whole_value_says() {
+    use kinogaki_geometry::Incidence;
+    const N: u32 = 6;
+    let at = |x: u32, y: u32| y * (N + 1) + x;
+    let mut positions: Vec<[f64; 3]> = (0..(N + 1) * (N + 1))
+        .map(|p| [f64::from(p % (N + 1)), f64::from(p / (N + 1)), 0.0])
+        .collect();
+    let (mut offsets, mut corners, mut kinds) = (vec![0u32], Vec::new(), Vec::new());
+    for y in 0..N {
+        for x in 0..N {
+            corners.extend([at(x, y), at(x + 1, y), at(x + 1, y + 1), at(x, y + 1)]);
+            offsets.push(corners.len() as u32);
+            kinds.push(Kind::POLYGON);
+        }
+    }
+    let line = positions.len() as u32;
+    positions.extend([[-1.0, -1.0, 0.0], [-2.0, -2.0, 0.0]]);
+    corners.extend([at(0, 0), line, line + 1]);
+    offsets.push(corners.len() as u32);
+    kinds.push(Kind::POLYLINE);
+    let topology = Primitives::new(
+        positions.len(),
+        offsets.into(),
+        corners.into(),
+        kinds.into(),
+        None,
+    )
+    .unwrap();
+    let value = Geometry::new(positions.into(), topology, Attributes::new()).unwrap();
+    let domains = [Domain::Point, Domain::Edge, Domain::Primitive];
+    for from in domains {
+        let count = value.count(from).unwrap() as u32;
+        assert!(count > 8, "{from:?}: one element is a few");
+        for element in 0..count {
+            let members = Elements::from_indices(count as usize, [element]).unwrap();
+            let s = Selection::on(&value, from, members, None).unwrap();
+            for to in domains.into_iter().filter(|&to| to != from) {
+                for coverage in [Coverage::Any, Coverage::Whole] {
+                    let targets = value.count(to).unwrap();
+                    let (mut touched, mut missing) = (vec![false; targets], vec![false; targets]);
+                    value.incident(from, to, &mut |a, b| match a == element {
+                        true => touched[b as usize] = true,
+                        false => missing[b as usize] = true,
+                    });
+                    let wanted: Vec<u32> = (0..targets)
+                        .filter(|&t| touched[t] && (coverage == Coverage::Any || !missing[t]))
+                        .map(|t| t as u32)
+                        .collect();
+                    let got = select::convert_by(&s, &value, to, coverage).unwrap();
+                    assert_eq!(
+                        got.members().iter().collect::<Vec<_>>(),
+                        wanted,
+                        "{from:?} {element} to {to:?} {coverage:?}"
+                    );
+                }
+            }
+        }
+    }
+}

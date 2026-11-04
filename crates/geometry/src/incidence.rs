@@ -21,6 +21,20 @@ pub trait Incidence {
     /// every element touches the one Detail.
     fn incident(&self, from: Domain, to: Domain, pair: &mut dyn FnMut(u32, u32));
 
+    /// What [`incident`](Self::incident) calls for the listed elements of
+    /// `from`, at the cost of those rather than of the whole value; `false`,
+    /// having called nothing, for a pair it has no such way to.
+    fn incident_of(
+        &self,
+        from: Domain,
+        to: Domain,
+        elements: &mut dyn Iterator<Item = u32>,
+        pair: &mut dyn FnMut(u32, u32),
+    ) -> bool {
+        let _ = (from, to, elements, pair);
+        false
+    }
+
     /// The fingerprint a selection made on it keeps: equal fingerprints
     /// number the same elements alike ([`Selection::validate`](crate::Selection::validate)).
     fn fingerprint(&self) -> [u8; 32];
@@ -76,6 +90,53 @@ impl Incidence for Geometry {
                 }
             }
         }
+    }
+
+    /// By the table's one index: points, edges and primitives touch each
+    /// other through it.
+    fn incident_of(
+        &self,
+        from: Domain,
+        to: Domain,
+        elements: &mut dyn Iterator<Item = u32>,
+        pair: &mut dyn FnMut(u32, u32),
+    ) -> bool {
+        let topology = self.primitives();
+        let index = topology.index();
+        match (from, to) {
+            (Domain::Point, Domain::Edge) => {
+                for p in elements {
+                    index.point_every_edge(p as usize).for_each(|e| pair(p, e));
+                }
+            }
+            (Domain::Edge, Domain::Point) => {
+                for e in elements {
+                    (index.edge(e as usize).points.iter()).for_each(|&p| pair(e, p));
+                }
+            }
+            (Domain::Point, Domain::Primitive) => {
+                for p in elements {
+                    index.point_primitives(p as usize).for_each(|f| pair(p, f));
+                }
+            }
+            (Domain::Primitive, Domain::Point) => {
+                for f in elements {
+                    (topology.primitive(f as usize).iter()).for_each(|&p| pair(f, p));
+                }
+            }
+            (Domain::Edge, Domain::Primitive) => {
+                for e in elements {
+                    index.edge_primitives(e as usize).for_each(|f| pair(e, f));
+                }
+            }
+            (Domain::Primitive, Domain::Edge) => {
+                for f in elements {
+                    index.primitive_edges(f as usize).for_each(|e| pair(f, e));
+                }
+            }
+            _ => return false,
+        }
+        true
     }
 
     fn fingerprint(&self) -> [u8; 32] {
