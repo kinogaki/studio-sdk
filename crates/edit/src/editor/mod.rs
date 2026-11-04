@@ -70,6 +70,7 @@ mod split;
 
 pub use carry::{Rule, rule};
 pub use change::{Change, Numbers};
+pub use finish::place;
 pub use gather::{Placed, gather, gather_table, spread};
 
 use crate::deform::Deform;

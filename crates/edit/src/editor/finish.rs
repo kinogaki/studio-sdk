@@ -13,6 +13,41 @@ use kinogaki_geometry::{
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+/// `base` with `points` at `at` and nothing else changed: an edit's finish when
+/// it moved only points, with no list of changes on the way, so a deformer that
+/// moves every point of a million in each cook of a drag costs one write.
+///
+/// ```
+/// use kinogaki_edit::editor::place;
+/// use kinogaki_geometry::{Attributes, Geometry, Primitives};
+/// use std::sync::Arc;
+///
+/// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+/// let flat = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
+/// let (lifted, change) = place(&flat, &[2], &[[0.0, 0.0, 1.0]]).unwrap();
+/// assert!(Arc::ptr_eq(lifted.primitives(), flat.primitives()));
+/// assert_eq!(change.moved, [2]);
+/// ```
+///
+/// # Errors
+/// A point past the last, a bad position, or not one position a point.
+pub fn place(
+    base: &Geometry,
+    points: &[u32],
+    at: &[[f64; 3]],
+) -> Result<(Geometry, Change), Error> {
+    if points.is_empty() {
+        return Ok((base.clone(), Change::default()));
+    }
+    let value = base.with_moved(points, at)?;
+    let moved = value.moved_points(base);
+    let change = Change {
+        moved,
+        ..Change::default()
+    };
+    Ok((value, change))
+}
+
 /// Where a new table's elements came from.
 struct Rows {
     primitives: Layout,
@@ -49,16 +84,7 @@ impl Editor {
         let mut moved: Vec<(u32, [f64; 3])> = self.moved.into_iter().collect();
         moved.sort_unstable_by_key(|m| m.0);
         let (points, at): (Vec<u32>, Vec<[f64; 3]>) = moved.into_iter().unzip();
-        if points.is_empty() {
-            return Ok((self.base, Change::default()));
-        }
-        let value = self.base.with_moved(&points, &at)?;
-        let moved = value.moved_points(&self.base);
-        let change = Change {
-            moved,
-            ..Change::default()
-        };
-        Ok((value, change))
+        place(&self.base, &points, &at)
     }
 
     /// Anything else: what the changes reach is written again.
