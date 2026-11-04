@@ -20,7 +20,7 @@
 //! [`LightCodec`], [`MaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
-//! [`ColorConfiguration`],
+//! [`ColorConfiguration`], [`DisplayOutput`],
 //! [`Tolerances`](crate::geometry::Tolerances) and
 //! [`DisplayQuality`](crate::geometry::DisplayQuality) are project values
 //! core keeps ([`Stored`](crate::Stored), `color`, `tolerances` and
@@ -37,6 +37,7 @@ mod image;
 mod instances;
 mod light;
 mod materials;
+mod output;
 mod quality;
 mod selection;
 mod tolerances;
@@ -49,6 +50,7 @@ pub use image::ImageCodec;
 pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
 pub use light::LightCodec;
 pub use materials::{ImportedMaterial, MaterialsCodec};
+pub use output::{BackgroundSpace, DisplayOutput};
 
 use crate::Error;
 use crate::components::Components;

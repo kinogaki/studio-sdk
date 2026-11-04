@@ -82,6 +82,12 @@ pub trait ColorService: Send + Sync + Debug {
         vec![self.working().to_owned()]
     }
 
+    /// The displays a picture can be made for: standard dynamic range, with a
+    /// tag a written file carries; by name, none by default.
+    fn target_displays(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     /// What its configuration got wrong (an unreadable config, a space it
     /// lacks), with what stands in; none by default.
     fn problem(&self) -> Option<Diagnostic> {

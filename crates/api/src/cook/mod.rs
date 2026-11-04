@@ -401,8 +401,9 @@ pub trait NodeType: Any + Send + Sync {
 
     /// Where pressing button `button` of its rows writes the node's value as
     /// a picture (a File Out: its Canvas facet's pieces composited at the
-    /// picture's size, in the file's format, through the color service's
-    /// pinned sRGB ACES 2.0 SDR view), as the row holds it; `None`: it writes
+    /// picture's size, for the project's
+    /// [`DisplayOutput`](crate::standard::DisplayOutput), as the canvas shows
+    /// it), as the row holds it; `None`: it writes
     /// nothing. Core runs the write off the UI thread and says on the status
     /// line how it went.
     fn writes(&self, button: &str, parameters: &Parameters) -> Option<String> {
