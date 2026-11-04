@@ -6,9 +6,64 @@
 //! ones ([`merged`]). So an id names one element for as long as it lives,
 //! whatever is inserted or removed around it, and a selection holding ids
 //! is found again after a change upstream ([`reresolve`](crate::select::reresolve)).
-use kinogaki_geometry::{Column, highest_id};
-use std::collections::HashSet;
+use kinogaki_geometry::{
+    Attribute, Column, Domain, Error, Geometry, Incidence, Meaning, highest_id, names,
+};
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
+
+/// `value` with ids on its points and primitives, where it has none: what
+/// stored edits name elements by. Those without take their numbers.
+///
+/// ```
+/// use kinogaki_edit::ids;
+/// use kinogaki_geometry::{Attributes, Domain, Geometry, Incidence, Primitives};
+///
+/// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+/// let bare = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
+/// let numbered = ids::numbered(&bare).unwrap();
+/// assert_eq!(numbered.ids(Domain::Point).unwrap().as_ref(), [0, 1, 2]);
+/// assert_eq!(numbered.ids(Domain::Primitive).unwrap().as_ref(), [0]);
+/// ```
+///
+/// # Errors
+/// What the attribute table refuses.
+pub fn numbered(value: &Geometry) -> Result<Geometry, Error> {
+    if value.ids(Domain::Point).is_some() && value.ids(Domain::Primitive).is_some() {
+        return Ok(value.clone());
+    }
+    let mut attributes = (**value.attributes()).clone();
+    for domain in [Domain::Point, Domain::Primitive] {
+        if value.ids(domain).is_none() {
+            let count = value.count(domain).unwrap_or(0) as i64;
+            let ids = Attribute::tuples((0..count).collect::<Vec<i64>>(), Meaning::None)?;
+            attributes = attributes.with(domain, names::ID, ids)?;
+        }
+    }
+    value.with_attributes(attributes)
+}
+
+/// The elements of `domain` in `value` with these ids, in their order;
+/// those gone left out.
+///
+/// ```
+/// use kinogaki_edit::ids;
+/// use kinogaki_geometry::{Attributes, Domain, Geometry, Primitives};
+///
+/// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+/// let bare = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
+/// let numbered = ids::numbered(&bare).unwrap();
+/// assert_eq!(ids::elements(&numbered, Domain::Point, &[2, 7, 0]), [2, 0]);
+/// ```
+pub fn elements(value: &Geometry, domain: Domain, ids: &[i64]) -> Vec<u32> {
+    let Some(now) = value.ids(domain) else {
+        return Vec::new();
+    };
+    let at: HashMap<i64, u32> = (now.iter().enumerate())
+        .map(|(i, &id)| (id, i as u32))
+        .collect();
+    ids.iter().filter_map(|id| at.get(id).copied()).collect()
+}
 
 /// `count` ids above every one of `existing`: what new or copied
 /// elements take. `None` when they would pass `i64::MAX`.

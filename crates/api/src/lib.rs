@@ -115,7 +115,7 @@ pub use cook::{
     NodeType, Outputs, Port, Ports, PortsCx, Prepared, Project, Reads, Resolved, RowsFor, SchemaCx,
 };
 pub use data::{Data, Typed};
-pub use data_type::{Color, DataType, InfoRow, Stamp};
+pub use data_type::{Color, DataType, InfoRow, Stamp, stamp_of};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use facets::{
     CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn, Look, Materials,

@@ -109,6 +109,16 @@ impl Symmetry {
         self.offset
     }
 
+    /// How near the plane a point lies on it.
+    pub fn tolerance(&self) -> f64 {
+        self.tolerance
+    }
+
+    /// The side that moves by the move itself.
+    pub fn primary(&self) -> Side {
+        self.primary
+    }
+
     /// The side `p` lies on.
     pub fn side(&self, p: Vec3) -> Side {
         let d = self.axis.of(p) - self.offset;

@@ -60,6 +60,24 @@ impl InfoRow {
 /// from a file). Caches that outlive one allocation key on it.
 pub type Stamp = [u8; 32];
 
+/// `value`'s hash as a [`Stamp`]: for a data type whose content hashes
+/// (a list of edits). A value hashing its floats by their bits gets one stamp
+/// per bit pattern.
+pub fn stamp_of(value: &impl std::hash::Hash) -> Stamp {
+    use std::hash::Hasher;
+    let word = |salt: u64| {
+        let mut hasher = std::hash::DefaultHasher::new();
+        hasher.write_u64(salt);
+        value.hash(&mut hasher);
+        hasher.finish().to_le_bytes()
+    };
+    let mut stamp = [0; 32];
+    for (salt, bytes) in stamp.chunks_mut(8).enumerate() {
+        bytes.copy_from_slice(&word(salt as u64));
+    }
+    stamp
+}
+
 /// A kind of value that flows on wires and stands as an object's result.
 ///
 /// Every method takes values of this type only: the environment calls a

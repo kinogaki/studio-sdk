@@ -51,10 +51,11 @@ pub use materials::PreviewMaterialsCodec;
 use crate::Error;
 use crate::components::Components;
 use crate::data::Typed;
+use crate::facets::Combine;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
-use kinogaki_geometry::{Domain, Geometry, Selection};
+use kinogaki_geometry::{Domain, Elements, Geometry, Selection};
 use kinogaki_render_api::ImportedMaterial;
 
 /// The id of [`Geometry`] values: polygons, polylines and curves.
@@ -118,6 +119,44 @@ pub const fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
 pub fn components(ty: DataTypeId, selection: Selection) -> Components {
     let level = level(selection.domain());
     Components::new(ty, level, selection.len(), selection)
+}
+
+/// `hit` combined into the sets `current` as `how` says, one set per element
+/// kind: Replace keeps the hit's kind alone; the others combine it into its
+/// kind's set and keep the other kinds' sets (Shift-picking an edge beside
+/// faces keeps both). What a context's levels do with a pick of a standard
+/// value.
+pub fn combined(current: &[Components], hit: &Components, how: Combine) -> Vec<Components> {
+    if how == Combine::Replace {
+        return vec![combined_set(None, hit, how)];
+    }
+    let mut sets = current.to_vec();
+    match sets.iter().position(|c| c.level() == hit.level()) {
+        Some(at) => sets[at] = combined_set(Some(&sets[at]), hit, how),
+        None => sets.push(combined_set(None, hit, how)),
+    }
+    sets
+}
+
+/// `hit` combined into `current`, a set of its kind (of another value's
+/// count: nothing kept of it).
+fn combined_set(current: Option<&Components>, hit: &Components, how: Combine) -> Components {
+    let Some(new) = hit.selection() else {
+        return hit.clone();
+    };
+    let count = new.members().count();
+    let old = (current.and_then(Components::selection))
+        .map(|s| s.members().clone())
+        .filter(|m| m.count() == count)
+        .unwrap_or_else(|| Elements::none(count));
+    let members = match how {
+        Combine::Replace | Combine::Add => old.union(new.members()),
+        Combine::Remove => old.difference(new.members()),
+        Combine::Toggle => old.symmetric_difference(new.members()),
+    }
+    .expect("sets of one count");
+    let selection = Selection::new(new.domain(), members, None).expect("no active one");
+    components(hit.ty(), selection)
 }
 
 /// The viewport's element kind that shows elements of `domain`: Primitive
