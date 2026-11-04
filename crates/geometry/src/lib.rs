@@ -124,6 +124,7 @@ mod vec3;
 mod vector;
 mod xform;
 
+pub mod nearest;
 pub use attributes::highest_id;
 pub use attributes::names;
 pub use attributes::{

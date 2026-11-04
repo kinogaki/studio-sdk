@@ -85,7 +85,7 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
         Some(K::Choice { .. }) => Value::Choice(text()?.into()),
         Some(
             K::Text
-            | K::Code { .. }
+            | K::Code
             | K::File
             | K::Path
             | K::Reference(_)
