@@ -20,7 +20,8 @@ impl Dirty {
     /// ([`Column::ptr_eq`](crate::geometry::Column::ptr_eq)): an unchanged
     /// primvar is the same column.
     pub const PRIMVARS: Dirty = Dirty(1 << 2);
-    /// Which materials a shape's primitives render with.
+    /// Which materials a shape's primitives, or an Instancer's instances,
+    /// render with.
     pub const MATERIALS: Dirty = Dirty(1 << 3);
     /// A placement (a shape's, a Camera's or a Light's, an Instancer's or its
     /// instances'), or its samples across the shutter.
