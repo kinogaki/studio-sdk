@@ -31,6 +31,9 @@ pub struct FlatNode<'a> {
     /// Bypassed: what that means is the compiler's (Comp passes the first
     /// input's image on).
     pub bypass: bool,
+    /// Frozen: what it keeps, one value per output port. It reads nothing
+    /// upstream; how it shows them is the compiler's.
+    pub kept: Option<&'a crate::cook::Outputs>,
 }
 
 impl FlatNode<'_> {

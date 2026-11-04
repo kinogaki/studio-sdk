@@ -205,6 +205,7 @@ fn a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network() {
                 .collect(),
         ],
         bypass,
+        kept: None,
     };
     let flat = Flat {
         nodes: vec![
