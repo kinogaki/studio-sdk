@@ -1,6 +1,6 @@
 //! What a small edit of a 1M-point value costs, in the release profile:
 //! `cargo run --release -p kinogaki-edit --example measure_edit`. Each row
-//! is the median of 21 runs; the bytes are the columns it wrote anew.
+//! is the median of 21 runs.
 use kinogaki_edit::editor::{Corner, Editor};
 use kinogaki_geometry::{
     Attribute, Attributes, Domain, Elements, Geometry, Kind, Meaning, Primitives, Text, names,

@@ -117,26 +117,69 @@ impl Geometry {
     }
 
     /// The same as [`shading_normals`](Self::shading_normals), made from
-    /// `before`'s (same topology, `N`, `sharp` and `smooth`, already built) by
-    /// recomputing only the polygons through `moved` and the vertices
-    /// around their points; `moved` must include every point whose
-    /// position differs. Otherwise built whole.
-    pub fn shading_normals_after(&self, before: &Geometry, moved: &[u32]) -> Arc<ShadingNormals> {
+    /// `previous`, `before`'s, when the two shade alike
+    /// ([`shades_like`](Self::shades_like)): only the polygons through
+    /// `moved` (which must include every point whose position differs), the
+    /// rows that differ between the tables, and the vertices around their
+    /// points are made again; the other cells stay shared. Built whole
+    /// otherwise.
+    pub fn shading_normals_after(
+        &self,
+        before: &Geometry,
+        previous: &ShadingNormals,
+        moved: &[u32],
+    ) -> Arc<ShadingNormals> {
         let inputs = Inputs::of(self);
         let kept = self.positions().derived(|_| Normals::default());
         if let Some(n) = kept.find(|k| k.same(&inputs)) {
             return n;
         }
-        let previous = before
-            .positions()
-            .derived(|_| Normals::default())
-            .find(|k| k.same(&inputs));
-        let built = Arc::new(match previous {
-            Some(previous) => refreshed(self, &inputs, &previous, moved),
-            None => build(self, &inputs),
+        let built = Arc::new(match self.shades_like(before) {
+            true => refreshed(self, before, &inputs, previous, moved),
+            false => build(self, &inputs),
         });
         kept.keep(inputs, built.clone());
         built
+    }
+
+    /// Whether what its normals are derived from, but for the positions and
+    /// the rows, is `before`'s: the same authored `N` over the same table,
+    /// and `sharp` and `smooth` holding the edges both tables have alike.
+    /// So only what the rows and the positions reach shades differently.
+    /// Costs the groups' members, not the edges.
+    pub fn shades_like(&self, before: &Geometry) -> bool {
+        let (is, was) = (Inputs::of(self), Inputs::of(before));
+        let table = Arc::ptr_eq(&is.topology, &was.topology);
+        let authored = match (&is.authored, &was.authored) {
+            (Some((a, x)), Some((b, y))) => table && a == b && Arc::ptr_eq(x, y),
+            (None, None) => true,
+            _ => false,
+        };
+        authored
+            && follows(&is.topology, &is.sharp, &was.topology, &was.sharp)
+            && follows(&is.topology, &is.smooth, &was.topology, &was.smooth)
+    }
+}
+
+/// Whether edge groups `is` of table `new` and `was` of table `old` hold the
+/// edges both tables have alike.
+fn follows(
+    new: &Primitives,
+    is: &Option<Arc<Elements>>,
+    old: &Primitives,
+    was: &Option<Arc<Elements>>,
+) -> bool {
+    let holds = |from: &Primitives, group: &Elements, to: &Primitives, other: &Elements| {
+        group.iter().all(|e| {
+            let [a, b] = from.edge(e as usize).points;
+            to.edge_of(a, b).is_none_or(|there| other.contains(there))
+        })
+    };
+    match (is, was) {
+        (None, None) => true,
+        (Some(x), Some(y)) if Arc::ptr_eq(x, y) && std::ptr::eq(new, old) => true,
+        (Some(x), Some(y)) => holds(new, x, old, y) && holds(old, y, new, x),
+        _ => false,
     }
 }
 
@@ -193,42 +236,74 @@ fn finished(vertices: Vec<[f32; 3]>, faces: Vec<V3>) -> ShadingNormals {
     }
 }
 
-/// `previous` with the polygons through `moved` and the vertices around
-/// their points recomputed.
+/// `previous` (of `before`) with the rows that differ, the polygons through
+/// `moved` and the vertices around their points made again.
 fn refreshed(
     value: &Geometry,
+    before: &Geometry,
     inputs: &Inputs,
     previous: &ShadingNormals,
     moved: &[u32],
 ) -> ShadingNormals {
     let topology = value.primitives();
+    let was = before.primitives();
+    let change = topology.changes_from(was);
+    let tail = change.tail as usize;
     let positions = value.positions();
     let index = topology.index();
     let mut changed: Vec<u32> = moved
         .iter()
         .filter(|&&p| (p as usize) < topology.points())
         .flat_map(|&p| index.point_faces(p as usize).iter().copied())
+        .chain(change.rewired.iter().copied())
+        .filter(|&f| (f as usize) < tail)
         .collect();
     changed.sort_unstable();
     changed.dedup();
-    let mut faces = previous.faces.to_vec();
+    let normal = |f: usize| match topology.kind(f).is_polygon() {
+        true => face_normal(topology, positions, f),
+        false => [0.0; 3],
+    };
+    let mut faces = previous.faces.edit();
+    let mut flat = previous.primitives.edit();
+    faces.truncate(tail);
+    flat.truncate(tail);
     for &f in &changed {
-        faces[f as usize] = face_normal(topology, positions, f as usize);
+        let n = normal(f as usize);
+        faces[f as usize] = n;
+        flat[f as usize] = vector::to_f32(n);
     }
-    let mut points: Vec<u32> = changed
-        .iter()
-        .flat_map(|&f| topology.primitive(f as usize).iter().copied())
+    for f in tail..topology.len() {
+        let n = normal(f);
+        faces.push(n);
+        flat.push(vector::to_f32(n));
+    }
+    let mut points: Vec<u32> = (changed.iter().copied())
+        .chain(tail as u32..topology.len() as u32)
+        .flat_map(|f| topology.primitive(f as usize).iter().copied())
+        .chain(
+            (change.rewired.iter().copied())
+                .flat_map(|f| was.primitive(f as usize).iter().copied()),
+        )
+        .chain((tail..was.len()).flat_map(|f| was.primitive(f).iter().copied()))
+        .filter(|&p| (p as usize) < topology.points())
         .collect();
     points.sort_unstable();
     points.dedup();
-    let mut vertices = previous.vertices.to_vec();
+    let mut vertices = previous.vertices.edit();
+    vertices.truncate(topology.offsets()[tail] as usize);
+    (vertices.len()..topology.vertex_count()).for_each(|_| vertices.push([0.0; 3]));
     let mut fan = Fan::default();
     for p in points {
         for &(v, n) in fan.at(value, inputs, p as usize, &faces) {
             vertices[v as usize] = n;
         }
     }
-    finished(vertices, faces)
+    ShadingNormals {
+        vertices: vertices.finish(),
+        primitives: flat.finish(),
+        faces: faces.finish(),
+    }
 }
 
 /// The vertex normals around one point, with buffers reused point to
@@ -254,7 +329,7 @@ impl Fan {
         value: &Geometry,
         inputs: &Inputs,
         point: usize,
-        faces: &[V3],
+        faces: &impl std::ops::Index<usize, Output = V3>,
     ) -> &[(u32, [f32; 3])] {
         let Self {
             local,

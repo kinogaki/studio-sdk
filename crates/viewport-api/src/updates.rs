@@ -74,15 +74,13 @@ pub struct DrawUpdate {
     pub vertices: BufferRanges,
     /// Triangle indices changed.
     pub indices: BufferRanges,
-    /// Line segment records ([`crate::OverlayVertex`]) and point markers
-    /// rewritten in place (a CV drag's hull and CV ranges).
+    /// Line segment records ([`crate::OverlayVertex`]) rewritten or added.
     pub lines: BufferRanges,
-    /// Point markers rewritten in place.
+    /// Point markers rewritten or added.
     pub points: BufferRanges,
-    /// The packet extends its parent's topology: streams grew (ranges cover
-    /// the appended elements, in the new lengths), edges renumbered (the
-    /// line stream is rewritten whole) and point markers were appended
-    /// (rewrite them over the position ranges).
+    /// The packet changes its parent's topology: streams may be of other
+    /// lengths (ranges cover what is new or moved, in the new lengths; what
+    /// a stream dropped goes by its count).
     pub extends: bool,
     /// Older packets this update also applies over, newest first, each with
     /// the ranges changed since it.

@@ -14,6 +14,7 @@
 //! points that moved.
 use crate::Error;
 use crate::render::Ranges;
+use kinogaki_geometry::Column as GeometryColumn;
 use kinogaki_geometry::{Bounds, Vec3};
 use kinogaki_viewport_api::{
     BufferRanges, Column, DrawUpdate, LineClass, LineClassId, LineStyle, Vertex,
@@ -59,10 +60,12 @@ pub struct Surface {
     points: Arc<[[f32; 3]]>,
     corners: Arc<[Corner]>,
     triangles: Arc<[[u32; 3]]>,
+    /// The triangles' corners, as a packet draws them.
+    indices: GeometryColumn<u32>,
     faces: usize,
     /// Each face's first triangle, and the triangle count last.
     face_starts: Arc<[u32]>,
-    lines: Arc<[OverlayVertex]>,
+    lines: GeometryColumn<OverlayVertex>,
     /// The lines' one class, edges (none without lines).
     classes: Arc<[LineClass]>,
     topology: u64,
@@ -122,13 +125,15 @@ impl Surface {
         let face_starts = (0..=faces)
             .map(|f| triangles.partition_point(|t| face(t) < f) as u32)
             .collect();
+        let indices = triangles.as_flattened().to_vec().into();
         Ok(Self {
             points,
             corners,
             triangles,
+            indices,
             faces,
             face_starts,
-            lines: Arc::from([]),
+            lines: GeometryColumn::default(),
             classes: Arc::from([]),
             topology,
             identity: Arc::new(()),
@@ -238,7 +243,7 @@ impl Surface {
                 selects: ElementKind::Edge,
             }])
         };
-        self.lines = lines;
+        self.lines = lines.to_vec().into();
         Ok(self.renewed(topology))
     }
 
@@ -323,7 +328,7 @@ impl Surface {
     }
 
     /// The line vertices, two a segment.
-    pub fn lines(&self) -> &Arc<[OverlayVertex]> {
+    pub fn lines(&self) -> &GeometryColumn<OverlayVertex> {
         &self.lines
     }
 
@@ -399,16 +404,19 @@ impl SurfaceSource for Surface {
         }
     }
 
-    fn indices(&self) -> &[u32] {
-        self.triangles.as_flattened()
+    fn indices(&self) -> &GeometryColumn<u32> {
+        &self.indices
     }
 
-    fn lines(&self) -> &[OverlayVertex] {
+    fn lines(&self) -> &GeometryColumn<OverlayVertex> {
         &self.lines
     }
 
-    fn points(&self) -> &[OverlayVertex] {
-        &[]
+    /// No markers.
+    fn points(&self) -> &GeometryColumn<OverlayVertex> {
+        static NONE: std::sync::LazyLock<GeometryColumn<OverlayVertex>> =
+            std::sync::LazyLock::new(GeometryColumn::default);
+        &NONE
     }
 
     fn line_classes(&self) -> &[LineClass] {
@@ -457,6 +465,7 @@ impl SurfaceSource for Surface {
         }
         Ok(self
             .lines
+            .as_slice()
             .as_chunks::<2>()
             .0
             .iter()
@@ -586,11 +595,7 @@ mod tests {
     fn a_surface_is_a_packet_over_its_own_arrays() {
         let surface = square();
         assert!(surface.same(&surface.clone()));
-        assert_eq!(surface.indices(), &[0, 1, 2, 0, 2, 3]);
-        assert!(std::ptr::eq(
-            surface.indices().as_ptr(),
-            surface.triangles().as_ptr().cast()
-        ));
+        assert_eq!(surface.indices().as_slice(), &[0, 1, 2, 0, 2, 3]);
         let lines = SurfaceSource::lines(&surface);
         assert_eq!((lines.len(), lines[2].point, lines[2].component), (8, 1, 1));
         assert!(SurfaceSource::points(&surface).is_empty());

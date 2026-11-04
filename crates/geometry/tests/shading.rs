@@ -277,7 +277,7 @@ fn the_refresh_after_a_drag_matches_a_whole_build() {
             }
             let after = before.with_positions(positions.clone().into()).unwrap();
             before.shading_normals();
-            let refreshed = after.shading_normals_after(&before, &moved);
+            let refreshed = after.shading_normals_after(&before, &before.shading_normals(), &moved);
             // The same positions in a column of their own: built whole.
             let fresh = after
                 .with_positions(positions.into())

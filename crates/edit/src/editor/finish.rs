@@ -44,7 +44,7 @@ impl Editor {
         self.remade()
     }
 
-    /// Points moved and nothing else: one copy of the positions.
+    /// Points moved and nothing else: the cells of the positions they fall in.
     fn moved_only(self) -> Result<(Geometry, Change), Error> {
         let mut moved: Vec<(u32, [f64; 3])> = self.moved.into_iter().collect();
         moved.sort_unstable_by_key(|m| m.0);

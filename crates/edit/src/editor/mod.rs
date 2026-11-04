@@ -5,10 +5,11 @@
 //! An editor is a list of changes over a shared value, and
 //! [`finish`](Editor::finish) makes the new value of them:
 //!
-//! - **Unchanged columns stay shared.** Moving points copies the positions
-//!   alone and keeps the table, its index and caches. Adding primitives
-//!   leaves every Point attribute alone. Only what a change reaches is
-//!   rewritten, once, in one pass, however many changes led to it.
+//! - **Unchanged cells stay shared.** Moving points copies the cells of the
+//!   positions they fall in and keeps the table, its index and caches. Adding
+//!   primitives leaves every Point attribute alone. Only the cells a change
+//!   reaches are written, once, however many changes led to it, and only those
+//!   are checked; a new table's index comes from the base's when that is built.
 //! - **Attributes follow.** A new element names its sources, `(element,
 //!   weight)` of the same domain, and every attribute takes its value by the
 //!   [`rule`] of its type: a mean for reals, normalized for normals, along

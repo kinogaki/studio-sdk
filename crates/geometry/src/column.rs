@@ -246,6 +246,28 @@ impl<T> Column<T> {
             .map(|c| c << Self::SHIFT)
     }
 
+    /// The values in `range` as consecutive slices, a cell at a time.
+    ///
+    /// # Panics
+    /// When `range` is not within `0..len()`.
+    pub fn slices(&self, range: Range<usize>) -> impl Iterator<Item = &[T]> {
+        assert!(
+            range.start <= range.end && range.end <= self.0.len,
+            "range {range:?} of a column of {}",
+            self.0.len
+        );
+        let mut at = range.start;
+        std::iter::from_fn(move || {
+            (at < range.end).then(|| {
+                let cell = self.cell(at >> Self::SHIFT);
+                let start = at & Self::MASK;
+                let end = cell.len().min(start + range.end - at);
+                at += end - start;
+                &cell[start..end]
+            })
+        })
+    }
+
     /// The values in `range` when they lie in one buffer's run, without any
     /// copy: always for a column made in one piece, and for a range within a
     /// cell.
@@ -679,6 +701,12 @@ impl<T> Clone for Column<T> {
 impl<T> Default for Column<T> {
     fn default() -> Self {
         Self::new(Vec::new())
+    }
+}
+
+impl<T, const N: usize> From<[T; N]> for Column<T> {
+    fn from(values: [T; N]) -> Self {
+        Self::new(values.into())
     }
 }
 

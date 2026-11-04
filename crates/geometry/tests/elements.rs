@@ -101,3 +101,36 @@ fn set_algebra_matches_a_btree_model_in_every_form() {
         }
     }
 }
+
+#[test]
+fn a_set_grows_by_what_is_added_in_every_form() {
+    let grown = |base: Elements, added: &[bool]| {
+        let first = base.count();
+        let mut want: Vec<u32> = base.iter().collect();
+        want.extend(
+            (first..)
+                .zip(added)
+                .filter(|(_, m)| **m)
+                .map(|(i, _)| i as u32),
+        );
+        let out = base.grown(added);
+        assert_eq!(out.count(), first + added.len());
+        assert_eq!(out.iter().collect::<Vec<_>>(), want);
+        assert_eq!(out, Elements::from_indices(out.count(), want).unwrap());
+    };
+    let added = [true, false, true, true];
+    grown(Elements::all(100), &[true, true]);
+    grown(Elements::all(100), &added);
+    grown(Elements::none(100), &added);
+    grown(
+        Elements::from_indices(100_000, [5, 70_000]).unwrap(),
+        &added,
+    );
+    grown(Elements::from_fn(100_000, |e| e % 2 == 0), &added);
+    grown(Elements::from_fn(64, |e| e % 2 == 0), &added);
+    grown(Elements::from_fn(64, |e| e % 2 == 0), &[]);
+    // Whole words share: a million bits, one word written.
+    let dense = Elements::from_fn(1 << 20, |e| e % 2 == 0);
+    let more = dense.grown(&[true; 64]);
+    assert_eq!(more.len(), dense.len() + 64);
+}

@@ -253,14 +253,14 @@ pub trait SurfaceSource: Any + Send + Sync {
         write: &mut dyn FnMut(Range<usize>, &[u8]),
     );
     /// Triangle vertex indices into the vertex column.
-    fn indices(&self) -> &[u32];
+    fn indices(&self) -> &kinogaki_geometry::Column<u32>;
     /// Line segments (pairs) and point markers. A segment's `component`
     /// is its packet-wide line id (see [`crate::LineClass`]); a marker's is
     /// the id point picks and point selections use (a mesh's point index,
     /// a CAD control vertex's id).
-    fn lines(&self) -> &[OverlayVertex];
+    fn lines(&self) -> &kinogaki_geometry::Column<OverlayVertex>;
     /// Point markers.
-    fn points(&self) -> &[OverlayVertex];
+    fn points(&self) -> &kinogaki_geometry::Column<OverlayVertex>;
     /// The classes the segments are drawn and picked in, in drawing order;
     /// segments outside every class are not drawn.
     fn line_classes(&self) -> &[crate::LineClass];
@@ -364,14 +364,14 @@ mod tests {
         }
         fn column_bytes(&self, _: Column, _: Range<usize>, _: &mut dyn FnMut(Range<usize>, &[u8])) {
         }
-        fn indices(&self) -> &[u32] {
-            &[]
+        fn indices(&self) -> &kinogaki_geometry::Column<u32> {
+            unreachable!("not asked")
         }
-        fn lines(&self) -> &[OverlayVertex] {
-            &[]
+        fn lines(&self) -> &kinogaki_geometry::Column<OverlayVertex> {
+            unreachable!("not asked")
         }
-        fn points(&self) -> &[OverlayVertex] {
-            &[]
+        fn points(&self) -> &kinogaki_geometry::Column<OverlayVertex> {
+            unreachable!("not asked")
         }
         fn line_classes(&self) -> &[LineClass] {
             &[]

@@ -141,7 +141,8 @@ pub use geometry::Geometry;
 pub use incidence::Incidence;
 pub use instancing::placements;
 pub use primitives::{
-    Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, TableWriter, Walk,
+    Basis, Components, CurveData, Edge, Index, Kind, Knots, Primitives, TableChange, TableWriter,
+    Walk,
 };
 pub use sampled::Sampled;
 pub use selection::Selection;

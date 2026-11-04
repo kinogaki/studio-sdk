@@ -351,6 +351,20 @@ fn fresh_ids(
 /// `group` laid out by `layout`: kept elements stay members; a new element
 /// is one when its strongest source is.
 pub(super) fn carried_group(group: &Elements, layout: &Layout, blends: &Blends) -> Elements {
+    // Every element where it was and new ones after: the group grows.
+    if let [Run::Kept(kept), rest @ ..] = layout.runs()
+        && kept.start == 0
+        && kept.end as usize == group.count()
+        && rest.iter().all(|run| matches!(run, Run::New(_)))
+    {
+        let added: Vec<bool> = (rest.iter())
+            .map(|run| match run {
+                Run::New(span) => strongest(blends.of(*span)).is_some_and(|e| group.contains(e)),
+                Run::Kept(_) => false,
+            })
+            .collect();
+        return group.grown(&added);
+    }
     let members: Vec<u32> = group.iter().collect();
     let mut out = Vec::new();
     let mut at = 0u32;

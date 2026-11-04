@@ -240,7 +240,7 @@ fn the_triangulation_is_kept_and_its_refresh_after_a_drag_matches_a_whole_build(
         }
         let after = before.with_positions(positions.clone().into()).unwrap();
         before.triangulation();
-        let refreshed = after.triangulation_after(&before, &moved);
+        let refreshed = after.triangulation_after(&before, &before.triangulation(), &moved);
         // The same positions in a column of their own: built whole.
         let fresh = after
             .with_positions(positions.into())
@@ -261,13 +261,13 @@ fn a_drag_that_flips_no_diagonal_keeps_the_triangle_columns() {
     // A small lift of one interior point: every polygon keeps its triangles.
     positions[10][1] += 0.01;
     let after = before.with_positions(positions.into()).unwrap();
-    let moved = after.triangulation_after(&before, &[10]);
+    let moved = after.triangulation_after(&before, &before.triangulation(), &[10]);
     assert!(moved.triangles().ptr_eq(t.triangles()));
     assert!(moved.corners().ptr_eq(t.corners()));
     // Folding a polygon changes its triangles, and so the column.
     let mut positions = after.positions().to_vec();
     positions[10][0] += 3.0;
     let folded = after.with_positions(positions.into()).unwrap();
-    let refolded = folded.triangulation_after(&after, &[10]);
+    let refolded = folded.triangulation_after(&after, &after.triangulation(), &[10]);
     assert!(!refolded.triangles().ptr_eq(t.triangles()));
 }

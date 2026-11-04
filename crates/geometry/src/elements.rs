@@ -123,6 +123,42 @@ impl Elements {
         Self::ascending(count, Column::new(ids))
     }
 
+    /// This set with `added` elements after its own, each a member when
+    /// `added` says: what an edit that appends elements makes of a group. It
+    /// costs what is added: a listed or bit form shares its other cells.
+    pub fn grown(&self, added: &[bool]) -> Self {
+        let first = self.count as usize;
+        let count = first + added.len();
+        let new = (first..count).zip(added).filter(|(_, member)| **member);
+        match &self.repr {
+            Repr::All if added.iter().all(|&member| member) => Self::all(count),
+            Repr::All => {
+                let members = (0..first).chain(new.map(|(i, _)| i)).map(|i| i as u32);
+                Self::ascending(count, members.collect())
+            }
+            Repr::Sparse(ids) => {
+                let mut ids = ids.edit();
+                new.for_each(|(i, _)| ids.push(i as u32));
+                let ids = ids.finish();
+                if ids.len() == count {
+                    Self::all(count)
+                } else {
+                    Self::sparse(count, ids)
+                }
+            }
+            Repr::Dense(words, members) => {
+                let mut words = words.edit();
+                (words.len()..count.div_ceil(64)).for_each(|_| words.push(0));
+                let mut members = *members;
+                for (i, _) in new {
+                    words[i / 64] |= 1 << (i % 64);
+                    members += 1;
+                }
+                Self::dense(count, words.finish(), members)
+            }
+        }
+    }
+
     /// `ids`, strictly ascending and below `count`, in the smallest form.
     fn ascending(count: usize, ids: Column<u32>) -> Self {
         debug_assert!(ids.as_slice().windows(2).all(|w| w[0] < w[1]));

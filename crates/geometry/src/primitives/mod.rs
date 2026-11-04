@@ -3,6 +3,7 @@
 //! what is derived from it once: the canonical [`Index`] of edges and
 //! adjacency, the edge count, the polygons and the
 //! [`fingerprint`](Primitives::fingerprint).
+mod changes;
 mod components;
 mod curves;
 mod fingerprint;
@@ -11,6 +12,7 @@ mod kind;
 pub(crate) mod validate;
 mod writer;
 
+pub use changes::TableChange;
 pub use components::Components;
 pub use curves::{CurveData, Knots};
 pub use index::{Index, Walk};

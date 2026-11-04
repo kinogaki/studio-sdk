@@ -159,22 +159,22 @@ impl Geometry {
     }
 
     /// The same as [`triangulation`](Self::triangulation), made from
-    /// `before`'s (when `before` has the same topology and has been
-    /// triangulated) by clipping again only the polygons through the
-    /// points `moved`, which must include every point whose position
-    /// differs. Otherwise it is built whole.
-    pub fn triangulation_after(&self, before: &Geometry, moved: &[u32]) -> Arc<Triangulation> {
+    /// `previous`, `before`'s: only the polygons through the points `moved`
+    /// (which must include every point whose position differs) and the rows
+    /// that differ between the two tables are clipped again, the other
+    /// triangles stay and their cells stay shared. Built whole when most rows
+    /// differ.
+    pub fn triangulation_after(
+        &self,
+        before: &Geometry,
+        previous: &Triangulation,
+        moved: &[u32],
+    ) -> Arc<Triangulation> {
         let kept = self.positions().derived(|_| Triangulations::default());
         if let Some(t) = kept.find(|k| Arc::ptr_eq(k, self.primitives())) {
             return t;
         }
-        let previous = Arc::ptr_eq(before.primitives(), self.primitives())
-            .then(|| before.positions().derived(|_| Triangulations::default()))
-            .and_then(|k| k.find(|k| Arc::ptr_eq(k, self.primitives())));
-        let built = Arc::new(match previous {
-            Some(previous) => rebuilt(self, &previous, moved),
-            None => build(self),
-        });
+        let built = Arc::new(rebuilt(self, before.primitives(), previous, moved));
         kept.keep(self.primitives().clone(), built.clone());
         built
     }
@@ -267,56 +267,81 @@ fn build(value: &Geometry) -> Triangulation {
     }
 }
 
-/// `previous` (over the same topology) with the polygons through `moved`
-/// clipped again at `value`'s positions; the layout is the topology's, so
-/// each polygon's triangles stay where they were. When every moved polygon
-/// keeps its triangles (its diagonals didn't flip), the columns are
-/// `previous`'s own, shared: a drag that changes no triangle changes no
-/// triangle column.
-fn rebuilt(value: &Geometry, previous: &Triangulation, moved: &[u32]) -> Triangulation {
+/// `previous` (over the table `was`) with the rows that differ and the
+/// polygons through `moved` clipped again at `value`'s positions, the rows
+/// from the [tail](crate::TableChange::tail) on appended. A polygon below the
+/// tail keeps its place, its triangles written only when they differ, so a
+/// drag that changes no triangle changes no triangle column.
+fn rebuilt(
+    value: &Geometry,
+    was: &Primitives,
+    previous: &Triangulation,
+    moved: &[u32],
+) -> Triangulation {
     let topology = value.primitives();
+    let change = topology.changes_from(was);
+    let tail = change.tail as usize;
+    if change.rewired.len() + topology.len() - tail > topology.len() / 2 + BLOCK {
+        return build(value);
+    }
     let index = topology.index();
     let mut polygons: Vec<u32> = moved
         .iter()
         .filter(|&&p| (p as usize) < topology.points())
         .flat_map(|&p| index.point_faces(p as usize).iter().copied())
+        .chain(change.rewired)
+        .filter(|&f| (f as usize) < tail && topology.kind(f as usize).is_polygon())
         .collect();
     polygons.sort_unstable();
     polygons.dedup();
+    let layout = Layout::of(topology);
+    let first = layout.before(tail);
     let mut changed: Vec<(usize, Triangle)> = Vec::new();
-    let mut fans: Vec<u32> = previous
-        .fans
-        .iter()
-        .copied()
-        .filter(|f| polygons.binary_search(f).is_err())
+    let mut fans: Vec<u32> = (previous.fans.iter().copied())
+        .filter(|&f| (f as usize) < tail && polygons.binary_search(&f).is_err())
         .collect();
     for &p in &polygons {
-        let range = previous.of(p as usize);
-        let (one, fanned) = triangles_of(value, &previous.layout, p as usize..p as usize + 1);
-        if !fanned.is_empty() {
-            fans.push(p);
-        }
-        changed.extend(range.zip(one).filter(|(i, t)| {
+        let (one, fanned) = triangles_of(value, &layout, p as usize..p as usize + 1);
+        fans.extend(fanned);
+        let at = layout.before(p as usize);
+        changed.extend((at..).zip(one).filter(|(i, t)| {
             previous.triangles[*i] != t.points || previous.corners[*i] != t.vertices
         }));
     }
+    let (appended, tail_fans) = triangles_of(value, &layout, tail..topology.len());
+    fans.extend(tail_fans);
     fans.sort_unstable();
-    let (triangles, corners) = if changed.is_empty() {
+    let shrinks = previous.len() != first;
+    let (triangles, corners) = if changed.is_empty() && appended.is_empty() && !shrinks {
         (previous.triangles.clone(), previous.corners.clone())
     } else {
-        let mut triangles = previous.triangles.to_vec();
-        let mut corners = previous.corners.to_vec();
+        let mut triangles = previous.triangles.edit();
+        let mut corners = previous.corners.edit();
+        triangles.truncate(first);
+        corners.truncate(first);
         for (i, t) in changed {
             triangles[i] = t.points;
             corners[i] = t.vertices;
         }
-        (triangles.into(), corners.into())
+        for t in &appended {
+            triangles.push(t.points);
+            corners.push(t.vertices);
+        }
+        (triangles.finish(), corners.finish())
+    };
+    let primitives = if appended.is_empty() && !shrinks {
+        previous.primitives.clone()
+    } else {
+        let mut primitives = previous.primitives.edit();
+        primitives.truncate(first);
+        appended.iter().for_each(|t| primitives.push(t.primitive));
+        primitives.finish()
     };
     Triangulation {
         triangles,
         corners,
-        primitives: previous.primitives.clone(),
+        primitives,
         fans: fans.into(),
-        layout: previous.layout.clone(),
+        layout,
     }
 }
