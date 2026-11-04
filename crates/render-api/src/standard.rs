@@ -35,7 +35,7 @@ pub(crate) const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
 /// The spot light's id.
 pub(crate) const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
 /// The fog's id.
-pub(crate) const FOG: &str = "kinogaki.render.fog";
+pub const FOG: &str = "kinogaki.render.fog";
 
 /// The parameter saying where an emitter's spectrum comes from.
 pub const EMISSION: &str = "emission";
@@ -326,10 +326,10 @@ pub fn lights() -> Vec<PrimType> {
 }
 
 /// Exponential height fog: its density `density × e^(−falloff × (h −
-/// height))` at height `h` along [`crate::RenderSettings::up`], from
+/// height))` at height `h` along the project's up axis, from
 /// `start` along each view ray on (falloff 0: even distance fog). A scene
 /// has at most one.
-pub(crate) fn fog() -> PrimType {
+pub fn fog() -> PrimType {
     const GROUP: &str = "fog";
     let along = |min| ValueKind::Number(Number::length().range(min, 1e6).decimals(3).speed(0.01));
     let fog =

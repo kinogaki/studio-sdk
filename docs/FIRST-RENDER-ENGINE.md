@@ -23,7 +23,7 @@ let description = EngineDescription::builder(EngineId::new("acme.ray.engine"), "
     .build();
 ```
 
-A host sends nothing the capabilities don't name: no prim of another kind, no light of a type it doesn't declare (a standard one keeps its id across engines, `standard::lights`), no motion it doesn't blur. A package carries it with `Package::with_engine` (its `display::Engine` also makes one on the host's device) or `with_engine_description` (headless). Its id is under the package's vendor.
+A host sends nothing the capabilities don't name: no prim of another kind, no light of a type it doesn't declare (a standard one keeps its id across engines, `standard::lights`, `standard::fog`), no motion it doesn't blur. A package carries it with `Package::with_engine` (its `display::Engine` also makes one on the host's device) or `with_engine_description` (headless). Its id is under the package's vendor.
 
 `display::Engine::make` receives the host's `wgpu` device and queue, the wake and `Options`: an engine renders on the host's device and shows its frames as textures there (`Display::acquire`), so nothing is copied. It may share none and put the pixels in `Frame::pixels` instead.
 

@@ -25,9 +25,14 @@
 //! [`MemoryElement`] also refuse what a codec's read leaves unread (a
 //! field, metadata, a child), so a codec writes only what it reads back,
 //! and a package's round-trip test finds one that doesn't.
+//!
+//! **Values.** A parameter's or setting's [`Value`](crate::Value) has one
+//! encoding as a field: [`field_of`] and [`value_of`].
 mod memory;
+mod values;
 
 pub use memory::MemoryElement;
+pub use values::{field_of, value_of};
 
 use crate::Error;
 use crate::data::Data;
