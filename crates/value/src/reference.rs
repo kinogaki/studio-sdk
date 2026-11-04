@@ -3,7 +3,7 @@
 //! do, lets the user pick one (from a searchable list, or dragged from the
 //! outliner or a network) and resolves the path, written from the root or
 //! from the node holding the parameter, when the node cooks.
-use crate::id::{DataTypeId, ObjectKindId};
+use crate::id::{ContextId, DataTypeId, ObjectKindId};
 
 /// A scene object, by the host's id for it: it names the object whatever
 /// the object is called or wherever it moves. Valid while the object
@@ -30,6 +30,8 @@ pub enum Fits {
     /// Any Material: one of a Material Library's, or one an object
     /// publishes (a printer's slot).
     Materials,
+    /// An object holding a network of this context, or a node of one.
+    Networks(ContextId),
 }
 
 impl RefFilter {
@@ -46,6 +48,11 @@ impl RefFilter {
     /// One Material.
     pub fn material() -> Self {
         Self::of(Fits::Materials)
+    }
+
+    /// One network of `context`, by the object holding it, or one of its nodes.
+    pub fn network(context: ContextId) -> Self {
+        Self::of(Fits::Networks(context))
     }
 
     fn of(fits: Fits) -> Self {
