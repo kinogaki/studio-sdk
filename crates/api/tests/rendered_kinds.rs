@@ -87,6 +87,7 @@ impl RenderSetupKind for Setups {
             values,
             outputs: Vec::new(),
             processing: Processing::Network { source: None },
+            color: Default::default(),
         })
     }
     fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>> {

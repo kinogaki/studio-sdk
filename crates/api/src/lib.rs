@@ -144,7 +144,7 @@ pub use mesher::{Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
     Adoption, CreateCx, KindCreation, ObjectBody, ObjectKindSpec, Processing, PublishedMaterial,
-    RenderSetup, RenderSetupKind, RenderedKind, Valued,
+    RenderColor, RenderSetup, RenderSetupKind, RenderedKind, Valued,
 };
 pub use package::{Package, PackageUi};
 pub use params::{Parameters, Schema, Value};

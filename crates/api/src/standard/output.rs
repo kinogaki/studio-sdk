@@ -4,22 +4,25 @@ use crate::element::{ElementReader, ElementWriter, Field};
 use crate::id::StoredId;
 use crate::stored::{Scope, Stored};
 
-/// Where a picture's background joins it.
+/// What a picture's background color means.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BackgroundSpace {
-    /// Composited in linear light, then through the view with the pieces: its
-    /// color is linear in the working space.
+    /// Linear in the working space, through the view. Under a Comp result it
+    /// joins in light, so the result's alpha blends in light; under a page it is
+    /// the code values the view makes of it, which pieces blend over in the
+    /// display's encoding as they do over any other.
     Scene,
-    /// Added after the pieces reach the display, blended in the display's
-    /// encoding: its color is the display's code values, so 1 is display white.
+    /// The display's code values: 1 is display white, and what lies over it
+    /// blends in the display's encoding.
     #[default]
     Display,
 }
 
-/// The target display and background of what the 2D canvas shows and final
-/// outputs write: the element `output` among the project's settings. Core
-/// registers it, and its canvas and final writes read it; a package's project
-/// section edits it. Written files say which display they are for.
+/// The project's target display and background: what a Layout page composes for,
+/// and what a render reaches unless its [`RenderColor`](crate::RenderColor) says
+/// otherwise. The element `output` among the project's settings. Core registers
+/// it, and its canvas and final writes read it; a package's project section edits
+/// it. Written files say which display they are for.
 ///
 /// ```
 /// use kinogaki_studio_api::Stored;

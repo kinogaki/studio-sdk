@@ -428,6 +428,21 @@ pub struct RenderSetup {
     pub outputs: Vec<Aov>,
     /// What its render shows: a Comp network's result, or the raw render.
     pub processing: Processing,
+    /// How what it shows reaches a display.
+    pub color: RenderColor,
+}
+
+/// A render's color management: the display-referred output its result develops
+/// to, on the Canvas, in its final Output and File Outs, and where a Layout places
+/// it. An OpenEXR stays scene-referred whatever this says.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RenderColor {
+    /// The target display by its name in the color configuration; none: the
+    /// project's ([`DisplayOutput`](crate::standard::DisplayOutput)).
+    pub display: Option<String>,
+    /// The view of that display by name; none, or one it lacks: its first (ACES
+    /// 2.0 in the built-in configuration).
+    pub view: Option<String>,
 }
 
 impl RenderSetup {

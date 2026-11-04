@@ -16,7 +16,7 @@ use crate::data::Data;
 use crate::data_type::InfoRow;
 use crate::refs::NodeRef;
 use kinogaki_geometry::Xform;
-use kinogaki_geometry::image::{Image, Rect};
+use kinogaki_geometry::image::{Encoding, Image, Rect};
 use std::sync::Arc;
 
 /// What a surface chooses to show live: an object's result, or one node of the
@@ -64,7 +64,8 @@ pub enum CanvasPiece {
         size: f64,
         /// How its lines sit against the alignment point.
         align: TextAlign,
-        /// Its color, linear in the working space.
+        /// Its color: the code values of the display the picture is for, since
+        /// a picture composes in that display's encoding (1 is display white).
         color: [f64; 3],
         /// Its plane to canvas units.
         placed: Xform,
@@ -151,9 +152,49 @@ pub struct Picture {
 pub struct Probe {
     /// What it shows, in order (the channels by name, as stored).
     pub rows: Vec<InfoRow>,
-    /// The color there, linear in the working space, when it is one: the
-    /// host adds what the view transform makes of it.
-    pub color: Option<[f64; 3]>,
+    /// The color there, when it is one: the host adds what it shows as.
+    pub color: Option<ProbedColor>,
+}
+
+/// A color the probe read.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProbedColor {
+    /// Linear in the working space: it shows through the view.
+    Scene([f64; 3]),
+    /// A display's code values, in its space by name: they show as they are.
+    Display {
+        /// The space.
+        space: Arc<str>,
+        /// The code values.
+        codes: [f64; 3],
+    },
+}
+
+impl ProbedColor {
+    /// The color of pixel `rgba`, held as `encoding` says; none for data.
+    pub fn of(
+        encoding: &Encoding,
+        [r, g, b, a]: [f32; 4],
+        colors: &dyn ColorService,
+    ) -> Option<Self> {
+        let Encoding::Color {
+            space,
+            premultiplied,
+        } = encoding
+        else {
+            return None;
+        };
+        let under = if *premultiplied && a > 0.0 { a } else { 1.0 };
+        let mut held = [[r, g, b].map(|v| f64::from(v / under))];
+        if colors.display_referred(space) {
+            return Some(Self::Display {
+                space: space.clone(),
+                codes: held[0],
+            });
+        }
+        colors.to_working(space, &mut held).ok()?;
+        Some(Self::Scene(held[0]))
+    }
 }
 
 /// How a data type's values paint on the 2D canvas.

@@ -13,7 +13,10 @@
 //! each at that one boundary, as it sends it, through this service, and
 //! sends them again when the working space or the configuration changes.
 //! The same types carry both, so an adapter between authored kinds copies
-//! channels as they are. Files carry colors in spaces of their own. The host
+//! channels as they are. Files carry colors in spaces of their own. A picture
+//! is the one place past this rule: a Layout page composes display-referred
+//! pieces, so its Text's color and a display-referred background are the target
+//! display's code values, and a placed file keeps what it holds. The host
 //! holds the color maths (its configuration's conversions and view
 //! transforms) and lends the service to formats (`Reading`, `Writing`),
 //! cooks (the project they read) and runners; a package never carries a
@@ -70,6 +73,32 @@ pub trait ColorService: Send + Sync + Debug {
     /// default.
     fn file_space(&self, _path: &str) -> Option<String> {
         None
+    }
+
+    /// Whether colors in `space` are display-referred: a display's code values,
+    /// which reach a picture as they are rather than through a view. No, by
+    /// default.
+    fn display_referred(&self, _space: &str) -> bool {
+        false
+    }
+
+    /// The display of the configuration whose code values ICC `profile`
+    /// describes; none, by default.
+    fn profile_space(&self, _profile: &[u8]) -> Option<String> {
+        None
+    }
+
+    /// Code values `rgb` of a display no space describes (ICC `profile`) as
+    /// those of a wide display of the configuration, and its name; none, `rgb`
+    /// unchanged, for a profile it can't read (look-up tables, gray, CMYK).
+    fn convert_profile(&self, _profile: &[u8], _rgb: &mut [[f64; 3]]) -> Option<String> {
+        None
+    }
+
+    /// The views a render can show on `display`, the first the default; none,
+    /// by default.
+    fn views_of(&self, _display: &str) -> Vec<String> {
+        Vec::new()
     }
 
     /// Changes whenever a conversion, a file's space or a view transform
