@@ -149,13 +149,13 @@ impl SettingDescriptor {
     }
 
     /// It, applying while `when` holds (else disabled, saying `reason`).
-    pub(crate) fn requires(mut self, when: Condition, reason: &str) -> SettingDescriptor {
+    pub fn requires(mut self, when: Condition, reason: &str) -> SettingDescriptor {
         self.requires = Some((when, Arc::from(reason)));
         self
     }
 
     /// It, shown while `when` holds.
-    pub(crate) fn shown_when(mut self, when: Condition) -> SettingDescriptor {
+    pub fn shown_when(mut self, when: Condition) -> SettingDescriptor {
         self.shown_when = Some(when);
         self
     }

@@ -13,9 +13,11 @@
 //! time, times the instance's own (and, nested, its prototype's). What
 //! differs between instances beyond their placements is in the primvars:
 //! [`Domain::Instance`] (`Cd`, `id`, `name`, `v` in scene units a second:
-//! linear motion across the shutter) and [`Domain::Detail`].
+//! linear motion across the shutter) and [`Domain::Detail`]. An instance may
+//! render with a material of its own ([`Instancer::subsets`]) in place of its
+//! prototype's.
 use crate::id::PrimId;
-use crate::prim::Visibility;
+use crate::prim::{Subsets, Visibility};
 use kinogaki_geometry::{Attributes, Column, Domain, Error, Sampled, Xform};
 use std::sync::Arc;
 
@@ -26,6 +28,7 @@ pub struct Instancer {
     which: Option<Column<u32>>,
     xforms: Column<Xform>,
     primvars: Arc<Attributes>,
+    subsets: Subsets,
     xform: Sampled<Xform>,
     visibility: Visibility,
     path: Arc<str>,
@@ -44,6 +47,7 @@ impl Instancer {
             which: None,
             xforms,
             primvars: Arc::default(),
+            subsets: Subsets::default(),
             xform: Sampled::still(Xform::IDENTITY),
             visibility: Visibility::SHOWN,
             path: Arc::from(""),
@@ -81,6 +85,12 @@ impl Instancer {
     /// [`Domain::Detail`] primvars.
     pub fn primvars(&self) -> &Arc<Attributes> {
         &self.primvars
+    }
+
+    /// The material each instance renders with in place of its prototype's
+    /// (none named, or none: its prototype's).
+    pub fn subsets(&self) -> &Subsets {
+        &self.subsets
     }
 
     /// The Instancer to world across the shutter.
@@ -130,6 +140,12 @@ impl InstancerBuilder {
         self
     }
 
+    /// With each instance's material as `subsets` says.
+    pub fn subsets(mut self, subsets: Subsets) -> Self {
+        self.0.subsets = subsets;
+        self
+    }
+
     /// With `xform` across the shutter.
     pub fn xform(mut self, xform: Sampled<Xform>) -> Self {
         self.0.xform = xform;
@@ -173,6 +189,7 @@ impl InstancerBuilder {
                 )));
             }
         }
+        i.subsets.check(instances)?;
         i.primvars
             .check("instancers", None, |domain| match domain {
                 Domain::Instance => Some(instances),

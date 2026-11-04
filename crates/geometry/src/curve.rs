@@ -4,7 +4,7 @@
 use crate::column::Column;
 use crate::geometry::Geometry;
 use crate::limits::MAX_DEGREE;
-use crate::primitives::{Basis, Kind};
+use crate::primitives::{Basis, Kind, Primitives};
 use crate::spline::{self, homogeneous, rational};
 use crate::vec3::Vec3;
 
@@ -95,6 +95,27 @@ impl Geometry {
             weights: (data.and_then(|c| c.weights())).map(|w| &w.as_slice()[vertices]),
             knots: data.map_or(&[][..], |c| c.knots().of(p)),
             kind: table.kind(p),
+            degree: data.map_or(1, |c| c.degrees()[p] as usize),
+        }
+    }
+}
+
+impl Primitives {
+    /// Primitive `p` as a curve over `positions` in the table's numbering: a
+    /// polyline as its straight segments, a curve primitive by its basis.
+    ///
+    /// # Panics
+    /// When `p` is not a primitive; evaluating it, when `positions` misses
+    /// one of its points.
+    pub fn curve_over<'a>(&'a self, p: usize, positions: &'a [[f64; 3]]) -> Curve<'a> {
+        let vertices = self.primitive_vertices(p);
+        let data = self.curves();
+        Curve {
+            positions: Points::Over(positions),
+            points: self.primitive(p),
+            weights: (data.and_then(|c| c.weights())).map(|w| &w.as_slice()[vertices]),
+            knots: data.map_or(&[][..], |c| c.knots().of(p)),
+            kind: self.kind(p),
             degree: data.map_or(1, |c| c.degrees()[p] as usize),
         }
     }

@@ -146,7 +146,7 @@ impl Subsets {
         self.materials.get(usize::from(slot)).copied()
     }
 
-    fn check(&self, primitives: usize) -> Result<(), Error> {
+    pub(super) fn check(&self, primitives: usize) -> Result<(), Error> {
         if self.slots.is_empty() {
             return Ok(());
         }

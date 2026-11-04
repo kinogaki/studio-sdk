@@ -3,11 +3,14 @@
 //! shown.
 use crate::value::{Parameters, Value};
 
-/// While every named value holds its value; with none, always.
+/// While every named value holds its value and none holds what it mustn't;
+/// with neither, always.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Condition {
     /// The values tested, by name, and what each must hold.
     pub all: Vec<(String, Value)>,
+    /// The values tested, by name, and what each must not hold.
+    pub none: Vec<(String, Value)>,
 }
 
 impl Condition {
@@ -22,14 +25,24 @@ impl Condition {
         self
     }
 
+    /// It, and `name` not holding `value`.
+    pub fn except(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
+        self.none.push((name.into(), value.into()));
+        self
+    }
+
     /// Whether `values` meet it (a name missing from them does not).
     pub fn met(&self, values: &Parameters) -> bool {
         (self.all.iter()).all(|(name, value)| values.get(name) == Some(value))
+            && (self.none.iter()).all(|(name, value)| values.get(name) != Some(value))
     }
 
     /// The names it reads.
     pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.all.iter().map(|(name, _)| name.as_str())
+        self.all
+            .iter()
+            .chain(&self.none)
+            .map(|(name, _)| name.as_str())
     }
 }
 
