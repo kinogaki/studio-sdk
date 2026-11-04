@@ -82,6 +82,25 @@ pub const SMOOTH: &str = "smooth";
 /// The hidden primitives (a [`Domain::Primitive`] group): Hide.
 pub const HIDDEN: &str = ".hidden";
 
+/// The whole type and the domains of the standard attribute `name`, as the table
+/// fixes them: what a tool making an attribute of that name follows. `None` for
+/// any other name, and for a group's or `P`'s, which are no attribute.
+///
+/// ```
+/// use kinogaki_geometry::{Domain, Meaning, Storage, names};
+///
+/// let (ty, domains) = names::standard_type("N").unwrap();
+/// assert_eq!((ty.storage, ty.width, ty.meaning), (Storage::F32, 3, Meaning::Normal));
+/// assert!(domains.contains(&Domain::Vertex) && !domains.contains(&Domain::Edge));
+/// assert!(names::standard_type("sharp").is_none() && names::standard_type("P").is_none());
+/// ```
+pub fn standard_type(name: &str) -> Option<(AttributeType, &'static [Domain])> {
+    match standard(name)? {
+        Standard::Attribute(_, []) | Standard::Group(_) => None,
+        Standard::Attribute(ty, domains) => Some((ty, domains)),
+    }
+}
+
 /// What a standard name must be.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Standard {

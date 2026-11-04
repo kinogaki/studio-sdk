@@ -8,6 +8,7 @@ use kinogaki_geometry::{
     Knots, Meaning, Primitives, Storage, Text, Values, Xform, names,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::ops::Range;
 use std::sync::Arc;
 
 /// One value of a [`gather`] and where it goes.
@@ -198,6 +199,9 @@ pub fn gather_table(tables: &[(&Attributes, usize)], domain: Domain) -> Result<A
     gather_domain(Attributes::new(), domain, &sources)
 }
 
+/// The number [`picked`] reads as no element.
+pub const NOTHING: u32 = u32::MAX;
+
 /// `attribute`, one value an element, with element `e` held by `counts[e]`
 /// elements: an instance's value over its copy's points. An array stays out.
 ///
@@ -242,6 +246,94 @@ pub fn spread(attribute: &Attribute, counts: &[usize]) -> Result<Option<Attribut
         _ => return Ok(None),
     };
     attribute.with_values(values).map(Some)
+}
+
+/// `attribute`'s elements in another order, each new element taking element
+/// `from[i]`'s value exactly, whatever its storage, width or array;
+/// [`NOTHING`] takes the type's default (zero and no text, white for a color,
+/// the identity for a rotation or a matrix, no items for an array). What
+/// sorting, copying by number and taking the strongest sample come to.
+///
+/// ```
+/// use kinogaki_edit::editor::{NOTHING, picked};
+/// use kinogaki_geometry::{Attribute, Meaning};
+///
+/// let a = Attribute::tuples(vec![[1.0f32, 0.0, 0.0], [0.0, 1.0, 0.0]], Meaning::Color).unwrap();
+/// let got = picked(&a, &[1, NOTHING, 0]).unwrap();
+/// assert_eq!(got.as_tuples::<[f32; 3]>().unwrap(), [[0.0, 1.0, 0.0], [1.0; 3], [1.0, 0.0, 0.0]]);
+/// ```
+///
+/// # Errors
+/// A number past its elements, or what the attribute refuses.
+pub fn picked(attribute: &Attribute, from: &[u32]) -> Result<Attribute, Error> {
+    fn items<T: Copy>(
+        column: &Column<T>,
+        width: usize,
+        spans: &[Option<Range<usize>>],
+        fill: &[T],
+    ) -> Column<T> {
+        let mut out = Vec::new();
+        for span in spans {
+            match span {
+                Some(span) => {
+                    out.extend((span.start * width..span.end * width).map(|at| column[at]))
+                }
+                None => out.extend_from_slice(fill),
+            }
+        }
+        out.into()
+    }
+    let ty = attribute.ty();
+    let width = usize::from(ty.width);
+    let count = attribute.elements();
+    let span = |e: usize| match attribute.offsets() {
+        Some(o) => o[e] as usize..o[e + 1] as usize,
+        None => e..e + 1,
+    };
+    let mut spans = Vec::with_capacity(from.len());
+    for &e in from {
+        spans.push(match e {
+            NOTHING => None,
+            e if (e as usize) < count => Some(span(e as usize)),
+            e => {
+                return Err(Error::invalid(format!(
+                    "element {e} is past the last of {count}"
+                )));
+            }
+        });
+    }
+    let fill = if ty.array {
+        Vec::new()
+    } else {
+        default_item(ty)
+    };
+    let reals32: Vec<f32> = fill.iter().map(|&x| x as f32).collect();
+    let ints32: Vec<i32> = fill.iter().map(|&x| x as i32).collect();
+    let ints64: Vec<i64> = fill.iter().map(|&x| x as i64).collect();
+    let none = if ty.array {
+        Vec::new()
+    } else {
+        vec![Text::NONE]
+    };
+    let values = match attribute.values() {
+        Values::F32(c) => Values::F32(items(c, width, &spans, &reals32)),
+        Values::F64(c) => Values::F64(items(c, width, &spans, &fill)),
+        Values::I32(c) => Values::I32(items(c, width, &spans, &ints32)),
+        Values::I64(c) => Values::I64(items(c, width, &spans, &ints64)),
+        Values::Text(t) => Values::Text(t.with_indices(items(t.indices(), 1, &spans, &none))?),
+        _ => return Err(Error::invalid("a storage this edit doesn't know")),
+    };
+    if !ty.array {
+        return Attribute::new(ty, values);
+    }
+    let mut offsets = Vec::with_capacity(from.len() + 1);
+    let mut sum = 0_u32;
+    offsets.push(0);
+    for s in &spans {
+        sum += s.as_ref().map_or(0, |s| s.len() as u32);
+        offsets.push(sum);
+    }
+    Attribute::arrays(ty, offsets.into(), values)
 }
 
 /// `attributes` with `sources`' attributes and groups of `domain` gathered.

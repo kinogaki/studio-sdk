@@ -72,7 +72,7 @@ mod split;
 pub use carry::{Rule, rule};
 pub use change::{Change, Numbers};
 pub use finish::place;
-pub use gather::{Placed, gather, gather_table, spread};
+pub use gather::{NOTHING, Placed, gather, gather_table, picked, spread};
 
 use crate::deform::Deform;
 use kinogaki_geometry::{Basis, Error, Geometry, Kind, Xform};
