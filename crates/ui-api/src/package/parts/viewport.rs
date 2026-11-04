@@ -127,7 +127,10 @@ part! {
         /// show `step` (a preview, not yet an edit: points moved through
         /// [`Edited::moving`]) while it `Began` or `Moved`, make it the edit
         /// on `Released`, and put back what the drag showed on `Cancelled`
-        /// (the host cancels its gesture).
+        /// (the host cancels its gesture). A node the edit needs is added at
+        /// the first step that [`moves`](crate::gizmo::TransformStep::moves),
+        /// in that gesture: a click on the gizmo leaves nothing, and no undo
+        /// step.
         fn transform(&self, s: &mut S, cx: &mut dyn Cx, phase: TransformPhase, step: &TransformStep);
         /// The Gear's rows: the transform tool's settings here (soft
         /// selection, symmetry), under core's space row; the Gear shows

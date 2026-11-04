@@ -71,4 +71,34 @@ impl TransformStep {
             scale: [1.0; 3],
         }
     }
+
+    /// Whether it moves anything: a press with no motion, or one dragged back
+    /// to where it began, doesn't.
+    pub fn moves(&self) -> bool {
+        self.translate != Vec3::ZERO || self.rotate != [0.0; 3] || self.scale != [1.0; 3]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_step_moves_once_it_is_more_than_none() {
+        let none = TransformStep::none(
+            TransformTool::Move,
+            Handle::Center,
+            Vec3::ZERO,
+            [Vec3::X, Vec3::Y, Vec3::Z],
+        );
+        assert!(!none.moves());
+        let moved = |change: fn(&mut TransformStep)| {
+            let mut step = none;
+            change(&mut step);
+            step.moves()
+        };
+        assert!(moved(|s| s.translate = Vec3::Y));
+        assert!(moved(|s| s.rotate[1] = 5.0));
+        assert!(moved(|s| s.scale[2] = 2.0));
+    }
 }
