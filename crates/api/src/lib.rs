@@ -125,9 +125,10 @@ pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp, stamp_of};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use facets::{
-    CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn, Look, Materials,
-    ObjectPicking, Pickable, Piece, RenderCx, Renderable, Rendered, Role, SnapHit, SnapKind,
-    SnapQuery, SnapTargets, Snappable, Table, TableColumn, Tabular, Tally,
+    Canvas, CanvasPiece, CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn,
+    Look, Materials, ObjectPicking, Pickable, Picture, Piece, Probe, RenderCx, Renderable,
+    Rendered, Role, SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable, Table, TableColumn,
+    Tabular, Tally,
 };
 pub use format::{
     FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Purpose, Reading, Writing,

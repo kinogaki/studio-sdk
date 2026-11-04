@@ -37,6 +37,9 @@ pub struct NetworkContext {
     /// Other packages' node types its networks offer too, each listed under
     /// a section of this context's (CAM's networks take Mesh's Import).
     pub adopts: Vec<Adopted>,
+    /// Its networks' results show on the 2D canvas, not in the views: the
+    /// canvas comes to the front while one is open.
+    pub canvas: bool,
 }
 
 /// What a context's networks are.
@@ -80,6 +83,7 @@ impl NetworkContext {
             },
             layout: NodeLayout::Vertical,
             adopts: Vec::new(),
+            canvas: false,
         }
     }
 
@@ -115,6 +119,12 @@ impl NetworkContext {
     /// [`NetworkCompiler`](super::NetworkCompiler) plans its networks.
     pub fn compiled(mut self) -> Self {
         self.evaluation = Evaluation::Compile;
+        self
+    }
+
+    /// Its networks' results show on the 2D canvas.
+    pub fn on_canvas(mut self) -> Self {
+        self.canvas = true;
         self
     }
 

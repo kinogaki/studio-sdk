@@ -12,7 +12,9 @@
 //! and nothing fails.
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::facets::{Displayable, Look, ObjectPicking, Pickable, Renderable, Snappable, Tabular};
+use crate::facets::{
+    Canvas, Displayable, Look, ObjectPicking, Pickable, Renderable, Snappable, Tabular,
+};
 use crate::id::DataTypeId;
 use kinogaki_geometry::Bounds;
 
@@ -145,6 +147,11 @@ pub trait DataType: Send + Sync {
 
     /// How values reach render engines, when they render.
     fn renderable(&self) -> Option<&dyn Renderable> {
+        None
+    }
+
+    /// How values paint on the 2D canvas, when they do.
+    fn canvas(&self) -> Option<&dyn Canvas> {
         None
     }
 

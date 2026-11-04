@@ -10,6 +10,7 @@
 //! |---|---|
 //! | [`Geometry`] | polygons, polylines and curves over shared points: one [`Primitives`] table, each primitive of a [`Kind`] ([`Basis`] and closed), in any order, with [`Attributes`]; a primitive evaluates as a [`Curve`] |
 //! | [`Brep`](brep::Brep) | boundary-representation bodies with exact geometry, free curves and datums ([`brep`]) |
+//! | [`Image`](image::Image) | 2D tiled layers over a data and a display window: files, textures, Comp's boundaries, the canvas ([`image`]) |
 //! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and groups ([`Elements`]) per [`Domain`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`], [`Incidence`] | selected elements of one domain, with the active one; which elements of a value touch which (selection rules live in `kinogaki-edit`) |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
@@ -105,6 +106,7 @@ mod elements;
 mod error;
 mod frame;
 mod geometry;
+pub mod image;
 mod incidence;
 mod instancing;
 mod kept;
