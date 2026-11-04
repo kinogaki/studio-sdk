@@ -150,7 +150,7 @@ Facets are optional:
 | `Displayable` | the viewport | levels (`ElementKind`s), `prepare` → `Drawn` (pieces: packets with their placements, roles and how they draw while the object is open, plus type-owned detail) over the value shown before, `refine` once a value rests, `highlight` → `ElementSet`, `convert`, the status bar's counts (`tally` → `Tally`s) and a selection's box for the pivot (`bounds_of`) |
 | `Pickable` | viewport picking | the host finds packet elements (`Hit`s, box `ElementSet`s); the facet turns them into `Components` and combines selections |
 | `ObjectPicking` (`picking`) | the object levels | how an object holding the value is hit by a `Ray` (at its world `Xform`) and framed; without it core frames the value by its `bounds` and doesn't pick it |
-| `Look` (`look`) | shading | the pieces' colors while shaded and whether the value renders as a volume; without it the value shows as clay |
+| `Look` (`look`) | shading | the pieces' colors while shaded, the images they show over them (`SurfaceTextures`) and whether the value renders as a volume; without it the value shows as clay |
 | `Snappable` (`snapping`) | gizmo moves | what a move may land on in the value, for the user's `SnapTargets` (a set of `SnapKind`s: points, edges' middles, faces' centers, crossings, edges, surfaces): a `SnapQuery` answered with `SnapHit`s, a surface's with its normal there; the host keeps the rest of snapping (the master switch, the grid, ranking across objects, feedback) |
 | `Tabular` | the spreadsheet | tables, columns, and cells read a range of rows at a time |
 | `Renderable` | render sync | `RenderItem::Shape` over a `ShapeSource` (triangles or curves), or `RenderItem::Instances` of other items |

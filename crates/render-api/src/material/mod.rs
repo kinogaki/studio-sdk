@@ -17,7 +17,7 @@ mod display;
 pub mod preview;
 
 pub use def::{Input, NodeDef, Output, Socket};
-pub use display::MaterialDisplay;
+pub use display::{DisplayTexture, MaterialDisplay};
 
 use crate::settings::Textures;
 use kinogaki_geometry::Error;

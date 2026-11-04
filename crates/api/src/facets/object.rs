@@ -6,6 +6,7 @@ use crate::data::Data;
 use crate::facets::Drawn;
 use kinogaki_geometry::{Bounds, Projective, Ray, Xform};
 use kinogaki_render_api::MaterialDisplay;
+use kinogaki_viewport_api::{SurfaceImage, SurfaceTextures};
 use std::sync::Arc;
 
 /// A marquee over a view: its box, running 0–1 across the view and down
@@ -67,8 +68,19 @@ pub trait Materials {
     /// engine owns.
     fn display(&self, path: &str) -> Option<MaterialDisplay>;
 
+    /// Image file `file` (a material's [`DisplayTexture::file`]) as the
+    /// shaded views show it. `None` while it is read, or when it can't be.
+    /// Asking starts reading it, once; when it is read the host wakes once
+    /// and the [`revision`](Self::revision) moves.
+    ///
+    /// [`DisplayTexture::file`]: kinogaki_render_api::DisplayTexture::file
+    fn image(&self, file: &str) -> Option<Arc<SurfaceImage>> {
+        let _ = file;
+        None
+    }
+
     /// A number that changes whenever any answer may change (an edited
-    /// library, another color management). Looks cache by it.
+    /// library, a file read, another color management). Looks cache by it.
     fn revision(&self) -> u64;
 }
 
@@ -86,6 +98,20 @@ pub trait Look: Send + Sync {
         piece: usize,
         materials: &dyn Materials,
     ) -> Option<Arc<[u32]>>;
+
+    /// The images piece `piece` of `drawn` shows over its colors. `None`: its
+    /// colors alone. Keep the allocations while they stay the same: a new one
+    /// uploads.
+    fn textures(
+        &self,
+        data: &Data,
+        drawn: &Drawn,
+        piece: usize,
+        materials: &dyn Materials,
+    ) -> Option<SurfaceTextures> {
+        let _ = (data, drawn, piece, materials);
+        None
+    }
 
     /// Whether it renders as a volume (its surface only the volume's
     /// bounds, drawn as a ghost).

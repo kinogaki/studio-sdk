@@ -69,8 +69,8 @@ pub use material::preview::{
     PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
 };
 pub use material::{
-    Input, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef, NodeIndex,
-    Output, Socket,
+    DisplayTexture, Input, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef,
+    NodeIndex, Output, Socket,
 };
 pub use prim::{
     Camera, Instancer, InstancerBuilder, Material, Prim, PrimKind, Projection, STANDARD_PRIMVARS,

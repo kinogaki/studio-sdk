@@ -12,6 +12,8 @@
 //!   [`packet_as`].
 //! - [`pack_linear`]: a linear color as the RGB9E5 word surface colors
 //!   are carried in ([`ColorLayout`]).
+//! - [`SurfaceTextures`]: the images ([`SurfaceImage`]) a surface's polygons
+//!   show over their colors, read through a [`TextureCorner`] a polygon vertex.
 //! - [`ElementSet`]: the selected points, edges, faces, vertices or
 //!   objects; [`ElementSelection`]: one set per drawn family (faces,
 //!   lines, markers) for surfaces whose levels combine.
@@ -34,6 +36,7 @@ mod packet;
 mod points;
 mod selection;
 mod shading;
+mod textures;
 mod updates;
 pub use color::pack_linear;
 pub use lines::{ACCENT, LineClass, LineClassId, LineHighlight, LineLook, LineStyle};
@@ -49,4 +52,5 @@ pub use selection::ElementSelection;
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,
 };
+pub use textures::{SurfaceImage, SurfaceTextures, TextureCorner};
 pub use updates::{BufferRanges, DrawUpdate, UpdateRanges};

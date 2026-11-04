@@ -87,7 +87,7 @@ A value's kind is the SDK's `ValueKind`, its descriptor the one lights use, so a
 `Prim::Material` holds a `MaterialNetwork`: `nodes()` (each `def`, every value by name, `textures` by input name), `links()`, `output()` (the node shown: your own output node, if you want several terminals). Translate it to your shaders. A network with no nodes is your default material: what a look naming nothing renders. A node whose file isn't read yet isn't there (its links gone, what it drove holding its value), and the host sends the Material again once it is; colors are linear ACEScg.
 
 What needs your code is `MaterialRules`:
-- `display`: a simple approximation of your material for the shaded viewport: a color and the primvar it multiplies by, and whether it fills its shape as a volume. Render views show the real look.
+- `display`: a simple approximation of your material for the shaded viewport: a color, the primvar it multiplies by, the image it multiplies by (`DisplayTexture`: the file value a node holds, and the primvar of its coordinates, by default `uv`) and whether it fills its shape as a volume. All of it multiplies, linear. The host reads the file through the color service as it reads a render's, once, and shows the color alone until it is read; you never decode or upload anything for it. Name one image, the one that says most about the material's color. Render views show the real look.
 - `translate`: a material of yours from a network holding nodes you don't declare (another engine's, a file's). None renders your default.
 
 An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a Material with its inside seeded.
