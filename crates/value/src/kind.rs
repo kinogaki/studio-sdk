@@ -34,8 +34,8 @@ pub enum ValueKind {
     },
     /// [`Value::Text`], one line, committed when the edit ends.
     Text,
-    /// [`Value::Text`]: code, many lines in a code editor; its node type
-    /// names the language.
+    /// [`Value::Text`]: many lines in a code editor; its node type names the
+    /// language, plain text by default.
     Code,
     /// [`Value::Text`]: a file's path, as typed (empty: none). An image a
     /// render reads is sent as its texture, never as the path.

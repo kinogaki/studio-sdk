@@ -32,6 +32,10 @@ pub enum Fits {
     Materials,
     /// An object holding a network of this context, or a node of one.
     Networks(ContextId),
+    /// What writes a picture: an object that renders (its Output), or a node
+    /// with a [`SaveFile`](crate::ValueKind::SaveFile) row. The row resolves
+    /// to the file's path, so a node reads what was last written there.
+    Written,
 }
 
 impl RefFilter {
@@ -53,6 +57,11 @@ impl RefFilter {
     /// One network of `context`, by the object holding it, or one of its nodes.
     pub fn network(context: ContextId) -> Self {
         Self::of(Fits::Networks(context))
+    }
+
+    /// One object or node that writes a picture.
+    pub fn written() -> Self {
+        Self::of(Fits::Written)
     }
 
     fn of(fits: Fits) -> Self {

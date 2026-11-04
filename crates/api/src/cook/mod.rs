@@ -162,7 +162,9 @@ pub enum Resolved {
     /// What the path names: an object's result, or a node's.
     Object(Data),
     /// The path itself, as core resolved it from the node (absolute), for
-    /// a path the node writes rather than reads (a Material's).
+    /// a path the node writes rather than reads (a Material's); or the file
+    /// what it names writes ([`Fits::Written`](crate::params::Fits::Written)),
+    /// present on disk.
     Path(String),
 }
 
