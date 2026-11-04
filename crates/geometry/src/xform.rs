@@ -93,6 +93,23 @@ impl Xform {
         Vec3::new(r[0][3], r[1][3], r[2][3])
     }
 
+    /// `inner` placed by this: a point goes through `inner`, then this.
+    pub fn compose(&self, inner: &Xform) -> Xform {
+        let (a, b) = (self.rows(), inner.rows());
+        Xform::from_rows(std::array::from_fn(|r| {
+            std::array::from_fn(|c| {
+                let t = if c == 3 { a[r][3] } else { 0.0 };
+                t + (0..3).map(|k| a[r][k] * b[k][c]).sum::<f64>()
+            })
+        }))
+    }
+
+    /// `v`, a direction, turned and scaled as this does: no translation.
+    pub fn apply_vector(&self, v: Vec3) -> Vec3 {
+        let [x, y, z] = self.axes();
+        x * v.x + y * v.y + z * v.z
+    }
+
     /// Where point `p` goes: `M·p`.
     pub fn apply_point(&self, p: Vec3) -> Vec3 {
         let r = &self.0;

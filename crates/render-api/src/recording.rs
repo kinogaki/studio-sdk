@@ -6,12 +6,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::aov::{AovDesc, AovSpec, standard as aov};
-use crate::description::{Capabilities, EngineDescription, MaterialRules, Motion, Tint};
+use crate::description::{Capabilities, EngineDescription, Motion};
 use crate::dirty::Dirty;
 use crate::engine::{Outputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
-use crate::exchange::PreviewSurface;
 use crate::id::{EngineId, PrimId};
-use crate::material::MaterialNetwork;
+use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::{Prim, PrimKind, Topology};
 use crate::settings::RenderSettings;
 use crate::update::SceneUpdate;
@@ -49,6 +48,8 @@ pub struct RecordingEngine {
     pub views: BTreeMap<ViewId, (ViewDesc, bool)>,
     /// What it was sent.
     pub counts: Counts,
+    /// The previews it was asked for.
+    pub previews: Vec<PreviewRequest>,
     wake: Wake,
 }
 
@@ -61,6 +62,7 @@ impl RecordingEngine {
             settings: RenderSettings::default(),
             views: BTreeMap::new(),
             counts: Counts::default(),
+            previews: Vec::new(),
             wake,
         }
     }
@@ -78,41 +80,12 @@ impl RecordingEngine {
 /// The recording engine's id.
 const ID: &str = "kinogaki.render.recording";
 
-/// The recording engine's materials: none of its own, so everything is
-/// its empty material.
-struct Rules;
-
-fn empty() -> MaterialNetwork {
-    MaterialNetwork::new(EngineId::new(ID))
-}
-
-impl MaterialRules for Rules {
-    fn tint(&self, _: &MaterialNetwork) -> Option<Tint> {
-        None
-    }
-    fn volume(&self, _: &MaterialNetwork) -> bool {
-        false
-    }
-    fn flat(&self, _: &Tint) -> MaterialNetwork {
-        empty()
-    }
-    fn default_material(&self) -> MaterialNetwork {
-        empty()
-    }
-    fn preview_surface(&self, _: &MaterialNetwork) -> PreviewSurface {
-        PreviewSurface::default()
-    }
-    fn import_preview_surface(&self, _: &PreviewSurface) -> MaterialNetwork {
-        empty()
-    }
-}
-
 /// The recording engine's description: every structural prim, the
 /// standard types, the beauty, no settings and no vocabulary of its own.
 fn description() -> EngineDescription {
     let mut types = crate::standard::lights();
     types.push(crate::standard::fog());
-    EngineDescription::builder(EngineId::new(ID), "Recording", Arc::new(Rules))
+    EngineDescription::builder(EngineId::new(ID), "Recording")
         .capabilities(Capabilities {
             prims: PrimKind::STRUCTURAL.to_vec(),
             types,
@@ -206,6 +179,19 @@ impl RenderEngine for RecordingEngine {
             height,
             planes,
             names: Vec::new(),
+        });
+        result
+    }
+
+    /// Delivers a black picture at once, keeping what it was asked.
+    fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage> {
+        let (deliver, result) = pending(self.wake.clone());
+        let side = request.side;
+        self.previews.push(request);
+        let pixels = side as usize * side as usize * 4;
+        deliver.deliver(PreviewImage {
+            side,
+            pixels: Arc::from(vec![0.0f32; pixels]),
         });
         result
     }

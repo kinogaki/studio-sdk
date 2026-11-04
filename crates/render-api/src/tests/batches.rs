@@ -196,6 +196,26 @@ fn the_recording_engine_counts_what_it_was_sent() {
 }
 
 #[test]
+fn a_result_dropped_is_no_longer_wanted_and_a_preview_answers() {
+    let (wake, _) = counter();
+    let (deliver, result) = pending::<u32>(wake.clone());
+    assert!(deliver.wanted());
+    drop(result);
+    assert!(!deliver.wanted(), "a host's cancel, as the engine sees it");
+    let mut engine = RecordingEngine::new(wake);
+    let result = engine.preview(PreviewRequest {
+        network: Arc::default(),
+        textures: Vec::new(),
+        shape: PreviewShape::Sphere,
+        lighting: PreviewLighting::Studio,
+        side: 8,
+    });
+    let image = result.take().expect("at once").unwrap();
+    assert_eq!((image.side, image.pixels.len()), (8, 8 * 8 * 4));
+    assert_eq!(engine.previews.len(), 1);
+}
+
+#[test]
 fn a_shape_is_refused_unless_whole() {
     use crate::geometry::{Attribute, Domain, Kind, Meaning, Primitives, Sampled, Xform};
     let points = || -> crate::geometry::Column<[f32; 3]> { vec![[0.0f32; 3]; 4].into() };

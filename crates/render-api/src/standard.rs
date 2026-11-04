@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
-use crate::settings::{SettingDescriptor, SettingGroup, Trailing};
+use crate::settings::{SettingDescriptor, SettingGroup};
 use kinogaki_value::{Choice, Condition, Number, Unit, Value, ValueKind};
 
 /// The area light's id.
@@ -36,6 +36,9 @@ pub(crate) const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
 pub(crate) const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
 /// The fog's id.
 pub(crate) const FOG: &str = "kinogaki.render.fog";
+
+/// The parameter saying where an emitter's spectrum comes from.
+pub const EMISSION: &str = "emission";
 
 /// The group a light's parameters sit in.
 pub(crate) const LIGHT_GROUP: &str = "light";
@@ -123,8 +126,7 @@ pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
             LIGHT_GROUP,
             ValueKind::choice(choices),
             choice("color"),
-        )
-        .trailing(Trailing::EmissionSwatch),
+        ),
         SettingDescriptor::new("color", "Color", LIGHT_GROUP, ValueKind::Color, [1.0; 3])
             .shown_when(emission("color")),
         SettingDescriptor::new(

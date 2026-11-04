@@ -5,7 +5,7 @@
 use crate::data::Data;
 use crate::facets::Drawn;
 use kinogaki_geometry::{Bounds, Projective, Ray, Xform};
-use kinogaki_render_api::Tint;
+use kinogaki_render_api::MaterialDisplay;
 use std::sync::Arc;
 
 /// A marquee over a view: its box, running 0–1 across the view and down
@@ -62,14 +62,10 @@ pub trait ObjectPicking: Send + Sync {
 /// What the scene's materials say, as an object's look reads them. It is
 /// core's service, the same for every type.
 pub trait Materials {
-    /// The tint material `path` shows while shaded: its unwired base
-    /// color, the attribute an Attribute node wired into it reads, or
-    /// both. `None` when the path names no material or the material has
-    /// no tint.
-    fn tint(&self, path: &str) -> Option<Tint>;
-
-    /// Whether material `path` fills its object as a volume.
-    fn volume(&self, path: &str) -> bool;
+    /// What material `path` shows while shaded: its engine's approximation
+    /// of it. `None` when the path names no material, or one no installed
+    /// engine owns.
+    fn display(&self, path: &str) -> Option<MaterialDisplay>;
 
     /// A number that changes whenever any answer may change (an edited
     /// library, another color management). Looks cache by it.

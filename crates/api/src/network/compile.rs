@@ -102,7 +102,7 @@ impl<'a> CompileCx<'a> {
     /// through the trait first, and downcasts it to its own concrete type
     /// (`NodeType` is [`Any`]: `(ty as &dyn Any).downcast_ref::<Mine>()`)
     /// only for what that type alone knows (a Comp operator's plan node, a
-    /// shader's engine vocabulary).
+    /// shading node's def).
     pub fn node_type(&self, id: NodeTypeId) -> Option<&'a dyn NodeType> {
         self.types?.node_type(id)
     }

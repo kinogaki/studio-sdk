@@ -17,7 +17,7 @@
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
 //! here ([`GeometryCodec`], [`InstancesCodec`], [`BrepCodec`], [`CameraCodec`],
-//! [`LightCodec`], [`PreviewMaterialsCodec`]) are the ones core registers,
+//! [`LightCodec`], [`MaterialsCodec`]) are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
 //! [`ColorConfiguration`],
@@ -46,7 +46,7 @@ pub use color::ColorConfiguration;
 pub use geometry::GeometryCodec;
 pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
 pub use light::LightCodec;
-pub use materials::PreviewMaterialsCodec;
+pub use materials::{ImportedMaterial, MaterialsCodec};
 
 use crate::Error;
 use crate::components::Components;
@@ -56,7 +56,6 @@ use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
 use kinogaki_geometry::brep::Brep;
 use kinogaki_geometry::{Domain, Elements, Geometry, Selection};
-use kinogaki_render_api::ImportedMaterial;
 
 /// The id of [`Geometry`] values: polygons, polylines and curves.
 pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
@@ -65,8 +64,8 @@ pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
 pub const BREP: &str = "kinogaki.core.brep";
 
 /// The id of a file's materials as a format reads them beside its
-/// geometry ([`preview_materials`]).
-pub(crate) const PREVIEW_MATERIALS: &str = "kinogaki.core.preview_materials";
+/// geometry ([`materials`](fn@materials)).
+pub(crate) const MATERIALS: &str = "kinogaki.core.materials";
 
 /// The handle on [`Geometry`] values (`GEOMETRY`).
 pub const fn geometry() -> Typed<Geometry> {
@@ -110,8 +109,8 @@ pub const fn brep() -> Typed<Brep> {
 /// The handle on a file's materials as a format reads them beside its
 /// geometry (`PREVIEW_MATERIALS`): each keyed by the name the file's
 /// polygons' `material` values give it, with its preview surface.
-pub const fn preview_materials() -> Typed<Vec<ImportedMaterial>> {
-    Typed::new(DataTypeId::declared(PREVIEW_MATERIALS))
+pub const fn materials() -> Typed<Vec<ImportedMaterial>> {
+    Typed::new(DataTypeId::declared(MATERIALS))
 }
 
 /// `selection` of a value of data type `ty`, as the [`Components`] the

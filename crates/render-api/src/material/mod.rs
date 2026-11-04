@@ -1,0 +1,390 @@
+//! Material networks: the DAG machinery, with no shading model in it. A
+//! network is nodes of engine-declared types ([`NodeDef`], by id), each
+//! holding its inputs' values, links between their ports by name, and the one
+//! node it shows. What the nodes mean is their engine's: it translates a
+//! network to its shaders. Made by [`MaterialNetwork::builder`], which checks
+//! every value against its port, every link's sockets, and that nothing
+//! cycles; an engine never reads a half-formed network.
+//!
+//! An empty network ([`MaterialNetwork::default`]) renders as the engine's
+//! default material: what a look naming nothing shows.
+//!
+//! Colors are linear: authored in the working space, ACEScg in a network
+//! an engine receives (the host converts them as it sends the network;
+//! [`crate::RENDER_SPACE`]).
+mod def;
+mod display;
+pub mod preview;
+
+pub use def::{Input, NodeDef, Output, Socket};
+pub use display::MaterialDisplay;
+
+use crate::settings::Textures;
+use kinogaki_geometry::Error;
+use kinogaki_value::{NodeTypeId, Parameters, Value, ValueKind};
+use std::collections::BTreeSet;
+use std::sync::Arc;
+
+/// A node's index in its network.
+pub type NodeIndex = u32;
+
+/// A node: its type, every input's value (its default when never set), and,
+/// as an engine receives it, the Texture prims its image files were decoded
+/// to, by input name.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Node {
+    /// Its type.
+    pub def: NodeTypeId,
+    /// Every input's value that isn't a wire alone, by name.
+    pub values: Parameters,
+    /// Its files' Texture prims, filled by the host as it sends the network.
+    pub textures: Textures,
+}
+
+/// One link: output `output` of node `from` drives input `input` of `to`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Link {
+    /// The source node.
+    pub from: NodeIndex,
+    /// The source's output, by name.
+    pub output: Arc<str>,
+    /// The driven node.
+    pub to: NodeIndex,
+    /// The driven input, by name.
+    pub input: Arc<str>,
+}
+
+/// A material (see the module docs).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MaterialNetwork {
+    nodes: Vec<Node>,
+    links: Vec<Link>,
+    output: Option<NodeIndex>,
+    primvars: Arc<[Arc<str>]>,
+}
+
+impl MaterialNetwork {
+    /// A network with no nodes yet.
+    pub fn builder() -> NetworkBuilder {
+        NetworkBuilder::default()
+    }
+
+    /// Its nodes; links name them by index.
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
+    /// Its nodes, for a host resolving their files.
+    pub fn nodes_mut(&mut self) -> &mut [Node] {
+        &mut self.nodes
+    }
+
+    /// Its links, in the order they were made (an engine may emit in it).
+    pub fn links(&self) -> &[Link] {
+        &self.links
+    }
+
+    /// The node it shows: the terminal an engine starts from. None: it is
+    /// empty, and renders as the engine's default material.
+    pub fn output(&self) -> Option<&Node> {
+        self.nodes.get(self.output? as usize)
+    }
+
+    /// The output node's index.
+    pub fn output_index(&self) -> Option<NodeIndex> {
+        self.output
+    }
+
+    /// The primvars its values name ([`ValueKind::Attribute`]): what a host
+    /// sends the shapes using it, beside the
+    /// [standard ones](crate::STANDARD_PRIMVARS).
+    pub fn primvars(&self) -> &Arc<[Arc<str>]> {
+        &self.primvars
+    }
+
+    /// Whether `other` has the same nodes' types and links, so only values
+    /// differ.
+    pub fn same_wiring(&self, other: &MaterialNetwork) -> bool {
+        self.links == other.links
+            && self.output == other.output
+            && self.nodes.len() == other.nodes.len()
+            && (self.nodes.iter().zip(&other.nodes)).all(|(a, b)| a.def == b.def)
+    }
+
+    /// The network without the nodes `out` and every link to or from them:
+    /// the inputs they fed hold their own values. Without its output node it
+    /// is empty.
+    pub fn without(&self, out: &BTreeSet<NodeIndex>) -> MaterialNetwork {
+        if out.is_empty() {
+            return self.clone();
+        }
+        if self.output.is_some_and(|o| out.contains(&o)) {
+            return MaterialNetwork::default();
+        }
+        let renumbered = |n: NodeIndex| n - out.range(..n).count() as NodeIndex;
+        let kept = |n: &NodeIndex| !out.contains(n);
+        MaterialNetwork {
+            nodes: (self.nodes.iter().enumerate())
+                .filter(|(at, _)| kept(&(*at as NodeIndex)))
+                .map(|(_, node)| node.clone())
+                .collect(),
+            links: (self.links.iter())
+                .filter(|l| kept(&l.from) && kept(&l.to))
+                .map(|l| Link {
+                    from: renumbered(l.from),
+                    to: renumbered(l.to),
+                    ..l.clone()
+                })
+                .collect(),
+            output: self.output.map(renumbered),
+            primvars: self.primvars.clone(),
+        }
+    }
+}
+
+/// Makes a [`MaterialNetwork`], checking it whole.
+#[derive(Clone, Debug, Default)]
+pub struct NetworkBuilder {
+    defs: Vec<Arc<NodeDef>>,
+    network: MaterialNetwork,
+    primvars: BTreeSet<Arc<str>>,
+}
+
+impl NetworkBuilder {
+    /// A node of `def` holding `values`, each input not named at its default;
+    /// its index.
+    ///
+    /// # Errors
+    /// A value no input of `def` holds, or one its input's kind refuses.
+    pub fn node(&mut self, def: &Arc<NodeDef>, values: &Parameters) -> Result<NodeIndex, Error> {
+        if let Some(name) = (values.keys())
+            .find(|name| !(def.inputs.iter()).any(|i| i.value().is_some() && i.name() == *name))
+        {
+            let label = &def.label;
+            return Err(Error::invalid(format_args!("{label} has no value {name}")));
+        }
+        let mut held = Parameters::new();
+        for descriptor in def.inputs.iter().filter_map(Input::value) {
+            let value = values.get(&*descriptor.name).unwrap_or(&descriptor.default);
+            descriptor
+                .kind
+                .check(value, &descriptor.label)
+                .map_err(|why| Error::invalid(why.message))?;
+            if let (ValueKind::Attribute { .. }, Value::Text(names)) = (&descriptor.kind, value) {
+                self.primvars
+                    .extend(names.split_whitespace().map(Arc::from));
+            }
+            held.insert(descriptor.name.to_string(), value.clone());
+        }
+        self.defs.push(def.clone());
+        self.network.nodes.push(Node {
+            def: def.id,
+            values: held,
+            textures: Textures::new(),
+        });
+        Ok((self.network.nodes.len() - 1) as NodeIndex)
+    }
+
+    /// Output `output` of node `from` driving input `input` of node `to`.
+    ///
+    /// # Errors
+    /// No such node or port, an input already driven, or sockets that don't
+    /// meet ([`Socket::drives`]).
+    pub fn link(
+        &mut self,
+        from: NodeIndex,
+        output: &str,
+        to: NodeIndex,
+        input: &str,
+    ) -> Result<(), Error> {
+        let def = |at: NodeIndex| {
+            (self.defs.get(at as usize))
+                .ok_or_else(|| Error::invalid(format_args!("no node {at} to link")))
+        };
+        let (source, driven) = (def(from)?, def(to)?);
+        let out = (source.outputs.iter()).find(|o| &*o.name == output);
+        let out = out.ok_or_else(|| {
+            let label = &source.label;
+            Error::invalid(format_args!("{label} has no output {output}"))
+        })?;
+        let takes = (driven.inputs.iter()).find(|i| i.name() == input);
+        let takes = takes.and_then(Input::socket).ok_or_else(|| {
+            let label = &driven.label;
+            Error::invalid(format_args!(
+                "{label} has no input {input} a wire can drive"
+            ))
+        })?;
+        if !out.socket.drives(takes) {
+            let (a, b) = (&source.label, &driven.label);
+            return Err(Error::invalid(format_args!(
+                "{a}'s {output} can't drive {b}'s {input}"
+            )));
+        }
+        let held = |l: &Link| l.to == to && &*l.input == input;
+        if self.network.links.iter().any(held) {
+            let label = &driven.label;
+            return Err(Error::invalid(format_args!(
+                "{label}'s {input} is already driven"
+            )));
+        }
+        self.network.links.push(Link {
+            from,
+            output: Arc::from(output),
+            to,
+            input: Arc::from(input),
+        });
+        Ok(())
+    }
+
+    /// The network, showing node `output`.
+    ///
+    /// # Errors
+    /// No such node, or a link cycles.
+    pub fn build(mut self, output: NodeIndex) -> Result<MaterialNetwork, Error> {
+        if output as usize >= self.network.nodes.len() {
+            return Err(Error::invalid(format_args!("no node {output} to show")));
+        }
+        self.check_cycles()?;
+        self.network.output = Some(output);
+        self.network.primvars = self.primvars.into_iter().collect();
+        Ok(self.network)
+    }
+
+    /// Kahn's walk: what no walk reaches sits on a cycle.
+    fn check_cycles(&self) -> Result<(), Error> {
+        let count = self.network.nodes.len();
+        let mut waits = vec![0usize; count];
+        for link in &self.network.links {
+            waits[link.to as usize] += 1;
+        }
+        let mut ready: Vec<usize> = (0..count).filter(|&n| waits[n] == 0).collect();
+        let mut seen = 0;
+        while let Some(n) = ready.pop() {
+            seen += 1;
+            for link in self.network.links.iter().filter(|l| l.from as usize == n) {
+                waits[link.to as usize] -= 1;
+                if waits[link.to as usize] == 0 {
+                    ready.push(link.to as usize);
+                }
+            }
+        }
+        match seen == count {
+            true => Ok(()),
+            false => Err(Error::invalid("a material's links cycle")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SettingDescriptor;
+    use kinogaki_value::{NodeTypeId, ValueKind};
+
+    fn color(name: &str) -> SettingDescriptor {
+        SettingDescriptor::new(name, name, "", ValueKind::Color, Value::Color([0.5; 3]))
+    }
+
+    /// A surface output taking a color, a texture reading an attribute, and
+    /// an output node taking a surface.
+    fn defs() -> [Arc<NodeDef>; 3] {
+        let closure = || Socket::Closure(Arc::from("surface"));
+        let surface = NodeDef::new(NodeTypeId::declared("toy.m.surface"), "Surface", "Surface")
+            .input(Input::Driven(color("base"), Socket::Color))
+            .output(Output::new("out", "Out", closure()));
+        let attribute = ValueKind::Attribute {
+            menu: Vec::new(),
+            list: false,
+        };
+        let read = SettingDescriptor::new("name", "Name", "", attribute, "Cd");
+        let reader = NodeDef::new(NodeTypeId::declared("toy.m.read"), "Read", "Input")
+            .input(Input::Setting(read))
+            .input(Input::Driven(color("gain"), Socket::Color))
+            .output(Output::new("out", "Out", Socket::Color));
+        let output = NodeDef::new(NodeTypeId::declared("toy.m.output"), "Output", "Output")
+            .input(Input::wire("surface", "Surface", closure()));
+        [Arc::new(surface), Arc::new(reader), Arc::new(output)]
+    }
+
+    #[test]
+    fn a_network_is_whole_once_built() {
+        let [surface, read, output] = defs();
+        let mut b = MaterialNetwork::builder();
+        let (none, r) = (
+            Parameters::new(),
+            b.node(&read, &Parameters::new()).unwrap(),
+        );
+        let s = b.node(&surface, &none).unwrap();
+        let o = b.node(&output, &none).unwrap();
+        b.link(r, "out", s, "base").unwrap();
+        b.link(s, "out", o, "surface").unwrap();
+        let network = b.build(o).unwrap();
+        assert_eq!(network.output().map(|n| n.def), Some(output.id));
+        assert_eq!(network.primvars()[..], [Arc::from("Cd")]);
+        // Every value is there, a default never asked for.
+        assert_eq!(network.nodes()[1].values["base"], Value::Color([0.5; 3]));
+        assert!(
+            network.nodes()[2].values.is_empty(),
+            "a wire alone holds none"
+        );
+        // Without the reader: its link goes, the surface holds its own base.
+        let cut = network.without(&BTreeSet::from([r]));
+        assert_eq!(cut.links().len(), 1);
+        assert_eq!(
+            (cut.nodes().len(), cut.links()[0].from, cut.links()[0].to),
+            (2, 0, 1)
+        );
+        assert_eq!(cut.output_index(), Some(1));
+        // Without the output: empty.
+        assert_eq!(
+            network.without(&BTreeSet::from([o])),
+            MaterialNetwork::default()
+        );
+        assert!(MaterialNetwork::default().output().is_none());
+    }
+
+    #[test]
+    fn a_builder_refuses_what_isnt_whole() {
+        let [surface, read, output] = defs();
+        let none = Parameters::new();
+        let mut b = MaterialNetwork::builder();
+        let wrong = Parameters::from([("base".to_owned(), Value::Bool(true))]);
+        assert!(b.node(&surface, &wrong).is_err(), "a value of another kind");
+        let unknown = Parameters::from([("nope".to_owned(), Value::Bool(true))]);
+        assert!(b.node(&surface, &unknown).is_err(), "no such input");
+        let (s, r, o) = (
+            b.node(&surface, &none).unwrap(),
+            b.node(&read, &none).unwrap(),
+            b.node(&output, &none).unwrap(),
+        );
+        // A color into a closure, a closure into a color; ports that aren't.
+        assert!(b.link(r, "out", o, "surface").is_err());
+        assert!(b.link(s, "out", r, "gain").is_err());
+        assert!(b.link(r, "nope", s, "base").is_err());
+        assert!(b.link(r, "out", s, "nope").is_err());
+        assert!(
+            b.link(r, "out", r, "name").is_err(),
+            "a setting takes no wire"
+        );
+        assert!(b.link(9, "out", s, "base").is_err());
+        b.link(r, "out", s, "base").unwrap();
+        assert!(b.link(r, "out", s, "base").is_err(), "already driven");
+        assert!(b.clone().build(9).is_err(), "no such node to show");
+        // A cycle.
+        let mut c = MaterialNetwork::builder();
+        let (a, z) = (c.node(&read, &none).unwrap(), c.node(&read, &none).unwrap());
+        c.link(a, "out", z, "gain").unwrap();
+        c.link(z, "out", a, "gain").unwrap();
+        assert!(c.build(a).is_err());
+    }
+
+    #[test]
+    fn sockets_meet_by_kind() {
+        let closure = |n: &str| Socket::Closure(Arc::from(n));
+        assert!(Socket::Float.drives(&Socket::Color));
+        assert!(Socket::Color.drives(&Socket::Vector { width: 3 }));
+        assert!(closure("a").drives(&closure("a")));
+        assert!(!closure("a").drives(&closure("b")));
+        assert!(!closure("a").drives(&Socket::Float));
+    }
+}

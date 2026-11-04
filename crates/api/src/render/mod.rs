@@ -11,14 +11,17 @@
 //!
 //! An engine's settings and its declared prims' values are parameters of
 //! the one value model ([`Parameter::setting`](crate::params::Parameter::setting)),
-//! keyed over time as node parameters are.
+//! keyed over time as node parameters are. A Material's nodes are engine
+//! declared ([`ShaderNode`]s over `NodeDef`s).
+mod shader;
+
+pub use shader::{SHADER, SHADING, ShaderNode};
+
 use kinogaki_geometry::{Attributes, Column, Xform};
 use std::fmt;
 use std::sync::Arc;
 
-pub use kinogaki_render_api::{
-    Detail, Extra, ImportedMaterial, PlainTriangles, PreviewSurface, Ranges, ShapeSource, Topology,
-};
+pub use kinogaki_render_api::{Detail, PlainTriangles, Ranges, ShapeSource, Topology};
 
 /// What a value renders as.
 #[derive(Clone)]

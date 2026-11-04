@@ -121,6 +121,17 @@ impl IdAllocator {
         IdAllocator::default()
     }
 
+    /// An allocator giving out slots from `first` on: what names prims beside
+    /// ids another allocator gave out below it.
+    pub fn past(first: u32) -> IdAllocator {
+        let first = first as usize;
+        IdAllocator {
+            generations: vec![0; first],
+            live: vec![false; first],
+            free: Vec::new(),
+        }
+    }
+
     /// A new id for a prim of type `T`.
     pub fn allocate_as<T>(&mut self) -> Id<T> {
         Id::of(self.allocate())

@@ -1,80 +1,11 @@
-//! Vocabularies, networks, settings and the standard prims.
+//! Settings and the standard prims.
 use super::*;
 use kinogaki_value::ramp::{Interpolation, Key, Ramp};
-use kinogaki_value::{Choice, Condition, Parameters, Value, ValueKind};
+use kinogaki_value::{Condition, Parameters, Value, ValueKind};
 
 /// Values by name, from pairs.
 fn values<const N: usize>(pairs: [(&str, Value); N]) -> Parameters {
     pairs.into_iter().map(|(n, v)| (n.to_owned(), v)).collect()
-}
-
-/// A tiny vocabulary: one surface whose `mode` choice decides whether it
-/// has a second input.
-fn tiny_layout(_: &str, params: &Parameters) -> NodeLayout {
-    let two = params.get("mode").and_then(Value::choice) == Some("two");
-    let mut inputs = vec![SocketSpec::new(
-        "color",
-        "Color",
-        SocketKind::Color,
-        [0.5; 3],
-    )];
-    if two {
-        inputs.push(SocketSpec::new("amount", "Amount", SocketKind::Float, 1.0));
-    }
-    NodeLayout {
-        params: vec![ParamSpec {
-            name: Arc::from("mode"),
-            label: Arc::from("Mode"),
-            kind: ValueKind::choice(vec![Choice::new("one", "One"), Choice::new("two", "Two")]),
-            default: standard::choice("one"),
-            usage: None,
-            tooltip: None,
-            shown: true,
-        }],
-        inputs,
-        outputs: Vec::new(),
-    }
-}
-
-fn tiny() -> NodeType {
-    NodeType {
-        engine: EngineId::new("tiny"),
-        name: Arc::from("tiny_surface"),
-        label: Arc::from("Tiny Surface"),
-        category: Arc::from("Surface"),
-        aliases: Vec::new(),
-        surface: Some(Arc::from("Tiny")),
-        defaults: values([("mode", standard::choice("one"))]),
-        layout: Arc::new(tiny_layout),
-    }
-}
-
-#[test]
-fn node_types_fit_their_settings_and_lay_out_by_them() {
-    let t = tiny();
-    assert_eq!(t.layout(&t.defaults).inputs.len(), 1);
-    // A choice it does not offer takes the default; a missing one too.
-    let bad = values([("mode", standard::choice("three"))]);
-    assert_eq!(t.fit(&bad), Some(t.defaults.clone()));
-    assert_eq!(t.fit(&Parameters::new()), Some(t.defaults.clone()));
-    let two = values([("mode", standard::choice("two"))]);
-    assert_eq!(t.fit(&two), Some(two.clone()));
-    let layout = t.layout(&two);
-    assert_eq!(layout.input("amount"), Some(1));
-    assert!(layout.params[0].accepts(&two["mode"]));
-    // A layout whose settings never settle is reported, not cut short.
-    let flip = NodeType {
-        layout: Arc::new(|_, params: &Parameters| {
-            let one = params.get("mode").and_then(Value::choice) == Some("one");
-            let mut layout = tiny_layout("", params);
-            layout.params[0].default = standard::choice(if one { "two" } else { "one" });
-            layout.params[0].kind =
-                ValueKind::choice(vec![Choice::new(if one { "two" } else { "one" }, "Next")]);
-            layout
-        }),
-        ..tiny()
-    };
-    assert_eq!(flip.fit(&flip.defaults), None);
 }
 
 #[test]
@@ -225,10 +156,6 @@ fn rows_show_and_apply_by_the_values_beside_them() {
     assert!(shown(&values, "color") && !temperature.applies(&values));
     values.insert("emission".into(), standard::choice("temperature"));
     assert!(!shown(&values, "color") && temperature.applies(&values));
-    assert_eq!(
-        param(&area, "emission").unwrap().trailing,
-        Some(Trailing::EmissionSwatch)
-    );
     // A dome's image shows while it has no ground; an empty file is none.
     let dome = standard::dome_light();
     let mut sky = dome.defaults();

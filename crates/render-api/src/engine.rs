@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 use crate::aov::AovDesc;
 use crate::description::EngineDescription;
 use crate::id::Id;
+use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::{Error, ErrorKind};
@@ -165,6 +166,13 @@ pub fn pending<T>(wake: Wake) -> (Deliver<T>, Pending<T>) {
 }
 
 impl<T> Deliver<T> {
+    /// Whether anyone still holds the result: dropping the [`Pending`] is how
+    /// a host cancels. An engine asks between passes and lets go of a result
+    /// no one wants, stopping its work.
+    pub fn wanted(&self) -> bool {
+        Arc::strong_count(&self.slot) > 1
+    }
+
     /// Store the result and wake the host. Consumes the producer, so a
     /// result is resolved at most once.
     pub fn deliver(self, value: T) {
@@ -235,6 +243,9 @@ pub trait RenderEngine: Send {
     /// resolves once: the outputs, or why there are none (a failed read,
     /// or the request dropped with the view or the engine).
     fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Outputs>;
+    /// A picture of a material, rendered off the caller's thread; never
+    /// blocks. The host drops the result to cancel it ([`Deliver::wanted`]).
+    fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage>;
 }
 
 #[cfg(test)]

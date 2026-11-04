@@ -1,51 +1,65 @@
-//! [`PreviewMaterialsCodec`]: how a file's imported materials save.
-use super::preview_materials;
+//! [`ImportedMaterial`]: a material as a file brings it, and
+//! [`MaterialsCodec`], how a file's materials save.
+use super::materials;
 use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::element::{ElementReader, ElementWriter, Field};
-use kinogaki_render_api::{Extra, ImportedMaterial, PreviewSurface};
+use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
+use crate::network::{NetworkSeed, NewNode, SeedWire};
+use kinogaki_value::{NodeTypeId, Parameters, Value};
 
-/// Saves a file's materials as imported: `count`, then one `material`
-/// child `m<i>` each holding its `key` and `name`, and its preview
-/// surface's `diffuse`, `roughness`, `metallic`, `opacity`, `emissive`
-/// (each empty when the file doesn't say) and `texture` (no text or one),
-/// and its Kinogaki attributes as `extra_names`, `extra_kinds` (0 a
-/// number, 1 three, 2 a name), their numbers in order (`extra_numbers`)
-/// and their names (`extra_tokens`). A round trip is exact.
+/// A material a file brings: the key its polygons' `material` values name,
+/// the name it takes in the scene's library, and what starts its inside:
+/// nodes of whatever types the format's plugin knows, which an engine renders
+/// when it declares or translates them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportedMaterial {
+    /// What the file's polygons name it by.
+    pub key: String,
+    /// The name it takes in the library.
+    pub name: String,
+    /// What starts its inside.
+    pub inside: NetworkSeed,
+}
+
+/// Saves a file's materials as imported: `count`, then one `material` child
+/// `m<i>` each holding its `key` and `name`, its nodes (`n<k>`: `type`, a
+/// `name` when it has one, `display`, and its values `valueNames`,
+/// `valueKinds`, `v<j>`) and its wires (`from`, `output`, `to`, `input`). A
+/// round trip is exact. Numbers, colors, toggles, choices and texts save; a
+/// file's material holds no other value.
 ///
 /// ```
 /// use kinogaki_studio_api::DataCodec;
 /// use kinogaki_studio_api::element::MemoryElement;
-/// use kinogaki_studio_api::render::{ImportedMaterial, PreviewSurface};
-/// use kinogaki_studio_api::standard::{self, PreviewMaterialsCodec};
+/// use kinogaki_studio_api::network::{NetworkSeed, NewNode};
+/// use kinogaki_studio_api::standard::{self, ImportedMaterial, MaterialsCodec};
+/// use kinogaki_studio_api::NodeTypeId;
 ///
-/// let red = ImportedMaterial {
-///     key: "red".into(),
-///     name: "Red".into(),
-///     preview: PreviewSurface { diffuse: Some([0.8, 0.1, 0.1]), ..PreviewSurface::default() },
-/// };
-/// let data = standard::preview_materials().wrap(vec![red.clone()]);
+/// let mut inside = NetworkSeed::default();
+/// inside.node(NewNode::new(NodeTypeId::declared("acme.obj.surface")).with("red", 0.8).displayed());
+/// let red = ImportedMaterial { key: "red".into(), name: "Red".into(), inside };
+/// let data = standard::materials().wrap(vec![red.clone()]);
 /// let mut saved = MemoryElement::new("result");
-/// saved.write(|w| PreviewMaterialsCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| PreviewMaterialsCodec.read(r, None)).unwrap();
-/// assert_eq!(standard::preview_materials().get(&read), Some(&vec![red]));
+/// saved.write(|w| MaterialsCodec.write(&data, None, w)).unwrap();
+/// let read = saved.read(|r| MaterialsCodec.read(r, None)).unwrap();
+/// assert_eq!(standard::materials().get(&read), Some(&vec![red]));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PreviewMaterialsCodec;
+pub struct MaterialsCodec;
 
-impl DataCodec for PreviewMaterialsCodec {
+impl DataCodec for MaterialsCodec {
     fn write(
         &self,
         data: &Data,
         _base: Option<&Data>,
         out: &mut dyn ElementWriter,
     ) -> Result<(), Error> {
-        let materials = preview_materials()
+        let list = materials()
             .get(data)
             .ok_or_else(|| Error::invalid("not imported materials"))?;
-        out.set("count", Field::Int(materials.len() as i64))?;
-        for (at, m) in materials.iter().enumerate() {
+        out.set("count", Field::Int(list.len() as i64))?;
+        for (at, m) in list.iter().enumerate() {
             write_material(m, &mut *out.child(&format!("m{at}"), "material")?)?;
         }
         Ok(())
@@ -55,117 +69,136 @@ impl DataCodec for PreviewMaterialsCodec {
         let count = usize::try_from(element.int("count")?).map_err(|_| {
             Error::invalid(format_args!("{}: a negative count", element.location()))
         })?;
-        let materials = (0..count)
+        let list = (0..count)
             .map(|at| read_material(&*element.required_child(&format!("m{at}"))?))
             .collect::<Result<Vec<_>, Error>>()?;
-        Ok(preview_materials().wrap(materials))
+        Ok(materials().wrap(list))
     }
 }
 
 fn write_material(m: &ImportedMaterial, out: &mut dyn ElementWriter) -> Result<(), Error> {
-    let p = &m.preview;
-    let reals = |v: Option<&[f64]>| Field::F64s(v.map_or_else(Vec::new, <[f64]>::to_vec));
     out.set("key", Field::Text(m.key.clone()))?;
     out.set("name", Field::Text(m.name.clone()))?;
-    out.set("diffuse", reals(p.diffuse.as_ref().map(|v| &v[..])))?;
-    out.set(
-        "roughness",
-        reals(p.roughness.as_ref().map(std::slice::from_ref)),
-    )?;
-    out.set(
-        "metallic",
-        reals(p.metallic.as_ref().map(std::slice::from_ref)),
-    )?;
-    out.set(
-        "opacity",
-        reals(p.opacity.as_ref().map(std::slice::from_ref)),
-    )?;
-    out.set("emissive", reals(p.emissive.as_ref().map(|v| &v[..])))?;
-    out.set("texture", Field::Texts(p.texture.iter().cloned().collect()))?;
-    let (mut kinds, mut numbers, mut tokens) = (Vec::new(), Vec::new(), Vec::new());
-    for (_, extra) in &p.kinogaki {
-        match extra {
-            Extra::Number(n) => {
-                kinds.push(0);
-                numbers.push(*n);
-            }
-            Extra::Triple(t) => {
-                kinds.push(1);
-                numbers.extend(t);
-            }
-            Extra::Token(t) => {
-                kinds.push(2);
-                tokens.push(t.clone());
-            }
-        }
+    out.set("nodes", Field::Int(m.inside.nodes.len() as i64))?;
+    for (at, node) in m.inside.nodes.iter().enumerate() {
+        write_node(node, &mut *out.child(&format!("n{at}"), "node")?)?;
     }
-    let names = p.kinogaki.iter().map(|(n, _)| n.clone()).collect();
-    out.set("extraNames", Field::Texts(names))?;
-    out.set("extraKinds", Field::U8s(kinds))?;
-    out.set("extraNumbers", Field::F64s(numbers))?;
-    out.set("extraTokens", Field::Texts(tokens))
+    let wires = &m.inside.wires;
+    out.set(
+        "from",
+        Field::U32s(wires.iter().map(|w| w.from as u32).collect()),
+    )?;
+    out.set(
+        "output",
+        Field::Texts(wires.iter().map(|w| w.output.clone()).collect()),
+    )?;
+    out.set(
+        "to",
+        Field::U32s(wires.iter().map(|w| w.to as u32).collect()),
+    )?;
+    out.set(
+        "input",
+        Field::Texts(wires.iter().map(|w| w.input.clone()).collect()),
+    )
 }
 
-fn read_material(element: &dyn ElementReader) -> Result<ImportedMaterial, Error> {
-    let at = element.location();
-    let wrong = |name: &str| Error::invalid(format_args!("{at}: {name} has the wrong length"));
-    let one = |name: &str| -> Result<Option<f64>, Error> {
-        match element.f64s(name)? {
-            [] => Ok(None),
-            [v] => Ok(Some(*v)),
-            _ => Err(wrong(name)),
-        }
-    };
-    let three = |name: &str| -> Result<Option<[f64; 3]>, Error> {
-        match element.f64s(name)? {
-            [] => Ok(None),
-            &[a, b, c] => Ok(Some([a, b, c])),
-            _ => Err(wrong(name)),
-        }
-    };
-    let texture = match element.texts("texture")? {
-        [] => None,
-        [t] => Some(t.clone()),
-        _ => return Err(wrong("texture")),
-    };
-    let names = element.texts("extraNames")?;
-    let kinds = super::attributes::u8s(element, "extraKinds")?;
-    if kinds.len() != names.len() {
-        return Err(wrong("extraKinds"));
-    }
-    let (mut numbers, mut tokens) = (
-        element.f64s("extraNumbers")?.iter().copied(),
-        element.texts("extraTokens")?.iter().cloned(),
-    );
-    let mut next = || numbers.next().ok_or_else(|| wrong("extraNumbers"));
-    let mut kinogaki = Vec::with_capacity(names.len());
-    for (name, kind) in names.iter().zip(kinds) {
-        let extra = match kind {
-            0 => Extra::Number(next()?),
-            1 => Extra::Triple([next()?, next()?, next()?]),
-            2 => Extra::Token(tokens.next().ok_or_else(|| wrong("extraTokens"))?),
-            k => return Err(Error::invalid(format_args!("{at}: no attribute kind {k}"))),
+fn write_node(node: &NewNode, out: &mut dyn ElementWriter) -> Result<(), Error> {
+    out.set("type", Field::Text(node.node_type.as_str().to_owned()))?;
+    out.set("name", Field::Texts(node.name.iter().cloned().collect()))?;
+    out.set("display", Field::Bool(node.display))?;
+    let names = node.parameters.keys().cloned().collect();
+    out.set("valueNames", Field::Texts(names))?;
+    let mut kinds = Vec::with_capacity(node.parameters.len());
+    for (at, value) in node.parameters.values().enumerate() {
+        let (kind, field) = match value {
+            Value::Number(n) => (0, Field::Float(*n)),
+            Value::Integer(n) => (1, Field::Int(*n)),
+            Value::Numbers(n) => (2, Field::F64s(n.clone())),
+            Value::Color(c) => (3, Field::F64s(c.to_vec())),
+            Value::Bool(b) => (4, Field::Bool(*b)),
+            Value::Choice(key) => (5, Field::Text(key.to_string())),
+            Value::Text(t) => (6, Field::Text(t.clone())),
+            Value::Texts(t) => (7, Field::Texts(t.clone())),
+            other => {
+                return Err(Error::invalid(format_args!(
+                    "a file's material holds no value like {other:?}"
+                )));
+            }
         };
-        kinogaki.push((name.clone(), extra));
+        kinds.push(kind);
+        out.set(&format!("v{at}"), field)?;
     }
-    if next().is_ok() {
-        return Err(wrong("extraNumbers"));
+    out.set("valueKinds", Field::U8s(kinds))
+}
+
+fn read_material(e: &dyn ElementReader) -> Result<ImportedMaterial, Error> {
+    let count = usize::try_from(e.int("nodes")?)
+        .map_err(|_| Error::invalid(format_args!("{}: a negative count", e.location())))?;
+    let nodes = (0..count)
+        .map(|at| read_node(&*e.required_child(&format!("n{at}"))?))
+        .collect::<Result<Vec<_>, Error>>()?;
+    let wrong = || Error::invalid(format_args!("{}: its wires don't line up", e.location()));
+    let (from, output) = (e.u32s("from")?, e.texts("output")?);
+    let (to, input) = (e.u32s("to")?, e.texts("input")?);
+    if from.len() != output.len() || from.len() != to.len() || from.len() != input.len() {
+        return Err(wrong());
     }
-    if tokens.next().is_some() {
-        return Err(wrong("extraTokens"));
-    }
+    let wires = (0..from.len())
+        .map(|k| SeedWire {
+            from: from[k] as usize,
+            output: output[k].clone(),
+            to: to[k] as usize,
+            input: input[k].clone(),
+        })
+        .collect();
     Ok(ImportedMaterial {
-        key: element.text("key")?.to_owned(),
-        name: element.text("name")?.to_owned(),
-        preview: PreviewSurface {
-            diffuse: three("diffuse")?,
-            roughness: one("roughness")?,
-            metallic: one("metallic")?,
-            opacity: one("opacity")?,
-            emissive: three("emissive")?,
-            texture,
-            kinogaki,
+        key: e.text("key")?.to_owned(),
+        name: e.text("name")?.to_owned(),
+        inside: NetworkSeed {
+            nodes,
+            wires,
+            insides: Vec::new(),
         },
+    })
+}
+
+fn read_node(e: &dyn ElementReader) -> Result<NewNode, Error> {
+    let at = e.location();
+    let wrong = |what: &str| Error::invalid(format_args!("{at}: {what}"));
+    let names = e.texts("valueNames")?;
+    let kinds = super::attributes::u8s(e, "valueKinds")?;
+    if names.len() != kinds.len() {
+        return Err(wrong("its values don't line up"));
+    }
+    let mut parameters = Parameters::new();
+    for (k, (name, kind)) in names.iter().zip(kinds).enumerate() {
+        let field = e.field(&format!("v{k}"));
+        let field = field.ok_or_else(|| wrong("a value is missing"))?;
+        let value = match (kind, field) {
+            (0, FieldRef::Float(n)) => Value::Number(n),
+            (1, FieldRef::Int(n)) => Value::Integer(n),
+            (2, FieldRef::F64s(n)) => Value::Numbers(n.to_vec()),
+            (3, FieldRef::F64s(&[r, g, b])) => Value::Color([r, g, b]),
+            (4, FieldRef::Bool(b)) => Value::Bool(b),
+            (5, FieldRef::Text(t)) => Value::Choice(t.into()),
+            (6, FieldRef::Text(t)) => Value::Text(t.to_owned()),
+            (7, FieldRef::Texts(t)) => Value::Texts(t.to_vec()),
+            _ => return Err(wrong("a value isn't of its kind")),
+        };
+        parameters.insert(name.clone(), value);
+    }
+    let name = match e.texts("name")? {
+        [] => None,
+        [one] => Some(one.clone()),
+        _ => return Err(wrong("it has two names")),
+    };
+    let ty = e.text("type")?;
+    let node_type = NodeTypeId::parse(ty).ok_or_else(|| wrong("its type is no id"))?;
+    Ok(NewNode {
+        node_type,
+        name,
+        parameters,
+        display: e.bool("display")?,
     })
 }
 
@@ -175,43 +208,38 @@ mod tests {
     use crate::element::MemoryElement;
 
     #[test]
-    fn every_field_and_attribute_round_trips() {
+    fn every_value_and_wire_round_trips() {
+        let mut inside = NetworkSeed::default();
+        let image = NewNode::new(NodeTypeId::declared("acme.obj.image"))
+            .named("Base")
+            .with("file", "tex/steel.png")
+            .with("gain", 0.5)
+            .with("mode", Value::Choice("linear".into()))
+            .with("flip", true)
+            .with("count", Value::Integer(i64::MAX))
+            .with("offset", Value::Numbers(vec![0.25, 0.5]))
+            .with("tint", Value::Color([1.0, 0.5, 0.25]))
+            .with("names", Value::Texts(vec!["a".into(), "b".into()]));
+        let surface = NewNode::new(NodeTypeId::declared("acme.obj.surface")).displayed();
+        let (a, b) = (inside.node(image), inside.node(surface));
+        inside.wire(a, "out", b, "base");
         let full = ImportedMaterial {
             key: "steel".into(),
             name: "Steel 2".into(),
-            preview: PreviewSurface {
-                diffuse: Some([0.5, 0.5, 0.55]),
-                roughness: Some(0.3),
-                metallic: Some(1.0),
-                opacity: Some(0.9),
-                emissive: Some([0.0, 1.0, 2.0]),
-                texture: Some("tex/steel.png".into()),
-                kinogaki: vec![
-                    ("kinogaki:anisotropy".into(), Extra::Number(0.25)),
-                    ("kinogaki:sheen".into(), Extra::Triple([1.0, 0.5, 0.25])),
-                    ("kinogaki:surface".into(), Extra::Token("brushed".into())),
-                ],
-            },
+            inside,
         };
         let bare = ImportedMaterial {
             key: "plain".into(),
             name: "Plain".into(),
-            preview: PreviewSurface::default(),
+            inside: NetworkSeed::default(),
         };
-        let materials = vec![full, bare];
-        let data = preview_materials().wrap(materials.clone());
+        let list = vec![full, bare];
+        let data = materials().wrap(list.clone());
         let mut saved = MemoryElement::new("result");
         saved
-            .write(|w| PreviewMaterialsCodec.write(&data, None, w))
+            .write(|w| MaterialsCodec.write(&data, None, w))
             .unwrap();
-        let read = saved.read(|r| PreviewMaterialsCodec.read(r, None)).unwrap();
-        assert_eq!(preview_materials().get(&read), Some(&materials));
-        let none = preview_materials().wrap(Vec::new());
-        let mut saved = MemoryElement::new("result");
-        saved
-            .write(|w| PreviewMaterialsCodec.write(&none, None, w))
-            .unwrap();
-        let read = saved.read(|r| PreviewMaterialsCodec.read(r, None)).unwrap();
-        assert_eq!(preview_materials().get(&read), Some(&Vec::new()));
+        let read = saved.read(|r| MaterialsCodec.read(r, None)).unwrap();
+        assert_eq!(materials().get(&read), Some(&list));
     }
 }

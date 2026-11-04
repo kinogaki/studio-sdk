@@ -263,6 +263,35 @@ impl NetworkSeed {
     }
 }
 
+impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
+    /// A Material's inside making `network`: its nodes as it holds them, the
+    /// one it shows displayed.
+    fn from(network: &kinogaki_render_api::MaterialNetwork) -> Self {
+        let shown = network.output_index();
+        let nodes = (network.nodes().iter().enumerate())
+            .map(|(at, node)| NewNode {
+                node_type: node.def,
+                name: None,
+                parameters: node.values.clone(),
+                display: shown == Some(at as u32),
+            })
+            .collect();
+        let wires = (network.links().iter())
+            .map(|l| SeedWire {
+                from: l.from as usize,
+                output: l.output.to_string(),
+                to: l.to as usize,
+                input: l.input.to_string(),
+            })
+            .collect();
+        Self {
+            nodes,
+            wires,
+            insides: Vec::new(),
+        }
+    }
+}
+
 /// Another way Tab and the menus make a node: a node of `node.node_type`
 /// with its parameters set, and its inside started with nodes (a Material
 /// of an engine's preset). A package declares it

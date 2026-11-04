@@ -19,7 +19,7 @@ use crate::refs::{NodeRef, ObjectRef};
 use crate::stored::{Stored, StoredValues};
 use crate::{Diagnostic, Error};
 use kinogaki_render_api::{
-    Aov, Declared, EngineDescription, EngineId, Engines, PreviewSurface, SettingDescriptor,
+    Aov, Declared, EngineDescription, EngineId, Engines, MaterialNetwork, SettingDescriptor,
     SettingGroup,
 };
 use kinogaki_value::{Number, RefFilter, Unit, Value, ValueKind};
@@ -277,9 +277,8 @@ pub struct PublishedMaterial {
     key: String,
     /// What pickers call it ("AMS 1 · 2 PLA Basic").
     pub label: String,
-    /// How it looks: renders and the viewport show it through the active
-    /// engine's preview surface.
-    pub preview: PreviewSurface,
+    /// How it looks: nodes its engine declares, or that another translates.
+    pub network: Arc<MaterialNetwork>,
     /// Why it can't be used now ("the slot is empty"); a path naming it
     /// then names nothing, saying why.
     pub unavailable: Option<String>,
@@ -287,14 +286,14 @@ pub struct PublishedMaterial {
 
 impl PublishedMaterial {
     /// Material `key` (its path step below the object), called `label`,
-    /// looking as `preview`.
+    /// looking as `network`.
     ///
     /// # Errors
     /// When `key` is not an `is_path_step`.
     pub fn new(
         key: impl Into<String>,
         label: impl Into<String>,
-        preview: PreviewSurface,
+        network: Arc<MaterialNetwork>,
     ) -> Result<Self, crate::Error> {
         let key = key.into();
         if !is_path_step(&key) {
@@ -305,7 +304,7 @@ impl PublishedMaterial {
         Ok(Self {
             key,
             label: label.into(),
-            preview,
+            network,
             unavailable: None,
         })
     }

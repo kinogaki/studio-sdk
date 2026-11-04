@@ -2,7 +2,8 @@
 //! builds its UI, files, catalog and inspector from it, and holds the
 //! engines it can make in [`Engines`]. A description is data an engine
 //! may build at run time; what needs the engine's code (how its materials
-//! look elsewhere) is its [`MaterialRules`].
+//! look in a viewport, what it makes of another engine's) is its
+//! [`MaterialRules`].
 //!
 //! Every engine outputs linear ACEScg (the beauty and color AOVs): what a
 //! host shows through its view transform and what compositing reads.
@@ -11,71 +12,34 @@ use std::sync::Arc;
 
 use crate::aov::{Aov, AovSpec};
 use crate::declared::{AppliedSchema, PrimType};
-use crate::exchange::PreviewSurface;
 use crate::id::EngineId;
-use crate::material::MaterialNetwork;
+use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef};
 use crate::prim::PrimKind;
 use crate::settings::{SettingDescriptor, SettingGroup};
-use crate::vocabulary::NodeType;
-use kinogaki_value::Parameters;
+use kinogaki_value::NodeTypeId;
 
-/// The one look a raster view and other engines give a material: a color
-/// (linear ACEScg) or the mesh attribute its base color reads.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Tint {
-    /// One color.
-    Color([f32; 3]),
-    /// A mesh attribute, read as a color (0, black, on a mesh without it).
-    Attribute(Arc<str>),
-}
-
-impl Tint {
-    /// Its color where no attribute is read; none for an attribute.
-    pub fn color(&self) -> Option<[f32; 3]> {
-        match self {
-            Tint::Color(c) => Some(*c),
-            Tint::Attribute(_) => None,
-        }
-    }
-
-    /// The attribute it reads, if any.
-    pub fn attribute(&self) -> Option<&Arc<str>> {
-        match self {
-            Tint::Color(_) => None,
-            Tint::Attribute(name) => Some(name),
-        }
-    }
-}
-
-/// How an engine renders material previews: its settings for them and the
-/// floor the preview sphere stands on.
-#[derive(Clone, Debug, PartialEq)]
-pub struct PreviewSetup {
-    /// Settings over the defaults.
-    pub settings: Parameters,
-    /// The floor's material.
-    pub floor: MaterialNetwork,
-}
-
-/// What an engine's materials are to others: the rules only its code
-/// knows.
+/// What an engine's materials are to a host: the rules only its code knows.
 pub trait MaterialRules: Send + Sync {
-    /// What one of its materials shows as elsewhere (none: no one look,
-    /// such as a texture in its base color).
-    fn tint(&self, network: &MaterialNetwork) -> Option<Tint>;
-    /// Whether one of its materials fills its mesh as a volume (a
-    /// participating medium such as fog) rather than shading its surface:
-    /// raster views show such meshes as see-through bounds.
-    fn volume(&self, network: &MaterialNetwork) -> bool;
-    /// A material of its own showing `tint`: what it renders another
-    /// engine's material as.
-    fn flat(&self, tint: &Tint) -> MaterialNetwork;
-    /// The material it renders what names no material with.
-    fn default_material(&self) -> MaterialNetwork;
-    /// One of its materials as a preview surface (for export).
-    fn preview_surface(&self, network: &MaterialNetwork) -> PreviewSurface;
-    /// A material of its own from a preview surface (on import).
-    fn import_preview_surface(&self, surface: &PreviewSurface) -> MaterialNetwork;
+    /// A simple approximation of one of its materials, for the shaded
+    /// viewport: its color, and the primvar it reads, where it can say.
+    fn display(&self, network: &MaterialNetwork) -> MaterialDisplay;
+
+    /// A material of its own from `foreign`, a network holding nodes it
+    /// doesn't declare (another engine's, a file's). None: it renders it as
+    /// its default material.
+    fn translate(&self, foreign: &MaterialNetwork) -> Option<MaterialNetwork> {
+        let _ = foreign;
+        None
+    }
+}
+
+/// The rules of an engine bringing no material of its own.
+struct NoMaterials;
+
+impl MaterialRules for NoMaterials {
+    fn display(&self, _: &MaterialNetwork) -> MaterialDisplay {
+        MaterialDisplay::color([0.5; 3])
+    }
 }
 
 /// The motion an engine blurs while a camera's shutter is open.
@@ -133,9 +97,8 @@ pub struct EngineDescription {
     capabilities: Capabilities,
     setting_groups: Vec<SettingGroup>,
     settings: Vec<SettingDescriptor>,
-    material_nodes: Vec<Arc<NodeType>>,
-    preview: PreviewSetup,
-    materials: Arc<dyn MaterialRules>,
+    node_defs: Vec<Arc<NodeDef>>,
+    material_rules: Arc<dyn MaterialRules>,
 }
 
 impl std::fmt::Debug for EngineDescription {
@@ -170,21 +133,10 @@ impl EngineBuilder {
         self
     }
 
-    /// Its material vocabulary, in the order a UI lists it (by category).
-    pub fn material_nodes(mut self, nodes: Vec<Arc<NodeType>>) -> Self {
-        self.0.material_nodes = nodes;
-        self
-    }
-
-    /// How it renders material previews.
-    pub fn preview(mut self, preview: PreviewSetup) -> Self {
-        self.0.preview = preview;
-        self
-    }
-
-    /// What its materials are to others.
-    pub fn materials(mut self, rules: Arc<dyn MaterialRules>) -> Self {
-        self.0.materials = rules;
+    /// Bringing `defs`, its material nodes, under `rules`.
+    pub fn materials(mut self, defs: Vec<NodeDef>, rules: Arc<dyn MaterialRules>) -> Self {
+        self.0.node_defs = defs.into_iter().map(Arc::new).collect();
+        self.0.material_rules = rules;
         self
     }
 
@@ -202,22 +154,16 @@ impl EngineBuilder {
 
 impl EngineDescription {
     /// Engine `id` (`kinogaki.pixel.engine`, what files name it by) that a UI
-    /// calls `label` (`Pixel`), `rules` saying what its materials are to
-    /// others: rendering nothing yet.
-    pub fn builder(id: EngineId, label: &str, rules: Arc<dyn MaterialRules>) -> EngineBuilder {
-        let floor = MaterialNetwork::new(id.clone());
+    /// calls `label` (`Pixel`): rendering nothing yet, bringing no material.
+    pub fn builder(id: EngineId, label: &str) -> EngineBuilder {
         EngineBuilder(EngineDescription {
             id,
             label: Arc::from(label),
             capabilities: Capabilities::default(),
             setting_groups: Vec::new(),
             settings: Vec::new(),
-            material_nodes: Vec::new(),
-            preview: PreviewSetup {
-                settings: Parameters::new(),
-                floor,
-            },
-            materials: rules,
+            node_defs: Vec::new(),
+            material_rules: Arc::new(NoMaterials),
         })
     }
 
@@ -251,24 +197,14 @@ impl EngineDescription {
         &self.settings
     }
 
-    /// Its material vocabulary.
-    pub fn material_nodes(&self) -> &[Arc<NodeType>] {
-        &self.material_nodes
+    /// The material nodes it brings, in the order a UI lists them (by family).
+    pub fn node_defs(&self) -> &[Arc<NodeDef>] {
+        &self.node_defs
     }
 
-    /// How it renders material previews.
-    pub fn preview(&self) -> &PreviewSetup {
-        &self.preview
-    }
-
-    /// Its node type `name`.
-    pub fn node_type(&self, name: &str) -> Option<&Arc<NodeType>> {
-        self.material_nodes.iter().find(|t| &*t.name == name)
-    }
-
-    /// Its surface node types (a material's types), in order.
-    pub fn surfaces(&self) -> impl Iterator<Item = &Arc<NodeType>> {
-        self.material_nodes.iter().filter(|t| t.surface.is_some())
+    /// Its material node `id`, when it declares it.
+    pub fn node_def(&self, id: NodeTypeId) -> Option<&Arc<NodeDef>> {
+        self.node_defs.iter().find(|d| d.id == id)
     }
 
     /// Its output `id` ([`Aov::id`]).
@@ -301,47 +237,23 @@ impl EngineDescription {
         Some((groups, params))
     }
 
-    /// What one of its materials shows as elsewhere.
-    pub fn tint(&self, network: &MaterialNetwork) -> Option<Tint> {
-        self.materials.tint(network)
-    }
-
-    /// Whether one of its materials fills its mesh as a volume.
-    pub fn volume(&self, network: &MaterialNetwork) -> bool {
-        self.materials.volume(network)
-    }
-
-    /// A material of its own showing `tint`.
-    pub fn flat(&self, tint: &Tint) -> MaterialNetwork {
-        self.materials.flat(tint)
-    }
-
-    /// The material it renders what names no material with.
-    pub fn default_material(&self) -> MaterialNetwork {
-        self.materials.default_material()
-    }
-
-    /// One of its materials as a preview surface.
-    pub fn preview_surface(&self, network: &MaterialNetwork) -> PreviewSurface {
-        self.materials.preview_surface(network)
-    }
-
-    /// A material of its own from a preview surface.
-    pub fn import_preview_surface(&self, surface: &PreviewSurface) -> MaterialNetwork {
-        self.materials.import_preview_surface(surface)
-    }
-
-    /// `network` (a material of engine `owner`) as this engine renders
-    /// it: as it is when it is this engine's, else flat in the tint its
-    /// owner gives it, or this engine's default material when that gives
-    /// none.
-    pub fn adopt(&self, network: MaterialNetwork, owner: &EngineDescription) -> MaterialNetwork {
-        if network.engine == self.id {
-            return network;
+    /// `network` as this engine renders it: as it is when it declares every
+    /// node of it; else what it translates it to, or empty (its default
+    /// material) when it can't.
+    pub fn adopt(&self, network: &MaterialNetwork) -> MaterialNetwork {
+        let own = network
+            .nodes()
+            .iter()
+            .all(|n| self.node_def(n.def).is_some());
+        if own {
+            return network.clone();
         }
-        owner
-            .tint(&network)
-            .map_or_else(|| self.default_material(), |tint| self.flat(&tint))
+        (self.material_rules.translate(network)).unwrap_or_default()
+    }
+
+    /// What the shaded viewport shows of `network`, one of its materials.
+    pub fn display(&self, network: &MaterialNetwork) -> MaterialDisplay {
+        self.material_rules.display(network)
     }
 }
 
@@ -370,6 +282,13 @@ impl Engines {
     /// Whether there is no engine.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// The engine whose material `network` is: the one declaring the node it
+    /// shows.
+    pub fn owner(&self, network: &MaterialNetwork) -> Option<&Arc<EngineDescription>> {
+        let shown = network.output()?;
+        self.iter().find(|e| e.node_def(shown.def).is_some())
     }
 
     /// Every engine, in order.

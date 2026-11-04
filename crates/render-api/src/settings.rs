@@ -56,16 +56,6 @@ impl Default for RenderSettings {
     }
 }
 
-/// What a UI shows after a setting's row.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Trailing {
-    /// The color the standard emission settings beside it make
-    /// (`crate::standard::emission_params`), brightest channel at 1: the
-    /// host works it out (an illuminant's or blackbody's color needs its
-    /// spectrum).
-    EmissionSwatch,
-}
-
 /// A group of settings: a section of the inspector.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SettingGroup {
@@ -117,8 +107,6 @@ pub struct SettingDescriptor {
     pub(crate) requires: Option<(Condition, Arc<str>)>,
     /// When its row is shown; none: always.
     pub(crate) shown_when: Option<Condition>,
-    /// What its row shows after it.
-    pub trailing: Option<Trailing>,
     /// Whether a host may key it over time. Its kind gives the default
     /// ([`ValueKind::animatable`]); an engine turns it off for a value
     /// whose change should be one deliberate edit (a sample cap).
@@ -142,7 +130,6 @@ impl SettingDescriptor {
             tooltip: None,
             requires: None,
             shown_when: None,
-            trailing: None,
             animatable: kind.animatable(),
             kind,
             default: default.into(),
@@ -170,12 +157,6 @@ impl SettingDescriptor {
     /// It, shown while `when` holds.
     pub(crate) fn shown_when(mut self, when: Condition) -> SettingDescriptor {
         self.shown_when = Some(when);
-        self
-    }
-
-    /// It, with `trailing` after its row.
-    pub fn trailing(mut self, trailing: Trailing) -> SettingDescriptor {
-        self.trailing = Some(trailing);
         self
     }
 

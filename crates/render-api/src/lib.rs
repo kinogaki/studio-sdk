@@ -9,10 +9,11 @@
 //! Each engine describes itself without a device ([`EngineDescription`]):
 //! its settings ([`SettingDescriptor`]s), the prim types it declares
 //! (lights and fog, [`PrimType`]s; the [`standard`] ones shared), its
-//! material vocabulary ([`vocabulary`]), presets and outputs ([`Aov`]s,
-//! by id). Materials are networks of one
-//! engine's nodes ([`MaterialNetwork`]); an engine renders another's flat
-//! in its tint ([`EngineDescription::adopt`]). Engines output linear ACEScg.
+//! material nodes ([`NodeDef`]s) and outputs ([`Aov`]s, by id). The crate
+//! holds no shading model: materials are networks of engine-declared nodes
+//! ([`MaterialNetwork`]), which an engine translates to its shaders and
+//! approximates for the viewport ([`MaterialRules`]), and renders a
+//! [`PreviewImage`] of. Engines output linear ACEScg.
 //! Hosts make shape prims from [`ShapeSource`]s: triangles or curves, from a
 //! polygon value, a CAD tessellation or a toolpath preview alike.
 //! [`RecordingEngine`] stores what it is sent, for hosts' tests.
@@ -32,7 +33,6 @@ pub mod dirty;
 #[cfg(feature = "wgpu")]
 pub mod display;
 pub mod engine;
-pub mod exchange;
 pub mod id;
 pub mod material;
 pub mod prim;
@@ -43,7 +43,6 @@ pub mod source;
 pub mod standard;
 pub mod trace;
 pub mod update;
-pub mod vocabulary;
 
 pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
 
@@ -53,32 +52,35 @@ pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
 pub const RENDER_SPACE: &str = "ACEScg";
 pub use declared::{AppliedSchema, Declared, PrimType, Role};
 pub use description::{
-    Capabilities, EngineBuilder, EngineDescription, Engines, MaterialRules, Motion, PreviewSetup,
-    Tint,
+    Capabilities, EngineBuilder, EngineDescription, Engines, MaterialRules, Motion,
 };
 pub use dirty::Dirty;
 pub use engine::{
     Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
     ViewMode, Wake, pending,
 };
-pub use exchange::{Extra, ImportedMaterial, PreviewSurface};
 pub use id::{EngineId, Id, IdAllocator, PrimId};
 /// The standard geometry values, which engines read prims' data as.
 pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.
 pub use kinogaki_geometry::Detail;
 pub use kinogaki_value as value;
-pub use material::{ImageUse, Link, MaterialNetwork, NodeIndex, ShaderNode};
+pub use material::preview::{
+    PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
+};
+pub use material::{
+    Input, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef, NodeIndex,
+    Output, Socket,
+};
 pub use prim::{
     Camera, Instancer, InstancerBuilder, Material, Prim, PrimKind, Projection, STANDARD_PRIMVARS,
     Shape, ShapeBuilder, Subsets, TexelFormat, Texture, TextureColorSpace, Topology, Visibility,
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
-pub use settings::{RenderSettings, SettingDescriptor, SettingGroup, Textures, Trailing};
+pub use settings::{RenderSettings, SettingDescriptor, SettingGroup, Textures};
 pub use source::{PlainTriangles, ShapeSource};
 pub use update::{Change, SceneUpdate};
-pub use vocabulary::{Layout, NodeLayout, NodeType, ParamSpec, SocketKind, SocketSpec};
 
 #[cfg(test)]
 mod tests;

@@ -1,6 +1,5 @@
 //! Declared prims, materials, outputs and motion.
 use super::*;
-use kinogaki_geometry::{Sampled, Xform};
 
 #[test]
 fn engines_declare_types_and_apply_schemas_to_them() {
@@ -63,78 +62,67 @@ fn a_later_declared_prim_replaces_the_one_a_batch_sends() {
     assert_eq!(first.added, vec![(id, Prim::Declared(thick))]);
 }
 
-/// Material rules giving every material `tint`, flat materials of one
-/// `flat` node in `engine`.
-struct Rules {
-    engine: EngineId,
-    tint: Option<Tint>,
-}
+/// Rules approximating every material as one color, translating another
+/// engine's material to an empty network of a node of its own.
+struct Rules(NodeDef);
 
 impl MaterialRules for Rules {
-    fn tint(&self, _: &MaterialNetwork) -> Option<Tint> {
-        self.tint.clone()
+    fn display(&self, _: &MaterialNetwork) -> MaterialDisplay {
+        MaterialDisplay::color([0.1, 0.2, 0.3])
     }
-    fn volume(&self, _: &MaterialNetwork) -> bool {
-        false
+    fn translate(&self, _: &MaterialNetwork) -> Option<MaterialNetwork> {
+        let mut built = MaterialNetwork::builder();
+        let own = built
+            .node(&Arc::new(self.0.clone()), &Default::default())
+            .ok()?;
+        built.build(own).ok()
     }
-    fn flat(&self, tint: &Tint) -> MaterialNetwork {
-        let Tint::Color(c) = tint else { unreachable!() };
-        MaterialNetwork::single(
-            self.engine.clone(),
-            ShaderNode::new("flat").with("color", c.map(f64::from)),
-        )
-    }
-    fn default_material(&self) -> MaterialNetwork {
-        MaterialNetwork::new(self.engine.clone())
-    }
-    fn preview_surface(&self, _: &MaterialNetwork) -> PreviewSurface {
-        PreviewSurface::default()
-    }
-    fn import_preview_surface(&self, _: &PreviewSurface) -> MaterialNetwork {
-        self.default_material()
-    }
+}
+
+/// `engine`'s one node def.
+fn def(engine: &str) -> NodeDef {
+    let id = kinogaki_value::NodeTypeId::declared(if engine == "here" {
+        "toy.here.paint"
+    } else {
+        "toy.there.paint"
+    });
+    NodeDef::new(id, "Paint", "Surface")
+}
+
+/// The network of `def` alone.
+fn single(def: NodeDef) -> MaterialNetwork {
+    let mut built = MaterialNetwork::builder();
+    let own = built.node(&Arc::new(def), &Default::default()).unwrap();
+    built.build(own).unwrap()
 }
 
 #[test]
-fn another_engines_material_is_adopted_flat_in_its_tint() {
-    let flat_of = |engine: &str| MaterialNetwork::new(EngineId::new(engine));
-    let here: EngineDescription = RecordingEngine::new(Arc::new(|| {}))
-        .description()
-        .rebuilt()
-        .id(EngineId::new("here"))
-        .materials(Arc::new(Rules {
-            engine: EngineId::new("here"),
-            tint: None,
-        }))
+fn an_engine_keeps_its_own_material_and_translates_anothers() {
+    let base = RecordingEngine::new(Arc::new(|| {})).description().clone();
+    let here = (base.rebuilt().id(EngineId::new("here")))
+        .materials(vec![def("here")], Arc::new(Rules(def("here"))))
         .build();
-    let there = (here.rebuilt().id(EngineId::new("there")))
-        .materials(Arc::new(Rules {
-            engine: EngineId::new("there"),
-            tint: Some(Tint::Color([0.1, 0.2, 0.3])),
-        }))
+    let there = (base.rebuilt().id(EngineId::new("there")))
+        .materials(vec![def("there")], Arc::new(Rules(def("there"))))
         .build();
-    let own = flat_of("here");
-    assert_eq!(here.adopt(own.clone(), &there), own, "its own: as it is");
-    let adopted = here.adopt(flat_of("there"), &there);
-    assert_eq!(adopted.engine.as_str(), "here");
+    let own = single(def("here"));
+    assert_eq!(here.adopt(&own), own, "its own: as it is");
     assert_eq!(
-        adopted.nodes[0].values.get("color"),
-        Some(&kinogaki_value::Value::Color(
-            [0.1_f32, 0.2, 0.3].map(f64::from)
-        ))
+        here.adopt(&single(def("there"))),
+        own,
+        "another's: translated"
     );
-    // No one tint: the default material.
-    let there = (there.rebuilt())
-        .materials(Arc::new(Rules {
-            engine: EngineId::new("there"),
-            tint: None,
-        }))
-        .build();
-    assert_eq!(
-        here.adopt(flat_of("there"), &there),
-        here.default_material()
-    );
+    assert_eq!(here.display(&own), MaterialDisplay::color([0.1, 0.2, 0.3]));
+    // An engine with no rules for it renders its default: an empty network.
+    assert_eq!(base.adopt(&own), MaterialNetwork::default());
     let engines = Engines::new(vec![here.clone(), there]);
+    assert_eq!(engines.owner(&own).map(|e| e.id().as_str()), Some("here"));
+    let theirs = single(def("there"));
+    assert_eq!(
+        engines.owner(&theirs).map(|e| e.id().as_str()),
+        Some("there")
+    );
+    assert!(engines.owner(&MaterialNetwork::default()).is_none());
     assert_eq!(engines.default_engine().unwrap().id().as_str(), "here");
     assert!(engines.get(&EngineId::new("there")).is_some());
     assert!(engines.get(&EngineId::new("nope")).is_none());
@@ -145,15 +133,6 @@ fn another_engines_material_is_adopted_flat_in_its_tint() {
             && none.default_engine().is_none()
             && none.get(&EngineId::new("here")).is_none()
     );
-}
-
-#[test]
-fn tints_say_their_color_and_attribute() {
-    let cd: Arc<str> = Arc::from("Cd");
-    assert_eq!(Tint::Attribute(cd.clone()).color(), None);
-    assert_eq!(Tint::Attribute(cd.clone()).attribute(), Some(&cd));
-    assert_eq!(Tint::Color([1.0; 3]).color(), Some([1.0; 3]));
-    assert_eq!(Tint::Color([1.0; 3]).attribute(), None);
 }
 
 #[test]
@@ -180,11 +159,7 @@ fn outputs_have_one_id_each_and_engines_list_theirs() {
 }
 
 #[test]
-fn an_instancer_samples_all_its_copies_a_time_and_a_camera_blurs_while_open() {
-    let copies: Arc<[Xform]> = Arc::from([Xform::IDENTITY; 3]);
-    let moving = Sampled::new([0.0, 0.5], [copies.clone(), copies]).unwrap();
-    assert!(!moving.is_still() && moving.values()[1].len() == 3);
-    // A camera blurs while its shutter is open.
+fn a_camera_blurs_while_its_shutter_is_open() {
     let open = Camera {
         shutter: [-0.25, 0.25],
         ..Camera::default()

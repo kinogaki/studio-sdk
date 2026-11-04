@@ -9,6 +9,7 @@ use crate::id::{ContextId, PackageId};
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation};
 use crate::object::ObjectKindSpec;
+use crate::render::ShaderNode;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
 use kinogaki_render_api::EngineDescription;
@@ -241,15 +242,19 @@ impl Package {
         mut self,
         engine: impl kinogaki_render_api::display::Engine + 'static,
     ) -> Self {
-        self.engines.push(Arc::new(engine.description()));
+        let description = engine.description();
         self.makers.push(Arc::new(engine));
-        self
+        self.with_engine_description(description)
     }
 
     /// With the description of render engine `engine` too, which this
     /// build doesn't make (a headless one, or tests reading the values it
     /// declares).
     pub fn with_engine_description(mut self, engine: EngineDescription) -> Self {
+        for def in engine.node_defs() {
+            let node = ShaderNode::new(def.clone(), engine.label().clone());
+            self.node_types.push(Arc::new(node));
+        }
         self.engines.push(Arc::new(engine));
         self
     }
