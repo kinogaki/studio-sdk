@@ -5,12 +5,14 @@ use super::Editor;
 use super::carry::{carried_attribute, carried_group};
 use super::change::{Change, Numbers};
 use super::layout::{Blends, Layout, Run, Span};
+use super::place::placed;
 use super::settle::{Filling, GONE, Points, Settled, Vertex};
 use kinogaki_geometry::{
     Attributes, Basis, Column, ColumnWriter, CurveData, Domain, Error, Geometry, Knots, Primitives,
-    TableWriter,
+    TableWriter, Xform,
 };
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 use std::sync::Arc;
 
 /// `base` with `points` at `at` and nothing else changed: an edit's finish when
@@ -72,7 +74,9 @@ impl Editor {
             || !self.removed_primitives.is_empty()
             || !self.removed_points.is_empty()
             || !self.welded.is_empty()
-            || self.loose_go;
+            || self.loose_go
+            || !self.placed_points.is_empty()
+            || !self.placed_primitives.is_empty();
         if !structural && self.added_points.is_empty() {
             return self.moved_only();
         }
@@ -103,9 +107,10 @@ impl Editor {
             (Arc::new(table.with_points(points.layout.len())?), None)
         };
         let positions = self.positions(&points);
-        let attributes = self.attributes(&points, rows.as_ref(), &primitives)?;
         let topology = !Arc::ptr_eq(&primitives, table);
-        let change = self.change(&points, rows, topology);
+        let change = self.change(&points, rows.as_ref(), topology);
+        let attributes = self.attributes(&points, rows.as_ref(), &primitives)?;
+        let attributes = self.placed(attributes, &change, &primitives)?;
         let value = self.base.edited(positions, primitives, attributes)?;
         Ok((value, change))
     }
@@ -343,6 +348,50 @@ impl Editor {
         Ok(if changed { Arc::new(out) } else { base.clone() })
     }
 
+    /// `attributes` with what `place_points` and `place_primitives` asked of
+    /// their elements, under the numbers `change` says.
+    fn placed(
+        &self,
+        attributes: Arc<Attributes>,
+        change: &Change,
+        table: &Primitives,
+    ) -> Result<Arc<Attributes>, Error> {
+        if self.placed_points.is_empty() && self.placed_primitives.is_empty() {
+            return Ok(attributes);
+        }
+        let mut out = (*attributes).clone();
+        let mut turn = |domain: Domain, at: Xform, items: &[Range<u32>]| -> Result<(), Error> {
+            let current = out.clone();
+            for (d, name, attribute) in current.iter().filter(|a| a.0 == domain) {
+                out = out.with(d, name, placed(attribute, at, items.iter().cloned())?)?;
+            }
+            Ok(())
+        };
+        for (at, points) in &self.placed_points {
+            let items: Vec<_> = (points.iter())
+                .filter_map(|&p| change.points.of(p))
+                .map(|p| p..p + 1)
+                .collect();
+            turn(Domain::Point, *at, &items)?;
+        }
+        for (at, rows) in &self.placed_primitives {
+            let kept: Vec<u32> = rows
+                .iter()
+                .filter_map(|&r| change.primitives.of(r))
+                .collect();
+            let items: Vec<_> = kept.iter().map(|&r| r..r + 1).collect();
+            turn(Domain::Primitive, *at, &items)?;
+            let vertices: Vec<_> = (kept.iter())
+                .map(|&r| {
+                    let range = table.primitive_vertices(r as usize);
+                    range.start as u32..range.end as u32
+                })
+                .collect();
+            turn(Domain::Vertex, *at, &vertices)?;
+        }
+        Ok(Arc::new(out))
+    }
+
     /// The new table's edges by the base's they take their values from: an
     /// edge between points that kept their numbers, one that followed its
     /// points to new numbers, or one [`carry_edge`](Editor::carry_edge)
@@ -399,7 +448,7 @@ impl Editor {
     }
 
     /// The report.
-    fn change(&self, points: &Points, rows: Option<Rows>, topology: bool) -> Change {
+    fn change(&self, points: &Points, rows: Option<&Rows>, topology: bool) -> Change {
         let base = self.base.positions();
         let mut moved: Vec<u32> = (self.moved.iter())
             .filter(|(p, at)| base[**p as usize].map(f64::to_bits) != at.map(f64::to_bits))
@@ -412,7 +461,7 @@ impl Editor {
         welded.sort_unstable();
         let total = points.layout.len() as u32;
         let added = points.layout.added() as u32;
-        let primitives = match &rows {
+        let primitives = match rows {
             None => {
                 let kept = self.base_primitives();
                 Numbers {
@@ -433,7 +482,7 @@ impl Editor {
                 }
             }
         };
-        let rewired = rows.map(|rows| rows.rewired).unwrap_or_default();
+        let rewired = rows.map(|rows| rows.rewired.clone()).unwrap_or_default();
         Change {
             moved,
             points: Numbers {

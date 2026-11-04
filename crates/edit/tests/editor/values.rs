@@ -278,3 +278,73 @@ fn each_rule_is_declared_by_storage_and_meaning() {
     };
     assert_eq!(rule(array), Rule::Strongest);
 }
+
+#[test]
+fn placing_turns_values_by_their_meaning_and_shares_the_rest() {
+    use kinogaki_geometry::{Attribute, Attributes, Geometry, Meaning, Primitives, Xform};
+    let table = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+    let attributes = Attributes::new()
+        .with(
+            Domain::Point,
+            names::V,
+            Attribute::tuples(vec![[1.0f32, 2.0, 3.0]; 3], Meaning::Vector).unwrap(),
+        )
+        .unwrap()
+        .with(
+            Domain::Point,
+            names::ORIENT,
+            Attribute::tuples(vec![[0.0f32, 0.6, 0.0, 0.8]; 3], Meaning::Rotation).unwrap(),
+        )
+        .unwrap()
+        .with(
+            Domain::Point,
+            names::CD,
+            Attribute::tuples(vec![[1.0f32, 2.0, 3.0]; 3], Meaning::Color).unwrap(),
+        )
+        .unwrap()
+        .with(
+            Domain::Vertex,
+            names::N,
+            Attribute::tuples(vec![[1.0f32, 0.0, 0.0]; 3], Meaning::Normal).unwrap(),
+        )
+        .unwrap()
+        .with(
+            Domain::Primitive,
+            names::N,
+            Attribute::tuples(vec![[1.0f32, 0.0, 0.0]], Meaning::Normal).unwrap(),
+        )
+        .unwrap();
+    let at = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+    let value = Geometry::new(at.into(), table, attributes).unwrap();
+    // The mirror across X.
+    let across = Xform::from_rows([
+        [-1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+    ]);
+    let mut edit = Editor::new(&value);
+    edit.place_points([1], across);
+    edit.place_primitives([0], across);
+    let (out, change) = edit.finish().unwrap();
+    assert!(!change.topology, "the table stays");
+    let v = column::<[f32; 3]>(&out, Domain::Point, names::V);
+    assert_eq!((v[0], v[1]), ([1.0, 2.0, 3.0], [-1.0, 2.0, 3.0]));
+    // A turn about Y reversed in the mirror, the point left alone kept.
+    let q = column::<[f32; 4]>(&out, Domain::Point, names::ORIENT);
+    assert_eq!(q[0], [0.0, 0.6, 0.0, 0.8]);
+    assert!(
+        (q[1][1] + 0.6).abs() < 1e-6 && (q[1][3] - 0.8).abs() < 1e-6,
+        "{:?}",
+        q[1]
+    );
+    let cd = column::<[f32; 3]>(&out, Domain::Point, names::CD);
+    assert_eq!(cd[1], [1.0, 2.0, 3.0], "a color doesn't turn");
+    let n = column::<[f32; 3]>(&out, Domain::Vertex, names::N);
+    assert!(n.iter().all(|&n| n == [-1.0, 0.0, 0.0]), "{n:?}");
+    let n = column::<[f32; 3]>(&out, Domain::Primitive, names::N);
+    assert_eq!(n[0], [-1.0, 0.0, 0.0]);
+    assert!(
+        out.positions().ptr_eq(value.positions()),
+        "positions are the tool's"
+    );
+}

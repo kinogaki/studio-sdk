@@ -65,6 +65,7 @@ mod change;
 mod finish;
 mod gather;
 mod layout;
+mod place;
 mod settle;
 mod split;
 
@@ -74,7 +75,7 @@ pub use finish::place;
 pub use gather::{Placed, gather, gather_table, spread};
 
 use crate::deform::Deform;
-use kinogaki_geometry::{Basis, Error, Geometry, Kind};
+use kinogaki_geometry::{Basis, Error, Geometry, Kind, Xform};
 use layout::{Blends, Source, Span};
 use std::collections::{HashMap, HashSet};
 
@@ -133,6 +134,10 @@ pub struct Editor {
     /// doesn't know, once a split asks. A row rewired away stays listed;
     /// readers check.
     edited_through: Option<HashMap<u32, Vec<u32>>>,
+    /// What [`place_points`](Self::place_points) asked for.
+    placed_points: Vec<(Xform, Vec<u32>)>,
+    /// What [`place_primitives`](Self::place_primitives) asked for.
+    placed_primitives: Vec<(Xform, Vec<u32>)>,
 }
 
 impl Editor {
@@ -159,6 +164,8 @@ impl Editor {
             vertex_blends: Blends::default(),
             edge_from: HashMap::new(),
             edited_through: None,
+            placed_points: Vec::new(),
+            placed_primitives: Vec::new(),
         }
     }
 
@@ -393,6 +400,21 @@ impl Editor {
         let from = pair(from);
         let source = self.edge_from.get(&from).copied().unwrap_or(from);
         self.edge_from.insert(pair(to), source);
+    }
+
+    /// The values of `points` turn by `at`, as their [`Meaning`] says: `N`,
+    /// `v` and the like of what an operation moved by a placement, a new
+    /// point's after it took them from its sources. Positions are the tool's.
+    ///
+    /// [`Meaning`]: kinogaki_geometry::Meaning
+    pub fn place_points(&mut self, points: impl IntoIterator<Item = u32>, at: Xform) {
+        self.placed_points.push((at, points.into_iter().collect()));
+    }
+
+    /// The values of `primitives` and of their vertices turn by `at`, as
+    /// [`place_points`](Self::place_points) has it for points.
+    pub fn place_primitives(&mut self, primitives: impl IntoIterator<Item = u32>, at: Xform) {
+        (self.placed_primitives).push((at, primitives.into_iter().collect()));
     }
 
     /// Appends a row, its corners' sources kept.
