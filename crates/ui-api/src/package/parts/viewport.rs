@@ -32,6 +32,12 @@ part! {
         /// Ends live drags and gestures, for the reason `why` says
         /// ([`Ended`], with the order Escape is taken in).
         fn cancel(&self, s: &mut S, cx: &mut dyn Cx, why: Ended);
+        /// Keeps what a live tool did, as Enter does, and leaves nothing live:
+        /// its gesture one undo step. The host asks when the user goes on to
+        /// something else: the location leaves the context, or a node is picked
+        /// or edited in the network. It asks with the location still on the
+        /// context when it can; with nothing live this does nothing.
+        fn accept(&self, s: &mut S, cx: &mut dyn Cx);
         /// A key or typed text over the viewport, before any binding (see
         /// [`KeyPress`]): a live tool's own keys (Enter), a focused value
         /// field's typing ([`HostShell::keyboard_taken`](crate::host::HostShell::keyboard_taken)

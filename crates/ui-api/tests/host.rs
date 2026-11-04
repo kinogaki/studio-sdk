@@ -200,6 +200,9 @@ impl LiveTools<Forest> for TreeView {
     fn cancel(&self, s: &mut Forest, _cx: &mut dyn Cx, _why: Ended) {
         s.planting = None;
     }
+    fn accept(&self, s: &mut Forest, _cx: &mut dyn Cx) {
+        s.planting = None;
+    }
 }
 
 /// A ring at the pointer; leaves over the trees in the views showing

@@ -66,7 +66,8 @@
 //! commands; then once [`Display::settle`]; then for each drawn view
 //! [`Display::overlay`], each panel's [`Panels::panel`], and
 //! [`Display::edited`]. Keys come before all of it ([`LiveTools::key`]),
-//! and [`LiveTools::cancel`] ends a live gesture ([`Ended`]).
+//! [`LiveTools::cancel`] puts a live gesture back ([`Ended`]) and
+//! [`LiveTools::accept`] keeps it.
 mod data;
 mod display;
 mod edited;

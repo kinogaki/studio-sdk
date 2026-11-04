@@ -131,8 +131,6 @@ pub enum Ended {
     Escape,
     /// An undo or redo: what the gesture did is about to change under it.
     Undo,
-    /// The location left the context (another object, a level up).
-    Left,
 }
 
 /// A context's floating panel over the views ([`Panels`](super::Panels)).

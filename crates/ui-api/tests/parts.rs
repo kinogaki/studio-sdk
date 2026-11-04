@@ -31,6 +31,7 @@ struct Clock {
 struct Parts;
 
 impl LiveTools<Clock> for Parts {
+    fn accept(&self, _s: &mut Clock, _cx: &mut dyn Cx) {}
     /// Its hand: the pointer's, while it is over the view.
     fn tools(&self, _s: &mut Clock, cx: &mut dyn ViewCx) -> Takes {
         let held = cx
@@ -149,12 +150,12 @@ fn every_call_reaches_the_packages_own_part_with_its_state() {
             .tools
             .as_ref()
             .unwrap()
-            .cancel(s, &mut host, Ended::Left);
+            .cancel(s, &mut host, Ended::Undo);
     });
     let clock = hosting.state::<Clock>();
     assert_eq!(clock.phases, [TransformPhase::Began]);
     assert_eq!((clock.at, clock.typed), (12.5, Some((0, 3.0))));
-    assert_eq!(clock.ended, [Ended::Left]);
+    assert_eq!(clock.ended, [Ended::Undo]);
 }
 
 #[test]
