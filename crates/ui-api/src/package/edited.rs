@@ -45,6 +45,11 @@ pub struct Edited {
     /// polygons until the edit it commits is shown ([`Moving`]); `None`:
     /// no drag.
     pub moving: Option<Moving>,
+    /// A weight for each of the shown value's points, tinting the surface
+    /// by how far a move would reach (soft selection): blue barely, through
+    /// yellow, orange fully, the rest as it is; ignored unless it has one
+    /// for each point. The same `Arc` while nothing changed costs nothing.
+    pub tint: Option<Arc<[f32]>>,
     /// Nodes' cooked values core draws ghosted in this view, each placed
     /// by its object and in its tone (a tool's input beside what it makes,
     /// what a cut removes). Core cooks and prepares each as it does an

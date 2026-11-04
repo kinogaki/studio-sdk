@@ -210,6 +210,7 @@ impl Levels<Pinning> for PinLevels {
             icon: "cube".into(),
             mode: domain.into(),
             combines: false,
+            double: Default::default(),
         })
         .into()
     }

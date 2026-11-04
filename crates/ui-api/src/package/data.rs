@@ -4,7 +4,7 @@
 //! draws all of them with its own components,
 //! so every context's chrome looks and behaves alike.
 use crate::{Id, Rect};
-use kinogaki_studio_api::edit::select::Mode;
+use kinogaki_studio_api::edit::select::{Expand, Mode};
 use kinogaki_studio_api::params::Unit;
 use std::sync::Arc;
 
@@ -23,6 +23,9 @@ pub struct LevelSpec {
     pub mode: Mode,
     /// Whether it may be active together with others (Shift+number).
     pub combines: bool,
+    /// What a double click grows its pick to (Mesh's edge loops at its Edge
+    /// level); [`Expand::None`]: as a single click does.
+    pub double: Expand,
 }
 
 /// A button after a context's levels that makes several of them active
