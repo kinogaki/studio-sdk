@@ -46,12 +46,12 @@
 //! let absent = VerbId::declared("acme.points.absent");
 //! assert!(kernel::find(absent).is_none());
 //! let input = geometry.wrap(kinogaki_studio_api::geometry::Geometry::empty());
-//! let missing = kernel::run(absent, &Parameters::new(), &[input], &CancelToken::default());
+//! let missing = kernel::run(absent, &Parameters::new(), &[input], &CancelToken::default(), None);
 //! assert!(missing.is_err());
 //! ```
 use crate::Error;
 use crate::cancel::CancelToken;
-use crate::cook::{CookCx, Outputs, Port};
+use crate::cook::{CookCx, Outputs, Port, Project};
 use crate::data::Data;
 use crate::id::{PackageId, VerbId};
 use crate::params::{Parameters, Schema};
@@ -124,7 +124,9 @@ impl Verb {
     }
 
     /// Runs it on `inputs`, its rows as `parameters` say and otherwise at
-    /// their defaults, polling `cancel`.
+    /// their defaults, polling `cancel`, the caller's `project` its
+    /// [`CookCx::project`] (whose stored values hold the project's
+    /// [`Tolerances`](kinogaki_geometry::Tolerances)).
     ///
     /// # Errors
     /// Inputs that don't fit its ports, a row it doesn't have, cancelled,
@@ -134,6 +136,7 @@ impl Verb {
         parameters: &Parameters,
         inputs: &[Data],
         cancel: &CancelToken,
+        project: Option<&Project<'_>>,
     ) -> Result<Outputs, Error> {
         let mut rows = self.rows.values();
         for (name, value) in parameters {
@@ -147,7 +150,11 @@ impl Verb {
         }
         self.check_inputs(inputs, &rows)?;
         let mut scratch = None;
-        let mut cx = CookCx::builder(&rows, cancel, &mut scratch).build();
+        let mut cx = CookCx::builder(&rows, cancel, &mut scratch);
+        if let Some(project) = project {
+            cx = cx.with_project(project);
+        }
+        let mut cx = cx.build();
         (self.run)(&mut cx, inputs)
     }
 
@@ -226,10 +233,11 @@ pub fn run(
     parameters: &Parameters,
     inputs: &[Data],
     cancel: &CancelToken,
+    project: Option<&Project<'_>>,
 ) -> Result<Outputs, Error> {
     let verb = find(id).ok_or_else(|| {
         let package = id.package();
         Error::missing(format_args!("{id}: the kernel {package} isn't loaded"))
     })?;
-    verb.run(parameters, inputs, cancel)
+    verb.run(parameters, inputs, cancel, project)
 }

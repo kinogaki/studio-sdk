@@ -12,6 +12,7 @@ use kinogaki_value::Condition;
 /// point of it the handle's [`Handle::anchor`] says (its middle unless
 /// anchored).
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum HandleKind {
     /// The Move gizmo at `position`: an arrow drags along its axis, a
     /// plane square in its plane, the middle in the view's plane.

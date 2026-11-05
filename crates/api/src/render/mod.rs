@@ -25,6 +25,7 @@ pub use kinogaki_render_api::{Detail, PlainTriangles, Ranges, ShapeSource, Topol
 
 /// What a value renders as.
 #[derive(Clone)]
+#[non_exhaustive]
 pub enum RenderItem {
     /// Triangles or curves, where the object is.
     Shape {

@@ -67,6 +67,7 @@ pub struct Material {
 
 /// A prim's payload.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Prim {
     /// Triangles or curves in their own space.
     Shape(Shape),
@@ -87,6 +88,7 @@ pub enum Prim {
 /// takes of the types it declares.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PrimKind {
     Triangles,
     Curves,
