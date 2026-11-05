@@ -146,7 +146,7 @@ pub mod standard {
     }
 }
 
-/// An output an engine writes, and whether new Render Settings ask for it.
+/// An output an engine writes, and whether a new Render Output asks for it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AovSpec {
     /// The output.

@@ -76,7 +76,7 @@ pub struct Package {
     pub icons: Vec<Icon>,
     /// The render engines it brings, by their descriptions (headless):
     /// what declares the values its object kinds hold beyond their
-    /// placement (a light's prim values, a Render Settings' engine
+    /// placement (a light's prim values, a Render Output's engine
     /// settings), and what a host lists and renders by.
     pub engines: Vec<Arc<EngineDescription>>,
     /// How each of its engines is made on a device, by engine id (the

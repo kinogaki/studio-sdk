@@ -264,13 +264,13 @@ An `ObjectKindSpec` describes one kind of object. It gives:
 - `materials(body)`: Materials the object publishes (a printer's slots), each a `PublishedMaterial` under the object's path by its key (`/X1C/AMS 1 · 2`; a key is any `is_path_step`, spaces and `·` included), read-only, with a `PreviewSurface` and, while it can't be used, why (`unavailable`: a path naming it then names nothing). Core asks again whenever the body changes, and pickers and renders take them as they take a Material Library's;
 - `creations` and `create`, the ways an object level makes its objects, given a `CreateCx`: the installed engines and the user's stored values (`CreateCx::user`: a printer saved in Settings becomes a creation).
 
-An `ObjectBody` is the part of an object that the package owns: the kind's own state (a Mesh object's display settings, a Render Settings object's engine and settings). The environment keeps the object's name, its place in the hierarchy, its placement, its flags and its network. Bodies are immutable and are replaced whole, so undo keeps the previous body.
+An `ObjectBody` is the part of an object that the package owns: the kind's own state (a Mesh object's display settings, a Render Output object's engine and settings). The environment keeps the object's name, its place in the hierarchy, its placement, its flags and its network. Bodies are immutable and are replaced whole, so undo keeps the previous body.
 
 A kind whose objects are render prims themselves (an engine's lights and fog) says so through an optional facet, so the host's render sync never reads the body:
 - `renders()`, a `RenderedKind`: what an object is, as `Declared` prims of types its engine declares with every value it holds (`declared`), and the body holding an edit of them (`with_declared`). The host keeps, for the active engine, the values that engine's type declares, places the prims at the object, decodes the standard ones (UsdLux lights) for the viewport and exports, and draws the inspector rows from the types' schemas.
-- `at_root()`: its objects live only at the scene's root (Fog, Render Settings).
+- `at_root()`: its objects live only at the scene's root (Fog, Render Output).
 
-Each engine's package brings its own lights, and its fog if it renders one, as object kinds with this facet; the standard light and fog types (`kinogaki_render_api::standard`) are a shared vocabulary of plain data, so a light value from a file is adopted by any engine's Light kind. Render Settings, the scene's render outputs (which engine renders through which camera, and the Comp network that corrects the result), are core's own kind.
+Each engine's package brings its own lights, and its fog if it renders one, as object kinds with this facet; the standard light and fog types (`kinogaki_render_api::standard`) are a shared vocabulary of plain data, so a light value from a file is adopted by any engine's Light kind. Render Output, the scene's render outputs (which engine renders through which camera, and the Comp network that corrects the result), are core's own kind.
 
 ## Formats
 

@@ -19,7 +19,7 @@ pub enum BackgroundSpace {
 }
 
 /// The project's target display and background: what a Layout page composes for,
-/// and what a render reaches unless its Render Settings name another display.
+/// and what a render reaches unless its Render Output names another display.
 /// The element `output` among the project's settings. Core registers it, edits
 /// it in its project section, and its canvas and final writes read it. Written
 /// files say which display they are for.

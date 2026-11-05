@@ -3,7 +3,7 @@
 use crate::Error;
 
 /// How fine to make geometry for a render: a B-rep's tessellation, a
-/// sampled surface. One Render Settings value gives it to every engine;
+/// sampled surface. One Render Output value gives it to every engine;
 /// while a gesture is under way, render views use
 /// [`Viewport`](Detail::Viewport) and refine when idle.
 ///
