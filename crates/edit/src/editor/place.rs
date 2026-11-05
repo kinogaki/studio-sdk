@@ -26,23 +26,44 @@ pub(super) fn placed(
     at: Xform,
     items: impl Iterator<Item = Range<u32>>,
 ) -> Result<Attribute, Error> {
+    let placing = Placing::new(attribute.ty().meaning, at);
+    rewritten(attribute, items.flatten().map(|k| (k, &placing)))
+}
+
+/// `attribute` with each item of `items` placed by its own placement, the
+/// rest shared.
+pub(super) fn placed_each(
+    attribute: &Attribute,
+    items: &[(u32, Xform)],
+) -> Result<Attribute, Error> {
+    let meaning = attribute.ty().meaning;
+    let placings: Vec<(u32, Placing)> = (items.iter())
+        .map(|&(k, at)| (k, Placing::new(meaning, at)))
+        .collect();
+    rewritten(attribute, placings.iter().map(|(k, p)| (*k, p)))
+}
+
+/// `attribute` with each item of `items` placed as its placing says, while
+/// its type turns.
+fn rewritten<'p>(
+    attribute: &Attribute,
+    items: impl Iterator<Item = (u32, &'p Placing)>,
+) -> Result<Attribute, Error> {
     let ty = attribute.ty();
     if !turns(ty) {
         return Ok(attribute.clone());
     }
-    let placing = Placing::new(ty.meaning, at);
     let width = usize::from(ty.width);
-    fn write<T: Copy>(
+    fn write<'p, T: Copy>(
         column: &Column<T>,
         width: usize,
-        placing: &Placing,
-        items: impl Iterator<Item = Range<u32>>,
+        items: impl Iterator<Item = (u32, &'p Placing)>,
         to: impl Fn(T) -> f64,
         from: impl Fn(f64) -> T,
     ) -> Column<T> {
         let mut out = column.edit();
         let mut item = vec![0.0; width];
-        for k in items.flatten() {
+        for (k, placing) in items {
             let cells = k as usize * width;
             (0..width).for_each(|i| item[i] = to(out[cells + i]));
             placing.apply(&mut item);
@@ -51,8 +72,8 @@ pub(super) fn placed(
         out.finish()
     }
     let values = match attribute.values() {
-        Values::F32(c) => Values::F32(write(c, width, &placing, items, f64::from, |x| x as f32)),
-        Values::F64(c) => Values::F64(write(c, width, &placing, items, |x| x, |x| x)),
+        Values::F32(c) => Values::F32(write(c, width, items, f64::from, |x| x as f32)),
+        Values::F64(c) => Values::F64(write(c, width, items, |x| x, |x| x)),
         _ => return Ok(attribute.clone()),
     };
     attribute.with_values(values)

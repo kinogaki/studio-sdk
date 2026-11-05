@@ -63,7 +63,7 @@ fn a_deform_places_each_point_by_its_weight_where_a_preview_shows_it() {
         symmetry: None,
     };
     let mut edit = Editor::new(&value);
-    edit.deform(&[1, 3], &deform);
+    edit.deform(&[1, 3], &deform.field());
     let (out, change) = edit.finish().unwrap();
     assert_eq!(change.moved, [1, 3]);
     assert_eq!(out.positions()[1], [1.0, 0.0, 2.0]);
@@ -76,10 +76,63 @@ fn a_deform_places_each_point_by_its_weight_where_a_preview_shows_it() {
     // Without weights every point moves fully, from where the edit has it.
     let mut edit = Editor::new(&value);
     edit.set_position(0, [5.0, 5.0, 5.0]);
-    edit.deform(&[0, 2], &Deform::rigid(lift));
+    edit.deform(&[0, 2], &Deform::rigid(lift).field());
     let (out, _) = edit.finish().unwrap();
     assert_eq!(out.positions()[0], [5.0, 5.0, 7.0]);
     assert_eq!(out.positions()[2], [0.0, 1.0, 2.0]);
+}
+
+/// A deform turns what turns with a placement as the move does: a quarter
+/// turn about Z turns `N` and composes `orient`, keeps `rest` and colors,
+/// and a weight-0 point keeps its own; a field of the same turn written by
+/// hand (a deformer's) does the same.
+#[test]
+fn a_deform_turns_typed_values_as_the_move_does() {
+    let value = ruled(2, 2);
+    let quarter = [
+        0.0,
+        0.0,
+        std::f64::consts::FRAC_1_SQRT_2,
+        std::f64::consts::FRAC_1_SQRT_2,
+    ];
+    let turn = Move::new(Vec3::ZERO, quarter, Vec3::new(1.0, 1.0, 1.0), Vec3::ZERO).unwrap();
+    let deform = Deform {
+        step: turn,
+        weights: Some(Arc::from([1.0, 0.0])),
+        symmetry: None,
+    };
+    let mut edit = Editor::new(&value);
+    edit.deform(&[4, 5], &deform.field());
+    let (out, change) = edit.finish().unwrap();
+    assert!(Arc::ptr_eq(out.primitives(), value.primitives()) && !change.topology);
+    let n = |v| column::<[f32; 3]>(v, Domain::Point, names::N);
+    let (before, after) = (n(&value), n(&out));
+    let [x, y, z] = before[4];
+    let turned = [-y, x, z];
+    assert!(
+        (0..3).all(|k| (after[4][k] - turned[k]).abs() < 1e-5),
+        "{:?}",
+        after[4]
+    );
+    assert_eq!(after[5], before[5], "weight 0 keeps its own");
+    assert_eq!(after[0], before[0], "unmoved");
+    let orient = |v| column::<[f32; 4]>(v, Domain::Point, names::ORIENT);
+    assert_ne!(orient(&out)[4], orient(&value)[4], "a rotation composes");
+    let rest = |v| column::<[f64; 3]>(v, Domain::Point, names::REST);
+    let cd = |v| column::<[f32; 3]>(v, Domain::Point, names::CD);
+    assert_eq!(
+        (rest(&out), cd(&out)),
+        (rest(&value), cd(&value)),
+        "they stay"
+    );
+    // The same turn as a deformer's field.
+    let by_hand = |_: usize, at: Vec3| Vec3::new(-at.y, at.x, at.z);
+    let mut edit = Editor::new(&value);
+    edit.deform(&[4], &by_hand);
+    let (hand, _) = edit.finish().unwrap();
+    assert!((0..3).all(|k| (n(&hand)[4][k] - after[4][k]).abs() < 1e-5));
+    let (a, b) = (orient(&hand)[4], orient(&out)[4]);
+    assert!((0..4).all(|k| (a[k] - b[k]).abs() < 1e-5), "{a:?} {b:?}");
 }
 
 #[test]

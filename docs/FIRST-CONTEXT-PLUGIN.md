@@ -468,7 +468,7 @@ if let Some(gesture) = live.gesture.take() {
 use kinogaki_studio_api::edit::editor::Editor;
 
 let mut edit = Editor::new(&input);           // over the input value, shared
-edit.deform(&points, &deform);                // or add_point, add_primitive, weld, split_edge...
+edit.deform(&points, &deform.field());        // or add_point, add_primitive, weld, split_edge...
 let (pushed, change) = edit.finish()?;        // the new value, and what changed
 ```
 

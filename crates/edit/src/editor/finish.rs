@@ -4,6 +4,7 @@
 use super::Editor;
 use super::carry::{carried_attribute, carried_group};
 use super::change::{Change, Numbers};
+use super::follow::turned;
 use super::layout::{Blends, Layout, Run, Span};
 use super::place::placed;
 use super::settle::{Filling, GONE, Points, Settled, Vertex};
@@ -85,10 +86,11 @@ impl Editor {
 
     /// Points moved and nothing else: the cells of the positions they fall in.
     fn moved_only(self) -> Result<(Geometry, Change), Error> {
-        let mut moved: Vec<(u32, [f64; 3])> = self.moved.into_iter().collect();
+        let mut moved: Vec<(u32, [f64; 3])> = self.moved.iter().map(|(&p, &at)| (p, at)).collect();
         moved.sort_unstable_by_key(|m| m.0);
         let (points, at): (Vec<u32>, Vec<[f64; 3]>) = moved.into_iter().unzip();
-        place(&self.base, &points, &at)
+        let (value, change) = place(&self.base, &points, &at)?;
+        Ok((self.follow_moved(value)?, change))
     }
 
     /// Anything else: what the changes reach is written again.
@@ -356,7 +358,10 @@ impl Editor {
         change: &Change,
         table: &Primitives,
     ) -> Result<Arc<Attributes>, Error> {
-        if self.placed_points.is_empty() && self.placed_primitives.is_empty() {
+        if self.placed_points.is_empty()
+            && self.placed_primitives.is_empty()
+            && self.followed.is_empty()
+        {
             return Ok(attributes);
         }
         let mut out = (*attributes).clone();
@@ -389,6 +394,13 @@ impl Editor {
                 .collect();
             turn(Domain::Vertex, *at, &vertices)?;
         }
+        // What deformations' typed values follow, in the new numbering:
+        // vertices and edges only while the table is the base's.
+        let out = turned(&out, &self.followed, |domain, e| match domain {
+            Domain::Point => change.points.of(e),
+            Domain::Primitive => change.primitives.of(e),
+            _ => (!change.topology).then_some(e),
+        })?;
         Ok(Arc::new(out))
     }
 

@@ -64,6 +64,7 @@ mod carry;
 mod change;
 mod extract;
 mod finish;
+mod follow;
 mod gather;
 mod layout;
 mod place;
@@ -76,8 +77,7 @@ pub use extract::extract;
 pub use finish::place;
 pub use gather::{NOTHING, Placed, gather, gather_table, picked, spread};
 
-use crate::deform::Deform;
-use kinogaki_geometry::{Basis, Error, Geometry, Kind, Xform};
+use kinogaki_geometry::{Basis, Error, Geometry, Kind, Vec3, Xform};
 use layout::{Blends, Source, Span};
 use std::collections::{HashMap, HashSet};
 
@@ -140,6 +140,8 @@ pub struct Editor {
     placed_points: Vec<(Xform, Vec<u32>)>,
     /// What [`place_primitives`](Self::place_primitives) asked for.
     placed_primitives: Vec<(Xform, Vec<u32>)>,
+    /// What [`deform`](Self::deform)'s typed values follow.
+    followed: Vec<follow::Followed>,
 }
 
 impl Editor {
@@ -168,6 +170,7 @@ impl Editor {
             edited_through: None,
             placed_points: Vec::new(),
             placed_primitives: Vec::new(),
+            followed: Vec::new(),
         }
     }
 
@@ -280,17 +283,41 @@ impl Editor {
         }
     }
 
-    /// `points` placed by `deform`, each by its weight (in `points`' order):
-    /// the commit of a drag the viewport previewed
-    /// ([`Moving`](crate::preview::Moving)), through the one function the
-    /// preview places points with, from where the edit has them.
-    pub fn deform(&mut self, points: &[u32], deform: &Deform) {
-        for (i, &p) in points.iter().enumerate() {
-            if !self.check_point(p) {
+    /// `points` moved by `field`: the `i`th, where the edit has it, goes to
+    /// `field(i, at)`, and its values that turn with a placement (`N`, `v`,
+    /// `orient` and the like, of the point, its vertices, and the primitives
+    /// and edges all of whose points move) follow the field, as a placement
+    /// turns them (by the field's Jacobian at each element). The commit of a
+    /// drag the viewport previewed is `field` of its
+    /// [`Deform`](crate::deform::Deform) ([`Deform::field`](crate::deform::Deform::field)), the one
+    /// function the preview places points with; a deformer's own field
+    /// moves its points as a tool asks.
+    ///
+    /// A typed value follows in this edit's numbering; vertices' and edges'
+    /// only while the edit keeps the table.
+    pub fn deform(&mut self, points: &[u32], field: &(dyn Fn(usize, Vec3) -> Vec3 + Sync)) {
+        if let Some(&p) = points.iter().find(|&&p| p >= self.point_count()) {
+            self.check_point(p);
+            return;
+        }
+        let from: Vec<Vec3> = points.iter().map(|&p| self.position(p).into()).collect();
+        let mut to = from.clone();
+        let placed = kinogaki_geometry::parallel::chunks_mut(&mut to, 1024, |first, block| {
+            for (k, at) in block.iter_mut().enumerate() {
+                *at = field(first + k, *at);
+            }
+            Ok::<(), Error>(())
+        });
+        let followed = placed.and_then(|()| follow::followed(&self.base, points, &from, field));
+        match followed {
+            Ok(followed) if followed.is_empty() => {}
+            Ok(followed) => self.followed.push(followed),
+            Err(e) => {
+                self.refuse(e.to_string());
                 return;
             }
-            let weight = deform.weights.as_ref().and_then(|w| w.get(i)).copied();
-            let at = deform.place(self.position(p).into(), weight.unwrap_or(1.0));
+        }
+        for (&p, at) in points.iter().zip(to) {
             self.set_position(p, at.to_array());
         }
     }

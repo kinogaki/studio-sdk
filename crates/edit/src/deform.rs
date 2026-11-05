@@ -299,6 +299,21 @@ impl Deform {
         }
     }
 
+    /// The weight of the `i`th point it moves (1 without weights).
+    pub fn weight(&self, i: usize) -> f32 {
+        self.weights
+            .as_ref()
+            .and_then(|w| w.get(i))
+            .copied()
+            .unwrap_or(1.0)
+    }
+
+    /// Where the `i`th point it moves, at `at`, goes: what
+    /// [`Editor::deform`](crate::editor::Editor::deform) commits the move with.
+    pub fn field(&self) -> impl Fn(usize, Vec3) -> Vec3 + Sync + '_ {
+        |i, at| self.place(at, self.weight(i))
+    }
+
     /// The full move as a placement (weight 1, without the symmetry).
     pub fn xform(&self) -> Xform {
         self.step.xform()
