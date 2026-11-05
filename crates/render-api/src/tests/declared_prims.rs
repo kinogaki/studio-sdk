@@ -79,10 +79,10 @@ fn single(def: NodeDef) -> MaterialNetwork {
 #[test]
 fn an_engine_keeps_its_own_material_and_translates_anothers() {
     let base = RecordingEngine::new(Arc::new(|| {})).description().clone();
-    let here = (base.rebuilt().id(EngineId::new("here")))
+    let here = (base.rebuilt().id(EngineId::declared("toy.here.engine")))
         .materials(vec![def("here")], Arc::new(Rules(def("here"))))
         .build();
-    let there = (base.rebuilt().id(EngineId::new("there")))
+    let there = (base.rebuilt().id(EngineId::declared("toy.there.engine")))
         .materials(vec![def("there")], Arc::new(Rules(def("there"))))
         .build();
     let own = single(def("here"));
@@ -96,22 +96,32 @@ fn an_engine_keeps_its_own_material_and_translates_anothers() {
     // An engine with no rules for it renders its default: an empty network.
     assert_eq!(base.adopt(&own), MaterialNetwork::default());
     let engines = Engines::new(vec![here.clone(), there]);
-    assert_eq!(engines.owner(&own).map(|e| e.id().as_str()), Some("here"));
+    assert_eq!(
+        engines.owner(&own).map(|e| e.id().as_str()),
+        Some("toy.here.engine")
+    );
     let theirs = single(def("there"));
     assert_eq!(
         engines.owner(&theirs).map(|e| e.id().as_str()),
-        Some("there")
+        Some("toy.there.engine")
     );
     assert!(engines.owner(&MaterialNetwork::default()).is_none());
-    assert_eq!(engines.default_engine().unwrap().id().as_str(), "here");
-    assert!(engines.get(&EngineId::new("there")).is_some());
-    assert!(engines.get(&EngineId::new("nope")).is_none());
+    assert_eq!(
+        engines.default_engine().unwrap().id().as_str(),
+        "toy.here.engine"
+    );
+    assert!(
+        engines
+            .get(EngineId::declared("toy.there.engine"))
+            .is_some()
+    );
+    assert!(engines.get(EngineId::declared("toy.nope.engine")).is_none());
     // A host with no engine installed has none to default to.
     let none = Engines::new(Vec::new());
     assert!(
         none.is_empty()
             && none.default_engine().is_none()
-            && none.get(&EngineId::new("here")).is_none()
+            && none.get(EngineId::declared("toy.here.engine")).is_none()
     );
 }
 

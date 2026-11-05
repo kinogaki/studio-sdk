@@ -49,7 +49,7 @@ part! {
         /// the network, or again with its last values (the host's Repeat). An
         /// item can be run where it doesn't apply (a key, a shelf tile): it
         /// then does nothing but say why
-        /// ([`HostStatus::fail`](crate::host::HostStatus::fail)).
+        /// ([`HostStatus::report`](crate::host::HostStatus::report)).
         fn run(&self, s: &mut S, cx: &mut dyn Cx, item: &str, how: Invoked);
         /// Whether `item` applies now: at the active level, to the selection,
         /// in this mode (Fillet needs edges selected; Repeat a last tool).

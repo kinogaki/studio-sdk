@@ -398,13 +398,13 @@ fn nodes_hold_networks_of_declared_contexts_without_loops() {
 }
 
 /// An engine's description, by id.
-fn engine(id: &str) -> kinogaki_render_api::EngineDescription {
+fn engine(id: &'static str) -> kinogaki_render_api::EngineDescription {
     let wake: kinogaki_render_api::Wake = Arc::new(|| {});
     use kinogaki_render_api::RenderEngine;
     (kinogaki_render_api::RecordingEngine::new(wake)
         .description()
         .rebuilt())
-    .id(kinogaki_render_api::EngineId::new(id))
+    .id(kinogaki_render_api::EngineId::declared(id))
     .build()
 }
 
@@ -423,7 +423,7 @@ fn an_engine_setting_is_never_named_as_a_setups_own() {
 
 #[test]
 fn an_engine_id_is_declared_once_under_its_vendor() {
-    let package = |id: &'static str, engines: &[&str]| {
+    let package = |id: &'static str, engines: &[&'static str]| {
         (engines.iter()).fold(Package::new(PackageId::declared(id), id), |p, e| {
             p.with_engine_description(engine(e))
         })
@@ -448,10 +448,6 @@ fn an_engine_id_is_declared_once_under_its_vendor() {
     assert_refused(
         registry.register(package("rival.glow", &["acme.glow.spark"])),
         &["under another vendor's name", "acme.glow.spark"],
-    );
-    assert_refused(
-        registry.register(package("rival.glow", &["glow"])),
-        &["which isn't an id"],
     );
     assert!(
         registry

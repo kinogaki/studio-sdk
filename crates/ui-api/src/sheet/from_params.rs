@@ -42,8 +42,8 @@ impl From<&params::Schema> for Schema<String> {
     }
 }
 
-/// Parameter `p`'s field: its kind's, its help as the tooltip (or its
-/// problem, shown as an error), its keywords for search.
+/// Parameter `p`'s field: its kind's, its help as the tooltip, its keywords
+/// for search.
 fn field(p: &params::Parameter) -> Field<String> {
     let mut field = Field::new(
         p.name.clone(),
@@ -54,10 +54,6 @@ fn field(p: &params::Parameter) -> Field<String> {
     field.enabled = p.enabled;
     field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
     field.keywords = p.keywords.clone().into();
-    if let Some(problem) = &p.problem {
-        field.error = true;
-        field.tooltip = Some(problem.clone().into());
-    }
     field
 }
 
@@ -305,10 +301,9 @@ mod tests {
     }
 
     /// What a node type's `schema` fills in shows: an attribute menu, a
-    /// wire menu over the integers, a choice, a problem as an error,
-    /// and a button.
+    /// wire menu over the integers, a choice and a button.
     #[test]
-    fn shaped_rows_show_their_menus_problems_and_buttons() {
+    fn shaped_rows_show_their_menus_and_buttons() {
         let abc = vec![Choice::new("a", "A"), Choice::new("b", "B")];
         let schema = params::Schema::default()
             .parameter(Parameter::new(
@@ -336,10 +331,7 @@ mod tests {
                 ValueKind::choice(abc),
                 Value::Choice("a".into()),
             ))
-            .parameter(
-                Parameter::new("group", "Group", ValueKind::Group, "0-")
-                    .problem("expected a number"),
-            )
+            .parameter(Parameter::new("group", "Group", ValueKind::Group, "0-"))
             .button(params::Button::new("fit", "Fit").enabled(false));
         let sheet = Schema::<String>::from(&schema);
         let field = |name: &str| sheet.field(&name.to_owned()).unwrap();
@@ -352,7 +344,6 @@ mod tests {
             panic!()
         };
         assert!(crate::sheet::segments(choices), "two short ones: segments");
-        assert!(field("group").error);
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
     }
 }

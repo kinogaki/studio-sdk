@@ -138,9 +138,6 @@ pub struct Parameter {
     /// Whether it takes input; a disabled row shows its value greyed and
     /// its help says why.
     pub enabled: bool,
-    /// Why its value is faulty (a group expression that doesn't parse):
-    /// the row shows as an error with this as its tooltip. `None`: it isn't.
-    pub problem: Option<String>,
     /// Whether it can be keyed over time. Its kind gives the default
     /// ([`ValueKind::animatable`]); a type turns it off for a parameter
     /// that shapes its ports or spares, or whose change should be one
@@ -166,7 +163,6 @@ impl Parameter {
             help: String::new(),
             keywords: String::new(),
             enabled: true,
-            problem: None,
             animatable,
         }
     }
@@ -210,12 +206,6 @@ impl Parameter {
     /// Disabled (or enabled again).
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
-        self
-    }
-
-    /// Faulty, `why` (see [`problem`](Self::problem)).
-    pub fn problem(mut self, why: impl Into<String>) -> Self {
-        self.problem = Some(why.into());
         self
     }
 

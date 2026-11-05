@@ -4,6 +4,7 @@
 //! file's own tag, its file rules, its working space). [`image`](ImageFiles::image)
 //! is linear ACEScg, for a scene-referred network; [`picture`](ImageFiles::picture)
 //! is what the file holds, for a page.
+use kinogaki_geometry::Error;
 use kinogaki_geometry::image::Image;
 
 /// An image file as far as it is read.
@@ -14,7 +15,7 @@ pub enum FileImage {
     /// Here it is.
     Read(Image),
     /// Why it can't be read.
-    Failed(String),
+    Failed(Error),
 }
 
 /// The host's image files. A UI's or a runner's never wait; a cook's
@@ -44,7 +45,7 @@ pub struct NoFiles;
 
 impl ImageFiles for NoFiles {
     fn image(&self, _: &str) -> FileImage {
-        FileImage::Failed("nothing reads image files here".to_owned())
+        FileImage::Failed(Error::missing("nothing reads image files here"))
     }
 
     fn picture(&self, path: &str) -> FileImage {

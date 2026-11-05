@@ -1,5 +1,5 @@
 //! [`HostCall`]: what a package asked of a [`FakeHost`](super::FakeHost).
-use kinogaki_studio_api::Severity;
+use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::{Bounds, RowsFor, SlotId, Time};
 use studio_ui_api::gizmo::{TransformSpace, TransformTool};
 #[cfg(doc)]
@@ -40,12 +40,8 @@ pub enum HostCall {
     Frame(Bounds),
     /// [`HostView::redraw`].
     Redraw,
-    /// [`HostStatus::fail`].
-    Fail(String),
-    /// [`HostStatus::info`].
-    Info(String),
-    /// [`HostStatus::console`]: level, subject, text.
-    Console(Severity, Option<String>, String),
+    /// [`HostStatus::report`]: what was reported, about what.
+    Report(Diagnostic, Option<String>),
     /// [`HostShell::copy_text`].
     CopyText(String),
     /// [`Cx::latest_any`] running a job, by its kind.

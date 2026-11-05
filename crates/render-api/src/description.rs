@@ -12,10 +12,10 @@ use std::sync::Arc;
 
 use crate::aov::{Aov, AovSpec};
 use crate::declared::PrimType;
-use crate::id::EngineId;
 use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef};
 use crate::prim::PrimKind;
 use crate::settings::{SettingDescriptor, SettingGroup};
+use kinogaki_value::EngineId;
 use kinogaki_value::NodeTypeId;
 
 /// What an engine's materials are to a host: the rules only its code knows.
@@ -171,8 +171,8 @@ impl EngineDescription {
     }
 
     /// Its id in files.
-    pub fn id(&self) -> &EngineId {
-        &self.id
+    pub fn id(&self) -> EngineId {
+        self.id
     }
 
     /// What a UI calls it.
@@ -256,7 +256,7 @@ impl Engines {
     }
 
     /// Engine `id`.
-    pub fn get(&self, id: &EngineId) -> Option<&Arc<EngineDescription>> {
+    pub fn get(&self, id: EngineId) -> Option<&Arc<EngineDescription>> {
         self.0.iter().find(|e| e.id() == id)
     }
 

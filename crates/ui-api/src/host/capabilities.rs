@@ -10,7 +10,7 @@
 //! while it holds it.
 use super::data::{NodeRef, ObjectRef, Place, ViewCamera};
 use crate::gizmo::{TransformSpace, TransformTool};
-use kinogaki_studio_api::Severity;
+use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::geometry::Geometry;
 use kinogaki_studio_api::id::StoredId;
 use kinogaki_studio_api::session::Slot;
@@ -257,16 +257,11 @@ pub trait HostView {
 
 /// The status bar, the error line and the Console.
 pub trait HostStatus {
-    /// Shows `message` on the error line and logs it to the Console as an
-    /// error of the calling package.
-    fn fail(&mut self, message: &str);
-    /// Logs `message` to the Console as information.
-    fn info(&mut self, message: &str);
-    /// Logs a Console record of `level` saying `text`, about `subject`
-    /// inside the open object (its own spelling: a node path, an element).
-    /// Unlike [`fail`](Self::fail) and [`info`](Self::info), nothing shows
-    /// on the status line.
-    fn console(&mut self, level: Severity, subject: Option<&str>, text: &str);
+    /// Reports `diagnostic` as the calling package's: a Console record of
+    /// its severity, about `subject` inside the open object when it names
+    /// one (its own spelling: a node path, an element); an error also
+    /// shows on the error line.
+    fn report(&mut self, diagnostic: Diagnostic, subject: Option<&str>);
 }
 
 /// The shell around the views: actions, menus and the keyboard.

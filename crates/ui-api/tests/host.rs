@@ -4,12 +4,12 @@
 //! settings pages edit the stored values they are lent; a tool's card shows its node's rows
 //! through the host, with More while they are fewer than the inspector's;
 //! and a nested call is refused.
-use kinogaki_studio_api::RowsFor;
 use kinogaki_studio_api::element::{ElementReader, ElementWriter, Field};
 use kinogaki_studio_api::{
     ContextId, Error, ObjectKindId, Package, PackageId, Scope, Slot, SlotId, Stored, StoredId,
     StoredValue, StoredValues,
 };
+use kinogaki_studio_api::{Diagnostic, RowsFor};
 use studio_ui_api::host::{
     Cx, HostDoc, HostDocExt, HostSlotsExt, HostUndo, InspectorCx, NodeRef, NodeRows, ObjectRef,
     Place, View, ViewCx, Waker,
@@ -320,7 +320,7 @@ impl PageRows<Forest> for DensityPage {
             && let Some(v) = rows.number(&0)
         {
             user.set(Density(v));
-            cx.info("Density set");
+            cx.report(Diagnostic::info("Density set"), None);
         }
     }
 }
@@ -601,7 +601,7 @@ fn settings_pages_edit_the_stored_values_they_are_lent() {
     });
     assert!(
         host.take_calls()
-            .contains(&HostCall::Info("Density set".into()))
+            .contains(&HostCall::Report(Diagnostic::info("Density set"), None))
     );
     let rows = edited(3.5);
     trees.with(|ui, s| {

@@ -59,12 +59,13 @@ pub use engine::{
     Deliver, FinalOutputs, Frame, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
     ViewMode, Wake, pending,
 };
-pub use id::{EngineId, Id, IdAllocator, PrimId};
+pub use id::{Id, IdAllocator, PrimId};
 /// The standard geometry values, which engines read prims' data as.
 pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.
 pub use kinogaki_geometry::Detail;
 pub use kinogaki_value as value;
+pub use kinogaki_value::EngineId;
 pub use material::preview::{
     PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
 };

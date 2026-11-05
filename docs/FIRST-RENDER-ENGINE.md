@@ -9,7 +9,7 @@ Studio's own engine, Spectre (a spectral path tracer, in Studio's Spectre plugin
 An engine is described without a device, so a host can list it, build its rows and read its files with no GPU:
 
 ```rust
-let description = EngineDescription::builder(EngineId::new("acme.ray.engine"), "Ray")
+let description = EngineDescription::builder(EngineId::declared("acme.ray.engine"), "Ray")
     .capabilities(Capabilities {
         prims: vec![PrimKind::Triangles, PrimKind::Instancer, PrimKind::Camera,
                     PrimKind::Material, PrimKind::Texture],

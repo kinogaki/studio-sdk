@@ -5,7 +5,7 @@
 //! back, callbacks queued, never nested).
 use super::{FakeNetwork, HostCall};
 use kinogaki_studio_api::CancelToken;
-use kinogaki_studio_api::Severity;
+use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::geometry::Geometry;
 use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
@@ -512,18 +512,8 @@ impl HostView for FakeHost {
 }
 
 impl HostStatus for FakeHost {
-    fn fail(&mut self, message: &str) {
-        self.calls.push(HostCall::Fail(message.into()));
-    }
-    fn info(&mut self, message: &str) {
-        self.calls.push(HostCall::Info(message.into()));
-    }
-    fn console(&mut self, level: Severity, subject: Option<&str>, text: &str) {
-        self.calls.push(HostCall::Console(
-            level,
-            subject.map(str::to_owned),
-            text.into(),
-        ));
+    fn report(&mut self, diagnostic: Diagnostic, subject: Option<&str>) {
+        (self.calls).push(HostCall::Report(diagnostic, subject.map(str::to_owned)));
     }
 }
 

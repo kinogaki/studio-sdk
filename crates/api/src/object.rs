@@ -417,8 +417,8 @@ pub trait RenderSetupKind: Send + Sync {
 /// What a render is set up as: what [`RenderSetupKind::setup`] answers.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RenderSetup {
-    /// The engine that renders (its id).
-    pub engine: EngineId,
+    /// The engine that renders, by its id; `None` before one is chosen.
+    pub engine: Option<EngineId>,
     /// Its own settings ([`RenderSetup::settings`]) and the engine's, by
     /// their descriptors' names; one missing takes its descriptor's
     /// default.

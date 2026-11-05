@@ -1,41 +1,8 @@
 //! Prim ids: a slot and a generation, so an id that was removed never names
-//! the prim that later reuses its slot; and engine ids.
+//! the prim that later reuses its slot. Engine ids are declared ids
+//! ([`EngineId`](kinogaki_value::EngineId)).
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::Arc;
-
-/// A render engine's id (`kinogaki.pixel.engine`), what files and render
-/// settings name it by: `<vendor>.<package>.<name>`, as every declared id
-/// is, under the vendor of the package describing it. The registry checks
-/// both when it admits that package, so an engine a host lists always has
-/// a well-formed id of its own vendor; text read from a file is only
-/// compared with those.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct EngineId(Arc<str>);
-
-impl EngineId {
-    /// The engine id `text`.
-    pub fn new(text: &str) -> EngineId {
-        EngineId(Arc::from(text))
-    }
-
-    /// Its text (`kinogaki.pixel.engine`).
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Debug for EngineId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", &*self.0)
-    }
-}
-
-impl fmt::Display for EngineId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
 
 /// One prim of a scene: its slot and the generation of that slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

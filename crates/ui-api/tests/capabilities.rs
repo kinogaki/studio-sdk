@@ -2,7 +2,7 @@
 //! restarting a gesture, render views, Console records, the clipboard,
 //! latest-wins jobs, the inspector's row hooks, the vocabulary's node
 //! edit, a held node's base and result, and a library's viewport chrome.
-use kinogaki_studio_api::Severity;
+use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire};
 use kinogaki_studio_api::{
     ContextId, CookCx, Data, DataTypeId, Description, Error, HeldEdit, NodeRef, NodeType,
@@ -85,20 +85,20 @@ fn views_render_consoles_record_and_the_clipboard_holds_text() {
     let mut host = host();
     host.rendering.insert(1);
     assert!(host.rendering(1) && !host.rendering(0) && !host.rendering(9));
-    host.console(Severity::Warning, Some("Edit Mesh 1"), "3 open edges");
-    host.console(Severity::Info, None, "done");
+    let (open, done) = (
+        Diagnostic::warning("3 open edges"),
+        Diagnostic::info("done"),
+    );
+    host.report(open.clone(), Some("Edit Mesh 1"));
+    host.report(done.clone(), None);
     assert_eq!(host.paste_text(), None);
     host.copy_text("1, 2, 3");
     assert_eq!(host.paste_text().as_deref(), Some("1, 2, 3"));
     assert_eq!(
         host.take_calls(),
         [
-            HostCall::Console(
-                Severity::Warning,
-                Some("Edit Mesh 1".into()),
-                "3 open edges".into()
-            ),
-            HostCall::Console(Severity::Info, None, "done".into()),
+            HostCall::Report(open, Some("Edit Mesh 1".into())),
+            HostCall::Report(done, None),
             HostCall::CopyText("1, 2, 3".into()),
         ]
     );

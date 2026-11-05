@@ -9,11 +9,13 @@ use crate::aov::{AovDesc, AovSpec, standard as aov};
 use crate::description::{Capabilities, EngineDescription, Motion};
 use crate::dirty::Dirty;
 use crate::engine::{FinalOutputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
-use crate::id::{EngineId, PrimId};
+use crate::id::PrimId;
 use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::{Prim, PrimKind, Topology};
 use crate::settings::SceneSettings;
 use crate::update::SceneUpdate;
+use kinogaki_geometry::Diagnostic;
+use kinogaki_value::EngineId;
 
 /// What a [`RecordingEngine`] was sent.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -81,14 +83,14 @@ impl RecordingEngine {
 }
 
 /// The recording engine's id.
-const ID: &str = "kinogaki.render.recording";
+const ID: EngineId = EngineId::declared("kinogaki.render.recording");
 
 /// The recording engine's description: every structural prim, the
 /// standard types, the beauty, no settings and no vocabulary of its own.
 fn description() -> EngineDescription {
     let mut types = crate::standard::lights();
     types.push(crate::standard::fog());
-    EngineDescription::builder(EngineId::new(ID), "Recording")
+    EngineDescription::builder(ID, "Recording")
         .capabilities(Capabilities {
             prims: PrimKind::STRUCTURAL.to_vec(),
             types,
@@ -164,7 +166,7 @@ impl RenderEngine for RecordingEngine {
         self.focused = Some(view);
     }
 
-    fn problem(&self, _view: ViewId) -> Option<Arc<str>> {
+    fn problem(&self, _view: ViewId) -> Option<Diagnostic> {
         None
     }
 

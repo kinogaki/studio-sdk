@@ -10,8 +10,8 @@
 //!
 //! Each kind of id is its own type ([`DataTypeId`], [`ObjectKindId`],
 //! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`], [`StoredId`],
-//! [`MesherId`], [`VerbId`], [`CreationId`]), so a node type id can't be
-//! passed where a data type is meant. An id is a `Copy` value over `'static` text: one a package
+//! [`MesherId`], [`VerbId`], [`CreationId`], [`EngineId`]), so a node type
+//! id can't be passed where a data type is meant. An id is a `Copy` value over `'static` text: one a package
 //! declares in code is its literal (made in a `const`, with no lock or
 //! allocation), and one parsed from a file is interned in one table (each
 //! distinct text kept once for the program's life: packages are never
@@ -201,6 +201,13 @@ declare_id!(
     /// (`kinogaki.render.spot_light`).
     CreationId,
     "creation"
+);
+
+declare_id!(
+    /// A render engine (`kinogaki.spectre.engine`): what render settings
+    /// and files name it by. Registered by an `EngineDescription`.
+    EngineId,
+    "engine"
 );
 
 /// A package: `<vendor>.<package>` (`kinogaki.mesh`, `acme.trees`).

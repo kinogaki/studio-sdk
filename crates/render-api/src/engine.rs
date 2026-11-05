@@ -14,7 +14,7 @@ use crate::id::Id;
 use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
-use kinogaki_geometry::{Error, ErrorKind};
+use kinogaki_geometry::{Diagnostic, Error, ErrorKind};
 use kinogaki_value::Parameters;
 
 /// Called once per published result (a frame, a final read). An editor's
@@ -73,7 +73,7 @@ pub struct RenderStats {
     /// The last pass's GPU time, in milliseconds.
     pub pass_ms: f32,
     /// Problems to report once (an unsupported node, a missing texture).
-    pub problems: Vec<Arc<str>>,
+    pub problems: Vec<Diagnostic>,
 }
 
 /// The last whole pass of a view: its display image and stats.
@@ -171,10 +171,10 @@ impl<T> Deliver<T> {
         self.resolve(Ok(value));
     }
 
-    /// Resolve the result as failed, saying `why` (a readback failed, the
-    /// device was lost), and wake the host.
-    pub fn fail(self, why: impl std::fmt::Display) {
-        self.resolve(Err(Error::invalid(why)));
+    /// Resolve the result as failed with `error` (a readback that failed is
+    /// invalid, a lost device missing), and wake the host.
+    pub fn fail(self, error: Error) {
+        self.resolve(Err(error));
     }
 
     /// Resolves the result as `outcome` unless it is resolved already, and
@@ -236,7 +236,7 @@ pub trait RenderEngine: Send {
     fn focus(&mut self, view: ViewId);
     /// Why the view can't render, once it failed (it wakes the host once
     /// when it does); its neighbours render on.
-    fn problem(&self, view: ViewId) -> Option<Arc<str>>;
+    fn problem(&self, view: ViewId) -> Option<Diagnostic>;
     /// Read a view's outputs once its samples are done. The result
     /// resolves once: the outputs, or why there are none (a failed read,
     /// or the request dropped with the view or the engine).
@@ -279,13 +279,13 @@ mod tests {
     fn a_failure_resolves_once_saying_why() {
         let (wake, wakes) = counted();
         let (deliver, result) = pending::<u32>(wake);
-        deliver.fail("the device was lost");
+        let failed = Error::missing("the device was lost");
+        deliver.fail(failed.clone());
         assert_eq!(
             wakes.load(Ordering::SeqCst),
             1,
             "failing wakes; the drop after it doesn't"
         );
-        let failed = Error::invalid("the device was lost");
         assert_eq!(result.take(), Some(Err(failed)));
     }
 }

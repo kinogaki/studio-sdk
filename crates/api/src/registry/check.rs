@@ -123,7 +123,7 @@ impl Registry {
             declare("node creation", c.id.as_str(), owner(first))?;
         }
         for e in &package.engines {
-            let first = self.engines.get(e.id()).copied();
+            let first = self.engines.get(&e.id()).copied();
             declare("render engine", declared_id(id, e.id().as_str())?, first)?;
             let own = crate::RenderSetup::settings();
             if let Some(d) = (e.settings().iter()).find(|d| own.iter().any(|o| o.name == d.name)) {
@@ -194,8 +194,8 @@ impl Registry {
     #[cfg(feature = "wgpu")]
     fn check_makers(&self, package: &Package) -> Result<(), Error> {
         for maker in &package.makers {
-            let engine = maker.description().id().clone();
-            if !package.engines.iter().any(|e| *e.id() == engine) {
+            let engine = maker.description().id();
+            if !package.engines.iter().any(|e| e.id() == engine) {
                 return Err(Error::refused(format!(
                     "{package} makes render engine {engine}, which it doesn't describe",
                     package = package.id,

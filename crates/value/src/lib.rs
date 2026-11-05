@@ -28,8 +28,8 @@ pub mod value;
 pub use condition::Condition;
 pub use data::{Data, Typed};
 pub use id::{
-    ContextId, CreationId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
-    SlotId, StoredId,
+    ContextId, CreationId, DataTypeId, EngineId, FormatId, MesherId, NodeTypeId, ObjectKindId,
+    PackageId, SlotId, StoredId,
 };
 pub use kind::{Choice, CurveChannel, Number, Unit, ValueKind};
 pub use ramp::Ramp;

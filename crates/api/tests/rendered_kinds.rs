@@ -19,10 +19,14 @@ impl ObjectBody for Lamp {
     }
 }
 
+/// The engines its setups render with.
+const TOY: EngineId = EngineId::declared("toy.toy.engine");
+const OTHER: EngineId = EngineId::declared("toy.other.engine");
+
 /// A render setup for engine `engine`.
 #[derive(Debug)]
 struct Setup {
-    engine: &'static str,
+    engine: EngineId,
     camera: Option<ObjectRef>,
 }
 impl ObjectBody for Setup {
@@ -83,7 +87,7 @@ impl RenderSetupKind for Setups {
         let mut values = Parameters::new();
         values.insert(RenderSetup::CAMERA.into(), Value::Object(setup.camera));
         Some(RenderSetup {
-            engine: EngineId::new(setup.engine),
+            engine: Some(setup.engine),
             values,
             outputs: Vec::new(),
             processing: Processing::Network { source: None },
@@ -92,9 +96,9 @@ impl RenderSetupKind for Setups {
     }
     fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>> {
         body.downcast_ref::<Setup>()?;
-        let engine = ["toy", "other"]
+        let engine = [TOY, OTHER]
             .into_iter()
-            .find(|e| *e == setup.engine.as_str())?;
+            .find(|&e| Some(e) == setup.engine)?;
         Some(Arc::new(Setup {
             engine,
             camera: setup.camera(),
@@ -171,7 +175,7 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     let two = [declared[0].clone(), declared[0].clone()];
     assert!(rendered.with_declared(&lamp, &two).is_none());
     let setup = Setup {
-        engine: "toy",
+        engine: TOY,
         camera: None,
     };
     assert!(rendered.with_declared(&setup, &declared).is_none());
@@ -187,18 +191,18 @@ fn a_setup_kind_says_which_engine_renders_and_how() {
     };
     let kind: &dyn ObjectKindSpec = &setups;
     let body = Setup {
-        engine: "toy",
+        engine: TOY,
         camera: Some(ObjectRef(7)),
     };
     let setup = kind.render_setup().unwrap().setup(&body).unwrap();
     assert_eq!(
-        (setup.engine.as_str(), setup.camera(), setup.resolution()),
-        ("toy", Some(ObjectRef(7)), [1920, 1080]),
+        (setup.engine, setup.camera(), setup.resolution()),
+        (Some(TOY), Some(ObjectRef(7)), [1920, 1080]),
         "an own setting it doesn't hold takes its default"
     );
     // An edit comes back as a new body.
     let mut edited = RenderSetup {
-        engine: EngineId::new("other"),
+        engine: Some(OTHER),
         ..setup.clone()
     };
     edited
@@ -210,10 +214,10 @@ fn a_setup_kind_says_which_engine_renders_and_how() {
         .with_setup(&body, edited.clone())
         .unwrap();
     let back = kind.render_setup().unwrap().setup(&*body).unwrap();
-    assert_eq!((back.engine.as_str(), back.camera()), ("other", None));
+    assert_eq!((back.engine, back.camera()), (Some(OTHER), None));
     // A setup it can't hold, or another kind's body, is refused.
     let unknown = RenderSetup {
-        engine: EngineId::new("missing"),
+        engine: Some(EngineId::declared("toy.missing.engine")),
         ..edited.clone()
     };
     assert!(
