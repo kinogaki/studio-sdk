@@ -96,6 +96,7 @@
 //! assert!(Arc::ptr_eq(&valence(&a), &valence(&b)));
 //! assert_eq!(builds.load(Ordering::Relaxed), 1);
 //! ```
+mod across;
 mod attributes;
 mod bounds;
 pub mod brep;
@@ -129,6 +130,7 @@ mod vector;
 mod xform;
 
 pub mod nearest;
+pub use across::{Across, across};
 pub use attributes::highest_id;
 pub use attributes::names;
 pub use attributes::{
