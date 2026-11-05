@@ -13,7 +13,7 @@
 //! assert!(options::option(&chosen, "weld", Value::bool).unwrap());
 //! assert!(options::option(&chosen, "scale", Value::number).is_err());
 //! ```
-use crate::params::{Number, Parameter, Schema, ValueKind};
+use crate::params::{Number, NumberLook, Parameter, Schema, ValueKind};
 use crate::{Error, FormatOptions, Value};
 
 /// The smallest and largest import scale [`scale`]'s row accepts.
@@ -38,14 +38,10 @@ pub fn scale(schema: Schema, scale: f64) -> Schema {
         Parameter::new(
             "scale",
             "Scale",
-            ValueKind::Number(
-                Number::plain()
-                    .range(*SCALE.start(), *SCALE.end())
-                    .speed(0.01)
-                    .decimals(6),
-            ),
+            ValueKind::Number(Number::plain().range(*SCALE.start(), *SCALE.end())),
             scale,
         )
+        .look(NumberLook::default().speed(0.01).decimals(6))
         .keywords("size multiply factor"),
     )
 }

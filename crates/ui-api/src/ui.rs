@@ -97,12 +97,15 @@ pub trait Ui {
     /// A labelled toggle switch writing `on`.
     fn toggle(&mut self, on: &mut bool, text: &str) -> Response;
 
-    /// A number field writing `value`, shown, dragged, typed and clamped
-    /// as `number` says (the host formats its unit).
-    fn drag_value(&mut self, value: &mut f64, number: &sheet::Number) -> Response;
-
-    /// A slider writing `value` across `number`'s span.
-    fn slider(&mut self, value: &mut f64, number: &sheet::Number) -> Response;
+    /// A number field writing `value`, clamped to `number`'s limits and
+    /// formatted in its unit, shown and moved as `look` says (a slider
+    /// across its span, a stepper of whole numbers).
+    fn number(
+        &mut self,
+        value: &mut f64,
+        number: &sheet::Number,
+        look: sheet::NumberLook,
+    ) -> Response;
 
     /// A text field writing `text`; [`Response::changed`] while typing,
     /// [`Response::lost_focus`] when the edit ends.

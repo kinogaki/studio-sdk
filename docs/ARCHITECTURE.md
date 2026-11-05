@@ -26,7 +26,7 @@ Every value the SDK describes is a `Value` of a `ValueKind` (`kinogaki-value`, r
 - **Typed structures.** A ramp is a `Ramp` of keys (any number; an engine's capacity is its kind's `most`, and a longer ramp is refused, never cut short), tone curves are `ToneCurve`s, a color is `Value::Color` (linear: the working space as authored, ACEScg as an engine receives it).
 - **Units are owned.** `Unit::Suffix` holds its text (`" EV"`, `" K"`); the host shows lengths in the project's unit.
 - **Files and textures are two things.** An image is authored as its file's path (`ValueKind::File`, a `Value::Text`); an engine receives the Texture prim the host decoded it to, in the declared prim's or material node's `textures`, never the path.
-- **Kinds carry their options** (a choice's entries, an attribute row's names), checked by `ValueKind::check`, which core runs on every value it is handed. How a value is presented (segments or a menu) is the UI layer's.
+- **Kinds carry their options** (a choice's entries, an attribute row's names, a number's unit and limits), checked by `ValueKind::check`, which core runs on every value it is handed. How a value is presented (segments or a menu) is the UI layer's; how a number's row looks and moves (a slider or a stepper, its places and drag speed) is a `NumberLook` beside the kind, on the `Parameter`, the `SettingDescriptor` or the sheet's `Field`, never in it.
 
 ## Environment and packages
 

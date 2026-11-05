@@ -1,7 +1,7 @@
 //! A small plugin panel driven through the headless fakes: layouts that
 //! return values, a sheet keyed by the plugin's own type, menus, overlays
 //! and value fields.
-use studio_ui_api::sheet::{Action, Field, Number, Schema};
+use studio_ui_api::sheet::{Action, Field, Number, NumberLook, Schema};
 use studio_ui_api::{
     Align2, ButtonSpec, Color, Font, Id, KeyFilter, MenuItem, Pos, Rect, Shape, SheetStyle, Stroke,
     TextStyle, Ui, UiExt, ValueFields, pos, vec2,
@@ -100,8 +100,12 @@ fn layouts_return_their_bodies_values_and_widgets_report_clicks() {
     let changed = ui
         .vertical_with(|ui| {
             ui.label("Width", TextStyle::default());
-            ui.drag_value(&mut width, &Number::length().range(0.0..=10.0))
-                .changed
+            ui.number(
+                &mut width,
+                &Number::length().range(0.0, 10.0),
+                NumberLook::default(),
+            )
+            .changed
         })
         .inner;
     assert!(changed);
@@ -115,7 +119,7 @@ fn layouts_return_their_bodies_values_and_widgets_report_clicks() {
             Call::Button("Apply".into()),
             Call::Vertical,
             Call::Label("Width".into()),
-            Call::DragValue(0.0),
+            Call::Number(0.0),
         ]
     );
 }

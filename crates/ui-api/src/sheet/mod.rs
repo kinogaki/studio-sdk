@@ -26,7 +26,6 @@ mod edits;
 mod from_params;
 mod keyed;
 mod kind;
-mod number;
 mod schema;
 pub use kinogaki_studio_api::params::tone_curve;
 
@@ -40,8 +39,9 @@ pub use kind::{
 pub use kinogaki_studio_api::params::code::{
     CodeLanguage, Completion, Completions, PlainText, Token, TokenClass,
 };
-pub use kinogaki_studio_api::params::{Choice, CurveChannel};
-pub use number::{Number, NumberStyle};
+pub use kinogaki_studio_api::params::{
+    Choice, CurveChannel, Number, NumberLook, NumberStyle, Unit,
+};
 pub use schema::{Animation, Field, Item, Schema, Section};
 
 use crate::id::Id;

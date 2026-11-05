@@ -27,10 +27,8 @@ pub enum Call {
     Selectable(String),
     /// [`Ui::toggle`]: its text and the state after the call.
     Toggle(String, bool),
-    /// [`Ui::drag_value`]: the value after the call.
-    DragValue(f64),
-    /// [`Ui::slider`]: the value after the call.
-    Slider(f64),
+    /// [`Ui::number`]: the value after the call.
+    Number(f64),
     /// [`Ui::text_edit`]: the text after the call.
     TextEdit(String),
     /// [`Ui::choice`]: the entries and the index after the call.

@@ -24,7 +24,7 @@ use std::sync::Arc;
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
 use crate::settings::{SettingDescriptor, SettingGroup};
-use kinogaki_value::{Choice, Condition, Number, Unit, Value, ValueKind};
+use kinogaki_value::{Choice, Condition, Number, NumberLook, Unit, Value, ValueKind};
 
 /// The area light's id.
 pub const AREA_LIGHT: &str = "kinogaki.render.area_light";
@@ -110,14 +110,8 @@ pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
     .into_iter()
     .chain(ILLUMINANTS.iter().map(|(n, l)| Choice::new(n, l)))
     .collect();
-    let number = |min, max, unit, speed, decimals| {
-        ValueKind::Number(
-            Number::new(unit)
-                .range(min, max)
-                .speed(speed)
-                .decimals(decimals),
-        )
-    };
+    let number = |min, max, unit| ValueKind::Number(Number::new(unit).range(min, max));
+    let look = |speed, decimals| NumberLook::default().speed(speed).decimals(decimals);
     let emission = |key| Condition::when("emission", choice(key));
     vec![
         SettingDescriptor::new(
@@ -133,9 +127,10 @@ pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
             "colorTemperature",
             "Temperature",
             LIGHT_GROUP,
-            number(1000.0, 40_000.0, Unit::Suffix(Arc::from(" K")), 10.0, 0),
+            number(1000.0, 40_000.0, Unit::Suffix(Arc::from(" K"))),
             6500.0,
         )
+        .look(look(10.0, 0))
         .requires(
             emission("temperature"),
             "Used by the Color Temperature emission",
@@ -144,16 +139,18 @@ pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
             "intensity",
             "Intensity",
             LIGHT_GROUP,
-            number(0.0, 1e12, Unit::Plain, 0.05, 2),
+            number(0.0, 1e12, Unit::Plain),
             intensity,
-        ),
+        )
+        .look(look(0.05, 2)),
         SettingDescriptor::new(
             "exposure",
             "Exposure",
             LIGHT_GROUP,
-            number(-100.0, 100.0, Unit::Suffix(Arc::from(" EV")), 0.05, 2),
+            number(-100.0, 100.0, Unit::Suffix(Arc::from(" EV"))),
             0.0,
-        ),
+        )
+        .look(look(0.05, 2)),
     ]
 }
 
@@ -162,21 +159,41 @@ pub fn choice(key: &str) -> Value {
     Value::Choice(Arc::from(key))
 }
 
-/// A length in scene units, `min..=1e12`, dragged 0.01 a pixel.
-fn length(min: f64) -> ValueKind {
-    ValueKind::Number(Number::length().range(min, 1e12).decimals(3).speed(0.01))
+/// Length setting `name` in scene units, `min..=max`, at `default`,
+/// dragged 0.01 a point.
+fn length(
+    name: &str,
+    label: &str,
+    group: &str,
+    (min, max): (f64, f64),
+    default: f64,
+) -> SettingDescriptor {
+    let kind = ValueKind::Number(Number::length().range(min, max));
+    SettingDescriptor::new(name, label, group, kind, default)
+        .look(NumberLook::default().decimals(3).speed(0.01))
 }
 
-/// An angle in degrees, 0 to 180, its drag over `soft`.
-fn angle(soft: (f64, f64)) -> ValueKind {
-    let number = Number::angle().range(0.0, 180.0).soft(soft.0, soft.1);
-    ValueKind::Number(number.decimals(4).speed(0.5))
+/// Angle setting `name` in degrees, 0 to 180, at `default`, its drag over
+/// `soft`.
+fn angle(name: &str, label: &str, soft: (f64, f64), default: f64) -> SettingDescriptor {
+    let kind = ValueKind::Number(Number::angle().range(0.0, 180.0).soft(soft.0, soft.1));
+    SettingDescriptor::new(name, label, LIGHT_GROUP, kind, default)
+        .look(NumberLook::default().decimals(4).speed(0.5))
 }
 
-/// A slider over `min..=max`, its span `soft`, with `decimals`.
-pub fn slider(min: f64, max: f64, soft: (f64, f64), decimals: u8) -> ValueKind {
-    let number = Number::plain().range(min, max).soft(soft.0, soft.1);
-    ValueKind::Number(number.slider().decimals(decimals).speed(0.01))
+/// Slider setting `name` over `min..=max`, its span `soft`, with
+/// `decimals`, at `default`.
+fn slider(
+    name: &str,
+    label: &str,
+    group: &str,
+    (min, max, soft): (f64, f64, (f64, f64)),
+    decimals: u8,
+    default: f64,
+) -> SettingDescriptor {
+    let kind = ValueKind::Number(Number::plain().range(min, max).soft(soft.0, soft.1));
+    SettingDescriptor::new(name, label, group, kind, default)
+        .look(NumberLook::slider().decimals(decimals).speed(0.01))
 }
 
 fn toggle(name: &str, label: &str, group: &str, default: bool) -> SettingDescriptor {
@@ -222,9 +239,7 @@ pub(crate) fn area_light() -> PrimType {
         choice("rectangle"),
     );
     let shaped = |key| Condition::when("shape", choice(key));
-    let size = |name, label, default| {
-        SettingDescriptor::new(name, label, LIGHT_GROUP, length(0.0), default)
-    };
+    let size = |name, label, default| length(name, label, LIGHT_GROUP, (0.0, 1e12), default);
     light_type(
         AREA_LIGHT,
         "Area Light",
@@ -276,13 +291,7 @@ pub(crate) fn distant_light() -> PrimType {
     light_type(
         DISTANT_LIGHT,
         "Distant Light",
-        vec![SettingDescriptor::new(
-            "angle",
-            "Angle",
-            LIGHT_GROUP,
-            angle((0.0, 10.0)),
-            0.53,
-        )],
+        vec![angle("angle", "Angle", (0.0, 10.0), 0.53)],
         50_000.0,
         false,
         Vec::new(),
@@ -298,19 +307,14 @@ pub(crate) fn spot_light() -> PrimType {
         SPOT_LIGHT,
         "Spot Light",
         vec![
-            SettingDescriptor::new("radius", "Radius", LIGHT_GROUP, length(1e-6), 0.1),
-            SettingDescriptor::new(
-                "coneAngle",
-                "Cone Angle",
-                LIGHT_GROUP,
-                angle((0.0, 90.0)),
-                30.0,
-            ),
-            SettingDescriptor::new(
+            length("radius", "Radius", LIGHT_GROUP, (1e-6, 1e12), 0.1),
+            angle("coneAngle", "Cone Angle", (0.0, 90.0), 30.0),
+            slider(
                 "coneSoftness",
                 "Cone Softness",
                 LIGHT_GROUP,
-                slider(0.0, 1.0, (0.0, 1.0), 2),
+                (0.0, 1.0, (0.0, 1.0)),
+                2,
                 0.2,
             ),
         ],
@@ -331,25 +335,24 @@ pub fn lights() -> Vec<PrimType> {
 /// has at most one.
 pub fn fog() -> PrimType {
     const GROUP: &str = "fog";
-    let along = |min| ValueKind::Number(Number::length().range(min, 1e6).decimals(3).speed(0.01));
-    let fog =
-        |name, label, kind, default: f64| SettingDescriptor::new(name, label, GROUP, kind, default);
     PrimType {
         id: Arc::from(FOG),
         label: Arc::from("Fog"),
         role: Role::Atmosphere,
         groups: vec![SettingGroup::new(GROUP, "Fog", true)],
         params: vec![
-            fog("density", "Density", slider(0.0, 1e6, (0.0, 1.0), 3), 0.1),
+            slider("density", "Density", GROUP, (0.0, 1e6, (0.0, 1.0)), 3, 0.1),
             SettingDescriptor::new("color", "Color", GROUP, ValueKind::Color, [0.3, 0.34, 0.42]),
-            fog("start", "Start", along(0.0), 0.0),
-            fog("height", "Height", along(-1e6), 0.0),
-            fog("falloff", "Falloff", slider(0.0, 1e6, (0.0, 4.0), 3), 0.5),
+            length("start", "Start", GROUP, (0.0, 1e6), 0.0),
+            length("height", "Height", GROUP, (-1e6, 1e6), 0.0),
+            slider("falloff", "Falloff", GROUP, (0.0, 1e6, (0.0, 4.0)), 3, 0.5),
             toggle("inscatter", "In-scatter", GROUP, false),
-            fog(
+            slider(
                 "anisotropy",
                 "Anisotropy",
-                slider(-0.9, 0.9, (-0.9, 0.9), 3),
+                GROUP,
+                (-0.9, 0.9, (-0.9, 0.9)),
+                3,
                 0.3,
             )
             .requires(

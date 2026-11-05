@@ -10,9 +10,10 @@ use kinogaki_studio_api::params::{Choice, CurveChannel};
 /// that holds none (a button) has no value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
-    /// `Value::Number`: a length, angle, percentage, plain number or
-    /// slider; a stepper ([`NumberStyle::Stepper`](super::NumberStyle::Stepper))
-    /// edits a whole number, and its edits are `Value::Integer`.
+    /// `Value::Number`: a length, angle, percentage or plain number, shown
+    /// as the field's [`NumberLook`](super::NumberLook) says; a stepper
+    /// ([`NumberStyle::Stepper`](super::NumberStyle::Stepper)) edits a
+    /// whole number, and its edits are `Value::Integer`.
     Number(Number),
     /// `Value::Numbers` (2–4) lettered X, Y, Z, W; `lock` shows the uniform
     /// lock in that state (its click is [`Action::Lock`](super::Action::Lock)).

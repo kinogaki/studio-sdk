@@ -6,7 +6,7 @@ use studio_ui_api::Color;
 use studio_ui_api::Id;
 use studio_ui_api::Painter;
 use studio_ui_api::Theme;
-use studio_ui_api::sheet::{Edits, FieldKey, Number, Schema, SheetStyle};
+use studio_ui_api::sheet::{Edits, FieldKey, Number, NumberLook, NumberStyle, Schema, SheetStyle};
 use studio_ui_api::value_fields::ValueFields;
 use studio_ui_api::{Body, RowMenu, Ui};
 use studio_ui_api::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};
@@ -119,14 +119,12 @@ impl Ui for RecordingUi {
         response
     }
 
-    fn drag_value(&mut self, value: &mut f64, number: &Number) -> Response {
+    fn number(&mut self, value: &mut f64, number: &Number, look: NumberLook) -> Response {
         let size = vec2(
             self.theme.metrics.slider_width,
             self.theme.metrics.interact_size.y,
         );
-        let id = self
-            .id
-            .with(("drag-value", self.shared.borrow().calls.len()));
+        let id = self.id.with(("number", self.shared.borrow().calls.len()));
         let mut response = self.place(id, size, Sense::CLICK_AND_DRAG);
         if let Some(v) = self
             .shared
@@ -135,31 +133,14 @@ impl Ui for RecordingUi {
             .take()
             .filter(|_| self.enabled)
         {
-            *value = number.clamp(v);
+            let v = number.clamp(v);
+            *value = match look.style {
+                NumberStyle::Stepper => v.round(),
+                NumberStyle::Field | NumberStyle::Slider => v,
+            };
             response.changed = true;
         }
-        self.record(Call::DragValue(*value));
-        response
-    }
-
-    fn slider(&mut self, value: &mut f64, number: &Number) -> Response {
-        let size = vec2(
-            self.theme.metrics.slider_width,
-            self.theme.metrics.interact_size.y,
-        );
-        let id = self.id.with(("slider", self.shared.borrow().calls.len()));
-        let mut response = self.place(id, size, Sense::CLICK_AND_DRAG);
-        if let Some(v) = self
-            .shared
-            .borrow_mut()
-            .number
-            .take()
-            .filter(|_| self.enabled)
-        {
-            *value = number.clamp(v);
-            response.changed = true;
-        }
-        self.record(Call::Slider(*value));
+        self.record(Call::Number(*value));
         response
     }
 

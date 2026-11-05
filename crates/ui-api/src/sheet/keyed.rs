@@ -78,7 +78,7 @@ mod tests {
         let mut s = Schema::new();
         s.section("main", "Main", true);
         for &name in names {
-            s.push(Field::number(name, name, 1.0, Number::new()));
+            s.push(Field::number(name, name, 1.0, Number::plain()));
         }
         s
     }

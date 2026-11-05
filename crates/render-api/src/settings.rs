@@ -12,7 +12,7 @@
 //! it to, in the prim's or node's [`Textures`].
 
 use kinogaki_geometry::{Error, Rate, Units};
-use kinogaki_value::{Condition, Parameters, Value, ValueKind};
+use kinogaki_value::{Condition, NumberLook, Parameters, Value, ValueKind};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -90,6 +90,9 @@ pub struct SettingDescriptor {
     pub label: Arc<str>,
     /// What it holds.
     pub kind: ValueKind,
+    /// How its numbers show and move; the host's defaults for their unit
+    /// unless set.
+    pub look: NumberLook,
     /// Its default, a value its kind takes.
     pub default: Value,
     /// The group it sits in (a [`SettingGroup::name`]).
@@ -126,6 +129,7 @@ impl SettingDescriptor {
             shown_when: None,
             animatable: kind.animatable(),
             kind,
+            look: NumberLook::default(),
             default: default.into(),
         }
     }
@@ -133,6 +137,12 @@ impl SettingDescriptor {
     /// It, animatable or not (see [`animatable`](Self::animatable)).
     pub fn animatable(mut self, on: bool) -> SettingDescriptor {
         self.animatable = on;
+        self
+    }
+
+    /// It, its numbers shown and moved as `look` says.
+    pub fn look(mut self, look: NumberLook) -> SettingDescriptor {
+        self.look = look;
         self
     }
 

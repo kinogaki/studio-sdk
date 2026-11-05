@@ -2,8 +2,8 @@
 //! parameter name: what the host shows for a node's parameters. A field
 //! holds its parameter's value as it is, so an edit is the parameter's new
 //! value.
-use super::{Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
-use kinogaki_studio_api::params::{self, SchemaItem, Unit, ValueKind};
+use super::{Field, FileDialog, Item, Kind, Number, NumberLook, Schema, Section};
+use kinogaki_studio_api::params::{self, SchemaItem, ValueKind};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
 /// each parameter a field keyed by its name, with its help as the tooltip
@@ -42,62 +42,40 @@ impl From<&params::Schema> for Schema<String> {
     }
 }
 
-/// Parameter `p`'s field: its kind's, its help as the tooltip, its keywords
-/// for search.
+/// Parameter `p`'s field: its kind's, its look (a whole number's a
+/// stepper), its help as the tooltip, its keywords for search.
 fn field(p: &params::Parameter) -> Field<String> {
+    let look = match p.kind {
+        ValueKind::Integer { .. } => NumberLook::stepper(),
+        _ => p.look,
+    };
     let mut field = Field::new(
         p.name.clone(),
         p.label.clone(),
         Kind::from(&p.kind),
         Some(p.value.clone()),
-    );
+    )
+    .look(look);
     field.enabled = p.enabled;
     field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
     field.keywords = p.keywords.clone().into();
     field
 }
 
-/// How a parameter number shows: its unit's defaults, its limits and look.
-impl From<&params::Number> for Number {
-    fn from(number: &params::Number) -> Self {
-        let base = match number.unit {
-            Unit::Plain => Number::new(),
-            Unit::Length => Number::length(),
-            Unit::Angle => Number::angle(),
-            Unit::Percent => Number::percent(),
-            Unit::Millimeters | Unit::Suffix(_) => Number::new().unit(number.unit.clone()),
-        };
-        let mut out = base.range(number.min..=number.max);
-        if let Some((min, max)) = number.soft {
-            out = out.soft(min..=max);
-        }
-        if number.slider {
-            out.style = NumberStyle::Slider;
-        }
-        if let Some(places) = number.decimals {
-            out.decimals = places.into();
-        }
-        if let Some(speed) = number.speed {
-            out.speed = speed;
-        }
-        out
-    }
-}
-
 /// The field kind a value kind shows as, with its options: a choice's
 /// entries, an attribute row's names, an integer's menu over its values
-/// from 0.
+/// from 0 (else a number its field's stepper look edits whole).
 impl From<&ValueKind> for Kind {
     fn from(kind: &ValueKind) -> Self {
         match kind {
-            ValueKind::Number(n) => Kind::Number(n.into()),
+            ValueKind::Number(n) => Kind::Number(n.clone()),
             ValueKind::Integer { menu, .. } if !menu.is_empty() => Kind::Dropdown {
                 items: menu.iter().map(|n| n.clone().into()).collect(),
                 available: vec![true; menu.len()],
                 info: None,
             },
             ValueKind::Integer { min, max, .. } => {
-                Kind::Number(Number::integer(*min as f64..=*max as f64))
+                Kind::Number(Number::plain().range(*min as f64, *max as f64))
             }
             ValueKind::Toggle => Kind::Toggle,
             ValueKind::Choice { choices } => Kind::Choice {
@@ -130,7 +108,7 @@ impl From<&ValueKind> for Kind {
             ValueKind::Color => Kind::Color,
             ValueKind::DisplayColor => Kind::DisplayColor,
             ValueKind::Vector { number, .. } => Kind::Vector {
-                number: number.into(),
+                number: number.clone(),
                 lock: None,
             },
             ValueKind::Ramp { color, .. } => Kind::Ramp {
@@ -143,7 +121,7 @@ impl From<&ValueKind> for Kind {
             // Apart until the host says the node keeps them linked (its
             // view, not the value).
             ValueKind::Channels(number) => Kind::Channels {
-                number: number.into(),
+                number: number.clone(),
                 linked: false,
             },
             // Data is never a field (see the schema's sheet): read-only text
@@ -158,6 +136,7 @@ impl From<&ValueKind> for Kind {
 mod tests {
     use super::*;
     use crate::sheet::ramp;
+    use crate::sheet::{NumberStyle, Unit};
     use kinogaki_studio_api::params::Value;
     use kinogaki_studio_api::params::{Choice, Parameter, RefFilter};
 
@@ -225,17 +204,17 @@ mod tests {
             panic!("{:?}", distance.kind)
         };
         assert_eq!(
-            (n.unit.clone(), n.range.clone(), n.soft.clone()),
-            (Unit::Length, 0.0..=10.0, Some(0.0..=2.0))
+            (n.unit.clone(), n.min, n.max, n.soft),
+            (Unit::Length, 0.0, 10.0, Some((0.0, 2.0)))
         );
         let count = sheet.field(&"count".to_owned()).unwrap();
         assert_eq!(count.value, Some(Value::Integer(4)));
-        let Kind::Number(count) = &count.kind else {
+        let Kind::Number(n) = &count.kind else {
             panic!()
         };
         assert_eq!(
-            (count.style, count.range.clone()),
-            (NumberStyle::Stepper, 1.0..=64.0)
+            (count.look.style, n.min, n.max),
+            (NumberStyle::Stepper, 1.0, 64.0)
         );
         let mode = sheet.field(&"mode".to_owned()).unwrap();
         assert!(!mode.enabled && mode.tooltip.is_none());

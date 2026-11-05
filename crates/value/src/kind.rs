@@ -271,7 +271,8 @@ impl ValueKind {
     }
 }
 
-/// How a number shows: its unit, limits and look.
+/// What a number measures and its limits. How its row looks and moves is
+/// a [`NumberLook`](crate::NumberLook) beside it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Number {
     /// What it measures.
@@ -284,12 +285,6 @@ pub struct Number {
     /// The span dragging and the slider cover, when narrower than the
     /// limits; typing may leave it.
     pub soft: Option<(f64, f64)>,
-    /// Shown as a slider filling the soft span (or the limits).
-    pub slider: bool,
-    /// Most decimal places shown; `None` leaves it to the host.
-    pub decimals: Option<u8>,
-    /// How much it changes per point dragged; `None` leaves it to the host.
-    pub speed: Option<f64>,
     /// A length whose default is a real size in millimetres (a
     /// primitive's dimensions): the host gives every new node, and a reset
     /// to the default, that size in the document's unit. Its limits are
@@ -305,9 +300,6 @@ impl Number {
             min: f64::NEG_INFINITY,
             max: f64::INFINITY,
             soft: None,
-            slider: false,
-            decimals: None,
-            speed: None,
             real_size: false,
         }
     }
@@ -339,18 +331,6 @@ impl Number {
         self
     }
 
-    /// Shown as a slider.
-    pub fn slider(mut self) -> Self {
-        self.slider = true;
-        self
-    }
-
-    /// Changing by `speed` per point dragged.
-    pub fn speed(mut self, speed: f64) -> Self {
-        self.speed = Some(speed);
-        self
-    }
-
     /// A length whose default is a real size in millimetres
     /// ([`Number::real_size`](Number#structfield.real_size)).
     pub fn real_size(mut self) -> Self {
@@ -359,10 +339,9 @@ impl Number {
         self
     }
 
-    /// Showing at most `places` decimals.
-    pub fn decimals(mut self, places: u8) -> Self {
-        self.decimals = Some(places);
-        self
+    /// `v` within the limits.
+    pub fn clamp(&self, v: f64) -> f64 {
+        v.clamp(self.min, self.max)
     }
 
     /// Whether every one of `numbers` is finite and within the limits.

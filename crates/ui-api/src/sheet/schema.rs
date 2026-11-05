@@ -1,6 +1,6 @@
 //! [`Schema`]: sections, headings and fields, top to bottom.
 use super::tone_curve::ToneCurve;
-use super::{CurveChannel, FileDialog, Kind, Number, Socket, Text, Trailing};
+use super::{CurveChannel, FileDialog, Kind, Number, NumberLook, Socket, Text, Trailing};
 use kinogaki_studio_api::params::{Choice, Value};
 
 /// What a property sheet shows, top to bottom. `K` is the owner's key for
@@ -69,6 +69,9 @@ pub struct Field<K> {
     pub label: Text,
     /// Its type and presentation.
     pub kind: Kind,
+    /// How its numbers show and move (a number, vector, fields or
+    /// channels kind); the host's defaults for their unit unless set.
+    pub look: NumberLook,
     /// The current value; the host writes edits into it. `None` for a
     /// kind that holds none (a button).
     pub value: Option<Value>,
@@ -105,6 +108,7 @@ impl<K> Field<K> {
             key,
             label: label.into(),
             kind,
+            look: NumberLook::default(),
             value,
             enabled: true,
             read_only: false,
@@ -117,6 +121,12 @@ impl<K> Field<K> {
             animation: Animation::Static,
             keyable: false,
         }
+    }
+
+    /// It, its numbers shown and moved as `look` says.
+    pub fn look(mut self, look: NumberLook) -> Self {
+        self.look = look;
+        self
     }
 
     /// A number field.
@@ -322,6 +332,7 @@ impl<K> Field<K> {
             key: f(self.key),
             label: self.label,
             kind: self.kind,
+            look: self.look,
             value: self.value,
             enabled: self.enabled,
             read_only: self.read_only,

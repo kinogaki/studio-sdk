@@ -1,6 +1,6 @@
 //! [`Schema`]: how parameters are presented, as data. The host turns it
 //! into its inspector's rows; edits come back as new [`Value`]s.
-use super::{Choice, Number, Parameters, Value, ValueKind};
+use super::{Choice, Number, NumberLook, Parameters, Value, ValueKind};
 use crate::Error;
 use crate::data::Data;
 
@@ -130,6 +130,9 @@ pub struct Parameter {
     pub kind: ValueKind,
     /// Its current value (the default, in a description).
     pub value: Value,
+    /// How its numbers show and move, for a number, vector or channels
+    /// kind; the host's defaults for its unit unless set.
+    pub look: NumberLook,
     /// Its tooltip; empty for none.
     pub help: String,
     /// More words a search finds it by ("orientation" for an up axis);
@@ -160,6 +163,7 @@ impl Parameter {
             label: label.into(),
             kind,
             value: value.into(),
+            look: NumberLook::default(),
             help: String::new(),
             keywords: String::new(),
             enabled: true,
@@ -250,7 +254,7 @@ impl Parameter {
     /// default: its kind, label and tooltip, animatable as `d` says.
     pub fn setting(d: &kinogaki_render_api::SettingDescriptor) -> Self {
         let p = Self::new(&*d.name, &*d.label, d.kind.clone(), d.default.clone());
-        let p = p.animatable(d.animatable);
+        let p = p.animatable(d.animatable).look(d.look);
         match &d.tooltip {
             Some(tip) => p.help(&**tip),
             None => p,
@@ -260,6 +264,12 @@ impl Parameter {
     /// Animatable or not (see [`animatable`](Self::animatable)).
     pub fn animatable(mut self, on: bool) -> Self {
         self.animatable = on;
+        self
+    }
+
+    /// Its numbers shown and moved as `look` says.
+    pub fn look(mut self, look: NumberLook) -> Self {
+        self.look = look;
         self
     }
 
