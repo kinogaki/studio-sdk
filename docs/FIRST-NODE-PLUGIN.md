@@ -51,7 +51,7 @@ Replace `src/lib.rs` with the box and its typed handle. `BOX` wraps a `BoxShape`
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::network::Flags;
-use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
+use kinogaki_studio_api::params::{Number, Parameter};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
@@ -247,17 +247,15 @@ impl NodeType for BoxNode {
         NodeTypeId::declared("acme.boxes.box_node")
     }
     fn description(&self) -> Description {
-        let vector = |number: Number| ValueKind::Vector { components: 3, number };
-        let sides = vector(Number::length().range(0.001, f64::INFINITY));
-        let center = vector(Number::length());
+        let sides = Number::length().range(0.001, f64::INFINITY);
         Description::new("Box")
             .context(network())
             .listed("Create", Category::Create, "Primitives", &["cube"])
             .output(Port::new("box", "Box", BOX.id()))
             .parameters(
                 Schema::default()
-                    .parameter(Parameter::new("size", "Size", sides, vec![1.0; 3]))
-                    .parameter(Parameter::new("center", "Center", center, vec![0.0; 3])),
+                    .parameter(Parameter::vector("size", "Size", sides, [1.0; 3]))
+                    .parameter(Parameter::vector("center", "Center", Number::length(), [0.0; 3])),
             )
             .handle(Handle::new(
                 "box",

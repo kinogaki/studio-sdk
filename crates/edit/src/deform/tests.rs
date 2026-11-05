@@ -119,3 +119,23 @@ fn scale_acts_along_the_axes() {
 fn axes_index_coordinates() {
     assert_eq!([Axis::X, Axis::Y, Axis::Z].map(Axis::index), [0, 1, 2]);
 }
+
+#[test]
+fn a_move_gives_back_its_rotation_on_the_shortest_arc() {
+    let half = std::f64::consts::FRAC_PI_8;
+    let quarter_about_z = [0.0, 0.0, half.sin(), half.cos()];
+    let m = Move::new(
+        Vec3::ZERO,
+        quarter_about_z,
+        Vec3::new(1.0, 1.0, 1.0),
+        Vec3::ZERO,
+    );
+    let back = m.unwrap().rotation();
+    for (got, want) in back.iter().zip(quarter_about_z) {
+        assert!((got - want).abs() < 1e-12, "{back:?}");
+    }
+    // −q is the same turn: it comes back as q.
+    let negated = quarter_about_z.map(|c| -c);
+    let m = Move::new(Vec3::ZERO, negated, Vec3::new(1.0, 1.0, 1.0), Vec3::ZERO);
+    assert!((m.unwrap().rotation()[3] - half.cos()).abs() < 1e-12);
+}

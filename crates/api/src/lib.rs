@@ -147,7 +147,7 @@ pub use object::{
     Valued,
 };
 pub use package::{Package, PackageUi};
-pub use params::{Parameters, Schema, Value};
+pub use params::{Parameters, ParametersExt, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, ShapeSource};

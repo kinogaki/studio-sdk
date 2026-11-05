@@ -4,7 +4,7 @@ use crate::components::Components;
 use crate::cook::{Error, Inside, Iteration, Project, Resolved, Written};
 use crate::data::Data;
 use crate::id::ContextId;
-use crate::params::{Parameters, Value};
+use crate::params::{Parameters, ParametersExt, Value};
 use crate::refs::NodeRef;
 use kinogaki_geometry::{Rate, Time};
 use std::any::Any;
@@ -158,43 +158,32 @@ impl<'a> CookCx<'a> {
 
     /// Parameter `name` as a number, or a failure naming it.
     pub fn number(&self, name: &str) -> Result<f64, Error> {
-        self.typed(name, "a number", Value::number)
+        self.parameters.number(name)
     }
 
     /// Parameter `name` as a toggle's state, or a failure naming it.
     pub fn toggle(&self, name: &str) -> Result<bool, Error> {
-        self.typed(name, "a toggle", Value::bool)
+        self.parameters.toggle(name)
     }
 
     /// Parameter `name` as a whole number, or a failure naming it.
     pub fn integer(&self, name: &str) -> Result<i64, Error> {
-        self.typed(name, "a whole number", Value::integer)
+        self.parameters.integer(name)
     }
 
     /// Parameter `name` as a choice's key, or a failure naming it.
     pub fn choice(&self, name: &str) -> Result<&str, Error> {
-        self.typed(name, "a choice", Value::choice)
+        self.parameters.choice(name)
     }
 
     /// Parameter `name` as text, or a failure naming it.
     pub fn text(&self, name: &str) -> Result<&str, Error> {
-        self.typed(name, "text", Value::text)
+        self.parameters.text(name)
     }
 
     /// Data parameter `name`'s value, or a failure naming it.
     pub fn data(&self, name: &str) -> Result<&Data, Error> {
-        self.typed(name, "data", Value::data)
-    }
-
-    fn typed<'v, T>(
-        &'v self,
-        name: &str,
-        what: &str,
-        read: impl Fn(&'v Value) -> Option<T>,
-    ) -> Result<T, Error> {
-        self.parameter(name)
-            .and_then(read)
-            .ok_or_else(|| Error::invalid(format!("parameter {name:?} is not {what}")))
+        self.parameters.data(name)
     }
 
     /// The name of the node behind input `wire` (an index into the inputs),

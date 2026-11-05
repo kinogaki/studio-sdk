@@ -197,6 +197,13 @@ impl Move {
         Some(self)
     }
 
+    /// The rotation as the quaternion `[x, y, z, w]` it was made from
+    /// (normalized, the shortest arc).
+    pub fn rotation(&self) -> [f64; 4] {
+        let (s, c) = (self.angle * 0.5).sin_cos();
+        [self.axis.x * s, self.axis.y * s, self.axis.z * s, c]
+    }
+
     /// The translation at full weight.
     pub fn translate(&self) -> Vec3 {
         self.translate

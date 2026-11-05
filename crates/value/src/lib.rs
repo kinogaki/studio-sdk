@@ -6,6 +6,7 @@
 //! | [`id`] | declared ids (`<vendor>.<package>.<name>`), one type per kind of thing |
 //! | [`data`] | [`Data`]: a type-erased value of a registered data type, and a kernel's [`Typed`] handle |
 //! | [`value`] | [`Value`]: what a parameter, a render setting, a declared prim's value or a material port holds; [`Parameters`], values by name |
+//! | [`reads`] | [`ParametersExt`]: a value of [`Parameters`] read by name as its variant, or an error naming it |
 //! | [`kind`] | [`ValueKind`]: what a value holds, its limits and the options its kind takes ([`Number`], [`Unit`], [`Choice`]) |
 //! | [`condition`] | [`Condition`]: when something applies, as values holding values |
 //! | [`ramp`], [`tone_curve`] | the structured values: [`Ramp`] and [`ToneCurve`] |
@@ -21,6 +22,7 @@ pub mod data;
 pub mod id;
 pub mod kind;
 pub mod ramp;
+pub mod reads;
 pub mod reference;
 pub mod tone_curve;
 pub mod value;
@@ -33,6 +35,7 @@ pub use id::{
 };
 pub use kind::{Choice, CurveChannel, Number, Unit, ValueKind};
 pub use ramp::Ramp;
+pub use reads::ParametersExt;
 pub use reference::{Fits, ObjectRef, RefFilter};
 pub use tone_curve::ToneCurve;
 pub use value::{Parameters, Value};

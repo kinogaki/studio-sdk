@@ -1,6 +1,6 @@
 //! [`Schema`]: how parameters are presented, as data. The host turns it
 //! into its inspector's rows; edits come back as new [`Value`]s.
-use super::{Parameters, Value, ValueKind};
+use super::{Choice, Number, Parameters, Value, ValueKind};
 use crate::Error;
 use crate::data::Data;
 
@@ -165,6 +165,78 @@ impl Parameter {
             enabled: true,
             animatable,
         }
+    }
+
+    /// A number of `number`'s unit and limits, at `default`.
+    pub fn number(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        number: Number,
+        default: f64,
+    ) -> Self {
+        Self::new(name, label, ValueKind::Number(number), default)
+    }
+
+    /// A whole number in `min..=max`, at `default`.
+    pub fn integer(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        min: i64,
+        max: i64,
+        default: i64,
+    ) -> Self {
+        Self::new(name, label, ValueKind::integer(min, max), default)
+    }
+
+    /// Three numbers, each of `number`'s unit and limits, at `default`.
+    pub fn vector(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        number: Number,
+        default: [f64; 3],
+    ) -> Self {
+        let kind = ValueKind::Vector {
+            components: 3,
+            number,
+        };
+        Self::new(name, label, kind, default.to_vec())
+    }
+
+    /// A toggle, at `default`.
+    pub fn toggle(name: impl Into<String>, label: impl Into<String>, default: bool) -> Self {
+        Self::new(name, label, ValueKind::Toggle, default)
+    }
+
+    /// A line of text, at `default`.
+    pub fn text(name: impl Into<String>, label: impl Into<String>, default: &str) -> Self {
+        Self::new(name, label, ValueKind::Text, default)
+    }
+
+    /// One of `choices` (`(key, label)`, in order), at key `default`.
+    pub fn choice(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        choices: &[(&str, &str)],
+        default: &str,
+    ) -> Self {
+        let choices = choices.iter().map(|(key, label)| Choice::new(key, label));
+        let kind = ValueKind::choice(choices.collect());
+        Self::new(name, label, kind, Value::Choice(default.into()))
+    }
+
+    /// Attribute names of the input, one or (`list`) a list, at `default`;
+    /// the node type fills the menu ([`NodeType::schema`](crate::NodeType::schema)).
+    pub fn attribute(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        list: bool,
+        default: &str,
+    ) -> Self {
+        let kind = ValueKind::Attribute {
+            menu: Vec::new(),
+            list,
+        };
+        Self::new(name, label, kind, default)
     }
 
     /// Data parameter `name` labelled `label` holding values of `empty`'s

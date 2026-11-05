@@ -20,7 +20,7 @@ use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::geometry::Column;
 use kinogaki_studio_api::network::Flags;
-use kinogaki_studio_api::params::{Number, Parameter, ValueKind};
+use kinogaki_studio_api::params::{Number, Parameter};
 use kinogaki_studio_api::*;
 use std::sync::{Arc, LazyLock};
 
@@ -238,11 +238,7 @@ impl NodeType for BoxNode {
     /// and one in the middle, and dragging them writes the size and the
     /// center. It is offered in Boxes networks, listed in Tab under Create.
     fn description(&self) -> Description {
-        let vector = |number: Number| ValueKind::Vector {
-            components: 3,
-            number,
-        };
-        let sides = vector(Number::length().range(0.001, f64::INFINITY));
+        let sides = Number::length().range(0.001, f64::INFINITY);
         Description::new("Box")
             .icon("example.boxes/box")
             .context(network())
@@ -250,12 +246,12 @@ impl NodeType for BoxNode {
             .output(Port::new("box", "Box", BOX.id()))
             .parameters(
                 Schema::default()
-                    .parameter(Parameter::new("size", "Size", sides, vec![1.0; 3]))
-                    .parameter(Parameter::new(
+                    .parameter(Parameter::vector("size", "Size", sides, [1.0; 3]))
+                    .parameter(Parameter::vector(
                         "center",
                         "Center",
-                        vector(Number::length()),
-                        vec![0.0; 3],
+                        Number::length(),
+                        [0.0; 3],
                     )),
             )
             .handle(Handle::new(

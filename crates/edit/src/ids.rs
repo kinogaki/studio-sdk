@@ -43,8 +43,9 @@ pub fn numbered(value: &Geometry) -> Result<Geometry, Error> {
     value.with_attributes(attributes)
 }
 
-/// The elements of `domain` in `value` with these ids, in their order;
-/// those gone left out.
+/// The stable id of element `element` of `domain` in `value`: its `id`,
+/// or its number on a value without ids there (what a step written on
+/// such a value names it by).
 ///
 /// ```
 /// use kinogaki_edit::ids;
@@ -52,17 +53,47 @@ pub fn numbered(value: &Geometry) -> Result<Geometry, Error> {
 ///
 /// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
 /// let bare = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
+/// assert_eq!(ids::id_of(&bare, Domain::Point, 2), 2);
+/// ```
+pub fn id_of(value: &Geometry, domain: Domain, element: u32) -> i64 {
+    value
+        .ids(domain)
+        .map_or(i64::from(element), |ids| ids[element as usize])
+}
+
+/// The elements of `domain` in `value` with these ids, in their order;
+/// those gone left out. On a value without ids there, an id is the
+/// element's number ([`id_of`]).
+///
+/// ```
+/// use kinogaki_edit::ids;
+/// use kinogaki_geometry::{Attributes, Domain, Geometry, Primitives};
+///
+/// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+/// let bare = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
+/// assert_eq!(ids::elements(&bare, Domain::Point, &[2, 7, 0]), [2, 0]);
 /// let numbered = ids::numbered(&bare).unwrap();
 /// assert_eq!(ids::elements(&numbered, Domain::Point, &[2, 7, 0]), [2, 0]);
 /// ```
 pub fn elements(value: &Geometry, domain: Domain, ids: &[i64]) -> Vec<u32> {
-    let Some(now) = value.ids(domain) else {
-        return Vec::new();
-    };
-    let at: HashMap<i64, u32> = (now.iter().enumerate())
-        .map(|(i, &id)| (id, i as u32))
-        .collect();
-    ids.iter().filter_map(|id| at.get(id).copied()).collect()
+    let find = element_of(value, domain);
+    ids.iter().filter_map(|&id| find(id)).collect()
+}
+
+/// A lookup of `domain`'s elements in `value` by stable id ([`id_of`]'s
+/// inverse), the table made once: the element with an id, `None` for one
+/// gone.
+pub fn element_of(value: &Geometry, domain: Domain) -> impl Fn(i64) -> Option<u32> + use<> {
+    let count = value.count(domain).unwrap_or(0) as u64;
+    let at: Option<HashMap<i64, u32>> = value.ids(domain).map(|now| {
+        (now.iter().enumerate())
+            .map(|(i, &id)| (id, i as u32))
+            .collect()
+    });
+    move |id| match &at {
+        Some(at) => at.get(&id).copied(),
+        None => u32::try_from(id).ok().filter(|&e| u64::from(e) < count),
+    }
 }
 
 /// `count` ids above every one of `existing`: what new or copied

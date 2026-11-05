@@ -185,7 +185,7 @@ A package owns only what a node is and computes. It implements `NodeType`:
 - `reads(parameters)`: what besides inputs and parameters invalidates a node with those parameters, as data (time, input names, selection). What a node doesn't declare, core withholds from its `CookCx`, so it can't depend on it by accident;
 
 `CookCx` gives a cook:
-- parameters by name (`Parameters` of `params::Value`; typed reads, `CookCx::number`, `integer`, `toggle`, `choice` (its key), `text`, fail with the parameter's name);
+- parameters by name (`Parameters` of `params::Value`; typed reads, `CookCx::number`, `integer`, `toggle`, `choice` (its key), `text`, fail with the parameter's name; they are `ParametersExt`'s, which reads any `Parameters` the same way, an Edit step's or a compiler's);
 - which inputs are on which port (`port`), and input names when declared;
 - the component selection the node acts on and the one input 0 carries;
 - cancellation (`check`) and time; parallel work goes through `geometry::parallel` (`chunks_mut`, `map_blocks`) onto the `Workers` the host installs once per process, which receive each caller's location so the host can size runs per call site, so packages never start threads;
