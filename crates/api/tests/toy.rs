@@ -348,7 +348,7 @@ fn objects_adopt_imported_values_of_their_result_type() {
         .unwrap();
     let value = imported.items[0].data.as_ref().unwrap();
     let engines = kinogaki_render_api::Engines::new(Vec::new());
-    let cx = CreateCx::new(&engines, None);
+    let cx = CreateCx::new(&engines);
     let kind = registry
         .object_kinds()
         .find(|k| k.adopted().contains(&value.ty()))

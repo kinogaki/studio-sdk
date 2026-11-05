@@ -274,7 +274,7 @@ fn the_entry_point_makes_the_package() {
 fn boxes_are_made_empty_or_holding_a_box() {
     let kind = BoxesKind;
     let engines = kinogaki_render_api::Engines::new(Vec::new());
-    let cx = CreateCx::new(&engines, None);
+    let cx = CreateCx::new(&engines);
     let made: Vec<_> = kind
         .creations(&cx)
         .into_iter()

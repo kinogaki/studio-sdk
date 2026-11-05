@@ -1,9 +1,8 @@
-//! Object kinds that take part in a render through their facets, as a
-//! render-domain package's do: a lamp renders as a spot of a type its
-//! engine declares (and as nothing for an engine that declares none), a
-//! render setup names its engine, size, camera and settings, and a kind
-//! without either answers neither.
-use kinogaki_render_api::{EngineDescription, EngineId, RecordingEngine, RenderEngine, standard};
+//! Object kinds that are render prims through their facet, as an engine's
+//! lights are: a lamp renders as a spot of a type its engine declares (and
+//! as nothing for an engine that declares none), and a kind without the
+//! facet answers none.
+use kinogaki_render_api::{EngineDescription, RecordingEngine, RenderEngine, standard};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::*;
 use std::sync::Arc;
@@ -19,23 +18,16 @@ impl ObjectBody for Lamp {
     }
 }
 
-/// The engines its setups render with.
-const TOY: EngineId = EngineId::declared("toy.toy.engine");
-const OTHER: EngineId = EngineId::declared("toy.other.engine");
-
-/// A render setup for engine `engine`.
+/// Another kind's body.
 #[derive(Debug)]
-struct Setup {
-    engine: EngineId,
-    camera: Option<ObjectRef>,
-}
-impl ObjectBody for Setup {
+struct Other;
+impl ObjectBody for Other {
     fn kind(&self) -> ObjectKindId {
-        ObjectKindId::declared("toy.lights.setup")
+        ObjectKindId::declared("toy.lights.other")
     }
 }
 
-/// Bodies of both kinds save nowhere (not what this tests).
+/// Bodies save nowhere (not what this tests).
 struct Unsaved;
 impl ObjectCodec for Unsaved {
     fn write(&self, _: &dyn ObjectBody, _: &mut dyn ElementWriter) -> Result<(), Error> {
@@ -46,11 +38,10 @@ impl ObjectCodec for Unsaved {
     }
 }
 
-/// A kind of `id`, its facets `rendered` and `setup`.
+/// A kind of `id`, its facet `rendered`.
 struct Kind {
     id: &'static str,
     rendered: Option<LampPrims>,
-    setup: Option<Setups>,
 }
 
 struct LampPrims;
@@ -77,32 +68,6 @@ impl RenderedKind for LampPrims {
         };
         let intensity = spot.value("intensity")?.number()?;
         Some(Arc::new(Lamp { intensity }))
-    }
-}
-
-struct Setups;
-impl RenderSetupKind for Setups {
-    fn setup(&self, body: &dyn ObjectBody) -> Option<RenderSetup> {
-        let setup = body.downcast_ref::<Setup>()?;
-        let mut values = Parameters::new();
-        values.insert(RenderSetup::CAMERA.into(), Value::Object(setup.camera));
-        Some(RenderSetup {
-            engine: Some(setup.engine),
-            values,
-            outputs: Vec::new(),
-            processing: Processing::Network { source: None },
-            color: Default::default(),
-        })
-    }
-    fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>> {
-        body.downcast_ref::<Setup>()?;
-        let engine = [TOY, OTHER]
-            .into_iter()
-            .find(|&e| Some(e) == setup.engine)?;
-        Some(Arc::new(Setup {
-            engine,
-            camera: setup.camera(),
-        }))
     }
 }
 
@@ -134,9 +99,6 @@ impl ObjectKindSpec for Kind {
     fn renders(&self) -> Option<&dyn RenderedKind> {
         self.rendered.as_ref().map(|r| r as &dyn RenderedKind)
     }
-    fn render_setup(&self) -> Option<&dyn RenderSetupKind> {
-        self.setup.as_ref().map(|s| s as &dyn RenderSetupKind)
-    }
 }
 
 /// An engine declaring the standard spot, or nothing.
@@ -156,7 +118,6 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     let lamps = Kind {
         id: "toy.lights.lamp",
         rendered: Some(LampPrims),
-        setup: None,
     };
     let kind: &dyn ObjectKindSpec = &lamps;
     let rendered = kind.renders().unwrap();
@@ -174,79 +135,18 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     // Two prims don't fit a lamp; another kind's body is none of its.
     let two = [declared[0].clone(), declared[0].clone()];
     assert!(rendered.with_declared(&lamp, &two).is_none());
-    let setup = Setup {
-        engine: TOY,
-        camera: None,
-    };
-    assert!(rendered.with_declared(&setup, &declared).is_none());
-    assert!(kind.render_setup().is_none() && !kind.at_root());
+    assert!(rendered.with_declared(&Other, &declared).is_none());
+    assert!(!kind.at_root());
 }
 
 #[test]
-fn a_setup_kind_says_which_engine_renders_and_how() {
-    let setups = Kind {
-        id: "toy.lights.setup",
-        rendered: None,
-        setup: Some(Setups),
-    };
-    let kind: &dyn ObjectKindSpec = &setups;
-    let body = Setup {
-        engine: TOY,
-        camera: Some(ObjectRef(7)),
-    };
-    let setup = kind.render_setup().unwrap().setup(&body).unwrap();
-    assert_eq!(
-        (setup.engine, setup.camera(), setup.resolution()),
-        (Some(TOY), Some(ObjectRef(7)), [1920, 1080]),
-        "an own setting it doesn't hold takes its default"
-    );
-    // An edit comes back as a new body.
-    let mut edited = RenderSetup {
-        engine: Some(OTHER),
-        ..setup.clone()
-    };
-    edited
-        .values
-        .insert(RenderSetup::CAMERA.into(), Value::Text(String::new()));
-    let body = kind
-        .render_setup()
-        .unwrap()
-        .with_setup(&body, edited.clone())
-        .unwrap();
-    let back = kind.render_setup().unwrap().setup(&*body).unwrap();
-    assert_eq!((back.engine, back.camera()), (Some(OTHER), None));
-    // A setup it can't hold, or another kind's body, is refused.
-    let unknown = RenderSetup {
-        engine: Some(EngineId::declared("toy.missing.engine")),
-        ..edited.clone()
-    };
-    assert!(
-        kind.render_setup()
-            .unwrap()
-            .with_setup(&*body, unknown)
-            .is_none()
-    );
-    let lamp = Lamp { intensity: 1.0 };
-    assert!(
-        kind.render_setup()
-            .unwrap()
-            .with_setup(&lamp, edited)
-            .is_none()
-    );
-    // Another kind's body is none of its.
-    assert_eq!(kind.render_setup().unwrap().setup(&lamp), None);
-    assert!(kind.renders().is_none());
-}
-
-#[test]
-fn a_kind_without_facets_answers_neither() {
+fn a_kind_without_the_facet_answers_none() {
     let plain = Kind {
         id: "toy.lights.plain",
         rendered: None,
-        setup: None,
     };
     let kind: &dyn ObjectKindSpec = &plain;
-    assert!(kind.renders().is_none() && kind.render_setup().is_none());
+    assert!(kind.renders().is_none());
 }
 
 /// A lamp's codec: its type and intensity; a lamp of a type no installed

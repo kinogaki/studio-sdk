@@ -170,6 +170,12 @@ impl SettingDescriptor {
     }
 }
 
+/// The names of the settings a host's render output holds of its own beside
+/// its engine's: the image's size, the camera, the output file and the motion
+/// samples. An engine names none of its settings so (the registry refuses
+/// one that does).
+pub const OUTPUT_SETTINGS: [&str; 4] = ["resolution", "camera", "output", "motionSamples"];
+
 /// Every descriptor's default.
 pub fn defaults(descriptors: &[SettingDescriptor]) -> Parameters {
     (descriptors.iter())

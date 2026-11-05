@@ -19,10 +19,10 @@ pub enum BackgroundSpace {
 }
 
 /// The project's target display and background: what a Layout page composes for,
-/// and what a render reaches unless its [`RenderColor`](crate::RenderColor) says
-/// otherwise. The element `output` among the project's settings. Core registers
-/// it, and its canvas and final writes read it; a package's project section edits
-/// it. Written files say which display they are for.
+/// and what a render reaches unless its Render Settings name another display.
+/// The element `output` among the project's settings. Core registers it, edits
+/// it in its project section, and its canvas and final writes read it. Written
+/// files say which display they are for.
 ///
 /// ```
 /// use kinogaki_studio_api::Stored;

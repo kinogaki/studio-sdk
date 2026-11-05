@@ -14,12 +14,60 @@
 //! | ToneCurves | [`F64s`](Field::F64s): a curve after another, its interpolation (0 monotone, 1 linear), its key count, then its keys' x, y |
 //!
 //! A value reads back by its declared kind; one no descriptor declares reads
-//! back by its field's type alone, and writes back the same.
-use super::{Field, FieldRef};
-use crate::Error;
+//! back by its field's type alone, and writes back the same. A body holding
+//! values by their descriptors' names (a light's, a render output's engine
+//! settings) saves them as one element's fields ([`write_values`],
+//! [`read_values`]).
+use super::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::params::ramp::{Interpolation, Key, Ramp};
 use crate::params::tone_curve::{self, ToneCurve};
 use crate::params::{Value, ValueKind};
+use crate::{Error, Parameters};
+use kinogaki_render_api::SettingDescriptor;
+use std::collections::btree_map::Entry;
+
+/// `values` as fields of `out`, each under its name.
+///
+/// # Errors
+/// A value no field holds ([`field_of`]).
+pub fn write_values(out: &mut dyn ElementWriter, values: &Parameters) -> Result<(), Error> {
+    values
+        .iter()
+        .try_for_each(|(name, value)| out.set(name, field_of(name, value)?))
+}
+
+/// The values `e`'s fields hold: each of `settings` by its descriptor (of
+/// its kind, within its limits), and every other field as its type says
+/// (another engine's value, kept so a save writes it back).
+///
+/// # Errors
+/// A setting missing, of another kind or out of range, naming it.
+pub fn read_values<'d>(
+    e: &dyn ElementReader,
+    settings: impl IntoIterator<Item = &'d SettingDescriptor>,
+) -> Result<Parameters, Error> {
+    let bad =
+        |name: &str, why: String| Error::invalid(format_args!("{}: {name} {why}", e.location()));
+    let mut values = Parameters::new();
+    for d in settings {
+        let field = e
+            .field(&d.name)
+            .ok_or_else(|| bad(&d.name, "is missing".into()))?;
+        let value = value_of(field, Some(&d.kind)).map_err(|why| bad(&d.name, why))?;
+        if !d.accepts(&value) {
+            return Err(bad(&d.name, "is out of range".into()));
+        }
+        values.insert(d.name.to_string(), value);
+    }
+    for name in e.fields() {
+        if let Entry::Vacant(held) = values.entry(name) {
+            let value =
+                value_of(e.required(held.key())?, None).map_err(|why| bad(held.key(), why))?;
+            held.insert(value);
+        }
+    }
+    Ok(values)
+}
 
 /// `value` as a field (named `name`, for what it says).
 ///
@@ -192,6 +240,54 @@ fn curves_of(mut numbers: &[f64]) -> Option<Vec<ToneCurve>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::element::MemoryElement;
+
+    /// `values` written, read back by `settings`.
+    fn back(values: &Parameters, settings: &[SettingDescriptor]) -> Result<Parameters, Error> {
+        let mut e = MemoryElement::new("values");
+        e.write(|out| write_values(out, values)).unwrap();
+        e.read(|r| read_values(r, settings))
+    }
+
+    fn width() -> SettingDescriptor {
+        let kind = ValueKind::Number(crate::params::Number::plain().range(0.0, 10.0));
+        SettingDescriptor::new("width", "Width", "", kind, 1.0)
+    }
+
+    #[test]
+    fn values_keep_what_no_descriptor_declares_and_save_it_back() {
+        let mut values = Parameters::from([("width".to_owned(), Value::Number(2.0))]);
+        let kept = [
+            ("acmeGlow", Value::Number(2.5)),
+            ("acmeSeed", Value::Integer(4)),
+            ("acmeOn", Value::Bool(true)),
+            ("acmeSide", Value::Text("lit".into())),
+            ("acmeOffset", Value::Numbers(vec![1.0, 2.0])),
+        ];
+        values.extend(kept.map(|(name, v)| (name.to_owned(), v)));
+        assert_eq!(back(&values, &[width()]).unwrap(), values);
+        let ramp = Ramp::default_of(true);
+        let kind = ValueKind::Ramp {
+            color: true,
+            most: None,
+        };
+        let d = SettingDescriptor::new("ramp", "Ramp", "", kind, ramp.clone());
+        let values = Parameters::from([("ramp".to_owned(), Value::Ramp(ramp))]);
+        assert_eq!(back(&values, &[d]).unwrap(), values);
+    }
+
+    #[test]
+    fn a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused() {
+        let mut values = Parameters::from([("width".to_owned(), Value::Number(-1.0))]);
+        let why = back(&values, &[width()]).unwrap_err().to_string();
+        assert!(why.contains("width is out of range"), "{why}");
+        values.remove("width");
+        let why = back(&values, &[width()]).unwrap_err().to_string();
+        assert!(why.contains("width is missing"), "{why}");
+        values.insert("width".into(), Value::Text("wide".into()));
+        let why = back(&values, &[width()]).unwrap_err().to_string();
+        assert!(why.contains("width is not a float64"), "{why}");
+    }
 
     #[test]
     fn a_damaged_ramp_or_curve_is_refused() {

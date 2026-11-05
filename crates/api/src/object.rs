@@ -1,9 +1,8 @@
 //! Scene objects a package contributes: [`ObjectKindSpec`] describes a
 //! kind (Mesh, CAD, a CAM setup), [`ObjectBody`] is one object's own state
-//! (a Mesh object's display settings). A kind whose objects take part in a render
-//! themselves says how through its optional facets: [`RenderedKind`] (a
-//! light, fog: prims of types engines declare) and [`RenderSetupKind`]
-//! (Render Settings: which engine renders, and how).
+//! (a Mesh object's display settings). A kind whose objects are render prims
+//! themselves (an engine's lights and fog) says so through its optional
+//! [`RenderedKind`] facet.
 //!
 //! The environment keeps every object's name, place in the hierarchy,
 //! placement and flags, and, for a kind that names a context
@@ -15,17 +14,12 @@
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
-use crate::refs::{NodeRef, ObjectRef};
 use crate::stored::{Stored, StoredValues};
 use crate::{Diagnostic, Error};
-use kinogaki_render_api::{
-    Aov, Declared, EngineDescription, EngineId, Engines, MaterialNetwork, SettingDescriptor,
-    SettingGroup,
-};
-use kinogaki_value::{Number, RefFilter, Unit, Value, ValueKind};
+use kinogaki_render_api::{Declared, Engines, MaterialNetwork};
 use std::any::Any;
 use std::fmt::Debug;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 /// One object's package-owned state. Bodies are immutable and shared: an
 /// edit makes a new body, so undo keeps the old one.
@@ -124,11 +118,6 @@ pub trait ObjectKindSpec: Send + Sync {
         None
     }
 
-    /// How its objects set up a render (Render Settings), when they do.
-    fn render_setup(&self) -> Option<&dyn RenderSetupKind> {
-        None
-    }
-
     /// The lines its objects draw as where they are (a light's shape),
     /// when they draw so.
     fn glyphs(&self) -> Option<&dyn crate::facets::Glyphs> {
@@ -147,7 +136,7 @@ pub trait ObjectKindSpec: Send + Sync {
     }
 
     /// The ways an object level makes this kind's objects now (a Light of
-    /// each type the active engine renders; a Pin Board), each listed in
+    /// each type its engine renders; a Pin Board), each listed in
     /// Create, Tab and the A menu by its id. Only what can be made now is
     /// listed (what doesn't apply is hidden); a kind that stays at the root
     /// ([`at_root`](Self::at_root)) is listed only there. None by default:
@@ -160,7 +149,7 @@ pub trait ObjectKindSpec: Send + Sync {
     /// A new body for creation `id` (one of [`creations`](Self::creations)'),
     /// which Studio adds selected, holding its creation's start and opened
     /// as it says, in one undo step; `Err` with why it can't be made now
-    /// (a key or shelf run after the active engine changed).
+    /// (a key or shelf naming a creation that is no longer offered).
     fn create(&self, id: CreationId, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
         let _ = cx;
         Err(Error::invalid(format_args!("{id} isn't made here")))
@@ -332,23 +321,19 @@ pub(crate) fn is_path_step(text: &str) -> bool {
         && !text.contains(['/', '*', '?'])
 }
 
-/// What a kind's creations may depend on: the installed render engines,
-/// the active Render Settings' engine, if any, and the user's stored
-/// values.
+/// What a kind's creations may depend on: the installed render engines
+/// and the user's stored values.
 #[derive(Clone, Copy)]
 pub struct CreateCx<'a> {
     engines: &'a Engines,
-    active: Option<&'a EngineDescription>,
     user: Option<&'a StoredValues>,
 }
 
 impl<'a> CreateCx<'a> {
-    /// Creating with `engines` installed, `active` rendering, no user
-    /// values.
-    pub fn new(engines: &'a Engines, active: Option<&'a EngineDescription>) -> Self {
+    /// Creating with `engines` installed, no user values.
+    pub fn new(engines: &'a Engines) -> Self {
         Self {
             engines,
-            active,
             user: None,
         }
     }
@@ -368,10 +353,6 @@ impl<'a> CreateCx<'a> {
     /// The installed engines.
     pub fn engines(&self) -> &'a Engines {
         self.engines
-    }
-    /// The engine the active Render Settings name, if any.
-    pub fn active(&self) -> Option<&'a EngineDescription> {
-        self.active
     }
 }
 
@@ -394,182 +375,4 @@ pub trait RenderedKind: Send + Sync {
         body: &dyn ObjectBody,
         declared: &[Declared],
     ) -> Option<Arc<dyn ObjectBody>>;
-}
-
-/// A kind whose objects set up a render: which engine renders, at what
-/// size, through which camera, with which of the engine's settings and
-/// outputs. The host's Render mode and Render Image read the active one
-/// (the first at the scene's root with its Render flag on), and its
-/// inspector draws the setup by the engine's description and writes an
-/// edit back.
-pub trait RenderSetupKind: Send + Sync {
-    /// The render `body` sets up, when it is one of this kind's.
-    fn setup(&self, body: &dyn ObjectBody) -> Option<RenderSetup>;
-
-    /// `body` setting up `setup` instead (an edit of what
-    /// [`setup`](Self::setup) answered, or a new object's engine and its
-    /// defaults), when it is one of this kind's and `setup` fits it. The
-    /// host checks the values and outputs against the engine's
-    /// description; the kind checks what it can without one.
-    fn with_setup(&self, body: &dyn ObjectBody, setup: RenderSetup) -> Option<Arc<dyn ObjectBody>>;
-}
-
-/// What a render is set up as: what [`RenderSetupKind::setup`] answers.
-#[derive(Clone, Debug, PartialEq)]
-pub struct RenderSetup {
-    /// The engine that renders, by its id; `None` before one is chosen.
-    pub engine: Option<EngineId>,
-    /// Its own settings ([`RenderSetup::settings`]) and the engine's, by
-    /// their descriptors' names; one missing takes its descriptor's
-    /// default.
-    pub values: crate::Parameters,
-    /// The outputs a final render writes beside the beauty, by the
-    /// engine's ids (`Capabilities::aovs`).
-    pub outputs: Vec<Aov>,
-    /// What its render shows: a Comp network's result, or the raw render.
-    pub processing: Processing,
-    /// How what it shows reaches a display.
-    pub color: RenderColor,
-}
-
-/// A render's color management: the display-referred output its result develops
-/// to, on the Canvas, in its final Output and File Outs, and where a Layout places
-/// it. An OpenEXR stays scene-referred whatever this says.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct RenderColor {
-    /// The target display by its name in the color configuration; none: the
-    /// project's ([`DisplayOutput`](crate::standard::DisplayOutput)).
-    pub display: Option<String>,
-    /// The view of that display by name; none, or one it lacks: its first (ACES
-    /// 2.0 in the built-in configuration).
-    pub view: Option<String>,
-}
-
-impl RenderSetup {
-    /// The final image's width and height, pixels.
-    pub const RESOLUTION: &str = "resolution";
-    /// The Camera object a final render looks through (none: the view's
-    /// camera).
-    pub const CAMERA: &str = "camera";
-    /// Where a final render writes its image, relative to the project's
-    /// folder unless absolute.
-    pub const OUTPUT: &str = "output";
-    /// How many placements across the shutter a moving prim sends an
-    /// engine that blurs motion: core samples them. The host offers it
-    /// only while the engine blurs motion and the camera's shutter is open.
-    pub const MOTION_SAMPLES: &str = "motionSamples";
-
-    /// A setup's own settings, every engine's alike, in the Image group
-    /// before the engine's: Resolution, Camera, Output and Motion Samples.
-    /// They are the setup's structure, so none animates.
-    pub fn settings() -> &'static [SettingDescriptor] {
-        static SETTINGS: LazyLock<[SettingDescriptor; 4]> = LazyLock::new(|| {
-            let pixels = Number::new(Unit::Suffix(" px".into()))
-                .range(1.0, 16_384.0)
-                .decimals(0)
-                .speed(1.0);
-            let size = ValueKind::Vector {
-                components: 2,
-                number: pixels,
-            };
-            let cameras = RefFilter::objects([crate::standard::CAMERA_KIND]);
-            let own = |name, label, kind, default: Value| {
-                SettingDescriptor::new(name, label, IMAGE, kind, default).animatable(false)
-            };
-            [
-                own(
-                    RenderSetup::RESOLUTION,
-                    "Resolution",
-                    size,
-                    vec![1920.0, 1080.0].into(),
-                ),
-                own(
-                    RenderSetup::CAMERA,
-                    "Camera",
-                    ValueKind::Object(cameras),
-                    Value::Object(None),
-                ),
-                own(
-                    RenderSetup::OUTPUT,
-                    "Output",
-                    ValueKind::File,
-                    "render.exr".into(),
-                ),
-                own(
-                    RenderSetup::MOTION_SAMPLES,
-                    "Motion Samples",
-                    ValueKind::integer(2, 16),
-                    Value::Integer(3),
-                ),
-            ]
-        });
-        &*SETTINGS
-    }
-
-    /// The group a setup's own settings sit in.
-    pub fn group() -> SettingGroup {
-        SettingGroup::new(IMAGE, "Image", true)
-    }
-
-    /// The final image's width and height, pixels.
-    pub fn resolution(&self) -> [u32; 2] {
-        match self.own(Self::RESOLUTION).numbers() {
-            Some(&[w, h]) => [w, h].map(|side| side.round() as u32),
-            _ => unreachable!("its kind takes two numbers"),
-        }
-    }
-
-    /// The Camera object a final render looks through (none: the view's).
-    pub fn camera(&self) -> Option<ObjectRef> {
-        self.own(Self::CAMERA).object()
-    }
-
-    /// Where a final render writes its image.
-    pub fn output(&self) -> &str {
-        self.own(Self::OUTPUT).text().unwrap_or_default()
-    }
-
-    /// The placements across the shutter a moving prim sends.
-    pub fn motion_samples(&self) -> u32 {
-        match self.own(Self::MOTION_SAMPLES) {
-            &Value::Integer(n) => n as u32,
-            _ => unreachable!("its kind takes an integer"),
-        }
-    }
-
-    /// Own setting `name`'s value: the one held when its kind takes it,
-    /// else its default.
-    fn own(&self, name: &str) -> &Value {
-        let d = (Self::settings().iter()).find(|d| &*d.name == name);
-        let d = d.expect("a setup's own setting");
-        (self.values.get(name))
-            .filter(|v| d.accepts(v))
-            .unwrap_or(&d.default)
-    }
-}
-
-/// The name of the group a setup's own settings sit in.
-const IMAGE: &str = "image";
-
-/// What a render shows: the raw render, or a Comp network's result (the
-/// host resolves the nodes against the network and compiles them).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Processing {
-    /// A Comp network's displayed node; the raw render while it shows
-    /// nothing (empty, or no display flag).
-    Network {
-        /// The Render Settings object holding the network (`None`: the
-        /// object itself).
-        source: Option<ObjectRef>,
-    },
-    /// One node of a Comp network, whatever its display flag.
-    Node {
-        /// As [`Processing::Network`]'s.
-        source: Option<ObjectRef>,
-        /// The node.
-        node: NodeRef,
-    },
-    /// The raw render through the view transform.
-    #[default]
-    Raw,
 }

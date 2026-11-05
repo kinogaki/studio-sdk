@@ -120,7 +120,7 @@ impl Registry {
         // no engine installed; the rest are named by the engines' own
         // types.
         let engines = Engines::new(Vec::new());
-        let cx = CreateCx::new(&engines, None);
+        let cx = CreateCx::new(&engines);
         let made = |k: &dyn ObjectKindSpec| k.creations(&cx).into_iter().map(|c| c.id);
         for text in package.object_kinds.iter().flat_map(|k| made(&**k)) {
             let first = (self.object_kinds.values())
@@ -135,10 +135,10 @@ impl Registry {
         for e in &package.engines {
             let first = self.engines.get(&e.id()).copied();
             declare("render engine", declared_id(id, e.id().as_str())?, first)?;
-            let own = crate::RenderSetup::settings();
-            if let Some(d) = (e.settings().iter()).find(|d| own.iter().any(|o| o.name == d.name)) {
+            let own = kinogaki_render_api::settings::OUTPUT_SETTINGS;
+            if let Some(d) = (e.settings().iter()).find(|d| own.contains(&&*d.name)) {
                 return Err(Error::refused(format_args!(
-                    "{id}: render engine {} has a setting named {}, as a render setup's own",
+                    "{id}: render engine {} has a setting named {}, as a render output's own",
                     e.id(),
                     d.name
                 )));

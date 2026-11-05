@@ -40,7 +40,7 @@ fn the_package_registers_whole() {
     // Create offers the board, which opens; making one gives a board.
     let kind = registry.object_kind(board()).unwrap();
     let engines = kinogaki_render_api::Engines::new(Vec::new());
-    let cx = CreateCx::new(&engines, None);
+    let cx = CreateCx::new(&engines);
     let creations = kind.creations(&cx);
     assert_eq!(
         (creations[0].id.as_str(), creations[0].opens),

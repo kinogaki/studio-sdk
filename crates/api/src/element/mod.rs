@@ -32,7 +32,7 @@ mod memory;
 mod values;
 
 pub use memory::MemoryElement;
-pub use values::{field_of, value_of};
+pub use values::{field_of, read_values, value_of, write_values};
 
 use crate::Error;
 use crate::data::Data;

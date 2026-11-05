@@ -26,7 +26,7 @@ impl ObjectCodec for Unsaved {
 }
 
 /// Kind `id`, made as `made` says, and as `engine_made` too while an
-/// engine renders (named by the engine, so not checked).
+/// engine is installed (named by the engine, so not checked).
 struct Kind {
     id: &'static str,
     made: &'static [&'static str],
@@ -59,7 +59,7 @@ impl ObjectKindSpec for Kind {
         &Unsaved
     }
     fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
-        let engine = cx.active().map(|_| self.engine_made);
+        let engine = cx.engines().iter().next().map(|_| self.engine_made);
         (self.made.iter().copied().chain(engine))
             .map(|id| KindCreation::new(CreationId::declared(id), id))
             .collect()
