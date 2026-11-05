@@ -147,7 +147,7 @@ pub struct FakeHost {
     /// no values).
     pub snap: Option<SnapHit>,
     /// The display options' values in each view, by the view's index and
-    /// the option's id ([`ViewCx::displayed`]; a fake host knows no
+    /// the option's id ([`HostView::displayed`]; a fake host knows no
     /// declarations, so every other option is 0).
     pub displayed: BTreeMap<(usize, String), usize>,
     /// The latest-wins jobs not yet run, by kind, with their tokens;
@@ -514,8 +514,8 @@ impl HostNetwork for FakeHost {
 }
 
 impl HostView for FakeHost {
-    fn view_count(&self) -> usize {
-        self.cameras.len().max(1)
+    fn shown_views(&self) -> std::ops::Range<usize> {
+        0..self.cameras.len().max(1)
     }
     fn active_view(&self) -> usize {
         0
@@ -531,6 +531,10 @@ impl HostView for FakeHost {
     }
     fn rendering(&self, view: usize) -> bool {
         self.rendering.contains(&view)
+    }
+    /// Its `displayed` value of `id` in `view`.
+    fn displayed(&self, view: usize, id: &str) -> usize {
+        (self.displayed.get(&(view, id.to_owned()))).map_or(0, |&v| v)
     }
 }
 
@@ -705,11 +709,6 @@ impl ViewCx for FakeHost {
         _on: SnapOn,
     ) -> Option<SnapHit> {
         self.snap
-    }
-    /// Its `displayed` value of `id` for its view.
-    fn displayed(&self, id: &str) -> usize {
-        let view = self.view().index;
-        (self.displayed.get(&(view, id.to_owned()))).map_or(0, |&v| v)
     }
 }
 

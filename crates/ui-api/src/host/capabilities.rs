@@ -246,8 +246,8 @@ fn unstored<T: Stored>() -> ! {
 
 /// The viewport's views and cameras.
 pub trait HostView {
-    /// How many views show (1 or 4).
-    fn view_count(&self) -> usize;
+    /// The views that show, by index: all four, or the active one alone.
+    fn shown_views(&self) -> std::ops::Range<usize>;
     /// The active view's index.
     fn active_view(&self) -> usize;
     /// View `index`'s camera; `None` for no such view.
@@ -262,6 +262,15 @@ pub trait HostView {
     /// viewport's shading): a package keeps render-only work (a preview
     /// copy of a drag) for while one does. `false` for no such view.
     fn rendering(&self, view: usize) -> bool;
+    /// Display option `id`'s value in view `view`: as the user set it
+    /// (that view's, or the context's for a
+    /// [`Context`](crate::package::DisplayScope::Context) option), else its
+    /// declaration's default ([`DisplayOption`](crate::package::DisplayOption)):
+    /// a toggle's 1 or 0, a choice's index. 0 for an option the open
+    /// context doesn't declare, or no such view. Any call reads it: a
+    /// view's (its own, `ViewCx::view().index`), and `settle`, which
+    /// works out before any view draws what the views show.
+    fn displayed(&self, view: usize, id: &str) -> usize;
 }
 
 /// The status bar, the error line and the Console.

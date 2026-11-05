@@ -208,7 +208,7 @@ impl LiveTools<Forest> for TreeView {
 /// them.
 impl Display<Forest> for TreeView {
     fn edited(&self, _s: &Forest, cx: &dyn ViewCx) -> Option<Edited> {
-        (cx.displayed(LEAVES.id) == 1).then(Edited::default)
+        (cx.displayed(cx.view().index, LEAVES.id) == 1).then(Edited::default)
     }
     fn settle(&self, s: &mut Forest, _cx: &mut dyn Cx) {
         s.overlays += 1;

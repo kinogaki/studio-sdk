@@ -215,13 +215,6 @@ pub trait ViewCx: Cx {
     /// and picks are the context's `Levels`. `None`: nothing there, or nothing
     /// shown.
     fn element_at(&mut self, at: Pos, levels: &[ElementKind]) -> Option<Components>;
-    /// Display option `id`'s value in this view: as the user set it (this
-    /// view's, or the context's for a
-    /// [`Context`](crate::package::DisplayScope::Context) option), else its
-    /// declaration's default ([`DisplayOption`](crate::package::DisplayOption)):
-    /// a toggle's 1 or 0, a choice's index. 0 for an option the open
-    /// context doesn't declare.
-    fn displayed(&self, id: &str) -> usize;
 }
 
 /// The value a [`ViewCx::snap`] searches.
