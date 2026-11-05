@@ -27,8 +27,8 @@ pub enum Fits {
     /// Objects and nodes whose result is of one of these data types
     /// (geometry: a Mesh object, a Part, a node in a Mesh network).
     Data(Vec<DataTypeId>),
-    /// Any Material: one of a Material Library's, or one an object
-    /// publishes (a printer's slot).
+    /// Any Material: a Material node, a Material Library's or one in any
+    /// other network.
     Materials,
     /// An object holding a network of this context, or a node of one.
     Networks(ContextId),

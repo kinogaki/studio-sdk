@@ -16,7 +16,7 @@ use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
 use crate::stored::{Stored, StoredValues};
 use crate::{Diagnostic, Error};
-use kinogaki_render_api::{Declared, Engines, MaterialNetwork};
+use kinogaki_render_api::{Declared, Engines};
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -87,23 +87,13 @@ pub trait ObjectKindSpec: Send + Sync {
     /// ([`context`](Self::context) `None`) and has a
     /// [`result`](Self::result): a reference naming the object reads it,
     /// and core reads it again when the body or the path changes (a
-    /// printer's value naming its slots' Materials by path). With it come
+    /// printer's value). With it come
     /// lines for what the value leaves out of the body (an engine's own
     /// parameters on a standard light), which Export reports. `None` by
     /// default: a reference to it names nothing.
     fn value(&self, body: &dyn ObjectBody, path: &str) -> Option<Valued> {
         let _ = (body, path);
         None
-    }
-
-    /// The Materials `body`'s object publishes (a printer's slots), each
-    /// under the object's path by its key (`/X1C/AMS 1 · 2`): read-only,
-    /// listed wherever Materials are picked and resolved like a Material
-    /// Library's. Core asks again whenever the body changes. None by
-    /// default.
-    fn materials(&self, body: &dyn ObjectBody) -> Vec<PublishedMaterial> {
-        let _ = body;
-        Vec::new()
     }
 
     /// Whether its objects live only at the scene's root (Fog, Render
@@ -258,67 +248,6 @@ impl Adoption {
         self.renamed.push((key.into(), below.into()));
         self
     }
-}
-
-/// A Material an object publishes ([`ObjectKindSpec::materials`]).
-#[derive(Clone, Debug, PartialEq)]
-pub struct PublishedMaterial {
-    key: String,
-    /// What pickers call it ("AMS 1 · 2 PLA Basic").
-    pub label: String,
-    /// How it looks: nodes its engine declares, or that another translates.
-    pub network: Arc<MaterialNetwork>,
-    /// Why it can't be used now ("the slot is empty"); a path naming it
-    /// then names nothing, saying why.
-    pub unavailable: Option<String>,
-}
-
-impl PublishedMaterial {
-    /// Material `key` (its path step below the object), called `label`,
-    /// looking as `network`.
-    ///
-    /// # Errors
-    /// When `key` is not an `is_path_step`.
-    pub fn new(
-        key: impl Into<String>,
-        label: impl Into<String>,
-        network: Arc<MaterialNetwork>,
-    ) -> Result<Self, crate::Error> {
-        let key = key.into();
-        if !is_path_step(&key) {
-            return Err(crate::Error::invalid(format_args!(
-                "{key:?} is not a path step"
-            )));
-        }
-        Ok(Self {
-            key,
-            label: label.into(),
-            network,
-            unavailable: None,
-        })
-    }
-
-    /// Its path step below its object.
-    pub fn key(&self) -> &str {
-        &self.key
-    }
-
-    /// Unavailable, saying `why`.
-    pub fn unavailable(mut self, why: impl Into<String>) -> Self {
-        self.unavailable = Some(why.into());
-        self
-    }
-}
-
-/// Whether `text` may name one step of a scene path: not empty, without
-/// `/`, the wildcards `*` and `?`, or space at either end, and neither `.`
-/// nor `..`. Spaces and any other characters are allowed.
-pub(crate) fn is_path_step(text: &str) -> bool {
-    !text.is_empty()
-        && text.trim() == text
-        && text != "."
-        && text != ".."
-        && !text.contains(['/', '*', '?'])
 }
 
 /// What a kind's creations may depend on: the installed render engines

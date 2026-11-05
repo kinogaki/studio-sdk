@@ -143,8 +143,7 @@ pub use id::{
 pub use mesher::{Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
 pub use object::{
-    Adoption, CreateCx, KindCreation, ObjectBody, ObjectKindSpec, PublishedMaterial, RenderedKind,
-    Valued,
+    Adoption, CreateCx, KindCreation, ObjectBody, ObjectKindSpec, RenderedKind, Valued,
 };
 pub use package::{Package, PackageUi};
 pub use params::{Parameters, ParametersExt, Schema, Value};
