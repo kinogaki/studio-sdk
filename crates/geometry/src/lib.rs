@@ -24,8 +24,10 @@
 //! through a constructor or builder that checks its rules (each type lists
 //! them) and refuses with an [`Error`] naming the element at
 //! fault, so code reading a value may rely on them: no invalid value can
-//! exist. Enums are `#[non_exhaustive]`, and each says what a reader does
-//! with a variant it doesn't know.
+//! exist. An enum the SDK grows, whose values a reader meets without naming
+//! them all, is `#[non_exhaustive]` (its reader's wildcard says what it does
+//! with a variant added since); a closed set a match answers whole is
+//! exhaustive. `ARCHITECTURE.md` states the rule.
 //!
 //! **Shared and immutable.** Arrays are [`Column`]s: shared cells that adopt
 //! a `Vec` without copying it. A value is never changed in place: an edit

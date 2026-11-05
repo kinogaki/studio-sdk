@@ -18,6 +18,7 @@ use crate::Error;
 use crate::cancel::CancelToken;
 use crate::cook::Outputs;
 use crate::data::Data;
+use crate::id::PackageId;
 use crate::params::code::CodeLanguage;
 use crate::params::{Parameters, Schema};
 use kinogaki_geometry::{Domain, Elements, Rate, Time};
@@ -85,12 +86,22 @@ pub trait ScriptEngine: Send + Sync + Debug {
 
 /// The process's engine. Packages install once per process and are never
 /// unloaded.
-static ENGINE: RwLock<Option<Arc<dyn ScriptEngine>>> = RwLock::new(None);
+static ENGINE: RwLock<Option<(PackageId, Arc<dyn ScriptEngine>)>> = RwLock::new(None);
 
-/// Offers `engine` to the whole process: the host calls it for the package
-/// that brings one. The latest answers.
-pub fn offer(engine: Arc<dyn ScriptEngine>) {
-    *ENGINE.write().unwrap_or_else(|e| e.into_inner()) = Some(engine);
+/// Offers `package`'s `engine` to the whole process: the
+/// [`Registry`](crate::Registry) does, once it admitted the package, and
+/// nothing else.
+pub(crate) fn offer(package: PackageId, engine: Arc<dyn ScriptEngine>) {
+    *ENGINE.write().unwrap_or_else(|e| e.into_inner()) = Some((package, engine));
+}
+
+/// The package whose engine is offered, when one is.
+pub(crate) fn offered_by() -> Option<PackageId> {
+    ENGINE
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .map(|(package, _)| *package)
 }
 
 /// The process's engine.
@@ -98,6 +109,10 @@ pub fn offer(engine: Arc<dyn ScriptEngine>) {
 /// # Errors
 /// [`Missing`](crate::ErrorKind::Missing) while none is offered.
 pub fn engine() -> Result<Arc<dyn ScriptEngine>, Error> {
-    let engine = ENGINE.read().unwrap_or_else(|e| e.into_inner()).clone();
+    let engine = ENGINE
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .map(|(_, e)| e.clone());
     engine.ok_or_else(|| Error::missing("no script engine is installed"))
 }

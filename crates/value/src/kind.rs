@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 /// What a value holds and the options its kind takes.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum ValueKind {
     /// [`Value::Number`]: a real number with a unit and limits.
     Number(Number),

@@ -108,9 +108,10 @@ fn a_cook_reads_parameters_ports_and_scratch() {
     // Port 0 has two wires, port 1 one.
     let inputs = [numbers(&[1.0, 2.0]), numbers(&[3.0]), numbers(&[100.0])];
     for cooks in 1..=2 {
-        let mut cx = CookCx::new(&parameters, &cancel, &mut scratch)
+        let mut cx = CookCx::builder(&parameters, &cancel, &mut scratch)
             .with_ports(&[2, 1])
-            .with_incoming(&incoming);
+            .with_incoming(&incoming)
+            .build();
         assert_eq!((cx.port(0), cx.port(1), cx.port(2)), (0..2, 2..3, 3..3));
         let out = Scale.cook(&mut cx, &inputs).unwrap();
         assert_eq!(NUMBERS.get(&out.data[0]), Some(&vec![2.0, 4.0, 6.0]));
@@ -118,7 +119,7 @@ fn a_cook_reads_parameters_ports_and_scratch() {
         assert_eq!(*cx.scratch::<usize>(), cooks);
     }
     // Scratch of another type replaces the slot.
-    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
+    let mut cx = CookCx::builder(&parameters, &cancel, &mut scratch).build();
     assert_eq!(cx.scratch::<String>(), "");
 }
 
@@ -127,7 +128,7 @@ fn withheld_and_wrong_parameters_fail_by_name() {
     let parameters = Parameters::from([("factor".to_owned(), Value::Text("x".into()))]);
     let cancel = CancelToken::default();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
+    let mut cx = CookCx::builder(&parameters, &cancel, &mut scratch).build();
     // Without ports each input is its own port; no names, no selection.
     assert_eq!(cx.port(1), 1..2);
     assert!(cx.selection().is_none());
@@ -144,7 +145,7 @@ fn a_cancelled_cook_reports_cancelled() {
     let cancel = CancelToken::default();
     cancel.cancel();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
+    let mut cx = CookCx::builder(&parameters, &cancel, &mut scratch).build();
     assert_eq!(
         Scale.cook(&mut cx, &[numbers(&[1.0])]).unwrap_err(),
         Error::cancelled()
@@ -220,7 +221,7 @@ fn the_registry_holds_cooks_and_held_edits() {
     );
     let held = registry.held_edit(OFFSETS.id()).unwrap();
     let (cancel, mut scratch, none) = (CancelToken::default(), None, Parameters::new());
-    let mut cx = CookCx::new(&none, &cancel, &mut scratch);
+    let mut cx = CookCx::builder(&none, &cancel, &mut scratch).build();
     let short = OFFSETS.wrap(vec![0.5]);
     assert!(!held.reads_input(&short, 1));
     let edited = held

@@ -403,7 +403,7 @@ fn the_node_makes_a_box() {
     parameters.insert("size".into(), vec![2.0, 3.0, 4.0].into());
     let cancel = CancelToken::default();
     let mut scratch = None;
-    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
+    let mut cx = CookCx::builder(&parameters, &cancel, &mut scratch).build();
     let data = BoxNode.cook(&mut cx, &[]).unwrap().data.remove(0);
     let bounds = BoxType.bounds(&data).unwrap();
     assert_eq!(bounds.max, Vec3::new(1.0, 1.5, 2.0));

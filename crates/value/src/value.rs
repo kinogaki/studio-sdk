@@ -11,6 +11,7 @@ use std::sync::Arc;
 /// integers `i64` wherever they are held, authored or sent: an engine
 /// narrows what it keeps on its own side.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Value {
     /// A real number, in stored units (lengths in scene units, angles in
     /// degrees, percentages as shown).

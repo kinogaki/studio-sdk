@@ -22,7 +22,7 @@ mod placement;
 mod sheet;
 
 pub use binding::{Scalar, Vector};
-pub use context::CookCx;
+pub use context::{CookCx, CookCxBuilder};
 pub use description::{
     Arity, Category, Description, Listing, NodeRole, Port, Ports, Reach, Unwired,
 };

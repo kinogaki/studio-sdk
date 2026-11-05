@@ -12,8 +12,7 @@ use std::ops::Range;
 
 /// One cook's context, built by core for each cook of a node.
 ///
-/// Core builds it with [`new`](Self::new) and the `with_*` methods; a node
-/// reads it. What a node didn't declare in its
+/// A host builds it ([`builder`](Self::builder)); a node only reads it. What a node didn't declare in its
 /// [`Reads`](crate::cook::Reads) is withheld: a node that doesn't read
 /// time sees [`Time::ZERO`] at 24 frames a second, one that doesn't read input names sees
 /// none, one that doesn't read the selection sees none.
@@ -41,20 +40,20 @@ pub struct CookCx<'a> {
 }
 
 impl<'a> CookCx<'a> {
-    /// A context with `parameters`, polling `cancel`, lending the node's
-    /// scratch slot `scratch`: one wire on each input port, no names, no
-    /// selection, the default time.
+    /// A context to build, for a host or a test: `parameters`, polling
+    /// `cancel`, lending the node's scratch slot `scratch`; one wire on each
+    /// input port, no names, no selection, the default time.
     ///
     /// Core keeps one scratch slot per node and lends it to one cook of
     /// the node at a time; a cook that runs beside it (the same node at
     /// another time) gets a fresh slot that is dropped afterwards. Core
     /// drops a node's slot with the node.
-    pub fn new(
+    pub fn builder(
         parameters: &'a Parameters,
         cancel: &'a CancelToken,
         scratch: &'a mut Option<Box<dyn Any + Send>>,
-    ) -> Self {
-        Self {
+    ) -> CookCxBuilder<'a> {
+        CookCxBuilder(Self {
             parameters,
             wires: &[],
             names: &[],
@@ -72,15 +71,7 @@ impl<'a> CookCx<'a> {
             iteration: None,
             current: None,
             scratch,
-        }
-    }
-
-    /// With what the node's held network gave
-    /// ([`Reads::inside`](crate::cook::Reads::inside)): core sets it when the
-    /// node reads its inside.
-    pub fn with_inside(mut self, inside: Inside<'a>) -> Self {
-        self.inside = Some(inside);
-        self
+        })
     }
 
     /// What the network the node holds gave, when the node reads its inside
@@ -89,24 +80,10 @@ impl<'a> CookCx<'a> {
         self.inside
     }
 
-    /// In pass `iteration` of a loop
-    /// ([`Reads::iteration`](crate::cook::Reads::iteration)).
-    pub fn with_iteration(mut self, iteration: &'a Iteration) -> Self {
-        self.iteration = Some(iteration);
-        self
-    }
-
     /// Which pass of a loop it cooks in, when it reads that and there is a
     /// loop around it.
     pub fn iteration(&self) -> Option<&'a Iteration> {
         self.iteration
-    }
-
-    /// Working on `current`, a loop's pass's
-    /// ([`Reads::current`](crate::cook::Reads::current)).
-    pub fn with_current(mut self, current: &'a Data) -> Self {
-        self.current = Some(current);
-        self
     }
 
     /// What the pass of a loop it cooks in works on, when it reads that and
@@ -115,73 +92,10 @@ impl<'a> CookCx<'a> {
         self.current
     }
 
-    /// In a network of `context`.
-    pub fn with_context(mut self, context: ContextId) -> Self {
-        self.context = Some(context);
-        self
-    }
-
     /// The context of the node's network; `None` when the host didn't say
     /// (a package's own tests).
     pub fn context(&self) -> Option<ContextId> {
         self.context
-    }
-
-    /// With `wires[p]` wires on input port `p` (a multi-input port may
-    /// have none or many). Without it, each input is its own port.
-    pub fn with_ports(mut self, wires: &'a [usize]) -> Self {
-        self.wires = wires;
-        self
-    }
-
-    /// With the names of the nodes behind the wires, one per input.
-    pub fn with_input_names(mut self, names: &'a [String]) -> Self {
-        self.names = names;
-        self
-    }
-
-    /// With `wanted[k]` saying whether anything reads output `k`. Without
-    /// it every output is wanted.
-    pub fn with_wanted(mut self, wanted: &'a [bool]) -> Self {
-        self.wanted = wanted;
-        self
-    }
-
-    /// With `selection` as the components the node acts on.
-    pub fn with_selection(mut self, selection: &'a Components) -> Self {
-        self.selection = Some(selection);
-        self
-    }
-
-    /// With `incoming` as the selection input 0 carries.
-    pub fn with_incoming(mut self, incoming: &'a Components) -> Self {
-        self.incoming = Some(incoming);
-        self
-    }
-
-    /// At `time`.
-    pub fn with_time(mut self, time: Time) -> Self {
-        self.time = time;
-        self
-    }
-
-    /// In a document showing `rate` frames a second.
-    pub fn with_rate(mut self, rate: Rate) -> Self {
-        self.rate = rate;
-        self
-    }
-
-    /// With what core resolved the node's path parameters to, by parameter
-    /// name ([`Reads::objects`](crate::cook::Reads::objects)).
-    pub fn with_resolved(mut self, resolved: &'a [(String, Resolved)]) -> Self {
-        self.resolved = resolved;
-        self
-    }
-
-    /// In `project` ([`Reads::project`](crate::cook::Reads::project)).
-    pub fn with_project(mut self, project: &'a Project<'a>) -> Self {
-        self.project = Some(project);
-        self
     }
 
     /// What path parameter `name` names (an object's result, a node's),
@@ -222,12 +136,6 @@ impl<'a> CookCx<'a> {
     /// the node reads the project.
     pub fn colors(&self) -> Option<&'a dyn crate::color::ColorService> {
         self.project.map(|p| p.colors)
-    }
-
-    /// Cooking the node the host knows as `node`.
-    pub fn with_node(mut self, node: NodeRef) -> Self {
-        self.node = node;
-        self
     }
 
     /// The host's id for the node cooking: stable while the node exists
@@ -366,6 +274,108 @@ impl<'a> CookCx<'a> {
     }
 }
 
+/// A [`CookCx`] being assembled: what a host (or a test standing in for one)
+/// lends a cook before it runs. A node never builds one.
+pub struct CookCxBuilder<'a>(CookCx<'a>);
+
+impl<'a> CookCxBuilder<'a> {
+    /// With what the node's held network gave
+    /// ([`Reads::inside`](crate::cook::Reads::inside)): core sets it when the
+    /// node reads its inside.
+    pub fn with_inside(mut self, inside: Inside<'a>) -> Self {
+        self.0.inside = Some(inside);
+        self
+    }
+
+    /// In pass `iteration` of a loop
+    /// ([`Reads::iteration`](crate::cook::Reads::iteration)).
+    pub fn with_iteration(mut self, iteration: &'a Iteration) -> Self {
+        self.0.iteration = Some(iteration);
+        self
+    }
+
+    /// Working on `current`, a loop's pass's
+    /// ([`Reads::current`](crate::cook::Reads::current)).
+    pub fn with_current(mut self, current: &'a Data) -> Self {
+        self.0.current = Some(current);
+        self
+    }
+
+    /// In a network of `context`.
+    pub fn with_context(mut self, context: ContextId) -> Self {
+        self.0.context = Some(context);
+        self
+    }
+
+    /// With `wires[p]` wires on input port `p` (a multi-input port may
+    /// have none or many). Without it, each input is its own port.
+    pub fn with_ports(mut self, wires: &'a [usize]) -> Self {
+        self.0.wires = wires;
+        self
+    }
+
+    /// With the names of the nodes behind the wires, one per input.
+    pub fn with_input_names(mut self, names: &'a [String]) -> Self {
+        self.0.names = names;
+        self
+    }
+
+    /// With `wanted[k]` saying whether anything reads output `k`. Without
+    /// it every output is wanted.
+    pub fn with_wanted(mut self, wanted: &'a [bool]) -> Self {
+        self.0.wanted = wanted;
+        self
+    }
+
+    /// With `selection` as the components the node acts on.
+    pub fn with_selection(mut self, selection: &'a Components) -> Self {
+        self.0.selection = Some(selection);
+        self
+    }
+
+    /// With `incoming` as the selection input 0 carries.
+    pub fn with_incoming(mut self, incoming: &'a Components) -> Self {
+        self.0.incoming = Some(incoming);
+        self
+    }
+
+    /// At `time`.
+    pub fn with_time(mut self, time: Time) -> Self {
+        self.0.time = time;
+        self
+    }
+
+    /// In a document showing `rate` frames a second.
+    pub fn with_rate(mut self, rate: Rate) -> Self {
+        self.0.rate = rate;
+        self
+    }
+
+    /// In `project` ([`Reads::project`](crate::cook::Reads::project)).
+    pub fn with_project(mut self, project: &'a Project<'a>) -> Self {
+        self.0.project = Some(project);
+        self
+    }
+
+    /// Cooking the node the host knows as `node`.
+    pub fn with_node(mut self, node: NodeRef) -> Self {
+        self.0.node = node;
+        self
+    }
+
+    /// With what core resolved the node's path parameters to, by parameter
+    /// name ([`Reads::objects`](crate::cook::Reads::objects)).
+    pub fn with_resolved(mut self, resolved: &'a [(String, Resolved)]) -> Self {
+        self.0.resolved = resolved;
+        self
+    }
+
+    /// The context, ready to lend.
+    pub fn build(self) -> CookCx<'a> {
+        self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -387,7 +397,9 @@ mod tests {
         let parameters = Parameters::new();
         let cancel = CancelToken::default();
         let mut scratch = None;
-        let cx = CookCx::new(&parameters, &cancel, &mut scratch).with_resolved(&resolved);
+        let cx = CookCx::builder(&parameters, &cancel, &mut scratch)
+            .with_resolved(&resolved)
+            .build();
         assert_eq!(cx.object("source").and_then(|d| number.get(d)), Some(&2.0));
         assert_eq!(cx.path("material"), Some("/Materials/Red"));
         assert!(cx.object("material").is_none() && cx.path("source").is_none());
@@ -402,10 +414,11 @@ mod tests {
         let parameters = Parameters::new();
         let cancel = CancelToken::default();
         let (mut a, mut b) = (None, None);
-        let plain = CookCx::new(&parameters, &cancel, &mut a);
+        let plain = CookCx::builder(&parameters, &cancel, &mut a).build();
         assert!(plain.inside().is_none());
-        let holder =
-            CookCx::new(&parameters, &cancel, &mut b).with_inside(Inside::Walked(&outputs));
+        let holder = CookCx::builder(&parameters, &cancel, &mut b)
+            .with_inside(Inside::Walked(&outputs))
+            .build();
         match holder.inside() {
             Some(Inside::Walked(o)) => assert_eq!(number.get(&o.data[0]), Some(&3.0)),
             other => panic!("the walked inside, not {other:?}"),

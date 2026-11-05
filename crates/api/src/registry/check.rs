@@ -92,8 +92,18 @@ impl Registry {
                 owner(self.contexts.get(&c.id)),
             )?;
         }
+        let mut verbs = BTreeSet::new();
         for v in &package.verbs {
-            declare("verb", v.id().as_str(), self.verbs.get(&v.id()).copied())?;
+            let offered = crate::kernel::offered_by(v.id()).filter(|&by| by != id);
+            let twice = (!verbs.insert(v.id())).then_some(id);
+            declare("verb", v.id().as_str(), offered.or(twice))?;
+        }
+        if let Some(by) = crate::script::offered_by().filter(|&by| by != id)
+            && package.script_engine.is_some()
+        {
+            return Err(Error::refused(format!(
+                "{id} brings a script engine, which {by} brings"
+            )));
         }
         for m in &package.meshers {
             let first = self.meshers.iter().find(|e| e.item.id() == m.id());
@@ -408,6 +418,13 @@ impl Registry {
                     delta = h.delta(),
                     first = first
                 )));
+            }
+        }
+        for v in &package.verbs {
+            for port in v.inputs().iter().chain(v.outputs()) {
+                for data in port.types() {
+                    known(v.id().as_str(), data)?;
+                }
             }
         }
         for n in &package.node_types {

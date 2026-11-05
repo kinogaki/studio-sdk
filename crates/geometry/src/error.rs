@@ -21,6 +21,7 @@ pub struct Error {
 /// What kind of failure an [`Error`] is: what its caller does differs by
 /// it, while the user reads the diagnostic alone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// The input can't be used: a value breaking a rule, a malformed file,
     /// a stored value of the wrong shape, data of another type, a file the

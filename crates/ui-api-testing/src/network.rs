@@ -235,7 +235,9 @@ impl FakeNetwork {
         }
         let cancel = CancelToken::default();
         let mut scratch = None;
-        let mut cx = CookCx::new(&at.parameters, &cancel, &mut scratch).with_ports(&wires);
+        let mut cx = CookCx::builder(&at.parameters, &cancel, &mut scratch)
+            .with_ports(&wires)
+            .build();
         match (&at.delta, code.held()) {
             (Some(delta), Some(ty)) => {
                 let held = self.types.held.get(&ty).ok_or_else(|| {

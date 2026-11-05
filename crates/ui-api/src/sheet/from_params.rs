@@ -146,9 +146,10 @@ impl From<&ValueKind> for Kind {
                 number: number.into(),
                 linked: false,
             },
-            // Never a field (see the schema's sheet); read-only text if
-            // one is made of it alone.
-            ValueKind::Data(_) => Kind::Info,
+            // Data is never a field (see the schema's sheet): read-only text
+            // if one is made of it alone, as is a kind this sheet has no
+            // field for.
+            _ => Kind::Info,
         }
     }
 }

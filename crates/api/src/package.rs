@@ -52,7 +52,7 @@ pub struct Package {
     pub verbs: Vec<Verb>,
     /// The script engine it brings ([`script`](crate::script)): core's own
     /// package does.
-    pub script_engine: Option<Arc<dyn crate::script::ScriptEngine>>,
+    pub(crate) script_engine: Option<Arc<dyn crate::script::ScriptEngine>>,
     /// What its node types compute.
     pub node_types: Vec<Arc<dyn NodeType>>,
     /// The network contexts it declares, whose networks core keeps in the

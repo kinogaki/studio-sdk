@@ -41,6 +41,7 @@ pub fn field_of(name: &str, value: &Value) -> Result<Field, Error> {
         Value::Ramp(r) => Field::F64s(ramp_numbers(r)),
         Value::ToneCurves(curves) => Field::F64s(curve_numbers(curves)),
         Value::Data(_) => return Err(refused("data saves as a data element, not a field")),
+        _ => return Err(refused("a value of a kind no field holds")),
     })
 }
 
@@ -100,6 +101,7 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
         Some(K::Vector { .. } | K::Channels(_)) => Value::Numbers(numbers()?.to_vec()),
         Some(K::Object(_)) => return Err(wrong("a node's or a tool's value")),
         Some(K::Data(_)) => return Err(wrong("a data element")),
+        Some(_) => return Err(wrong("a kind no field holds")),
         None => match field {
             FieldRef::Float(x) => Value::Number(x),
             FieldRef::F64s(n) => Value::Numbers(n.to_vec()),
