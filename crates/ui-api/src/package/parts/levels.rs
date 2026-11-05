@@ -8,8 +8,8 @@ use kinogaki_studio_api::{Combine, Components, Vec3};
 
 part! {
     /// A context's selection levels (Mesh's Piece, Face, Edge, Point; CAD's
-    /// Body, Face, Edge, CV…). The selection itself is the package's own
-    /// [slot](kinogaki_studio_api::Slot).
+    /// Body, Face, Edge, CV…). The selection itself is the host's
+    /// ([`HostSelection::selected_components`](crate::host::HostSelection::selected_components)).
     pub trait Levels<S> {
         /// Its levels, in order (number keys 1, 2, … choose them). Read once,
         /// when the package registers.

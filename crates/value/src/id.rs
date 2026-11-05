@@ -170,7 +170,7 @@ declare_id!(
     "node type"
 );
 declare_id!(
-    /// A package's session slot (`kinogaki.mesh.selection`). Registered
+    /// A package's session slot (`example.pins.pins`). Registered
     /// by a `SessionSlot`.
     SlotId,
     "session slot"

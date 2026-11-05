@@ -9,7 +9,7 @@
 //!
 //! | Module | What |
 //! |---|---|
-//! | [`select`] | a selection as another domain ([`convert`](select::convert), by [`Coverage`](select::Coverage)), and how a pick grows ([`Mode`](select::Mode): a domain and an [`Expand`](select::Expand)) |
+//! | [`select`] | a selection as another domain ([`convert`](select::convert), by [`Coverage`](select::Coverage)), how a pick grows ([`Mode`](select::Mode): a domain and an [`Expand`](select::Expand)), and what the selection commands find from it (loops, rims, borders, likeness, the [shortest way](select::Ways)) |
 //! | [`deform`] | a move as data ([`Deform`](deform::Deform): a [`Move`](deform::Move), per-point weights and a [`Symmetry`](deform::Symmetry)), the one function a preview and a commit place points with |
 //! | [`editor`] | the one way a stored value changes ([`Editor`](editor::Editor)): adding, removing, welding, splitting and rewiring, attributes, groups and ids following, unchanged columns shared, with a report of what changed ([`Change`](editor::Change)); values [gathered](editor::gather) into one |
 //! | [`ids`] | stable ids: [`fresh`](ids::fresh) ones for new elements |

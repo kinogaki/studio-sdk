@@ -4,7 +4,6 @@
 //! called the way the host calls it (state taken out per call and put
 //! back, callbacks queued, never nested).
 use super::{FakeNetwork, HostCall};
-use kinogaki_studio_api::CancelToken;
 use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::facets::{SnapHit, SnapTargets};
 use kinogaki_studio_api::geometry::Geometry;
@@ -15,6 +14,7 @@ use kinogaki_studio_api::{
     Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, ObjectBody, ObjectKindId,
     Package, RowsFor, SessionSlot, SessionSlots, SlotId, StoredId, Time,
 };
+use kinogaki_studio_api::{CancelToken, Components};
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -49,6 +49,7 @@ pub struct FakeObject {
 #[derive(Clone, Debug)]
 struct Kept {
     slots: SessionSlots,
+    components: Option<(ObjectRef, Vec<Components>)>,
     networks: BTreeMap<ObjectRef, FakeNetwork>,
 }
 
@@ -59,7 +60,13 @@ impl Kept {
         let revisions = |k: &Kept| -> Vec<(ObjectRef, u64)> {
             k.networks.iter().map(|(&o, n)| (o, n.revision())).collect()
         };
-        self.slots == other.slots && revisions(self) == revisions(other)
+        let components = match (&self.components, &other.components) {
+            (Some((a, x)), Some((b, y))) => {
+                a == b && x.len() == y.len() && x.iter().zip(y).all(|(x, y)| x.ptr_eq(y))
+            }
+            (a, b) => a.is_none() && b.is_none(),
+        };
+        self.slots == other.slots && components && revisions(self) == revisions(other)
     }
 }
 
@@ -82,6 +89,8 @@ pub struct FakeHost {
     pub slots: SessionSlots,
     /// The objects selected.
     pub objects: Vec<ObjectRef>,
+    /// The components selected, and on which object.
+    pub components: Option<(ObjectRef, Vec<Components>)>,
     /// The nodes picked, the active one last.
     pub nodes: Vec<NodeRef>,
     /// Where the user is.
@@ -164,6 +173,7 @@ impl FakeHost {
             calls: Vec::new(),
             slots: SessionSlots::new(slots),
             objects: Vec::new(),
+            components: None,
             nodes: Vec::new(),
             place: Place::Objects {
                 context: scene,
@@ -234,6 +244,7 @@ impl FakeHost {
     fn kept(&self) -> Kept {
         Kept {
             slots: self.slots.clone(),
+            components: self.components.clone(),
             networks: self.networks.clone(),
         }
     }
@@ -241,6 +252,7 @@ impl FakeHost {
     /// Puts back what `kept` holds.
     fn restore(&mut self, kept: Kept) {
         self.slots = kept.slots;
+        self.components = kept.components;
         self.networks = kept.networks;
     }
 
@@ -363,6 +375,17 @@ impl HostSelection for FakeHost {
     fn select_objects(&mut self, objects: &[ObjectRef]) {
         self.calls.push(HostCall::SelectObjects(objects.to_vec()));
         self.objects = objects.to_vec();
+    }
+    fn selected_components(&self, object: ObjectRef) -> Vec<Components> {
+        match &self.components {
+            Some((on, sets)) if *on == object => sets.clone(),
+            _ => Vec::new(),
+        }
+    }
+    fn select_components(&mut self, object: ObjectRef, sets: Vec<Components>) {
+        let before = self.kept();
+        self.components = (!sets.is_empty()).then_some((object, sets));
+        self.record("Select", before);
     }
     fn picked_nodes(&self) -> Vec<NodeRef> {
         self.nodes.clone()

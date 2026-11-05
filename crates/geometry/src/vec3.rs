@@ -75,9 +75,15 @@ impl Vec3 {
 
     /// The vector at unit length; `None` when it has no direction or isn't
     /// finite.
-    pub(crate) fn normalized(self) -> Option<Vec3> {
+    pub fn normalized(self) -> Option<Vec3> {
         let length = self.length();
         (length > 0.0 && length.is_finite()).then(|| self * (1.0 / length))
+    }
+
+    /// The point `t` of the way from `self` to `other` (0 is `self`, 1
+    /// `other`).
+    pub fn lerp(self, other: Vec3, t: f64) -> Vec3 {
+        self + (other - self) * t
     }
 
     /// The smaller of each component.
@@ -191,6 +197,7 @@ mod tests {
         assert_eq!(Vec3::ZERO.normalized(), None);
         assert_eq!(a.min(b), Vec3::new(-2.0, 0.5, 3.0));
         assert_eq!(a.max(b), Vec3::new(1.0, 2.0, 4.0));
+        assert_eq!(Vec3::ZERO.lerp(b, 0.5), Vec3::new(-1.0, 0.25, 2.0));
         assert!(!Vec3::new(f64::NAN, 0.0, 0.0).is_finite());
     }
 

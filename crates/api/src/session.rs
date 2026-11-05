@@ -32,7 +32,7 @@ use std::sync::Arc;
 /// after every undo, redo, cancelled gesture and edit, `estimated_bytes`
 /// when it budgets the undo history. None may block.
 pub trait Slot: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
-    /// The slot's id (`kinogaki.mesh.selection`), under its package's
+    /// The slot's id (`example.pins.pins`), under its package's
     /// vendor.
     fn id() -> SlotId;
 

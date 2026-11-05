@@ -16,8 +16,8 @@ use kinogaki_studio_api::id::StoredId;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
-    Bounds, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId, ObjectBody, ObjectKindId,
-    Parameters, SlotId, Time, Vec3,
+    Bounds, Components, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId, ObjectBody,
+    ObjectKindId, Parameters, SlotId, Time, Vec3,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -120,13 +120,22 @@ fn unregistered<T: Slot>() -> ! {
     )
 }
 
-/// What is selected: objects at an object level, nodes in the open
-/// network. Component selections are packages' own slots.
+/// What is selected: objects at an object level, the components of one
+/// object, nodes in the open network.
 pub trait HostSelection {
     /// The objects selected at the object levels.
     fn selected_objects(&self) -> Vec<ObjectRef>;
     /// Selects `objects` (only those), as a click does.
     fn select_objects(&mut self, objects: &[ObjectRef]);
+    /// The components selected on `object`, one set per element kind, as
+    /// the open context's levels picked them, in the representation of the
+    /// value they were picked on (a set picked on another topology is
+    /// still held: the context checks it fits what shows). Empty when
+    /// none are, or the selection is another object's.
+    fn selected_components(&self, object: ObjectRef) -> Vec<Components>;
+    /// Makes `sets` the components selected on `object` (empty: none), as
+    /// one undo step called "Select", or part of the open gesture.
+    fn select_components(&mut self, object: ObjectRef, sets: Vec<Components>);
     /// The nodes picked on the open level.
     fn picked_nodes(&self) -> Vec<NodeRef>;
     /// The active node (the inspected one).
