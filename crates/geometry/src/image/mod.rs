@@ -43,7 +43,7 @@ use crate::attributes::Attributes;
 use crate::column::Column;
 use crate::error::Error;
 use crate::limits::MAX_NAME;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 /// Pixels a side of a [`Tile`] (Krita's size): an edit copies 64 × 64 pixels
 /// at the least.
@@ -223,6 +223,31 @@ pub struct Image {
     attributes: Arc<Attributes>,
 }
 
+/// An [`Image`] held without keeping its pixels or metadata alive: what a
+/// store of images keeps, so an image goes with its last holder and the
+/// store answers with the same tiles while one holds it.
+#[derive(Clone, Debug)]
+pub struct WeakImage {
+    display: Rect,
+    data: Rect,
+    aspect: f64,
+    layers: Weak<[Layer]>,
+    attributes: Weak<Attributes>,
+}
+
+impl WeakImage {
+    /// The image, while something else holds it.
+    pub fn upgrade(&self) -> Option<Image> {
+        Some(Image {
+            display: self.display,
+            data: self.data,
+            aspect: self.aspect,
+            layers: self.layers.upgrade()?,
+            attributes: self.attributes.upgrade()?,
+        })
+    }
+}
+
 /// Tiles across and down a data window of `size`.
 pub fn tiles_of(size: [u32; 2]) -> [u32; 2] {
     size.map(|n| n.div_ceil(TILE))
@@ -265,6 +290,17 @@ impl Image {
     /// Its metadata: Detail attributes.
     pub fn attributes(&self) -> &Attributes {
         &self.attributes
+    }
+
+    /// It held weakly ([`WeakImage`]).
+    pub fn downgrade(&self) -> WeakImage {
+        WeakImage {
+            display: self.display,
+            data: self.data,
+            aspect: self.aspect,
+            layers: Arc::downgrade(&self.layers),
+            attributes: Arc::downgrade(&self.attributes),
+        }
     }
 
     /// This image with `changed` tiles of layer `layer` replaced, by their
