@@ -449,7 +449,7 @@ cargo test
 
 Studio loads plugins built against its **plugin kit**: the build of the SDK the release ships (`deps/`, with `libkinogaki_shared` holding every SDK crate) and its standard library (`sysroot/`). The kit's README names the exact compiler. Each plugin library records the build of `libkinogaki_shared` it was compiled against, and Studio refuses one recording another build before it calls anything in it.
 
-Build the library with `rustc`, from a small root file that links the kit's shared library once (`kinogaki_shared::link!()`, which also writes that record) and includes the plugin's own `src/lib.rs`. Here `$KIT` is the unpacked kit, and the commands are macOS's (Linux: `.so`; Windows: `.dll`):
+A Studio release ships its kit beside the application, as the folder `Kinogaki Studio Plugin Kit`. Build the library with `rustc`, from a small root file that links the kit's shared library once (`kinogaki_shared::link!()`, which also writes that record) and includes the plugin's own `src/lib.rs`. Here `$KIT` is the unpacked kit, and the commands are macOS's (Linux: `.so`; Windows: `.dll`):
 
 ```sh
 cat > target/root.rs <<'EOF'

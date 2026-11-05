@@ -431,10 +431,55 @@ rustc --edition 2024 --crate-type dylib --crate-name pins -C prefer-dynamic \
 
 Install it as a node plugin, `nodes/pins.dylib` with `nodes/pins.prisma` naming `acme.pins` (node walkthrough, step 8). In Studio, a Pin Board opens into the pinning context: 1 and 2 choose Pin and Board, Tab and right-click offer Pin (and Clear once there are pins), each an undo step, and the inspector shows the count.
 
+## 10. Live tools and the editor
+
+The pin board changes its own body. A context over geometry (Studio's Mesh plugin is one) changes the standard `Geometry` its networks cook, and does it in two places that never meet: the UI, which records what the user did as nodes and rows, and a node type's cook, which makes the new value. Neither writes a value in place.
+
+**A live tool** is a context's `LiveTools` part: a tool that stays live after it starts, its card up, its rows adjustable, until Enter keeps it or Escape puts back what it did. Its shape is one gesture:
+
+```rust
+// Starting the tool (a library item ran): one undo step from here on.
+// None while another's gesture is open: the tool then joins that one.
+live.gesture = cx.begin_gesture("Push");
+let mut made = None;
+cx.edit_network(object, "Push", &mut |edit| {
+    made = Some(edit.add_node_in(None, new_node.clone(), Place::Grow(Growth::Modify))?);
+    Ok(())
+})?;
+// Each change of a row while it is live: inside the same gesture.
+cx.edit_network(object, "Push", &mut |edit| edit.set_parameter(node, "distance", Value::Number(d)))?;
+// Enter, or LiveTools::accept: keep it.
+if let Some(gesture) = live.gesture.take() {
+    cx.finish_gesture(gesture)?;
+}
+// Or LiveTools::cancel(Ended::Escape | Ended::Undo): put it back.
+if let Some(gesture) = live.gesture.take() {
+    cx.cancel_gesture(gesture);
+}
+```
+
+- `tools` reads a view's input each frame and says what it `Takes` (core's picks, gizmo, handles and wheel stay off while it does); `key` takes Enter; `cancel` ends it for the reason `Ended` gives; `accept` keeps it when the user goes elsewhere (another context, another node), as Enter does. `live_node` names the node while its card is up, and `Panels` draws that card with `Cx::node_rows`.
+- The host calls none of these from inside a host method, so a tool's state is always the package's to change.
+- Where the context keeps its edits in one node (an Edit node holding a list of steps as its held delta, `HeldEdit`), the tool adds a step to that delta with `NetworkEdit::set_delta` instead of adding a node: the same gesture, the same undo.
+
+**The cook** of the node, or the `HeldEdit::apply` of the step, makes the new value through `kinogaki_edit::editor::Editor` (re-exported as `kinogaki_studio_api::edit::editor`), the one way a stored value changes:
+
+```rust
+use kinogaki_studio_api::edit::editor::Editor;
+
+let mut edit = Editor::new(&input);           // over the input value, shared
+edit.deform(&points, &deform);                // or add_point, add_primitive, weld, split_edge...
+let (pushed, change) = edit.finish()?;        // the new value, and what changed
+```
+
+Unchanged cells stay shared with the input, attributes and groups follow each new element's sources, stable ids are kept or fresh, and `Change` says what moved, was added and went, so the display patches only that. A bad element number is remembered and reported by `finish`, so the tool's loops stay plain. The selection the tool runs on is found again on a later input by its stable ids (`select::reresolve`).
+
+**A drag** of points shows before anything cooks. While it lasts, the context's `Display::edited` hands core an `Edited` whose `moving` is a `Moving`: the points, resolved once when the drag began, and the current `Deform`. Core places them with `Deform::place`, the same function the cook's `Editor::deform` uses, so the preview is the commit. With the host's gizmo (`Transforms`), `transform` gets each `TransformStep` with its `TransformPhase`: `Began` resolves the points, `Moved` updates the `Deform`, `Released` commits it as one edit (a node's rows or a step), `Cancelled` drops it. The drag adds nothing to any cache: the same `Arc`s every frame, one edit at the end.
+
 ## Where to go next
 
 The context parts this plugin leaves out, all in `studio_ui_api::package` with their rules in its rustdoc and [The host interface](ARCHITECTURE.md#the-host-interface):
 
-- the viewport parts, each a capability of its own: `LiveTools` (its tools' input, keys and gestures, what they `Takes` of a view, `cancel` with why they `Ended`, `accept` keeping their work as Enter does), `Panels` (floating panels such as a tool's card showing its node's rows with `Cx::node_rows`), `Transforms` (the host's gizmo over its selection, `GizmoUse`, and the Gear's rows), `Display` (what it adds over the edited surface core draws, `settle` once a frame, overlays through the `Painter`), `Timeline` (its own time) and `NumericBar`; `studio_ui_api_testing::view` is a view to call them about in a test;
+- the viewport parts, each a capability of its own: `LiveTools` (step 10), `Panels` (floating panels such as a tool's card showing its node's rows with `Cx::node_rows`), `Transforms` (the host's gizmo over its selection, `GizmoUse`, and the Gear's rows), `Display` (what it adds over the edited surface core draws, `settle` once a frame, overlays through the `Painter`), `Timeline` (its own time) and `NumericBar`; `studio_ui_api_testing::view` is a view to call them about in a test;
 - `ObjectRows`: rows for the context's objects in the inspector;
 - a `KeyStore`, marking menus and shelves (`MenuDefaults`) in the library, and settings pages over its stored values (`SettingsPage`).

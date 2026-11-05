@@ -2,7 +2,7 @@
 
 A render engine is a package that renders what a host sends it. It depends on `kinogaki-render-api` alone, and sees no kernel, no document and no network: only prims, in batches, with what changed about each.
 
-The worked example is core's testkit: `core/testkit/src/tracer` is a small CPU ray caster written against this page, and `core/scene/tests/tracer.rs` drives it through core's render sync. Everything below that it does is tested there.
+Studio's own engine, Spectre (a spectral path tracer, in Studio's Spectre plugin), is written against this page and nothing else; so will Pixel be, Studio's realtime engine, which is open source. The snippets below are an engine called Ray under the `acme` vendor.
 
 ## What a host knows of an engine
 
@@ -109,4 +109,13 @@ An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a
 
 ## Testing
 
-Copy `core/scene/tests/tracer.rs`: it makes a `Target` over a `RenderGeometry` as Studio does, and checks instances, motion, previews, idle, cancel, and that editing a parameter sends one Material with `PARAMS`. `RecordingEngine` stores what it was sent, for tests of a host.
+An engine is tested with plain cargo against this crate alone, as a host drives it: make prims with their builders, send them as `SceneUpdate`s, open a view and read what comes back. Test at least:
+
+- each prim kind you declare, added, changed by each dirty bit you handle, and removed; an Instancer's prototypes rendering only through it, and an instance edit sending a new `xforms` column alone;
+- motion across the shutter: sampled placements and the `v` primvar;
+- a Material sent with `PARAMS` alone updating constants, and with `NETWORK` translating again; `translate` and `display` for a network of nodes you don't declare;
+- previews, two views sharing one scene, `focus`, `pause`, `drop_view`;
+- one wake per published pass, none while idle; a dropped `Pending` stopping the work (`Deliver::wanted`), and `finish` delivering the AOVs it was asked for;
+- closed-form scenes where your engine allows them (a white furnace returns the light it is lit by).
+
+GPU tests need a device: mark them `#[ignore]` and run them on a machine with one. `RecordingEngine` is the opposite tool: it stores what it was sent, for tests of a host.

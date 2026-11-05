@@ -1,15 +1,17 @@
 # Architecture
 
-The SDK has two crates:
+The SDK's two main crates are what a package is written against:
 - `kinogaki-studio-api` (`crates/api`) is the headless API: everything a package registers and exchanges that has no UI.
 - `kinogaki-studio-ui-api` (`crates/ui-api`, library `studio_ui_api`) is the UI layer: how a plugin's panels, cards, overlays and settings pages ask the host to draw. It is described in [The UI layer](#the-ui-layer) below.
 
-Leaf crates sit below them, so kernels can depend on a contract without depending on the API:
-- `kinogaki-value` (`crates/value`) is the value model: declared ids, `Data`, and the one `Value` and `ValueKind` every node parameter, format option, render setting, declared prim value and material port holds (see [Values](#values)). It depends on nothing.
+Leaf crates sit below them, each a contract another crate can depend on without the whole API:
+- `kinogaki-value` (`crates/value`) is the value model: declared ids, `Data`, and the one `Value` and `ValueKind` every node parameter, format option, render setting, declared prim value and material port holds (see [Values](#values)). It depends on `kinogaki-geometry` alone (for `Diagnostic` and `Domain`).
 - `kinogaki-geometry` (`crates/geometry`) holds the standard geometry values (see [Standard data types](#standard-data-types)).
-- `kinogaki-edit` (`crates/edit`, depending on `kinogaki-geometry` alone) holds the edit contracts core and the kernels share: selection rules and modes, deformations, a drag's moving points (see [Edit contracts](#edit-contracts)). A kernel (polygons, CAD) depends on `kinogaki-geometry` and `kinogaki-edit` only.
+- `kinogaki-edit` (`crates/edit`, depending on `kinogaki-geometry` alone) holds the edit contracts core and the kernels share: the editor every stored value changes through, selection rules and modes, deformations, a drag's moving points (see [Edit contracts](#edit-contracts)). It is re-exported as `kinogaki_studio_api::edit`.
 - `kinogaki-render-api` (`crates/render-api`, depending on `kinogaki-value` and `kinogaki-geometry`) is the render interface between a host and its engines (see [Rendering](#rendering)).
 - `kinogaki-viewport-api` (`crates/viewport-api`) is the viewport packet contract: what a data type hands the viewport to draw (see [The viewport](#the-viewport)).
+
+The test support crates `kinogaki-studio-api-testing` and `kinogaki-studio-ui-api-testing` are dev-dependencies only. A kernel is a package like any other: it depends on `kinogaki-studio-api`, which carries the verbs it offers and re-exports the geometry values and the edit contracts it works through (see [Kernels](#kernels)).
 
 This page explains how their parts fit together and the rules packages follow. The rustdoc on each item is the reference. To write a plugin step by step, start with [Write your first node plugin](FIRST-NODE-PLUGIN.md), then [Write your first context plugin](FIRST-CONTEXT-PLUGIN.md).
 
@@ -24,7 +26,7 @@ Every value the SDK describes is a `Value` of a `ValueKind` (`kinogaki-value`, r
 - **Typed structures.** A ramp is a `Ramp` of keys (any number; an engine's capacity is its kind's `most`, and a longer ramp is refused, never cut short), tone curves are `ToneCurve`s, a color is `Value::Color` (linear: the working space as authored, ACEScg as an engine receives it).
 - **Units are owned.** `Unit::Suffix` holds its text (`" EV"`, `" K"`); the host shows lengths in the project's unit.
 - **Files and textures are two things.** An image is authored as its file's path (`ValueKind::File`, a `Value::Text`); an engine receives the Texture prim the host decoded it to, in the declared prim's or material node's `textures`, never the path.
-- **Kinds carry their options** (a choice's entries and unavailable keys, an attribute row's names, a code row's language), checked by `ValueKind::check`, which core runs on every value it is handed. How a value is presented (segments or a menu) is the UI layer's.
+- **Kinds carry their options** (a choice's entries and unavailable keys, an attribute row's names), checked by `ValueKind::check`, which core runs on every value it is handed. How a value is presented (segments or a menu) is the UI layer's.
 
 ## Environment and packages
 
@@ -32,8 +34,8 @@ Studio is the **environment**. With no packages installed, it is the editor, net
 
 | Kind | Registers here | Example |
 |---|---|---|
-| Kernel | data types (`DataType`), how held edits apply to them (`HeldEdit`) and their session state (`SessionSlot`) | Studio's Mesh plugin's kernel: `kinogaki.mesh.geometry` over its mesh library |
-| Node package | node types (`NodeType`: description and cook), the network contexts they live in (`NetworkContext`) and object kinds (`ObjectKindSpec`); the contexts' UI through the UI layer | Mesh objects, the Mesh nodes and the Mesh context |
+| Kernel | verbs (`Verb`, `Package::with_verb`): functions by id over standard values that other packages run; never data types of its own | Studio's Mesh kernel: booleans, subdivision, remeshing, UVs |
+| Node package | node types (`NodeType`: description and cook), the data types they make (`DataType`), how held edits apply to them (`HeldEdit`), session state (`SessionSlot`), the network contexts they live in (`NetworkContext`) and object kinds (`ObjectKindSpec`); the contexts' UI through the UI layer | Mesh objects, the Mesh nodes and the Mesh context |
 | Format | readers and writers (`FileFormat`) | OBJ, STEP, USD |
 | Render | engines (`Package::engines`, their descriptions, and `Package::makers`, the `wgpu` feature); they consume `RenderPrim`s, never kernel types | Spectre, Pixel |
 
@@ -63,7 +65,10 @@ Each kind of thing has its own id type:
 - `StoredId`
 - `MesherId`
 - `VerbId`
+- `CreationId`
 - `PackageId` (two segments only)
+
+A render engine's id (`EngineId`, render-api's) names it under its package's vendor too.
 
 Every id is interned in one table and is a `Copy` pointer to its text. Packages are never unloaded, so the table never needs to free anything.
 
@@ -118,7 +123,7 @@ The topology's `Index` (edges in canonical order, polygons and polylines per edg
 
 ## Scripts
 
-A code node runs code over a standard value through the host's script engine (`kinogaki_studio_api::script`): `script::engine()?.run(ScriptRun { code, over, on, inputs, parameters, time, rate, cancel })`. `Over` says what it runs once for (each element of a `Domain`, or a count of numbers), and the engine's binding of the value says what code may name on it. The node holds rows: a `ValueKind::Code` row for the text, and it answers `NodeType::spares` and `reads` from `ScriptEngine::facts`, `NodeType::language` from `ScriptEngine::language`. A fault is an `Error` whose `Diagnostic` holds its line, column and lowest failing element; nothing partial is kept. Core's own package brings the engine (`Package::with_script_engine`), and a new standard value gains its binding with it.
+A code node runs code over a standard value through the host's script engine (`kinogaki_studio_api::script`): `script::engine()?.run(ScriptRun { code, over, on, inputs, parameters, time, rate, cancel })`. `Over` says what it runs once for (each element of a `Domain`, or a count of numbers), and the engine's binding of the value says what code may name on it. The node holds rows: a `ValueKind::Code` row for the text (the kind names no language: the node type's `language` does), and it answers `NodeType::spares` and `reads` from `ScriptEngine::facts`, `NodeType::language` from `ScriptEngine::language`. A fault is an `Error` whose `Diagnostic` holds its line, column and lowest failing element; nothing partial is kept. Core's own package brings the engine (`Package::with_script_engine`), and a new standard value gains its binding with it.
 
 A `NodeType::language` serves its node's code field through `params::code::CodeLanguage`: colors, completion, hover and `check`. While `check` finds an error the host keeps the row's text from the node's parameters, so the node goes on cooking the last text that held none.
 
@@ -128,6 +133,7 @@ Core owns the geometric values; kernels bring the operations and the maths; plug
 
 | Module | What |
 |---|---|
+| `editor` | the one way a stored `Geometry` changes: an `Editor` over a base value collects changes (moving, adding and removing points and primitives, welding, splitting, rewiring, `deform` by a `Deform`) and `finish` makes the new value and a `Change` saying what moved, was added or went. Unchanged cells stay shared, attributes follow their sources by their type's `rule`, groups and ids follow, numbers stay put until the finish. `gather` joins several placed values into one by the same rules. A tool's cook, an Edit node's stored step and a kernel's verb all change values through it |
 | `select` | `convert` (the standard rule: whole into Primitive and Object and from Point into Edge, any otherwise) and `convert_by` a `Coverage` (`Any`, `Whole`) turn a selection into another domain over any `Incidence` (polygons and B-rep alike); `resolve` spells it out; `reresolve` finds a selection on a later value of the one it was made on (itself while the numbering holds, by its members' stable ids after a change upstream, `None` without ids). A context's level declares a `Mode`: the domain it selects and how a pick `Expand`s there (`None`, or `Connected`: the pieces it touches, joined through shared points, a non-blank `name` kept together); `expand` grows a selection so. Mesh's Pieces level is `Mode { domain: Primitive, expand: Connected }`, a selection mode, not a domain |
 | `deform` | a move as data: a `Deform` is a `Move` (translation, then rotation and scale about a pivot, along its axes), each moved point's weight (a soft move) and a `Symmetry` (a mirror plane on an `Axis`, its primary `Side`). `Deform::place` puts one point where the move takes it at its weight; `apply` places a run of points. The viewport's drag preview and the kernel's commit place points with the same function, so the preview is the commit |
 | `ids` | stable ids, one rule for every kernel: kept elements keep their `id`, new or copied ones take `fresh` ids above every id the value holds, and `editor::gather`, a Merge's and a realize's one path, keeps the first input's ids and gives later collisions and missing ones fresh ids |
@@ -217,7 +223,7 @@ A context declared `compiled()` (Comp's, shading's) isn't cooked node by node. I
 
 A compiler sees the installed node types through `CompileCx::node_type`. It reads what a type declares (its description, ports and spares) through the trait first. `NodeType` is `Any`, so the compiler may upcast a type to `&dyn Any` and downcast it to its own concrete type, but only for what that type alone knows (a Comp operator's lib-composit type, a shader's engine vocabulary).
 
-Shader node types (an engine's material vocabulary as the nodes of a Material's Shading network) are the render package's, not the SDK's: the SDK carries the engine's vocabulary (`kinogaki_render_api::vocabulary`) and the Shading context's id, and Phase 3's engine-neutral material DAG takes over the rest.
+A Material's Shading network is compiled the same way, by core: its node types are `render::shader::ShaderNode`s, one over each material node (`NodeDef`) an engine declares, and core compiles the network to the `MaterialNetwork` engines receive (render-api's `material` module; see [Materials](FIRST-RENDER-ENGINE.md#materials)).
 
 The package that declares a compiled context registers its compiler (`Package::with_compiler`, exactly one per compiled context: the registry refuses a compiled context without one, and a compiler or runner for any other context). With the `wgpu` feature it also brings the plan's runner (`Package::runners`: a `PlanRunner` (`network::run`, the `wgpu` feature) makes a `Runner` on the host's device, which runs plans on the GPU). A runner that shows display values asks the host's color service for the view's transform as WGSL, so its images go through the same view transform as the viewport's.
 
@@ -278,7 +284,7 @@ A `FileFormat` declares:
 
 It reads a file (`read(path, options, &Reading)`) into `Imported`, a list of `FileItem`s with parents listed before their children; an item with no data is a group, and each is placed relative to its parent and shown or hidden. A `Reading` carries the purpose, the project's `Units` (lengths convert into them), an origin a format may seed names with (a File node's id), project values the host lends by type, a `CancelToken` long reads poll, and for a File node the data type it wants (`wants`: a STEP file read as B-rep or as polygons). For a File node a format reads one item. A format may also provide a `FormatWriter`, which writes items (`write(path, items, &Writing, options)`, returning its warnings: what was written with loss or skipped) with options of its own: defaults by name (`FormatWriter::options`, none by default) and an Export dialog (`FormatWriter::schema`). Export hands a writer its own options, never the format's reading ones. A `Writing` carries the project's `Units`, a `CancelToken` long writes (and their meshing) poll, `meshed` (a value as polygons through the installed mesher, for a writer that writes only those) and, for a writer whose `frames()` says it writes ranges, the range as `Frames` (frames a second, how many, the items at each).
 
-`format::options` holds what formats share about options: reading a typed option (`option`; a choice is held and saved by its key, so a saved setting survives a reordered list), and the rows most import dialogs show (`scale`, `toggle`). A file's materials travel beside its geometry as `standard::preview_materials()` (`kinogaki.core.preview_materials`, which core registers with `PreviewMaterialsCodec`), a list of `ImportedMaterial` (the key its polygons name, a library name, a `PreviewSurface`); File ▸ Import is to turn it into a Material Library (P90b).
+`format::options` holds what formats share about options: reading a typed option (`option`; a choice is held and saved by its key, so a saved setting survives a reordered list), and the rows most import dialogs show (`scale`, `toggle`). A file's materials travel beside its geometry as `standard::preview_materials()` (`kinogaki.core.preview_materials`, which core registers with `PreviewMaterialsCodec`), a list of `ImportedMaterial` (the key its polygons name, a library name, a `PreviewSurface`); File ▸ Import does not yet turn it into a Material Library.
 
 To import, the environment passes each value to the first object kind that `adopts` it, lending it the engines (a Material Library adopts a file's materials as Materials, each empty until the render package fills it). Formats are offered the types kinds declare as `adopted`, not their results: what an object can be made from and what it gives are separate. With no formats installed, nothing can be imported.
 
@@ -370,7 +376,7 @@ From the most declarative to the most direct:
 
 A node's parameter schema (`params::Schema`) becomes a sheet with `From`, keyed by parameter name, so the host shows every node's parameters the same way.
 
-A node type shapes its rows from what its node reads (`NodeType::schema` with a `SchemaCx`: which ports are wired, what each input held at the last cook, what the node itself made then while its stamp holds (`SchemaCx::output`: an Auto choice can name what it came to), the names of the nodes behind each port's wires). It hides rows a wire or a choice makes moot, fills its kinds' options (`ValueKind::Attribute`'s `menu` of the input's attribute names; `ValueKind::Integer`'s `menu`, the names behind the wires, for an integer choosing a wire; `ValueKind::Choice`'s `unavailable` keys; `ValueKind::Code`'s `language`), marks a faulty value with its `problem`, and adds `Button` rows. A button holds no value: pressing it asks `NodeType::pressed`, and core applies the answer as one edit on the inspector's own path, so `NodeType::edited` answers it too. A choice shows as segments while it has three entries or fewer, 18 characters together at most and none unavailable (`sheet::segments`), else as a menu. A held node's delta shows its own rows (`HeldEdit::rows`, over the node's held result), written back through `HeldEdit::apply_rows` and `HeldEdit::pressed`. `SchemaCx::purpose` says where the rows show: the inspector, or a tool's card (`RowsFor::Card { more }`), where a type may show fewer.
+A node type shapes its rows from what its node reads (`NodeType::schema` with a `SchemaCx`: which ports are wired, what each input held at the last cook, what the node itself made then while its stamp holds (`SchemaCx::output`: an Auto choice can name what it came to), the names of the nodes behind each port's wires). It hides rows a wire or a choice makes moot, fills its kinds' options (`ValueKind::Attribute`'s `menu` of the input's attribute names; `ValueKind::Integer`'s `menu`, the names behind the wires, for an integer choosing a wire; `ValueKind::Choice`'s `unavailable` keys), marks a faulty value with its `problem`, and adds `Button` rows. A button holds no value: pressing it asks `NodeType::pressed`, and core applies the answer as one edit on the inspector's own path, so `NodeType::edited` answers it too. A choice shows as segments while it has three entries or fewer, 18 characters together at most and none unavailable (`sheet::segments`), else as a menu. A held node's delta shows its own rows (`HeldEdit::rows`, over the node's held result), written back through `HeldEdit::apply_rows` and `HeldEdit::pressed`. `SchemaCx::purpose` says where the rows show: the inspector, or a tool's card (`RowsFor::Card { more }`), where a type may show fewer.
 
 Every kind of value has a sheet kind, drawn by Studio's own widget for it, like Houdini's parameter templates: numbers, vectors, colors (with an emission's swatch, `Trailing::emission`), linked RGBA channels, choices, toggles, text, code, secrets, file paths, free paths in the scene's tree, references (`Kind::Reference(RefFilter)`: the field says what fits, such as objects of some kinds, results of some data types or Materials, and Studio fills the searchable picker, takes drops from the outliner and networks, and resolves the path from the sheet's holder), float and color ramps (`Value::Ramp`; `kinogaki_value::ramp`, re-exported as `params::ramp` and `sheet::ramp`, is their one maths: nodes, Studio's ramp widget and render engines evaluate them alike; a ramp row may fix one interpolation for every key), tone curves (`Value::ToneCurves`) and a material input's connection button (`Socket`). A file path's folder button opens the host's file dialog as its `FileDialog` says, and the chosen file arrives as an edit of the field. A field's `animation` (`Animation`: static, animated, keyed at the current time, or overridden: set from elsewhere than its own) is its value field's tint; Studio sets it on the rows it animates (node parameters, objects' placement and kind rows) and marks them `keyable`, so an Alt+click on the label reports `Action::Key` and Studio sets or removes the key there. A package's own rows are not keyable unless it marks them. Raw `Ui` widgets are for custom panels only.
 
