@@ -5,9 +5,7 @@
 //!
 //! The standard types ([`crate::standard`]: UsdLux's lights and fog) are
 //! declared alike by every engine that renders them, so they keep their id
-//! across engines. An engine adds types of its own (Pixel's rim light) and
-//! parameters of its own on others' types ([`AppliedSchema`], like USD's
-//! API schemas: Pixel's gobo on distant lights and spots).
+//! across engines. An engine adds types of its own (a rim light).
 
 use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
@@ -49,28 +47,7 @@ impl PrimType {
     }
 }
 
-/// Parameters an engine adds to other types (USD's applied API schemas):
-/// shown and rendered where an engine declaring it renders the type, kept
-/// either way.
-#[derive(Clone, Debug, PartialEq)]
-pub struct AppliedSchema {
-    /// The types it applies to, by id.
-    pub(crate) applies_to: Vec<Arc<str>>,
-    /// Its parameters' groups, in order (after the type's).
-    pub(crate) groups: Vec<SettingGroup>,
-    /// Its parameters (names no type it applies to uses).
-    pub params: Vec<SettingDescriptor>,
-}
-
-impl AppliedSchema {
-    /// Whether it applies to type `id`.
-    pub fn applies(&self, id: &str) -> bool {
-        self.applies_to.iter().any(|t| &**t == id)
-    }
-}
-
-/// A placed prim of a declared type: its values by parameter name (the
-/// type's and its applied schemas'), where it sits and whether it shows.
+/// A placed prim of a declared type: its values by parameter name, where it sits and whether it shows.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Declared {
     /// Its type's id.

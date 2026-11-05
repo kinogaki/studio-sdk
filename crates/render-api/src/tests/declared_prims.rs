@@ -2,33 +2,13 @@
 use super::*;
 
 #[test]
-fn engines_declare_types_and_apply_schemas_to_them() {
+fn engines_declare_types() {
     let (wake, _) = counter();
     let d = RecordingEngine::new(wake).description().as_ref().clone();
     assert!(d.prim_type(standard::AREA_LIGHT).is_some());
     assert!(d.prim_type("kinogaki.other.rim_light").is_none());
-    let gobo = AppliedSchema {
-        applies_to: vec![Arc::from(standard::SPOT_LIGHT)],
-        groups: vec![SettingGroup::new("gobo", "Gobo", false)],
-        params: vec![SettingDescriptor::new(
-            "gobo",
-            "Gobo",
-            "gobo",
-            kinogaki_value::ValueKind::Toggle,
-            false,
-        )],
-    };
-    let mut capabilities = d.capabilities().clone();
-    capabilities.applied.push(gobo);
-    let d = d.rebuilt().capabilities(capabilities).build();
-    let (groups, params) = d.schema(standard::SPOT_LIGHT).unwrap();
-    assert_eq!(params.last().unwrap().name.as_ref(), "gobo");
-    assert_eq!(groups.len(), 2);
-    let (_, area) = d.schema(standard::AREA_LIGHT).unwrap();
-    assert!(
-        area.iter().all(|p| &*p.name != "gobo"),
-        "applies to spots only"
-    );
+    let (_, params) = d.schema(standard::SPOT_LIGHT).unwrap();
+    assert_eq!(params, d.prim_type(standard::SPOT_LIGHT).unwrap().params);
     assert!(d.schema("kinogaki.other.rim_light").is_none());
     assert_eq!(
         Prim::Declared(standard::Light::default().declared()).kind(),

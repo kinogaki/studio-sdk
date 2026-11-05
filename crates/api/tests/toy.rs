@@ -229,7 +229,7 @@ impl FileFormat for XyzFormat {
     }
 }
 
-/// The points selected; place-bound, and a level of another context clears it.
+/// The points selected; a level of another context clears it.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Selection(Vec<u32>);
 impl Slot for Selection {
@@ -239,7 +239,6 @@ impl Slot for Selection {
     fn initial() -> Self {
         Self::default()
     }
-    const PLACE_BOUND: bool = true;
     fn restored(&self, doc: &dyn SlotDoc) -> Option<Self> {
         (doc.context() != points_context() && !self.0.is_empty()).then(Self::default)
     }
@@ -385,7 +384,7 @@ fn session_slots_start_initial_and_are_copied_on_write() {
     let mut registry = Registry::new();
     registry.register(kernel()).unwrap();
     let id = SlotId::declared("toy.points.selection");
-    assert!(registry.slot(id).is_some_and(|s| s.undoable()));
+    assert!(registry.slot(id).is_some());
     let mut session = SessionSlots::new(registry.slot(id));
     assert_eq!(session.get::<Selection>(), Some(&Selection::default()));
     let before = session.clone();
@@ -400,14 +399,11 @@ fn session_slots_start_initial_and_are_copied_on_write() {
     assert!(!session.set_any(id, Arc::new(7u8)));
     assert!(session.set_any(id, Arc::new(Selection(vec![3]))));
     assert!(session.get_any(id).unwrap().is::<Selection>());
-    // Restoring brings values in line; a new level starts place-bound
-    // ones over.
+    // Restoring brings values in line.
     session.keep(&Here(points_context()));
     assert_eq!(session.get::<Selection>(), Some(&Selection(vec![3])));
     session.keep(&Here(ContextId::declared("toy.other.context")));
     assert_eq!(session.get::<Selection>(), Some(&Selection::default()));
-    session.set(Selection(vec![4]));
-    session.reset_place_bound();
     assert_eq!(session, before);
     // An unregistered slot is none of these.
     assert!(!session.set(Selection2));

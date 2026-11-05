@@ -33,7 +33,7 @@ fn scene() -> ContextId {
     ContextId::declared("toy.core.scene")
 }
 
-/// The trees picked: undoable, and starts over on another level.
+/// The trees picked.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Picked(Vec<u32>);
 
@@ -44,7 +44,6 @@ impl Slot for Picked {
     fn initial() -> Self {
         Self::default()
     }
-    const PLACE_BOUND: bool = true;
 }
 
 /// The package's UI state: what its parts remember between calls.
@@ -559,16 +558,6 @@ fn a_views_calls_answer_its_own_display_options_and_place() {
         Pos::new(400.0, 0.0),
         "over its own view"
     );
-}
-
-#[test]
-fn another_level_starts_place_bound_slots_over() {
-    let mut host = host();
-    host.edit_slot("Pick", |slot| *slot = Picked(vec![3]));
-    host.go_to(inside(ObjectRef(7), Some(NodeRef(2)))).unwrap();
-    assert_eq!(host.slot::<Picked>(), &Picked(vec![3]));
-    host.go_to(inside(ObjectRef(8), Some(NodeRef(2)))).unwrap();
-    assert_eq!(host.slot::<Picked>(), &Picked::default());
 }
 
 #[test]

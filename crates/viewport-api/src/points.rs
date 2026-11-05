@@ -124,10 +124,6 @@ impl PointClass {
             ids,
         }
     }
-    /// The packet-wide id of this class's `local` id.
-    pub fn global(&self, local: u32) -> u32 {
-        self.first_id + local
-    }
     /// This class's own id of packet-wide `id`, when it is one of its ids.
     pub fn local(&self, id: u32) -> Option<u32> {
         id.checked_sub(self.first_id).filter(|&l| l < self.ids)
@@ -192,7 +188,6 @@ mod tests {
         assert!(PointClass::validate(&[cvs.clone(), class(1, 4, 3)]).is_err());
         assert!(PointClass::validate(&[class(8, 0, 1)]).is_err());
         assert_eq!(vertices.local(5), Some(1));
-        assert_eq!(vertices.global(1), 5);
         assert_eq!(vertices.local(3), None);
         let classes = [cvs, vertices];
         assert_eq!(

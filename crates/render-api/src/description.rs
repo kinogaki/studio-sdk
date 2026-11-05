@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use crate::aov::{Aov, AovSpec};
-use crate::declared::{AppliedSchema, PrimType};
+use crate::declared::PrimType;
 use crate::id::EngineId;
 use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef};
 use crate::prim::PrimKind;
@@ -69,8 +69,6 @@ pub struct Capabilities {
     /// The prim types it declares (lights, fog), the standard ones as
     /// [`crate::standard`] declares them.
     pub types: Vec<PrimType>,
-    /// The parameters it adds to types (a gobo on distant lights).
-    pub applied: Vec<AppliedSchema>,
     /// The outputs it can write, in the order a UI and a file list them
     /// (the beauty first).
     pub aovs: Vec<AovSpec>,
@@ -218,23 +216,11 @@ impl EngineDescription {
         self.capabilities.types.iter().find(|t| &*t.id == id)
     }
 
-    /// The schemas it applies to type `id`.
-    pub(crate) fn applied_to<'a>(&'a self, id: &'a str) -> impl Iterator<Item = &'a AppliedSchema> {
-        (self.capabilities.applied.iter()).filter(move |a| a.applies(id))
-    }
-
-    /// Type `id`'s groups and parameters as it renders them: the type's,
-    /// then each applied schema's (none when it does not declare the
-    /// type).
+    /// Type `id`'s groups and parameters as it renders them (none when it
+    /// does not declare the type).
     pub fn schema(&self, id: &str) -> Option<(Vec<SettingGroup>, Vec<SettingDescriptor>)> {
         let ty = self.prim_type(id)?;
-        let mut groups = ty.groups.clone();
-        let mut params = ty.params.clone();
-        for a in self.applied_to(id) {
-            groups.extend(a.groups.iter().cloned());
-            params.extend(a.params.iter().cloned());
-        }
-        Some((groups, params))
+        Some((ty.groups.clone(), ty.params.clone()))
     }
 
     /// `network` as this engine renders it: as it is when it declares every

@@ -378,7 +378,7 @@ impl<'a> CreateCx<'a> {
 /// A kind whose objects are render prims of their own: a light or fog,
 /// prims of types engines declare. The host reads what an object is
 /// through it and never reads the body: render sync keeps, for the active
-/// engine, the values its type and applied schemas declare; the viewport
+/// engine, the values its type declares; the viewport
 /// and exports read the standard ones (UsdLux lights); the inspector draws
 /// the values by their types' schemas and writes an edit back.
 pub trait RenderedKind: Send + Sync {

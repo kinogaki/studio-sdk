@@ -386,9 +386,6 @@ impl HostDoc for FakeHost {
     }
     fn go_to(&mut self, place: Place) -> Result<(), Error> {
         self.calls.push(HostCall::GoTo(place));
-        if place.context() != self.place.context() || place.object() != self.place.object() {
-            self.slots.reset_place_bound();
-        }
         self.place = place;
         Ok(())
     }

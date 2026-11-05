@@ -263,9 +263,7 @@ pub trait HostStatus {
     /// Logs `message` to the Console as information.
     fn info(&mut self, message: &str);
     /// Logs a Console record of `level` saying `text`, about `subject`
-    /// inside the open object (its own spelling: a node path, an element),
-    /// which the Console's link selects through the context's
-    /// [`Inspector::select_subject`](crate::package::Inspector::select_subject).
+    /// inside the open object (its own spelling: a node path, an element).
     /// Unlike [`fail`](Self::fail) and [`info`](Self::info), nothing shows
     /// on the status line.
     fn console(&mut self, level: Severity, subject: Option<&str>, text: &str);

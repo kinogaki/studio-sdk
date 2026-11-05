@@ -426,14 +426,6 @@ pub struct ViewportSpec {
     /// Its display options: rows of each view's Display popover, after
     /// core's own ([`DisplayOption`]).
     pub display: Vec<DisplayOption>,
-    /// Whether the Snap popover shows the shared steps (Snap from, Rotate
-    /// and Scale step): the moves here use them.
-    pub snap_steps: bool,
-    /// The Snap master here (the Snap button's switch, X): `None`, the
-    /// one the contexts without their own share; `Some(on)`, the
-    /// context's own (each mode's apart), starting at `on`. The host keeps
-    /// either in the user's settings.
-    pub own_snapping: Option<bool>,
     /// Where the transform pivot starts.
     pub default_pivot: Pivot,
 }
@@ -442,8 +434,6 @@ impl Default for ViewportSpec {
     fn default() -> Self {
         ViewportSpec {
             display: Vec::new(),
-            snap_steps: true,
-            own_snapping: None,
             default_pivot: Pivot::Center,
         }
     }

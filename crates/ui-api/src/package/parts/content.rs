@@ -13,11 +13,6 @@ part! {
     pub trait Inspector<S> {
         /// Draws the panel (its sheets through [`Ui::sheet`]).
         fn show(&self, s: &mut S, cx: &mut dyn InspectorCx, ui: &mut dyn Ui);
-        /// Selects what a Console record's subject names inside the open
-        /// object (its own spelling, as its reports wrote it).
-        fn select_subject(&self, s: &mut S, cx: &mut dyn Cx, subject: &str) {
-            let _ = (s, cx, subject);
-        }
         /// The user took `action` on row `row` (a parameter's name) of node
         /// `node`'s sheet: [`RowAction::Pick`] on a row offering a pick in the
         /// viewport (a group from the node's input). Core's sheet draws the

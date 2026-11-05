@@ -1,12 +1,12 @@
 //! Session slots, package-owned state of an editing session, and the
 //! gestures its undo steps are made of.
 //!
-//! What the user has selected in a Mesh network, CAD's picks, an open
-//! sketch: state a package keeps per session, outside the project file.
+//! What the user has selected in a network, a set of picks: state a
+//! package keeps per session, outside the project file.
 //! A package declares each slot as a value type implementing [`Slot`] and
 //! registers it ([`SessionSlot::of`], [`Package::with_slot`]); the
 //! environment holds every registered slot's value in one
-//! [`SessionSlots`] table and undoes the undoable ones with the scene.
+//! [`SessionSlots`] table and undoes them with the scene.
 //!
 //! Values are shared and copy-on-write, as object bodies are: an undo
 //! snapshot is a clone of the table (one pointer a value), and changing a
@@ -39,17 +39,6 @@ pub trait Slot: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
     /// The value a new session starts with.
     fn initial() -> Self;
 
-    /// Whether undo snapshots keep it, so undo, redo and a cancelled
-    /// gesture restore it with the document (a selection). A slot that
-    /// isn't (a memory of the session, such as the selection each object
-    /// had when it was left) keeps its value through them.
-    const UNDOABLE: bool = true;
-
-    /// Whether the value belongs to the level it was made at: showing
-    /// another level (an object level, or another object) starts it over
-    /// at [`Slot::initial`].
-    const PLACE_BOUND: bool = false;
-
     /// The value in line with `doc` after an undo, a redo or an edit;
     /// `None` when this one already is. It reads only what `doc` offers
     /// and never changes anything else.
@@ -75,14 +64,12 @@ pub trait SlotDoc {
 /// A shared slot value.
 type Value = Arc<dyn Any + Send + Sync>;
 
-/// A registered slot: its id and flags, and what the environment does
+/// A registered slot: its id, and what the environment does
 /// with a value of its type without knowing the type. Made from the
 /// value type with [`SessionSlot::of`]; cheap to copy.
 #[derive(Clone, Copy)]
 pub struct SessionSlot {
     id: SlotId,
-    undoable: bool,
-    place_bound: bool,
     type_name: &'static str,
     initial: fn() -> Value,
     copy: fn(&dyn Any) -> Value,
@@ -121,8 +108,6 @@ impl SessionSlot {
         }
         Self {
             id: T::id(),
-            undoable: T::UNDOABLE,
-            place_bound: T::PLACE_BOUND,
             type_name: std::any::type_name::<T>(),
             initial: initial::<T>,
             copy: copy::<T>,
@@ -137,11 +122,6 @@ impl SessionSlot {
     pub fn id(&self) -> SlotId {
         self.id
     }
-
-    /// Whether undo keeps it ([`Slot::UNDOABLE`]).
-    pub fn undoable(&self) -> bool {
-        self.undoable
-    }
 }
 
 impl fmt::Debug for SessionSlot {
@@ -149,8 +129,6 @@ impl fmt::Debug for SessionSlot {
         f.debug_struct("SessionSlot")
             .field("id", &self.id)
             .field("type", &self.type_name)
-            .field("undoable", &self.undoable)
-            .field("place_bound", &self.place_bound)
             .finish()
     }
 }
@@ -238,16 +216,6 @@ impl SessionSlots {
                 true
             }
             _ => false,
-        }
-    }
-
-    /// Every place-bound value back at its initial one
-    /// ([`Slot::PLACE_BOUND`]): another level shows.
-    pub fn reset_place_bound(&mut self) {
-        for entry in self.0.values_mut() {
-            if entry.slot.place_bound {
-                entry.value = (entry.slot.initial)();
-            }
         }
     }
 
