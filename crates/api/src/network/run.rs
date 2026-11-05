@@ -2,9 +2,9 @@
 //! ([`NetworkCompiler::compile`](super::NetworkCompiler::compile)'s values)
 //! run on the host's device by a [`Runner`] its package makes
 //! ([`PlanRunner`]). The host lends it what it reads ([`RunCx`]): the film, its
-//! [`ColorService`], whose view transforms come as WGSL (the host keeps the
-//! color maths), and its [`ImageFiles`]; and it shows the [`RunImage`] it
-//! returns.
+//! [`ColorService`] (the host keeps the color maths) and its [`ImageFiles`];
+//! and it shows the [`RunImage`] it returns, through the view transform when
+//! it is scene-referred.
 use crate::Error;
 use crate::color::ColorService;
 use crate::image_files::ImageFiles;

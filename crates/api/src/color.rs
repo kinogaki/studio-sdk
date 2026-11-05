@@ -18,16 +18,15 @@
 //! pieces, so its Text's color and a display-referred background are the target
 //! display's code values, and a placed file keeps what it holds. The host
 //! holds the color maths (its configuration's conversions and view
-//! transforms) and lends the service to formats (`Reading`, `Writing`),
-//! cooks (the project they read) and runners; a package never carries a
-//! copy of it.
+//! transforms, a file's space, display profiles) and lends the service to
+//! formats (`Reading`, `Writing`), cooks (the project they read) and
+//! runners; a package never carries a copy of it.
 //!
 //! Spaces are named as the host's configuration names them, or by its
 //! aliases (`lin_rec709`, `srgb_texture`, `ACEScg`).
 
 use crate::{Diagnostic, Error};
 use std::fmt::Debug;
-use std::sync::Arc;
 
 /// The host's color management.
 pub trait ColorService: Send + Sync + Debug {
@@ -57,24 +56,6 @@ pub trait ColorService: Send + Sync + Debug {
         self.convert(self.working(), to, rgb)
     }
 
-    /// `view`'s transform as WGSL named `name` (`[A-Za-z0-9_]`) reading its
-    /// data at `group`, `binding`, for a runner that shows display code
-    /// values (Comp's To Display); none when the configuration lacks it.
-    fn view_transform(
-        &self,
-        view: &ViewChoice,
-        name: &str,
-        group: u32,
-        binding: u32,
-    ) -> Option<ViewTransform>;
-
-    /// The space the configuration's file rules give the file at `path`
-    /// (an image's colors are in it); none when no rule names one, by
-    /// default.
-    fn file_space(&self, _path: &str) -> Option<String> {
-        None
-    }
-
     /// Whether colors in `space` are display-referred: a display's code values,
     /// which reach a picture as they are rather than through a view. No, by
     /// default.
@@ -82,27 +63,7 @@ pub trait ColorService: Send + Sync + Debug {
         false
     }
 
-    /// The display of the configuration whose code values ICC `profile`
-    /// describes; none, by default.
-    fn profile_space(&self, _profile: &[u8]) -> Option<String> {
-        None
-    }
-
-    /// Code values `rgb` of a display no space describes (ICC `profile`) as
-    /// those of a wide display of the configuration, and its name; none, `rgb`
-    /// unchanged, for a profile it can't read (look-up tables, gray, CMYK).
-    fn convert_profile(&self, _profile: &[u8], _rgb: &mut [[f64; 3]]) -> Option<String> {
-        None
-    }
-
-    /// The views a render can show on `display`, the first the default; none,
-    /// by default.
-    fn views_of(&self, _display: &str) -> Vec<String> {
-        Vec::new()
-    }
-
-    /// Changes whenever a conversion, a file's space or a view transform
-    /// would.
+    /// Changes whenever a conversion would.
     fn revision(&self) -> u64;
 
     /// The spaces a working space can be (the config's scene-linear
@@ -122,34 +83,4 @@ pub trait ColorService: Send + Sync + Debug {
     fn problem(&self) -> Option<Diagnostic> {
         None
     }
-}
-
-/// Which display and view a view transform is for.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ViewChoice {
-    /// The viewer's display and view.
-    Viewer,
-    /// A display and view of the host's color configuration, by name.
-    Pinned {
-        /// The display.
-        display: Arc<str>,
-        /// The view.
-        view: Arc<str>,
-    },
-}
-
-/// A view transform (scene-referred ACEScg to display code values, without
-/// the viewer's exposure and gamma) as the host's color management writes
-/// it for a compute shader: WGSL declaring its data buffer at the group and
-/// binding asked for, with helpers and a function `fn <function>(c:
-/// vec3<f32>) -> vec3<f32>`, and the buffer's contents. The host holds the
-/// color maths; a package only embeds the shader.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ViewTransform {
-    /// The WGSL: the buffer's declaration, helpers and the function.
-    pub source: String,
-    /// The function's name.
-    pub function: String,
-    /// The buffer's contents (f32s).
-    pub data: Vec<f32>,
 }

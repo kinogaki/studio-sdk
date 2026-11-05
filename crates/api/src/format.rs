@@ -329,7 +329,7 @@ pub trait Frames: Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::color::{ColorService, ViewChoice, ViewTransform};
+    use crate::color::ColorService;
     use crate::element::MemoryElement;
     use kinogaki_geometry::UpAxis;
 
@@ -342,9 +342,6 @@ mod tests {
         }
         fn convert(&self, _: &str, _: &str, _: &mut [[f64; 3]]) -> Result<(), Error> {
             Ok(())
-        }
-        fn view_transform(&self, _: &ViewChoice, _: &str, _: u32, _: u32) -> Option<ViewTransform> {
-            None
         }
         fn revision(&self) -> u64 {
             0
