@@ -96,7 +96,7 @@ An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a
 
 ## Previews
 
-`RenderEngine::preview(PreviewRequest)` returns at once; a host shows the `PreviewImage` when it arrives. A request is the SDK's preview shape: `shape`, `lighting`, `side`, the `network` with its colors converted and files resolved, and the `textures` it names. Render it any way you like, on your own thread; `PreviewRequest::scene` gives it as prims for a scene of its own (a sphere on a floor, a dome and a key light, a camera), and a floor naming no material takes your default. Your settings for previews are yours.
+`RenderEngine::preview(PreviewRequest)` returns at once; a host shows the `PreviewImage` when it arrives. A request is the SDK's preview shape: `shape`, `lighting`, `side`, the `network` with its colors converted and files resolved, and the `textures` it names. A host asks previews of an engine it made for them and drops at rest, never of one showing its views, so render them as you render a view: `PreviewRequest::scene` gives the request as prims (a sphere on a floor, a dome and a key light, a camera) that replace the last request's, and a floor naming no material takes your default. No second engine is needed. Your settings for previews are yours.
 
 ## Views, results and being polite
 

@@ -243,6 +243,9 @@ pub trait RenderEngine: Send {
     fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<FinalOutputs>;
     /// A picture of a material, rendered off the caller's thread; never
     /// blocks. The host drops the result to cancel it ([`Deliver::wanted`]).
+    /// A host asks previews of an engine it made for them, never of one
+    /// showing views: each request's scene replaces the last one's, and the
+    /// engine renders it as it renders a view, with no second engine.
     fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage>;
 }
 
