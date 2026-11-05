@@ -293,12 +293,6 @@ pub trait SurfaceSource: Any + Send + Sync {
     /// The classes the segments are drawn and picked in, in drawing order;
     /// segments outside every class are not drawn.
     fn line_classes(&self) -> &[crate::LineClass];
-    /// The classes the point markers are drawn in (see
-    /// [`crate::PointClass`]); none: every marker in the plain points'
-    /// look.
-    fn point_classes(&self) -> &[crate::PointClass] {
-        &[]
-    }
     /// Number of faces (face ids are below it).
     fn face_count(&self) -> usize;
     /// Face `face`'s triangles, as a range of triangles into

@@ -4,9 +4,8 @@
 //! - [`SurfaceSource`]: the packet a kernel (meshes, CAD, SDF…) provides
 //!   for drawing — shared point positions, vertex shading records,
 //!   triangles, line classes ([`LineClass`]: edges, hulls, curves… each
-//!   with its own look and ids) and point markers in point classes
-//!   ([`PointClass`]: points, control vertices, B-rep vertices…), with
-//!   sparse [`DrawUpdate`] ranges; a [`ShadingPlan`] lets the renderer
+//!   with its own look and ids) and point markers, with sparse
+//!   [`DrawUpdate`] ranges; a [`ShadingPlan`] lets the renderer
 //!   derive vertex shading from positions; [`FaceRun`]s draw some faces
 //!   see-through ([`FaceLook`]). A kernel reads its own packets back with
 //!   [`packet_as`].
@@ -33,7 +32,6 @@ mod lines;
 mod looks;
 mod overlay;
 mod packet;
-mod points;
 mod selection;
 mod shading;
 mod textures;
@@ -47,7 +45,6 @@ pub use overlay::{
 pub use packet::{
     ColorLayout, Column, ElementKind, ElementSet, OverlayVertex, SurfaceSource, Vertex, packet_as,
 };
-pub use points::{PointClass, PointClassId, PointLook, PointShape, PointStyle};
 pub use selection::ElementSelection;
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,
