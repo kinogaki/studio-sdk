@@ -105,8 +105,8 @@ pub struct Frame {
 }
 
 /// A final frame's outputs.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Outputs {
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FinalOutputs {
     /// Width, in pixels.
     pub width: u32,
     /// Height, in pixels.
@@ -117,18 +117,6 @@ pub struct Outputs {
     pub planes: Vec<(AovDesc, Arc<[f32]>)>,
     /// Cryptomatte names: the paths whose hashes appear in its planes.
     pub names: Vec<Arc<str>>,
-}
-
-impl Default for Outputs {
-    /// No outputs, one pixel a film pixel.
-    fn default() -> Outputs {
-        Outputs {
-            width: 0,
-            height: 0,
-            planes: Vec::new(),
-            names: Vec::new(),
-        }
-    }
 }
 
 /// What a pending result holds: nothing yet, its outcome, or its outcome
@@ -252,7 +240,7 @@ pub trait RenderEngine: Send {
     /// Read a view's outputs once its samples are done. The result
     /// resolves once: the outputs, or why there are none (a failed read,
     /// or the request dropped with the view or the engine).
-    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Outputs>;
+    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<FinalOutputs>;
     /// A picture of a material, rendered off the caller's thread; never
     /// blocks. The host drops the result to cancel it ([`Deliver::wanted`]).
     fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage>;

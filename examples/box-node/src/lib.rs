@@ -157,7 +157,7 @@ impl Displayable for BoxType {
         Ok(Drawn::one(Arc::new(surface)))
     }
     fn highlight(&self, _: &Data, _: &Drawn, _: &Components) -> ElementSet {
-        ElementSet::new(ElementKind::Face, false, [])
+        ElementSet::new(ElementKind::Primitive, false, [])
     }
     fn convert(&self, _: &Data, _: &Components, _: ElementKind) -> Option<Components> {
         None

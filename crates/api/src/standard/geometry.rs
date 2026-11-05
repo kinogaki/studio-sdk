@@ -142,5 +142,5 @@ pub(super) fn read_geometry(element: &dyn ElementReader) -> Result<Geometry, Err
     })?;
     let positions = attributes::rows(element, "positions")?.into();
     let attributes = Arc::new(attributes::read(element)?);
-    Geometry::with_primitives(positions, primitives, attributes).map_err(|e| invalid(&at, e))
+    Geometry::new(positions, primitives, attributes).map_err(|e| invalid(&at, e))
 }

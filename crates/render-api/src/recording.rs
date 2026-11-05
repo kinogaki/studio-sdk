@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::aov::{AovDesc, AovSpec, standard as aov};
 use crate::description::{Capabilities, EngineDescription, Motion};
 use crate::dirty::Dirty;
-use crate::engine::{Outputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
+use crate::engine::{FinalOutputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
 use crate::id::{EngineId, PrimId};
 use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::{Prim, PrimKind, Topology};
@@ -169,7 +169,7 @@ impl RenderEngine for RecordingEngine {
     }
 
     /// Delivers black outputs of the view's size at once.
-    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Outputs> {
+    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<FinalOutputs> {
         let (deliver, result) = pending(self.wake.clone());
         let (width, height) = self
             .views
@@ -185,7 +185,7 @@ impl RenderEngine for RecordingEngine {
                 )
             })
             .collect();
-        deliver.deliver(Outputs {
+        deliver.deliver(FinalOutputs {
             width,
             height,
             planes,

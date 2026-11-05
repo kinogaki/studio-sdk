@@ -2,10 +2,10 @@
 //! when a value is selected and changed.
 //!
 //! Core owns the geometric values (`kinogaki-geometry`); kernels bring
-//! the operations and the math; plugins bring tools and nodes. A kernel
-//! depends on `kinogaki-geometry` and this crate alone, so the edit
-//! policy core and every kernel share lives here instead of in the data
-//! crate:
+//! the operations and the math; plugins bring tools and nodes. The edit
+//! policy core and every kernel share lives here, beside the data crate
+//! rather than in it; a kernel reaches it through `kinogaki-studio-api`
+//! (`kinogaki_studio_api::edit`), where its verbs are declared:
 //!
 //! | Module | What |
 //! |---|---|

@@ -65,7 +65,7 @@ use kinogaki_geometry::{Domain, Elements, Geometry, Selection};
 pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
 
 /// The id of [`Brep`] values.
-pub const BREP: &str = "kinogaki.core.brep";
+pub const BREP: DataTypeId = DataTypeId::declared("kinogaki.core.brep");
 
 /// The id of a file's materials as a format reads them beside its
 /// geometry ([`materials`](fn@materials)).
@@ -103,13 +103,17 @@ pub const fn selection() -> Typed<Selection> {
 }
 
 /// The id of camera values: an unplaced lens ([`lens`], [`CameraCodec`]).
-pub const CAMERA: &str = "kinogaki.core.camera";
+pub const CAMERA: DataTypeId = DataTypeId::declared("kinogaki.core.camera");
+
+/// The id of the camera object kind, whose objects hold a [`CAMERA`]
+/// value: what a camera row picks.
+pub const CAMERA_KIND: crate::ObjectKindId = crate::ObjectKindId::declared("kinogaki.core.camera");
 
 /// The handle on camera values ([`CAMERA`]): render-api's
 /// [`Camera`](kinogaki_render_api::Camera), unplaced, in UsdGeomCamera's
 /// units; make one with [`lens`].
 pub const fn camera() -> Typed<kinogaki_render_api::Camera> {
-    Typed::new(DataTypeId::declared(CAMERA))
+    Typed::new(CAMERA)
 }
 
 /// The id of light values: an unplaced light ([`light_value`],
@@ -125,7 +129,7 @@ pub const fn light() -> Typed<kinogaki_render_api::standard::Light> {
 
 /// The handle on [`Brep`] values ([`BREP`]).
 pub const fn brep() -> Typed<Brep> {
-    Typed::new(DataTypeId::declared(BREP))
+    Typed::new(BREP)
 }
 
 /// The handle on a file's materials as a format reads them beside its
@@ -180,17 +184,10 @@ fn combined_set(current: Option<&Components>, hit: &Components, how: Combine) ->
     components(hit.ty(), selection)
 }
 
-/// The viewport's element kind that shows elements of `domain`: Primitive
-/// is faces, Detail and Object whole objects.
+/// The viewport's element kind that shows elements of `domain`; the whole
+/// value (Detail) shows as the object.
 pub fn level(domain: Domain) -> ElementKind {
-    match domain {
-        Domain::Point => ElementKind::Point,
-        Domain::Edge => ElementKind::Edge,
-        Domain::Vertex => ElementKind::Vertex,
-        Domain::Primitive => ElementKind::Face,
-        Domain::Instance => ElementKind::Instance,
-        _ => ElementKind::Object,
-    }
+    ElementKind::of(domain).unwrap_or(ElementKind::Object)
 }
 
 /// A refused value read from `at`, as the API's error.

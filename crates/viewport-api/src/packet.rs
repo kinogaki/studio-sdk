@@ -7,7 +7,7 @@
 //! index points. Columns may be paged, so they are read through callbacks at
 //! column granularity rather than per element.
 use crate::{DrawUpdate, UpdateRanges};
-use kinogaki_geometry::{Bounds, Error, Vec3};
+use kinogaki_geometry::{Bounds, Domain, Error, Vec3};
 use std::{
     any::Any,
     collections::BTreeSet,
@@ -92,8 +92,9 @@ pub enum ElementKind {
     Point,
     /// Lines, by packet-wide line id.
     Edge,
-    /// Faces, by face id.
-    Face,
+    /// Faces ([`Domain::Primitive`](kinogaki_geometry::Domain::Primitive):
+    /// a polygon, a B-rep body's face), by face id.
+    Primitive,
     /// Polygon vertices: records of the vertex column.
     Vertex,
     /// Whole objects, addressed by any of their faces.
@@ -103,6 +104,34 @@ pub enum ElementKind {
     /// shows them (a scene object draws the marked ones at their own
     /// placements).
     Instance,
+}
+
+impl ElementKind {
+    /// The kind that shows elements of `domain`; `None` for the whole value
+    /// ([`Domain::Detail`]), which nothing shows apart.
+    pub fn of(domain: Domain) -> Option<ElementKind> {
+        Some(match domain {
+            Domain::Point => ElementKind::Point,
+            Domain::Edge => ElementKind::Edge,
+            Domain::Primitive => ElementKind::Primitive,
+            Domain::Vertex => ElementKind::Vertex,
+            Domain::Object => ElementKind::Object,
+            Domain::Instance => ElementKind::Instance,
+            _ => return None,
+        })
+    }
+
+    /// The domain whose elements this kind shows.
+    pub fn domain(self) -> Domain {
+        match self {
+            ElementKind::Point => Domain::Point,
+            ElementKind::Edge => Domain::Edge,
+            ElementKind::Primitive => Domain::Primitive,
+            ElementKind::Vertex => Domain::Vertex,
+            ElementKind::Object => Domain::Object,
+            ElementKind::Instance => Domain::Instance,
+        }
+    }
 }
 
 /// Selected element ids, sorted and unique. Immutable: each value gets a
@@ -316,7 +345,7 @@ pub trait SurfaceSource: Any + Send + Sync {
     /// Elements of `kind` in this packet.
     fn element_count(&self, kind: ElementKind) -> usize {
         match kind {
-            ElementKind::Object | ElementKind::Face => self.face_count(),
+            ElementKind::Object | ElementKind::Primitive => self.face_count(),
             ElementKind::Edge => self
                 .line_classes()
                 .iter()
@@ -422,7 +451,7 @@ mod tests {
         let set = ElementSet::new(ElementKind::Point, false, [3, 1, 3]);
         assert_eq!(set.ids(), &[1, 3]);
         assert!(set.contains(3) && !set.contains(2));
-        let all = ElementSet::all(ElementKind::Face);
+        let all = ElementSet::all(ElementKind::Primitive);
         assert!(all.contains(99) && !all.is_empty());
     }
 

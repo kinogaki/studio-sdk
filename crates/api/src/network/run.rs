@@ -45,7 +45,9 @@ pub struct RunStats {
 /// The image a run shows.
 #[derive(Clone, Debug)]
 pub struct RunImage {
-    /// A view of it.
+    /// A view of it: an `Rgba16Float` texture with `COPY_SRC` usage, so the
+    /// host can read it back (a frozen node keeps it, a final render
+    /// writes it).
     pub view: wgpu::TextureView,
     /// Its size, in pixels.
     pub size: [u32; 2],

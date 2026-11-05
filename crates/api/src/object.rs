@@ -472,7 +472,7 @@ impl RenderSetup {
                 components: 2,
                 number: pixels,
             };
-            let cameras = RefFilter::objects([ObjectKindId::declared(crate::standard::CAMERA)]);
+            let cameras = RefFilter::objects([crate::standard::CAMERA_KIND]);
             let own = |name, label, kind, default: Value| {
                 SettingDescriptor::new(name, label, IMAGE, kind, default).animatable(false)
             };

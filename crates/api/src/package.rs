@@ -19,9 +19,9 @@ use std::fmt;
 use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
-/// types (a kernel's), held edits over them,
-/// B-rep meshers (a kernel's),
-/// node types' cooks, the network contexts its object kinds hold, object
+/// types, held edits over them, B-rep meshers, the verbs it offers as a
+/// kernel (a kernel adds no data types: it is a package of verbs), node
+/// types' cooks, the network contexts its object kinds hold, object
 /// kinds, file formats, session slots, stored values and icons, the render
 /// engines it describes (made, with the `wgpu` feature, by their makers);
 /// and its UI, when it has one

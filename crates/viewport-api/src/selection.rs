@@ -12,7 +12,7 @@ use kinogaki_geometry::Error;
 /// ([`ElementSelection::one`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ElementSelection<'a> {
-    /// [`ElementKind::Face`], or [`ElementKind::Object`] alone (object
+    /// [`ElementKind::Primitive`], or [`ElementKind::Object`] alone (object
     /// selection draws silhouettes and no component feedback).
     pub faces: Option<&'a ElementSet>,
     /// [`ElementKind::Edge`]: line ids of any class.
@@ -91,7 +91,7 @@ enum Slot {
 impl Slot {
     fn of(kind: ElementKind) -> Self {
         match kind {
-            ElementKind::Face | ElementKind::Object | ElementKind::Instance => Self::Faces,
+            ElementKind::Primitive | ElementKind::Object | ElementKind::Instance => Self::Faces,
             ElementKind::Edge => Self::Edges,
             ElementKind::Point | ElementKind::Vertex => Self::Points,
         }
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn sets_go_to_their_kinds_slots() {
-        let faces = ElementSet::new(ElementKind::Face, false, [1]);
+        let faces = ElementSet::new(ElementKind::Primitive, false, [1]);
         let edges = ElementSet::new(ElementKind::Edge, false, [2]);
         let points = ElementSet::new(ElementKind::Vertex, false, []);
         let s = ElementSelection::one(&edges).with(&points).with(&faces);

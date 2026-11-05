@@ -49,7 +49,7 @@ impl Aov {
         }
     }
 
-    /// Values a pixel ([`crate::Outputs`]' interleaving): RGBA 4, other
+    /// Values a pixel ([`crate::FinalOutputs`]' interleaving): RGBA 4, other
     /// colors and vectors 3, Cryptomatte 2 a level, the rest 1.
     pub fn channels(&self) -> usize {
         match self.class {

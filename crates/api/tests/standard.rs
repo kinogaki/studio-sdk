@@ -1,7 +1,9 @@
 //! The standard data types: handles, codecs, the tolerances and display
 //! quality values and the conformance suite.
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::{Domain, Elements, Geometry, Selection, Tolerances};
+use kinogaki_studio_api::geometry::{
+    Attributes, Domain, Elements, Geometry, Selection, Tolerances,
+};
 use kinogaki_studio_api::standard::{self, GeometryCodec};
 use kinogaki_studio_api::{Data, DataCodec, Scope, StoredValue, Units, UpAxis};
 use kinogaki_studio_api_testing as conformance;
@@ -205,7 +207,7 @@ fn read_quad_with(fields: &[(&str, Field)]) -> Result<Geometry, String> {
         vec![0, 1, 2, 3].into(),
     )
     .unwrap();
-    let value = Geometry::new(vec![[0.0; 3]; 4].into(), quad, Default::default()).unwrap();
+    let value = Geometry::new(vec![[0.0; 3]; 4].into(), quad, Attributes::default()).unwrap();
     let data = standard::geometry().wrap(value);
     let mut saved = MemoryElement::new("result");
     saved

@@ -11,11 +11,11 @@ use kinogaki_render_api::{Input, NodeDef};
 use std::sync::Arc;
 
 /// Inside a Material node: its shading network.
-pub const SHADING: &str = "kinogaki.core.shading";
+pub const SHADING: ContextId = ContextId::declared("kinogaki.core.shading");
 
 /// What a shading wire carries, as the network pane sees it: which sockets
 /// meet is checked as a Material compiles.
-pub const SHADER: &str = "kinogaki.core.shader";
+pub const SHADER: DataTypeId = DataTypeId::declared("kinogaki.core.shader");
 
 /// The node type of material node `def`, listed under its engine's label.
 pub struct ShaderNode {
@@ -42,11 +42,14 @@ impl NodeType for ShaderNode {
 
     fn description(&self) -> Description {
         let def = &self.def;
-        let wire = DataTypeId::declared(SHADER);
+        let wire = SHADER;
         let aliases: Vec<&str> = def.aliases.iter().map(|a| &**a).collect();
-        let mut description = Description::new(&*def.label)
-            .context(ContextId::declared(SHADING))
-            .listed(&*self.engine, Category::Surface, &*def.family, &aliases);
+        let mut description = Description::new(&*def.label).context(SHADING).listed(
+            &*self.engine,
+            Category::Surface,
+            &*def.family,
+            &aliases,
+        );
         let driven = (def.inputs.iter()).filter(|i| i.socket().is_some());
         for input in driven {
             description =

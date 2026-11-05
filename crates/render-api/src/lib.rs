@@ -56,7 +56,7 @@ pub use description::{
 };
 pub use dirty::Dirty;
 pub use engine::{
-    Deliver, Frame, Outputs, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
+    Deliver, FinalOutputs, Frame, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
     ViewMode, Wake, pending,
 };
 pub use id::{EngineId, Id, IdAllocator, PrimId};

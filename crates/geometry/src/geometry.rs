@@ -50,31 +50,20 @@ pub struct Geometry {
 }
 
 impl Geometry {
-    /// `positions` over `primitives`, with `attributes`, checked.
-    ///
-    /// # Errors
-    /// The first rule broken.
-    pub fn new(
-        positions: Column<[f64; 3]>,
-        primitives: Primitives,
-        attributes: Attributes,
-    ) -> Result<Self, Error> {
-        Self::with_primitives(positions, Arc::new(primitives), Arc::new(attributes))
-    }
-
-    /// `positions` and `attributes` over a table already checked
-    /// (another value's): only the positions and the attributes' sizes are
-    /// checked, never the table again. What a kernel uses when an edit
-    /// keeps the primitives of its input.
+    /// `positions` over `primitives`, with `attributes`: the positions and
+    /// the attributes' sizes are checked, never the table (a `Primitives`
+    /// is checked as it is made), so a table shared with another value
+    /// (an edit keeping its input's primitives) costs nothing.
     ///
     /// # Errors
     /// A bad position, a position count not the table's points, or a
     /// missized or misplaced attribute.
-    pub fn with_primitives(
+    pub fn new(
         positions: Column<[f64; 3]>,
-        primitives: Arc<Primitives>,
-        attributes: Arc<Attributes>,
+        primitives: impl Into<Arc<Primitives>>,
+        attributes: impl Into<Arc<Attributes>>,
     ) -> Result<Self, Error> {
+        let (primitives, attributes) = (primitives.into(), attributes.into());
         check_positions(&positions, &primitives)?;
         check_attributes(&attributes, None, &primitives)?;
         Ok(Self {

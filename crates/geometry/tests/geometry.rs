@@ -248,9 +248,9 @@ fn with_positions_shares_the_topology_the_attributes_and_their_caches() {
 }
 
 #[test]
-fn with_primitives_reuses_a_checked_topology() {
+fn a_shared_table_is_reused_unchecked() {
     let a = value();
-    let b = Geometry::with_primitives(
+    let b = Geometry::new(
         vec![[3.0; 3]; 5].into(),
         a.primitives().clone(),
         a.attributes().clone(),
@@ -266,7 +266,7 @@ fn with_primitives_reuses_a_checked_topology() {
             )
             .unwrap(),
     );
-    assert!(Geometry::with_primitives(positions().into(), a.primitives().clone(), wrong).is_err());
+    assert!(Geometry::new(positions().into(), a.primitives().clone(), wrong).is_err());
 }
 
 #[test]

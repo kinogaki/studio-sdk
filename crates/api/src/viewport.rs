@@ -602,7 +602,7 @@ mod tests {
         assert_eq!((lines.len(), lines[2].point, lines[2].component), (8, 1, 1));
         assert!(SurfaceSource::points(&surface).is_empty());
         assert_eq!(surface.element_count(ElementKind::Edge), 4);
-        assert_eq!(surface.element_count(ElementKind::Face), 1);
+        assert_eq!(surface.element_count(ElementKind::Primitive), 1);
         assert_eq!(surface.bounds().unwrap().max, Vec3::new(1.0, 1.0, 0.0));
         assert_eq!(surface.topology_key()[0], 42);
         assert!(surface.update().is_none());

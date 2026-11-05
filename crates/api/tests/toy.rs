@@ -306,7 +306,11 @@ fn display_prepares_highlights_and_cancels() {
     assert_eq!(surface.points()[2], [2.0; 3]);
     let picked = Components::new(CLOUD.id(), ElementKind::Point, 2, vec![2u32, 0]);
     assert_eq!(display.highlight(&data, &drawn, &picked).ids(), &[0, 2]);
-    assert!(display.convert(&data, &picked, ElementKind::Face).is_none());
+    assert!(
+        display
+            .convert(&data, &picked, ElementKind::Primitive)
+            .is_none()
+    );
     cancel.cancel();
     assert_eq!(
         display.prepare(&data, None, &request, &cancel).err(),

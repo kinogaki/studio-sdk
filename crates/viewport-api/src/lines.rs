@@ -133,7 +133,7 @@ pub struct LineClass {
     /// How many line ids the class has.
     pub ids: u32,
     /// The level its lines select: [`ElementKind::Edge`] (each line an
-    /// edge, by its packet-wide id) or [`ElementKind::Face`] (line `local`
+    /// edge, by its packet-wide id) or [`ElementKind::Primitive`] (line `local`
     /// is face `local`, so `ids` is at most the packet's faces).
     pub selects: ElementKind,
 }
@@ -146,14 +146,14 @@ impl LineClass {
     /// packet-wide id for an edge class, the face itself for a face class.
     pub fn element(&self, local: u32) -> u32 {
         match self.selects {
-            ElementKind::Face => local,
+            ElementKind::Primitive => local,
             _ => self.first_id + local,
         }
     }
     /// The packet-wide id of face `face`'s line, when this is a face class
     /// that draws it.
     pub fn face_line(&self, face: u32) -> Option<u32> {
-        (self.selects == ElementKind::Face && face < self.ids).then(|| self.first_id + face)
+        (self.selects == ElementKind::Primitive && face < self.ids).then(|| self.first_id + face)
     }
     /// Classes of one packet must cover distinct segments and distinct ids,
     /// with distinct class ids below the limit, each selecting edges or
@@ -168,7 +168,7 @@ impl LineClass {
                 )));
             }
             seen |= 1 << c.id.0;
-            if !matches!(c.selects, ElementKind::Edge | ElementKind::Face) {
+            if !matches!(c.selects, ElementKind::Edge | ElementKind::Primitive) {
                 return Err(Error::invalid(format_args!(
                     "line class {} selects neither edges nor faces",
                     c.name
@@ -247,7 +247,7 @@ mod tests {
         // as their faces.
         assert_eq!(hull.face_line(2), None);
         let curves = LineClass {
-            selects: ElementKind::Face,
+            selects: ElementKind::Primitive,
             ..hull
         };
         assert_eq!((curves.element(2), curves.face_line(2)), (2, Some(12)));
