@@ -93,7 +93,7 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
             | K::Attribute { .. }
             | K::Group,
         ) => Value::Text(text()?.to_owned()),
-        Some(K::Color) => match *numbers()? {
+        Some(K::Color | K::DisplayColor) => match *numbers()? {
             [r, g, b] => Value::Color([r, g, b]),
             _ => return Err(wrong("three float64")),
         },

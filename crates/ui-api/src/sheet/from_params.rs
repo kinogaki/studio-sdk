@@ -141,6 +141,7 @@ impl From<&ValueKind> for Kind {
             },
             ValueKind::Group => Kind::Expression { pick: None },
             ValueKind::Color => Kind::Color,
+            ValueKind::DisplayColor => Kind::DisplayColor,
             ValueKind::Vector { number, .. } => Kind::Vector {
                 number: number.into(),
                 lock: None,

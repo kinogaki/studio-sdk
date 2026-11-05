@@ -27,6 +27,9 @@ pub enum Kind {
     Fields(Number),
     /// `Value::Color`: working-space RGB, a swatch and channel fields.
     Color,
+    /// `Value::Color`: a display's code values, a swatch of them as they are
+    /// and channel fields from 0 to 1.
+    DisplayColor,
     /// `Value::Numbers` (4): R, G, B, A. Linked, one slider (the value of
     /// R) sets all four; unlinked, four fields lettered R, G, B, A. The
     /// link button reports [`Action::Lock`](super::Action::Lock) with its

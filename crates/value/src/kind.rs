@@ -68,6 +68,9 @@ pub enum ValueKind {
     /// [`Value::Color`]: linear RGB, channels finite (a working space's
     /// colors outside a narrower space's gamut have negative channels).
     Color,
+    /// [`Value::Color`]: a display's code values, what a page's text says it
+    /// is: 1 is 255, shown as they are.
+    DisplayColor,
     /// [`Value::Numbers`]: `components` numbers (2 to 4) lettered X, Y,
     /// Z, W, each as `number`.
     Vector {
@@ -164,6 +167,7 @@ impl ValueKind {
             | Self::Integer { .. }
             | Self::Vector { .. }
             | Self::Color
+            | Self::DisplayColor
             | Self::Channels(_)
             | Self::Toggle
             | Self::Choice { .. }
@@ -205,7 +209,7 @@ impl ValueKind {
                 | Self::Group,
                 Value::Text(_),
             ) => true,
-            (Self::Color, Value::Color(_)) => true,
+            (Self::Color | Self::DisplayColor, Value::Color(_)) => true,
             (Self::Vector { components, .. }, Value::Numbers(v)) => v.len() == *components as usize,
             (Self::Channels(_), Value::Numbers(v)) => v.len() == 4,
             (Self::Ramp { color, .. }, Value::Ramp(r)) => r.color == *color,
@@ -245,7 +249,7 @@ impl ValueKind {
                     (false, _) => format!("must be a whole number of at most {max}"),
                 })
             }
-            (Self::Color, Value::Color(c)) => match finite(c) {
+            (Self::Color | Self::DisplayColor, Value::Color(c)) => match finite(c) {
                 true => Ok(()),
                 false => Err("must be a color of finite channels".to_owned()),
             },
