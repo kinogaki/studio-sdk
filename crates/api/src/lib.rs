@@ -21,7 +21,7 @@
 //!   [`Renderable`]. [`Components`] is a component selection in a type's
 //!   own terms.
 //! - **Cooking** ([`cook`]): what a node type is and computes ([`NodeType`] with its [`Description`],
-//!   [`CookCx`], optional [`Incremental`] cooking); Studio's core owns the
+//!   and [`CookCx`]); Studio's core owns the
 //!   cooking DAG, the caches and the workers ([`geometry::parallel`]). [`HeldEdit`]s
 //!   apply a held node's authored delta to a data type.
 //! - **Kernels** ([`kernel`]): heavy algorithm libraries one package offers
@@ -118,9 +118,8 @@ pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
 pub use cook::{
-    Category, CookCx, CookPlan, Description, Incremental, Inside, Iteration, Listing, NewCx,
-    NodeRole, NodeType, Outputs, Pass, Passes, Port, Ports, PortsCx, Prepared, Project, Reads,
-    Resolved, RowsFor, SchemaCx,
+    Category, CookCx, Description, Inside, Iteration, Listing, NewCx, NodeRole, NodeType, Outputs,
+    Pass, Passes, Port, Ports, PortsCx, Project, Reads, Resolved, RowsFor, SchemaCx,
 };
 pub use data::{Data, Typed};
 pub use data_type::{Color, DataType, InfoRow, Stamp, stamp_of};

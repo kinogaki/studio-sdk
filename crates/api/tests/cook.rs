@@ -1,28 +1,35 @@
 //! The cook contract through toy nodes over a toy "numbers" data type: a
-//! Scale node (parameters, ports, parallel work, scratch, incremental
-//! updates) and a held edit that adds an authored delta.
+//! Scale node (parameters, ports, parallel work, scratch) and a held edit that adds an authored delta.
 use kinogaki_studio_api::cook::Arity;
 use kinogaki_studio_api::*;
 use kinogaki_studio_api_testing::assert_refused;
 use std::any::Any;
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 static NUMBERS: LazyLock<Typed<Vec<f64>>> =
     LazyLock::new(|| Typed::new(DataTypeId::declared("toy.numbers.list")));
 static OFFSETS: LazyLock<Typed<Vec<f64>>> =
     LazyLock::new(|| Typed::new(DataTypeId::declared("toy.numbers.offsets")));
 
-thread_local! {
-    /// Counts how often Scale really cooked (not from its plan), per test
-    /// thread: tests run side by side, and cooks run on the calling thread.
-    static FULL_COOKS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
 /// Scale: every number of every wire on port 0 times `factor`, written
 /// in parallel. Its scratch counts cooks of the node.
 struct Scale;
-impl Scale {
-    fn compute(cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
+impl NodeType for Scale {
+    fn id(&self) -> NodeTypeId {
+        NodeTypeId::declared("toy.numbers.scale")
+    }
+    fn description(&self) -> Description {
+        Description::new("Scale")
+            .input(Port::new("numbers", "Numbers", NUMBERS.id()).multi())
+            .output(Port::new("numbers", "Numbers", NUMBERS.id()))
+            .parameters(Schema::default().parameter(params::Parameter::new(
+                "factor",
+                "Factor",
+                params::ValueKind::Number(params::Number::plain()),
+                1.0,
+            )))
+    }
+    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
         cx.check()?;
         let factor = cx.number("factor")?;
         let mut values: Vec<f64> = inputs[cx.port(0)]
@@ -41,56 +48,6 @@ impl Scale {
         Ok(outputs)
     }
 }
-impl NodeType for Scale {
-    fn id(&self) -> NodeTypeId {
-        NodeTypeId::declared("toy.numbers.scale")
-    }
-    fn description(&self) -> Description {
-        Description::new("Scale")
-            .input(Port::new("numbers", "Numbers", NUMBERS.id()).multi())
-            .output(Port::new("numbers", "Numbers", NUMBERS.id()))
-            .parameters(Schema::default().parameter(params::Parameter::new(
-                "factor",
-                "Factor",
-                params::ValueKind::Number(params::Number::plain()),
-                1.0,
-            )))
-    }
-    fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error> {
-        FULL_COOKS.set(FULL_COOKS.get() + 1);
-        Self::compute(cx, inputs)
-    }
-    fn incremental(&self) -> Option<&dyn Incremental> {
-        Some(self)
-    }
-}
-impl Incremental for Scale {
-    fn prepare(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Prepared, Error> {
-        Ok(Prepared {
-            outputs: self.cook(cx, inputs)?,
-            plan: Some(Arc::new(ScalePlan {
-                input: inputs[0].clone(),
-            })),
-        })
-    }
-}
-
-/// Scale's plan: valid while its input is the same value.
-struct ScalePlan {
-    input: Data,
-}
-impl CookPlan for ScalePlan {
-    fn update(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Option<Outputs>, Error> {
-        if !inputs[0].ptr_eq(&self.input) {
-            return Ok(None);
-        }
-        Scale::compute(cx, inputs).map(Some)
-    }
-    fn memory(&self) -> usize {
-        0
-    }
-}
-
 /// Offsets: a held edit adding one authored offset per number, and the
 /// first number of input 1 to every one when the delta is longer than the
 /// base.
@@ -192,39 +149,6 @@ fn a_cancelled_cook_reports_cancelled() {
         Scale.cook(&mut cx, &[numbers(&[1.0])]).unwrap_err(),
         Error::cancelled()
     );
-}
-
-#[test]
-fn plans_update_until_their_input_changes() {
-    let cancel = CancelToken::default();
-    let mut scratch = None;
-    let input = numbers(&[1.0, 2.0]);
-    let parameters = factor(2.0);
-    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
-    let prepared = Scale
-        .incremental()
-        .unwrap()
-        .prepare(&mut cx, std::slice::from_ref(&input))
-        .unwrap();
-    let plan = prepared.plan.unwrap();
-    let before = FULL_COOKS.get();
-    // A drag of the factor updates from the plan.
-    let parameters = factor(3.0);
-    let mut cx = CookCx::new(&parameters, &cancel, &mut scratch);
-    let updated = plan
-        .update(&mut cx, std::slice::from_ref(&input))
-        .unwrap()
-        .unwrap();
-    assert_eq!(NUMBERS.get(&updated.data[0]), Some(&vec![3.0, 6.0]));
-    assert_eq!(FULL_COOKS.get(), before);
-    // A new input ends the plan; it can't reprepare.
-    let other = numbers(&[1.0, 2.0]);
-    assert!(
-        plan.update(&mut cx, std::slice::from_ref(&other))
-            .unwrap()
-            .is_none()
-    );
-    assert!(plan.reprepare(&mut cx, &[other]).unwrap().is_none());
 }
 
 /// Bare data types for the registry: no facets, a codec that refuses.

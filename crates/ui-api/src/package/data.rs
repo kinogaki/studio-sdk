@@ -7,7 +7,6 @@ use crate::{Id, Rect};
 use kinogaki_studio_api::Parameters;
 use kinogaki_studio_api::cook::Handle;
 use kinogaki_studio_api::edit::select::{Expand, Mode};
-use kinogaki_studio_api::params::Unit;
 use std::sync::Arc;
 
 /// One selection level of a context (Face, Edge, CV…), what the levels
@@ -152,89 +151,4 @@ pub enum PanelScope {
     View,
     /// The whole view pane (a tool's card): drawn once, over every view.
     Pane,
-}
-
-/// The numeric bar under the active view: its fields in order.
-#[derive(Clone, Debug, PartialEq)]
-pub struct NumericFields {
-    /// The fields.
-    pub fields: Vec<BarField>,
-    /// What the numbers measure.
-    pub unit: Unit,
-}
-
-/// One field of the numeric bar.
-#[derive(Clone, Debug, PartialEq)]
-pub struct BarField {
-    /// Shown before the field; `None`: an axis (X, Y, Z by position, in
-    /// the axis colors).
-    pub name: Option<String>,
-    /// What it holds.
-    pub value: BarValue,
-    /// Greyed, with this reason on hover: it takes no value.
-    pub unavailable: Option<String>,
-}
-
-/// What a numeric bar field holds.
-#[derive(Clone, Debug, PartialEq)]
-pub enum BarValue {
-    /// A number typed in.
-    Number(f64),
-    /// A whole number, unitless.
-    Count(u32),
-    /// One of `labels`, `at` chosen.
-    Choice {
-        /// The choices.
-        labels: Vec<String>,
-        /// The chosen one.
-        at: usize,
-    },
-}
-
-impl BarValue {
-    /// The value [`NumericBar::apply`](super::NumericBar::apply)
-    /// gets as current.
-    pub fn value(&self) -> f64 {
-        match *self {
-            Self::Number(v) => v,
-            Self::Count(n) => f64::from(n),
-            Self::Choice { at, .. } => at as f64,
-        }
-    }
-}
-
-/// How a context's time is labelled and stepped.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum TimeUnits {
-    /// Frames at this many a second.
-    Frames(f64),
-    /// Seconds, labelled h:mm:ss.
-    Clock,
-}
-
-/// A mark on a context's time ruler.
-#[derive(Clone, Debug, PartialEq)]
-pub struct TimeMark {
-    /// Where, in seconds.
-    pub at: f64,
-    /// A layer's start (true) or a key.
-    pub layer: bool,
-    /// Its name, on hover.
-    pub label: String,
-}
-
-/// A context's own time, which the Timeline shows and drives instead of
-/// the scene's while the context is open (CAM: the print's seconds).
-#[derive(Clone, Debug, PartialEq)]
-pub struct TimeDomain {
-    /// Start and end, in seconds.
-    pub range: (f64, f64),
-    /// How the ruler labels, snaps and steps.
-    pub units: TimeUnits,
-    /// Sorted by time; built once a result and shared.
-    pub marks: Arc<[TimeMark]>,
-    /// Now.
-    pub current: f64,
-    /// The playback speeds offered; none: 1×.
-    pub speeds: Vec<f64>,
 }

@@ -5,7 +5,7 @@
 //! dirty propagation and invalidation, the per-node result cache and its
 //! memory budget, latest-wins scheduling and cancellation, worker threads,
 //! held edits and time dependency. Packages own only what a node computes:
-//! [`NodeType::cook`], optionally [`Incremental`] cooking, and the
+//! [`NodeType::cook`] and the
 //! [`Reads`] that say what besides its inputs and parameters invalidates
 //! it. A package never keeps an evaluator, a worker or a private cache:
 //! per-node state lives in the core-owned scratch slot
@@ -18,7 +18,6 @@ mod binding;
 mod context;
 mod description;
 mod handle;
-mod incremental;
 mod placement;
 mod sheet;
 
@@ -28,7 +27,6 @@ pub use description::{
     Arity, Category, Description, Listing, NodeRole, Port, Ports, Reach, Unwired,
 };
 pub use handle::{Constraint, Handle, HandleKind, Space};
-pub use incremental::{CookPlan, Incremental, Prepared};
 pub use placement::Placement;
 pub use sheet::{NewCx, PortsCx, RowsFor, SchemaCx};
 
@@ -288,12 +286,6 @@ pub trait NodeType: Any + Send + Sync {
     /// cancellation and split work with
     /// [`geometry::parallel`](crate::geometry::parallel).
     fn cook(&self, cx: &mut CookCx<'_>, inputs: &[Data]) -> Result<Outputs, Error>;
-
-    /// Its incremental cooking, when it has any (an interactive drag of a
-    /// parameter then reuses prepared work).
-    fn incremental(&self) -> Option<&dyn Incremental> {
-        None
-    }
 
     /// Whether a cook with `parameters` reads wire `wire` of input `port`,
     /// which holds `wires` wires: a Switch reads its chosen wire only.

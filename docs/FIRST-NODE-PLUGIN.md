@@ -494,4 +494,4 @@ Start Studio: Settings ▸ Plugins lists Boxes, loaded or with the reason it isn
 
 - [Write your first context plugin](FIRST-CONTEXT-PLUGIN.md): a context with its own UI, levels, commands and an inspector row.
 - A node that reads inputs declares input `Port`s; its cook receives the wired values in port order (`CookCx::port` says which are whose). The inputs must be of data types some installed package registers. Studio's own Mesh and CAD data are its plugins' types, whose kernels are not public, so a third-party node works on its own data types (or another public package's).
-- A node that updates quickly during a drag implements `NodeType::incremental`; one that shapes its inspector rows from what is wired implements `NodeType::schema`. See [Cooking](ARCHITECTURE.md#cooking) and [What a plugin uses](ARCHITECTURE.md#what-a-plugin-uses).
+- A node that shapes its inspector rows from what is wired implements `NodeType::schema`. See [Cooking](ARCHITECTURE.md#cooking) and [What a plugin uses](ARCHITECTURE.md#what-a-plugin-uses).

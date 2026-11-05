@@ -1,26 +1,24 @@
 //! What a context adds to the viewport, one capability a trait: its live
 //! tools' input ([`LiveTools`]), its floating panels ([`Panels`]), the
 //! host's transform gizmo over its selection ([`Transforms`]), what it
-//! draws over the open object ([`Display`]), its own time
-//! ([`Timeline`]) and a live tool's numeric bar ([`NumericBar`]). The rest
+//! draws over the open object ([`Display`]). The rest
 //! of the viewport is core's: the left toolbar, the status bar, framing,
 //! the gizmo, pivot picks and component picks (through
 //! [`Levels`](crate::package::Levels)).
 use super::part;
 use crate::gizmo::{TransformPhase, TransformStep};
 use crate::host::{Cx, NodeRef, ViewCx};
-use crate::package::data::{Ended, GizmoUse, LiveHandles, NumericFields, Panel, Takes, TimeDomain};
+use crate::package::data::{Ended, GizmoUse, LiveHandles, Panel, Takes};
 use crate::package::edited::Edited;
 use crate::package::view::{Holds, KeyPress};
 use crate::sheet::{Edits, Schema};
 use crate::{Painter, Ui};
 use kinogaki_studio_api::Parameters;
-use kinogaki_studio_api::geometry::Geometry;
 
 part! {
     /// A context's live tools over the views: their input, keys and
     /// gestures. What a tool draws is the context's [`Display`] and
-    /// [`Panels`]; its numeric bar its [`NumericBar`].
+    /// [`Panels`].
     pub trait LiveTools<S> {
         /// A live tool's input in a view, before camera navigation: its
         /// drags, clicks and wheel (Alt's drags are the camera's), read
@@ -78,19 +76,6 @@ part! {
         /// to `values`.
         fn set_rows(&self, s: &mut S, cx: &mut dyn Cx, values: &Parameters) {
             let _ = (s, cx, values);
-        }
-        /// The open object's own snap targets beyond its shown value (a
-        /// curve's control points, a sketch's points and lines), in its
-        /// space: points snap as points, polylines as edges, their middles
-        /// and where they cross. [`ViewCx::snap`] and the host's gizmo
-        /// search them with the shown value, in one order and with one
-        /// feedback. Asked once a frame, before the views'
-        /// [`tools`](Self::tools); the same value (its positions and
-        /// topology shared) while nothing changed costs nothing. `None`:
-        /// none.
-        fn own_targets(&self, s: &S, cx: &dyn Cx) -> Option<Geometry> {
-            let _ = (s, cx);
-            None
         }
     }
 }
@@ -176,29 +161,5 @@ part! {
         fn overlay(&self, s: &S, cx: &dyn ViewCx, painter: &dyn Painter) {
             let _ = (s, cx, painter);
         }
-    }
-}
-
-part! {
-    /// A context's own time, which the Timeline shows and drives instead
-    /// of the scene's while the context is open (a print's seconds).
-    pub trait Timeline<S> {
-        /// Its time now; `None`: the scene's (nothing of its own to show).
-        fn time(&self, s: &S, cx: &dyn Cx) -> Option<TimeDomain>;
-        /// Shows the context at time `t`, in seconds (a scrub, a step or a
-        /// played frame).
-        fn set_time(&self, s: &mut S, cx: &mut dyn Cx, t: f64);
-    }
-}
-
-part! {
-    /// A live tool's numeric bar: while it gives one, it stands in the
-    /// transform tool's place under the active view.
-    pub trait NumericBar<S> {
-        /// Its fields now; `None`: no bar.
-        fn fields(&self, s: &S, cx: &dyn Cx) -> Option<NumericFields>;
-        /// A value typed or chosen in field `field` of
-        /// [`fields`](Self::fields) (`current`: what the field held).
-        fn apply(&self, s: &mut S, cx: &mut dyn Cx, field: usize, current: f64, value: f64);
     }
 }

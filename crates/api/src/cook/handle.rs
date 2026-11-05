@@ -230,8 +230,7 @@ pub enum Constraint {
 /// its context is open, Studio draws each handle whose [`Handle::when`]
 /// holds, hit-tests it, snaps its drags with the user's snapping, writes
 /// the bound parameters as the pointer moves (the node recooks through
-/// the usual cooking, incrementally where the node type is
-/// [`Incremental`](super::Incremental)) and records the whole drag as one
+/// the usual cooking) and records the whole drag as one
 /// undo step; inside a live tool's open gesture the drag is part of that
 /// gesture instead, and Escape puts back the drag alone. A handle reads
 /// and writes its numbers at the scene's current time: an animated row is

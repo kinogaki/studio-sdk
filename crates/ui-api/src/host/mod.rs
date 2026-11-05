@@ -227,8 +227,7 @@ pub trait ViewCx: Cx {
 /// The value a [`ViewCx::snap`] searches.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapOn {
-    /// The open object's shown value, with the targets its layer adds
-    /// through [`LiveTools::own_targets`](crate::package::LiveTools::own_targets).
+    /// The open object's shown value.
     Open,
     /// That object's shown value.
     Object(ObjectRef),

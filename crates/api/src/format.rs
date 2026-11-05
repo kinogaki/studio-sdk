@@ -181,7 +181,6 @@ pub trait FileFormat: Send + Sync {
                 Value::Color(c) => Field::F64s(c.to_vec()),
                 Value::Choice(v) => Field::Text(v.to_string()),
                 Value::Text(v) => Field::Text(v.clone()),
-                Value::Texts(v) => Field::Texts(v.clone()),
                 Value::Ramp(_) | Value::ToneCurves(_) | Value::Object(_) | Value::Data(_) => {
                     return Err(Error::invalid(format_args!(
                         "option {name}: a format's options hold no ramps, curves, objects or data"
@@ -212,7 +211,6 @@ pub trait FileFormat: Send + Sync {
                 (Value::Color(_), FieldRef::F64s(&[r, g, b])) => Value::Color([r, g, b]),
                 (Value::Choice(_), FieldRef::Text(v)) => Value::Choice(v.into()),
                 (Value::Text(_), FieldRef::Text(v)) => Value::Text(v.to_owned()),
-                (Value::Texts(_), FieldRef::Texts(v)) => Value::Texts(v.to_vec()),
                 _ => return Err(wrong()),
             };
         }

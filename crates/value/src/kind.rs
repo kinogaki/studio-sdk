@@ -29,8 +29,6 @@ pub enum ValueKind {
     Choice {
         /// The entries, in the order shown.
         choices: Vec<Choice>,
-        /// The keys of entries that can't apply now: shown greyed.
-        unavailable: Vec<Arc<str>>,
     },
     /// [`Value::Text`], one line, committed when the edit ends.
     Text,
@@ -94,9 +92,6 @@ pub enum ValueKind {
         /// The channels, in curve order.
         channels: Vec<CurveChannel>,
     },
-    /// [`Value::Texts`]: names a node keeps (the outputs it writes),
-    /// listed, not edited.
-    Texts,
     /// [`Value::Data`] of this registered data type: a record a node's
     /// tools author, never shown as a row and never animated.
     Data(DataTypeId),
@@ -132,12 +127,9 @@ pub struct CurveChannel {
 }
 
 impl ValueKind {
-    /// A choice of `choices`, none unavailable.
+    /// A choice of `choices`.
     pub fn choice(choices: Vec<Choice>) -> Self {
-        Self::Choice {
-            choices,
-            unavailable: Vec::new(),
-        }
+        Self::Choice { choices }
     }
 
     /// An integer in `min..=max`, without a menu.
@@ -181,7 +173,6 @@ impl ValueKind {
             | Self::Reference(_)
             | Self::Attribute { .. }
             | Self::Group
-            | Self::Texts
             | Self::Object(_)
             | Self::Data(_) => false,
         }
@@ -214,7 +205,6 @@ impl ValueKind {
             (Self::Channels(_), Value::Numbers(v)) => v.len() == 4,
             (Self::Ramp { color, .. }, Value::Ramp(r)) => r.color == *color,
             (Self::ToneCurves { channels }, Value::ToneCurves(c)) => c.len() == channels.len(),
-            (Self::Texts, Value::Texts(_)) => true,
             (Self::Object(_), Value::Object(_)) => true,
             (Self::Data(ty), Value::Data(data)) => data.ty() == *ty,
             _ => false,
@@ -537,7 +527,6 @@ mod tests {
         assert!(ValueKind::Number(Number::plain()).animatable());
         assert!(ValueKind::choice(vec![Choice::new("a", "A")]).animatable());
         assert!(!ValueKind::Code.animatable());
-        assert!(!ValueKind::Texts.animatable());
         let ramp = ValueKind::Ramp {
             color: true,
             most: None,

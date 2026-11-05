@@ -118,7 +118,6 @@ fn write_node(node: &NewNode, out: &mut dyn ElementWriter) -> Result<(), Error> 
             Value::Bool(b) => (4, Field::Bool(*b)),
             Value::Choice(key) => (5, Field::Text(key.to_string())),
             Value::Text(t) => (6, Field::Text(t.clone())),
-            Value::Texts(t) => (7, Field::Texts(t.clone())),
             other => {
                 return Err(Error::invalid(format_args!(
                     "a file's material holds no value like {other:?}"
@@ -182,7 +181,6 @@ fn read_node(e: &dyn ElementReader) -> Result<NewNode, Error> {
             (4, FieldRef::Bool(b)) => Value::Bool(b),
             (5, FieldRef::Text(t)) => Value::Choice(t.into()),
             (6, FieldRef::Text(t)) => Value::Text(t.to_owned()),
-            (7, FieldRef::Texts(t)) => Value::Texts(t.to_vec()),
             _ => return Err(wrong("a value isn't of its kind")),
         };
         parameters.insert(name.clone(), value);
@@ -218,8 +216,7 @@ mod tests {
             .with("flip", true)
             .with("count", Value::Integer(i64::MAX))
             .with("offset", Value::Numbers(vec![0.25, 0.5]))
-            .with("tint", Value::Color([1.0, 0.5, 0.25]))
-            .with("names", Value::Texts(vec!["a".into(), "b".into()]));
+            .with("tint", Value::Color([1.0, 0.5, 0.25]));
         let surface = NewNode::new(NodeTypeId::declared("acme.obj.surface")).displayed();
         let (a, b) = (inside.node(image), inside.node(surface));
         inside.wire(a, "out", b, "base");

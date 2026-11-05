@@ -31,8 +31,6 @@ pub enum Value {
     /// Text: a name, an expression, code, a path (to a file, a node, an
     /// object).
     Text(String),
-    /// Several texts: a list of names (the outputs a node writes).
-    Texts(Vec<String>),
     /// A scene object, by the host's id (none: no object): it names the
     /// object through renames and moves, where a path would have to be
     /// rewritten.
@@ -112,14 +110,6 @@ impl Value {
         }
     }
 
-    /// The texts, when they are several.
-    pub fn texts(&self) -> Option<&[String]> {
-        match self {
-            Self::Texts(v) => Some(v),
-            _ => None,
-        }
-    }
-
     /// The ramp, when it is one.
     pub fn ramp(&self) -> Option<&Ramp> {
         match self {
@@ -181,12 +171,6 @@ impl From<String> for Value {
     }
 }
 
-impl From<Vec<String>> for Value {
-    fn from(v: Vec<String>) -> Self {
-        Self::Texts(v)
-    }
-}
-
 impl From<Vec<f64>> for Value {
     fn from(v: Vec<f64>) -> Self {
         Self::Numbers(v)
@@ -231,8 +215,6 @@ mod tests {
         assert_eq!(Value::from("a").choice(), None);
         let ramp = Value::from(Ramp::default_of(false));
         assert_eq!(ramp.ramp().map(|r| r.keys.len()), Some(2));
-        let texts = Value::from(vec!["beauty".to_owned(), "depth".to_owned()]);
-        assert_eq!(texts.texts().map(<[String]>::len), Some(2));
         let data = Typed::<f64>::new(DataTypeId::declared("acme.points.count"));
         let value = Value::from(data.wrap(1.0));
         assert_eq!(value.data().and_then(|d| data.get(d)), Some(&1.0));

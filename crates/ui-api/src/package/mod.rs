@@ -41,8 +41,7 @@
 //! **A context** ([`ContextPart`]) is an id, its [`Library`] (what it
 //! offers the host's menus, keys, Tab and viewport chrome, as data) and a
 //! set of optional parts: the selection [`Levels`]; in the viewport its
-//! [`LiveTools`], [`Panels`], [`Transforms`], [`Display`], [`Timeline`]
-//! and [`NumericBar`]; the [`Inspector`], the [`Vocabulary`] that runs
+//! [`LiveTools`], [`Panels`], [`Transforms`] and [`Display`]; the [`Inspector`], the [`Vocabulary`] that runs
 //! its items, the [`ObjectRows`] for the object
 //! kinds it owns (their creations are the kinds' own,
 //! `ObjectKindSpec::creations`). A part a
@@ -78,8 +77,7 @@ mod settings;
 mod view;
 
 pub use data::{
-    BarField, BarValue, Candidate, Ended, GizmoUse, LevelPreset, LevelSpec, LiveHandles,
-    NumericFields, Panel, PanelScope, Takes, TimeDomain, TimeMark, TimeUnits,
+    Candidate, Ended, GizmoUse, LevelPreset, LevelSpec, LiveHandles, Panel, PanelScope, Takes,
 };
 pub use display::{DisplayKind, DisplayOption, DisplayScope};
 pub use edited::{Edited, Ghost, GhostTone};
@@ -89,8 +87,8 @@ pub use library::{
     ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
 pub use parts::{
-    Display, Inspector, Invoked, Levels, LiveTools, NumericBar, ObjectRows, Panels, RowAction,
-    Timeline, Transforms, Vocabulary,
+    Display, Inspector, Invoked, Levels, LiveTools, ObjectRows, Panels, RowAction, Transforms,
+    Vocabulary,
 };
 pub use settings::{PageRows, SettingsPage};
 pub use view::{Holds, KeyPress};
@@ -150,10 +148,6 @@ pub struct ContextPart<S: ?Sized> {
     pub transforms: Option<Box<dyn Transforms<S>>>,
     /// What it draws in the views.
     pub display: Option<Box<dyn Display<S>>>,
-    /// Its own time.
-    pub timeline: Option<Box<dyn Timeline<S>>>,
-    /// A live tool's numeric bar.
-    pub numeric: Option<Box<dyn NumericBar<S>>>,
     /// Its inspector.
     pub inspector: Option<Box<dyn Inspector<S>>>,
     /// Its tools and commands.
@@ -186,8 +180,6 @@ impl<S: ?Sized> ContextPart<S> {
             panels: None,
             transforms: None,
             display: None,
-            timeline: None,
-            numeric: None,
             inspector: None,
             vocabulary: None,
             objects: None,
@@ -211,10 +203,6 @@ impl<S: ?Sized> ContextPart<S> {
         with_transforms: transforms: Transforms,
         /// With what it draws in the views.
         with_display: display: Display,
-        /// With its own time.
-        with_timeline: timeline: Timeline,
-        /// With a numeric bar.
-        with_numeric: numeric: NumericBar,
         /// With an inspector.
         with_inspector: inspector: Inspector,
         /// With a vocabulary.
@@ -235,8 +223,6 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("panels", &has(self.panels.is_some()))
             .field("transforms", &has(self.transforms.is_some()))
             .field("display", &has(self.display.is_some()))
-            .field("timeline", &has(self.timeline.is_some()))
-            .field("numeric", &has(self.numeric.is_some()))
             .field("inspector", &has(self.inspector.is_some()))
             .field("vocabulary", &has(self.vocabulary.is_some()))
             .field("objects", &has(self.objects.is_some()))

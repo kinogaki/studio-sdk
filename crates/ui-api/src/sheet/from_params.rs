@@ -3,7 +3,7 @@
 //! holds its parameter's value as it is, so an edit is the parameter's new
 //! value.
 use super::{Field, FileDialog, Item, Kind, Number, NumberStyle, Schema, Section};
-use kinogaki_studio_api::params::{self, SchemaItem, Unit, Value, ValueKind};
+use kinogaki_studio_api::params::{self, SchemaItem, Unit, ValueKind};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
 /// each parameter a field keyed by its name, with its help as the tooltip
@@ -45,16 +45,11 @@ impl From<&params::Schema> for Schema<String> {
 /// Parameter `p`'s field: its kind's, its help as the tooltip (or its
 /// problem, shown as an error), its keywords for search.
 fn field(p: &params::Parameter) -> Field<String> {
-    let value = match &p.value {
-        // Texts show as one read-only line of their names.
-        Value::Texts(names) => Value::Text(names.join(", ")),
-        other => other.clone(),
-    };
     let mut field = Field::new(
         p.name.clone(),
         p.label.clone(),
         Kind::from(&p.kind),
-        Some(value),
+        Some(p.value.clone()),
     );
     field.enabled = p.enabled;
     field.tooltip = (!p.help.is_empty()).then(|| p.help.clone().into());
@@ -109,12 +104,8 @@ impl From<&ValueKind> for Kind {
                 Kind::Number(Number::integer(*min as f64..=*max as f64))
             }
             ValueKind::Toggle => Kind::Toggle,
-            ValueKind::Choice {
-                choices,
-                unavailable,
-            } => Kind::Choice {
+            ValueKind::Choice { choices } => Kind::Choice {
                 choices: choices.clone(),
-                unavailable: unavailable.clone(),
             },
             ValueKind::Text => Kind::Text,
             ValueKind::Code => Kind::Code {
@@ -161,7 +152,7 @@ impl From<&ValueKind> for Kind {
             },
             // Never a field (see the schema's sheet); read-only text if
             // one is made of it alone.
-            ValueKind::Texts | ValueKind::Data(_) => Kind::Info,
+            ValueKind::Data(_) => Kind::Info,
         }
     }
 }
@@ -170,6 +161,7 @@ impl From<&ValueKind> for Kind {
 mod tests {
     use super::*;
     use crate::sheet::ramp;
+    use kinogaki_studio_api::params::Value;
     use kinogaki_studio_api::params::{Choice, Parameter, RefFilter};
 
     #[test]
@@ -290,12 +282,6 @@ mod tests {
                 "Gain",
                 ValueKind::Channels(params::Number::plain().range(0.0, 4.0)),
                 vec![1.0; 4],
-            ))
-            .parameter(Parameter::new(
-                "outputs",
-                "Outputs",
-                ValueKind::Texts,
-                vec!["beauty".to_owned(), "depth".to_owned()],
             ));
         for item in &schema.items {
             let SchemaItem::Parameter(p) = item else {
@@ -316,13 +302,10 @@ mod tests {
             field("gain").kind,
             Kind::Channels { linked: false, .. }
         ));
-        let outputs = field("outputs");
-        assert!(matches!(outputs.kind, Kind::Info));
-        assert_eq!(outputs.value, Some(Value::Text("beauty, depth".into())));
     }
 
     /// What a node type's `schema` fills in shows: an attribute menu, a
-    /// wire menu over the integers, greyed choices, a problem as an error,
+    /// wire menu over the integers, a choice, a problem as an error,
     /// and a button.
     #[test]
     fn shaped_rows_show_their_menus_problems_and_buttons() {
@@ -350,10 +333,7 @@ mod tests {
             .parameter(Parameter::new(
                 "mode",
                 "Mode",
-                ValueKind::Choice {
-                    choices: abc,
-                    unavailable: vec!["b".into()],
-                },
+                ValueKind::choice(abc),
                 Value::Choice("a".into()),
             ))
             .parameter(
@@ -368,17 +348,10 @@ mod tests {
         );
         assert!(matches!(&field("index").kind, Kind::Dropdown { items, .. } if items.len() == 2));
         assert_eq!(sheet.index(&"index".to_owned()), Some(1));
-        let Kind::Choice {
-            choices,
-            unavailable,
-        } = &field("mode").kind
-        else {
+        let Kind::Choice { choices } = &field("mode").kind else {
             panic!()
         };
-        assert!(
-            !crate::sheet::segments(choices, unavailable),
-            "a menu, one greyed"
-        );
+        assert!(crate::sheet::segments(choices), "two short ones: segments");
         assert!(field("group").error);
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
     }

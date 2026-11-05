@@ -76,8 +76,6 @@ pub trait Runner: Send {
     /// What the last run's plan writes in a final render: each file, as the
     /// plan names it, and its image.
     fn written(&self) -> &[(String, RunImage)];
-    /// Drops what it keeps (the network was closed).
-    fn clear(&mut self);
 }
 
 /// How a compiled context's runner is made on a host's device.

@@ -1,15 +1,14 @@
 //! A context's viewport parts as the host holds them: each part a package
 //! gives is there and no other, and every call to one reaches the
 //! package's own part with its own state (the erased forms are made from
-//! each trait's one definition): the gizmo it shows and its drags, its
-//! time, its numeric bar, its tools' cancels, all on the fake host.
+//! each trait's one definition): the gizmo it shows and its drags and its
+//! tools' cancels, all on the fake host.
 use kinogaki_studio_api::Vec3;
 use kinogaki_studio_api::{ContextId, Package, PackageId};
 use studio_ui_api::gizmo::{Handle, TransformPhase, TransformStep, TransformTool};
 use studio_ui_api::host::{Cx, ViewCx, Waker};
 use studio_ui_api::package::{
-    BarField, BarValue, ContextPart, Ended, GizmoUse, LiveTools, NumericBar, NumericFields, Takes,
-    TimeDomain, TimeUnits, Timeline, Transforms, UiPackage, WithUi,
+    ContextPart, Ended, GizmoUse, LiveTools, Takes, Transforms, UiPackage, WithUi,
 };
 use studio_ui_api::{Pos, Rect, Vec2};
 use studio_ui_api_testing::{FakeHost, Hosting};
@@ -23,8 +22,6 @@ fn context() -> ContextId {
 struct Clock {
     gizmo: GizmoUse,
     phases: Vec<TransformPhase>,
-    at: f64,
-    typed: Option<(usize, f64)>,
     ended: Vec<Ended>,
 }
 
@@ -57,37 +54,6 @@ impl Transforms<Clock> for Parts {
     }
 }
 
-impl Timeline<Clock> for Parts {
-    fn time(&self, s: &Clock, _cx: &dyn Cx) -> Option<TimeDomain> {
-        Some(TimeDomain {
-            range: (0.0, 60.0),
-            units: TimeUnits::Clock,
-            marks: Vec::new().into(),
-            current: s.at,
-            speeds: Vec::new(),
-        })
-    }
-    fn set_time(&self, s: &mut Clock, _cx: &mut dyn Cx, t: f64) {
-        s.at = t;
-    }
-}
-
-impl NumericBar<Clock> for Parts {
-    fn fields(&self, s: &Clock, _cx: &dyn Cx) -> Option<NumericFields> {
-        Some(NumericFields {
-            fields: vec![BarField {
-                name: Some("At".into()),
-                value: BarValue::Number(s.at),
-                unavailable: None,
-            }],
-            unit: kinogaki_studio_api::params::Unit::Plain,
-        })
-    }
-    fn apply(&self, s: &mut Clock, _cx: &mut dyn Cx, field: usize, _current: f64, value: f64) {
-        s.typed = Some((field, value));
-    }
-}
-
 struct Ui;
 
 impl UiPackage for Ui {
@@ -99,9 +65,7 @@ impl UiPackage for Ui {
         vec![
             ContextPart::new(context())
                 .with_tools(Parts)
-                .with_transforms(Parts)
-                .with_timeline(Parts)
-                .with_numeric(Parts),
+                .with_transforms(Parts),
         ]
     }
 }
@@ -118,7 +82,6 @@ fn a_context_has_the_parts_it_gives_and_no_other() {
     let (_, hosting) = hosted();
     let context = &hosting.registered().contexts[0];
     assert!(context.tools.is_some() && context.transforms.is_some());
-    assert!(context.timeline.is_some() && context.numeric.is_some());
     assert!(context.panels.is_none() && context.display.is_none() && context.levels.is_none());
 }
 
@@ -140,12 +103,6 @@ fn every_call_reaches_the_packages_own_part_with_its_state() {
             ],
         );
         transforms.transform(s, &mut host, TransformPhase::Began, &step);
-        let timeline = context.timeline.as_ref().unwrap();
-        timeline.set_time(s, &mut host, 12.5);
-        assert_eq!(timeline.time(s, &host).map(|t| t.current), Some(12.5));
-        let numeric = context.numeric.as_ref().unwrap();
-        assert!(numeric.fields(s, &host).is_some());
-        numeric.apply(s, &mut host, 0, 12.5, 3.0);
         context
             .tools
             .as_ref()
@@ -154,7 +111,6 @@ fn every_call_reaches_the_packages_own_part_with_its_state() {
     });
     let clock = hosting.state::<Clock>();
     assert_eq!(clock.phases, [TransformPhase::Began]);
-    assert_eq!((clock.at, clock.typed), (12.5, Some((0, 3.0))));
     assert_eq!(clock.ended, [Ended::Undo]);
 }
 

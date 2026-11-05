@@ -10,7 +10,6 @@
 //! | Bool | [`Bool`](Field::Bool) |
 //! | Choice | [`Text`](Field::Text): its key |
 //! | Text | [`Text`](Field::Text) |
-//! | Texts | [`Texts`](Field::Texts) |
 //! | Ramp | [`F64s`](Field::F64s): a key after another, each its position, its value (one channel, or three) and its interpolation's place in `Interpolation::ALL` |
 //! | ToneCurves | [`F64s`](Field::F64s): a curve after another, its interpolation (0 monotone, 1 linear), its key count, then its keys' x, y |
 //!
@@ -37,7 +36,6 @@ pub fn field_of(name: &str, value: &Value) -> Result<Field, Error> {
         Value::Bool(b) => Field::Bool(*b),
         Value::Choice(key) => Field::Text(key.to_string()),
         Value::Text(t) => Field::Text(t.clone()),
-        Value::Texts(t) => Field::Texts(t.clone()),
         Value::Object(_) => return Err(refused("an object saves with its kind's codec")),
         Value::Ramp(r) if r.keys.is_empty() => return Err(refused("a ramp with no key")),
         Value::Ramp(r) => Field::F64s(ramp_numbers(r)),
@@ -74,10 +72,6 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
         FieldRef::Text(t) => Ok(t),
         _ => Err(wrong("a string")),
     };
-    let texts = || match field {
-        FieldRef::Texts(t) => Ok(t.to_vec()),
-        _ => Err(wrong("a list of strings")),
-    };
     Ok(match kind {
         Some(K::Number(_)) => Value::Number(number()?),
         Some(K::Integer { .. }) => Value::Integer(integer()?),
@@ -104,7 +98,6 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
             Value::ToneCurves(curves_of(numbers()?).ok_or_else(|| wrong("tone curves"))?)
         }
         Some(K::Vector { .. } | K::Channels(_)) => Value::Numbers(numbers()?.to_vec()),
-        Some(K::Texts) => Value::Texts(texts()?),
         Some(K::Object(_)) => return Err(wrong("a node's or a tool's value")),
         Some(K::Data(_)) => return Err(wrong("a data element")),
         None => match field {
@@ -113,7 +106,6 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
             FieldRef::Int(n) => Value::Integer(n),
             FieldRef::Bool(b) => Value::Bool(b),
             FieldRef::Text(t) => Value::Text(t.to_owned()),
-            FieldRef::Texts(t) => Value::Texts(t.to_vec()),
             _ => return Err("is no parameter value".to_owned()),
         },
     })

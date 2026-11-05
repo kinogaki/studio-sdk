@@ -177,10 +177,7 @@ impl<K> Field<K> {
 
     /// A choice of `choices`, at the one keyed `chosen`.
     pub fn choice(key: K, label: impl Into<Text>, chosen: &str, choices: Vec<Choice>) -> Self {
-        let kind = Kind::Choice {
-            choices,
-            unavailable: Vec::new(),
-        };
+        let kind = Kind::Choice { choices };
         Self::new(key, label, kind, Some(Value::Choice(chosen.into())))
     }
 

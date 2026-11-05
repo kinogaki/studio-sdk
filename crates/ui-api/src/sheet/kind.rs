@@ -4,7 +4,6 @@
 use super::{Number, Text};
 use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::params::{Choice, CurveChannel};
-use std::sync::Arc;
 
 /// The type of a field and how it is presented. Each kind says which
 /// [`Value`](kinogaki_studio_api::Value) variant its field holds; a kind
@@ -45,8 +44,6 @@ pub enum Kind {
     Choice {
         /// The entries, in order.
         choices: Vec<Choice>,
-        /// The keys of entries that can't apply now: greyed.
-        unavailable: Vec<Arc<str>>,
     },
     /// `Value::Integer`: an entry's position in a menu of `items` (a wire,
     /// a format, a list the owner keeps).
@@ -157,13 +154,10 @@ pub enum Kind {
     },
 }
 
-/// Whether a choice of `choices`, those keyed in `unavailable` greyed,
-/// shows as segments: three at most, 18 characters together at most and
-/// none unavailable. Otherwise it shows as a menu.
-pub fn segments(choices: &[Choice], unavailable: &[Arc<str>]) -> bool {
-    choices.len() <= 3
-        && choices.iter().map(|c| c.label.len()).sum::<usize>() <= 18
-        && unavailable.is_empty()
+/// Whether a choice of `choices` shows as segments: three at most, 18
+/// characters together at most. Otherwise it shows as a menu.
+pub fn segments(choices: &[Choice]) -> bool {
+    choices.len() <= 3 && choices.iter().map(|c| c.label.len()).sum::<usize>() <= 18
 }
 
 /// The file dialog of a [`Kind::Path`] field's folder button.
