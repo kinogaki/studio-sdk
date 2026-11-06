@@ -1,11 +1,15 @@
-//! What an engine's GPU tests share: this machine's device, offscreen, and
-//! the engine's wakes counted with a way to wait on them.
+//! What an engine's GPU tests share: this machine's device, offscreen, the
+//! tests' turns on it, and the engine's wakes counted with a way to wait on
+//! them.
 use kinogaki_render_api::display::wgpu;
 use kinogaki_render_api::{Pending, Wake};
 use std::future::Future;
 use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
+
+mod turns;
+pub use turns::{alone, share};
 
 /// `future`'s output, polled to completion (wgpu's requests resolve without
 /// a runtime).
@@ -20,11 +24,14 @@ pub fn ready<F: Future>(future: F) -> F::Output {
     }
 }
 
-/// This machine's GPU, offscreen: its high-performance adapter's device.
+/// This machine's GPU, offscreen: its high-performance adapter's device,
+/// with the test's turn on it taken ([`share`]; nothing more after
+/// [`alone`]).
 ///
 /// # Panics
 /// With no adapter or device.
 pub fn device() -> (wgpu::Device, wgpu::Queue) {
+    share();
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
     let options = wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,

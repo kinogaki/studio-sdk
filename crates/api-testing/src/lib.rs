@@ -1,8 +1,8 @@
 //! The SDK's test support (a dev-dependency only): [`assert_refused`] for
-//! admission tests, with `wgpu` an engine's GPU tests' device and counted
-//! wakes (`engine`), and the conformance suite of the standard data types:
-//! producers make
-//! standard values, consumers check them, and [`run`] tries every pair.
+//! admission tests, with `wgpu` an engine's GPU tests' device, their turns
+//! on it and counted wakes (`engine`), and the conformance suite of the
+//! standard data types: producers make standard values, consumers check
+//! them, and [`run`] tries every pair.
 //!
 //! A kernel implements [`Producer`] in its own repository (its operations'
 //! outputs over the fixtures), a render engine or a format implements
