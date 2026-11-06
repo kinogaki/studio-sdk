@@ -14,10 +14,12 @@
 //! (after its locals, devices and engines among them, are dropped). [`alone`] waits for every turn to end, holds the GPU by
 //! itself, and tests asking for a turn meanwhile wait for it; in this
 //! process, tests waiting to be alone go before new shared turns. Between
-//! processes a turn is an advisory lock on one file in the temporary
-//! directory (shared or exclusive), so every process's tests take turns.
+//! processes a turn is an advisory lock (shared or exclusive) on one file,
+//! `~/.kinogaki/gpu-turns.lock`, so every process's tests take turns,
+//! whichever checkout or session runs them.
 use std::cell::RefCell;
 use std::fs::File;
+use std::path::Path;
 use std::sync::{Condvar, Mutex, MutexGuard};
 
 /// This process's turns.
@@ -52,7 +54,11 @@ fn wait(turns: MutexGuard<'static, Turns>) -> MutexGuard<'static, Turns> {
 
 /// The lock file every process's turns share.
 fn lock_file() -> File {
-    let path = std::env::temp_dir().join("kinogaki-gpu-turns.lock");
+    let home = std::env::var_os("HOME").expect("HOME: the GPU turns' lock is in ~/.kinogaki");
+    let folder = Path::new(&home).join(".kinogaki");
+    std::fs::create_dir_all(&folder)
+        .unwrap_or_else(|e| panic!("the GPU turns' folder {}: {e}", folder.display()));
+    let path = folder.join("gpu-turns.lock");
     File::options()
         .create(true)
         .truncate(false)
