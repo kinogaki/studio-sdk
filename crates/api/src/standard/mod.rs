@@ -48,7 +48,7 @@ pub use color::ColorConfiguration;
 pub use geometry::GeometryCodec;
 pub use image::ImageCodec;
 pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
-pub use light::LightCodec;
+pub use light::{LightCodec, light_value};
 pub use materials::{ImportedMaterial, MaterialsCodec};
 pub use output::{BackgroundSpace, DisplayOutput};
 
@@ -122,7 +122,7 @@ pub(crate) const LIGHT: &str = "kinogaki.core.light";
 
 /// The handle on light values (`LIGHT`): render-api's standard
 /// [`Light`](kinogaki_render_api::standard::Light), unplaced, in UsdLux's
-/// terms; make one with `light_value`.
+/// terms; make one with [`light_value`].
 pub const fn light() -> Typed<kinogaki_render_api::standard::Light> {
     Typed::new(DataTypeId::declared(LIGHT))
 }

@@ -204,10 +204,11 @@ impl ObjectKindSpec for DeclaredKind {
         self.body(&light.declared()).map(Adoption::new)
     }
     /// A light of a standard type as a light value, saying what it leaves
-    /// out: the values no standard light type has (the engine's own).
+    /// out: the values no standard light type has (the engine's own). None
+    /// for a light no light value is ([`data::light_value`]).
     fn value(&self, body: &dyn ObjectBody, _path: &str) -> Option<Valued> {
         let prim = self.prim(body).filter(|_| self.of_lights())?;
-        let light = standard::Light::decode(prim)?;
+        let light = data::light_value(standard::Light::decode(prim)?).ok()?;
         let types = standard::lights();
         let own =
             |name: &String| (types.iter()).all(|t| t.params.iter().all(|d| *d.name != **name));

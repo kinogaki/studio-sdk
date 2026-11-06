@@ -239,7 +239,8 @@ pub(crate) fn area_light() -> PrimType {
         choice("rectangle"),
     );
     let shaped = |key| Condition::when("shape", choice(key));
-    let size = |name, label, default| length(name, label, LIGHT_GROUP, (0.0, 1e12), default);
+    // Above 0: a light of no size is no light value.
+    let size = |name, label, default| length(name, label, LIGHT_GROUP, (1e-6, 1e12), default);
     light_type(
         AREA_LIGHT,
         "Area Light",

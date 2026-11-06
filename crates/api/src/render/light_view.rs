@@ -125,18 +125,14 @@ pub(super) fn handles(prim: &Declared) -> Vec<Handle> {
                 center: origin(),
                 size,
             };
-            vec![Handle::new("Size", size).plane(2).range(0.0, f64::INFINITY)]
+            vec![Handle::new("Size", size).plane(2).range(1e-6, 1e12)]
         }
         Some(Shape::Disk { .. }) => {
             let radius = HandleKind::Radius {
                 radius: "radius".into(),
                 center: origin(),
             };
-            vec![
-                Handle::new("Radius", radius)
-                    .plane(2)
-                    .range(0.0, f64::INFINITY),
-            ]
+            vec![Handle::new("Radius", radius).plane(2).range(1e-6, 1e12)]
         }
         Some(Shape::Spot { .. }) => vec![
             angle("Cone angle", "coneAngle", None).range(0.0, 90.0),

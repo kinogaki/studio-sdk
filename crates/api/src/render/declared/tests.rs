@@ -175,3 +175,33 @@ fn a_standard_light_is_a_light_value_and_one_is_adopted() {
     assert_eq!(data::light().get(&valued.value), Some(&spot));
     assert_eq!(valued.warnings.len(), 1);
 }
+
+/// What a standard light's rows take is a light value its codec reads back:
+/// a size of 0 is refused, the least size is taken and saves; a color past
+/// what a light value holds (a row's colors are only finite) is no value,
+/// never one the codec then refuses on reopening.
+#[test]
+fn a_standard_lights_rows_take_only_what_its_codec_reads() {
+    use crate::codec::DataCodec;
+    let kind = lights();
+    let body = kind.new_body();
+    let sized = |width: f64| {
+        let mut prim = area();
+        prim.values.insert("width".into(), Value::Number(width));
+        prim
+    };
+    assert!(kind.with_declared(&*body, &[sized(0.0)]).is_none());
+    let least = kind.with_declared(&*body, &[sized(1e-6)]).unwrap();
+    let valued = kind.value(&*least, "/Area").unwrap().value;
+    let mut e = MemoryElement::new("light");
+    e.write(|w| data::LightCodec.write(&valued, None, w))
+        .unwrap();
+    let back = e.read(|r| data::LightCodec.read(r, None)).unwrap();
+    assert_eq!(data::light().get(&back), data::light().get(&valued));
+    let mut bright = area();
+    bright
+        .values
+        .insert("color".into(), Value::Color([1e20, 1.0, 1.0]));
+    let bright = kind.with_declared(&*body, &[bright]).unwrap();
+    assert!(kind.value(&*bright, "/Area").is_none());
+}

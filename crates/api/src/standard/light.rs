@@ -30,11 +30,12 @@ const MAX_VALUE: f32 = 1e12;
 /// and a softness of 0 to 1, colors finite (a component below 0 is a
 /// color outside the space's gamut, as a file in a narrower space than
 /// the scene's holds), and a dome's image a file whose path isn't blank.
-/// Its transform is dropped: where a light is isn't the value's.
+/// Its transform is dropped: where a light is isn't the value's. Make
+/// every light value with it: [`LightCodec`] reads only what it accepts.
 ///
 /// # Errors
 /// A value out of range.
-pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
+pub fn light_value(light: Light) -> Result<Light, Error> {
     let within = |v: f32| v.is_finite() && v.abs() <= MAX_VALUE;
     let positive = |v: f32| within(v) && v > 0.0;
     let at_least_0 = |v: f32| within(v) && v >= 0.0;
