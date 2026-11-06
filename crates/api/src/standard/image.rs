@@ -17,7 +17,8 @@ use std::sync::Arc;
 /// `linear` (an untagged layer's), or `raw`), `tiles` (the places of the
 /// tiles it stores, ascending) and
 /// `pixels` (their bytes, in order), so sparse layers stay sparse. A round
-/// trip is byte-exact.
+/// trip is byte-exact. An image whose pixels the host holds (a texture, a
+/// live result) is refused: it is read back before it is kept.
 ///
 /// ```
 /// use kinogaki_studio_api::DataCodec;
@@ -68,6 +69,11 @@ impl DataCodec for ImageCodec {
         let value = image()
             .get(data)
             .ok_or_else(|| Error::invalid("not an image"))?;
+        if value.is_held() {
+            return Err(Error::invalid(
+                "an image whose pixels the host holds can't be saved: read it back first",
+            ));
+        }
         out.set("display", window(value.display()))?;
         out.set("data", window(value.data()))?;
         out.set("aspect", Field::Float(value.aspect()))?;

@@ -2,7 +2,9 @@
 //! encoding, strict about what it reads.
 use kinogaki_studio_api::DataCodec;
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::image::{ColorTag, Encoding, Format, Image, Rect, Sample, Tile};
+use kinogaki_studio_api::geometry::image::{
+    ColorTag, Encoding, Format, HeldPixels, Image, Rect, Sample, Tile,
+};
 use kinogaki_studio_api::geometry::{Attribute, Attributes, Domain, Meaning};
 use kinogaki_studio_api::standard::{self, ImageCodec};
 use std::sync::Arc;
@@ -109,4 +111,27 @@ fn reading_is_strict() {
     assert!(write(vec![1; 4096], "u8").is_ok());
     assert!(write(vec![1; 3], "u8").is_err(), "not a tile's bytes");
     assert!(write(vec![1; 4096], "u9").is_err(), "no such sample");
+}
+
+/// Pixels a host holds, as a GPU texture is held.
+#[derive(Debug)]
+struct OnTheGpu;
+
+impl HeldPixels for OnTheGpu {
+    fn key(&self) -> u64 {
+        1
+    }
+}
+
+#[test]
+fn held_pixels_are_refused() {
+    let format = Format::rgba(Sample::F16, Encoding::color("ACEScg", true));
+    let image = Image::builder(Rect::new([0, 0], [4, 4]).unwrap())
+        .held(format, Arc::new(OnTheGpu))
+        .build()
+        .unwrap();
+    let data = standard::image().wrap(image);
+    let mut saved = MemoryElement::new("result");
+    let wrote = saved.write(|w| ImageCodec.write(&data, None, w));
+    assert!(wrote.is_err_and(|e| e.to_string().contains("read it back")));
 }

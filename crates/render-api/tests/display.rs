@@ -3,7 +3,7 @@
 //! checked here.
 #![cfg(feature = "wgpu")]
 
-use kinogaki_render_api::display::{Display, Engine, FilmImage, Made, Options, Shown, ShownFilm};
+use kinogaki_render_api::display::{Display, Engine, Made, Options, Shown, Texture};
 
 #[test]
 fn options_default_to_nothing() {
@@ -19,7 +19,6 @@ fn engines_and_displays_are_objects_hosts_can_share() {
     send::<dyn Display>();
     send::<Made>();
     send::<Shown>();
-    send::<ShownFilm>();
-    send_sync::<FilmImage>();
+    send_sync::<Texture>();
     send_sync::<dyn Engine>();
 }

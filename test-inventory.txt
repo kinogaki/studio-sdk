@@ -215,6 +215,7 @@ kinogaki-geometry/lib test curve::tests::a_span_reads_only_its_own_knots
 kinogaki-geometry/lib test diagnostic::tests::messages_say_where
 kinogaki-geometry/lib test error::tests::an_error_is_its_diagnostic_and_its_kind
 kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
+kinogaki-geometry/lib test image::tests::a_held_layer_has_no_tiles_and_compares_by_its_key
 kinogaki-geometry/lib test image::tests::a_plane_reads_back_as_it_was_built
 kinogaki-geometry/lib test image::tests::a_pyramid_means_tiles_and_derives_only_what_an_edit_touched
 kinogaki-geometry/lib test image::tests::a_whole_number_writes_rounded_and_saturated
@@ -383,6 +384,7 @@ kinogaki-studio-api/doc test crates/api/src/standard/quality.rs - standard::qual
 kinogaki-studio-api/doc test crates/api/src/viewport.rs - viewport::Surface::polygons
 kinogaki-studio-api/image_codec test an_image_round_trips_byte_exact_and_sparse_stays_sparse
 kinogaki-studio-api/image_codec test every_color_tag_and_sample_round_trips
+kinogaki-studio-api/image_codec test held_pixels_are_refused
 kinogaki-studio-api/image_codec test reading_is_strict
 kinogaki-studio-api/instances test a_move_shares_the_prototypes_and_attributes
 kinogaki-studio-api/instances test instances_refuse_what_they_cant_place

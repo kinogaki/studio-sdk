@@ -279,3 +279,34 @@ fn metadata_lives_in_detail() {
     image = image.with_attributes(detail).unwrap();
     assert!(image.attributes().get(Domain::Detail, "fps").is_some());
 }
+
+/// Pixels a test holds: known by a number.
+#[derive(Debug)]
+struct Held(u64);
+
+impl HeldPixels for Held {
+    fn key(&self) -> u64 {
+        self.0
+    }
+}
+
+#[test]
+fn a_held_layer_has_no_tiles_and_compares_by_its_key() {
+    let format = || Format::rgba(Sample::F16, linear());
+    let held = |key| {
+        Image::builder(window(70, 3))
+            .held(format(), Arc::new(Held(key)))
+            .build()
+            .unwrap()
+    };
+    let image = held(7);
+    assert!(image.is_held() && !ramp(2, 2).is_held());
+    let layer = &image.layers()[0];
+    assert!(layer.tiles().is_empty() && layer.held().is_some_and(|h| h.key() == 7));
+    assert_eq!(image.plane(0), None, "no pixels to give");
+    assert_eq!(image.read_pixel(0, 1, 1), [0.0; 4]);
+    assert_eq!(image.pixel_bytes(), 0);
+    assert!(image.with_tiles(0, [([0, 0], None)]).is_err());
+    assert_eq!(image, held(7));
+    assert_ne!(image, held(8));
+}

@@ -9,6 +9,9 @@
 //!   [`Sample`], its colors named by [`Encoding`]: tagged ([`ColorTag`]) with
 //!   a space of the project's color configuration (what a file says until
 //!   the host resolves it), or raw data that is never converted.
+//! - **Held pixels.** A layer's pixels may instead be held by the host
+//!   ([`HeldPixels`]): a texture on its GPU, or a live result resolved each
+//!   frame. Such an image is shown, read back or let go; it has no tiles.
 //! - **Tiles.** A layer's pixels live in [`TILE`]-sided [`Tile`]s, row-major
 //!   over the data window, each its own shared [`Column`], a
 //!   tile of nothing but zeros absent. An edit ([`Image::with_tiles`]) makes
@@ -36,6 +39,7 @@
 //! assert_eq!(image.read_pixel(0, 100, 0), [0.0; 4]); // outside the data window
 //! ```
 mod encoding;
+mod held;
 pub mod metadata;
 mod pyramid;
 mod sample;
@@ -44,6 +48,7 @@ mod sampling;
 mod tests;
 
 pub use encoding::{ColorTag, Encoding};
+pub use held::HeldPixels;
 pub use pyramid::Pyramid;
 pub use sample::{Sample, f32_to_half, half_to_f32};
 pub use sampling::{Filter, Sampling, Wrap};
@@ -179,11 +184,18 @@ impl Tile {
     }
 }
 
+/// Where a layer's pixels are.
+#[derive(Clone, Debug)]
+enum Pixels {
+    Tiles(Arc<[Option<Tile>]>),
+    Held(Arc<dyn HeldPixels>),
+}
+
 /// One layer of an image.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Layer {
     format: Format,
-    tiles: Arc<[Option<Tile>]>,
+    pixels: Pixels,
 }
 
 impl Layer {
@@ -193,8 +205,35 @@ impl Layer {
     }
 
     /// Its tiles, row-major over the data window; `None` holds all zeros.
+    /// None at all while its pixels are held.
     pub fn tiles(&self) -> &[Option<Tile>] {
-        &self.tiles
+        match &self.pixels {
+            Pixels::Tiles(tiles) => tiles,
+            Pixels::Held(_) => &[],
+        }
+    }
+
+    /// Its pixels, when the host holds them.
+    pub fn held(&self) -> Option<&Arc<dyn HeldPixels>> {
+        match &self.pixels {
+            Pixels::Held(held) => Some(held),
+            Pixels::Tiles(_) => None,
+        }
+    }
+}
+
+/// Tiles compare by their bytes; held pixels by their kind and key.
+impl PartialEq for Layer {
+    fn eq(&self, other: &Self) -> bool {
+        let same = match (&self.pixels, &other.pixels) {
+            (Pixels::Tiles(a), Pixels::Tiles(b)) => a == b,
+            (Pixels::Held(a), Pixels::Held(b)) => {
+                let (x, y): (&dyn std::any::Any, &dyn std::any::Any) = (&**a, &**b);
+                x.type_id() == y.type_id() && a.key() == b.key()
+            }
+            _ => false,
+        };
+        same && self.format == other.format
     }
 }
 
@@ -302,7 +341,12 @@ impl Image {
         let at = self.layers.get(layer);
         let at = at.ok_or_else(|| Error::invalid(format_args!("no layer {layer}")))?;
         let across = tiles_of(self.data.size());
-        let mut tiles: Vec<Option<Tile>> = at.tiles.to_vec();
+        if at.held().is_some() {
+            return Err(Error::invalid(format_args!(
+                "layer {layer} is held, not tiled"
+            )));
+        }
+        let mut tiles: Vec<Option<Tile>> = at.tiles().to_vec();
         for ([x, y], tile) in changed {
             if x >= across[0] || y >= across[1] {
                 return Err(Error::invalid(format_args!("no tile at ({x}, {y})")));
@@ -313,7 +357,7 @@ impl Image {
             tiles[(y * across[0] + x) as usize] = tile;
         }
         let mut layers = self.layers.to_vec();
-        layers[layer].tiles = tiles.into();
+        layers[layer].pixels = Pixels::Tiles(tiles.into());
         Ok(Self {
             layers: layers.into(),
             ..self.clone()
@@ -338,14 +382,14 @@ impl Image {
         if at[0] >= across[0] || at[1] >= across[1] {
             return None;
         }
-        let tiles = &self.layers.get(layer)?.tiles;
-        tiles[(at[1] * across[0] + at[0]) as usize].as_ref()
+        let tiles = self.layers.get(layer)?.tiles();
+        tiles.get((at[1] * across[0] + at[0]) as usize)?.as_ref()
     }
 
     /// Pixel (`x`, `y`) of layer `layer` as stored: its channels in order,
     /// decoded to floats (U8 and U16 to 0–1), no conversion of its space. A
     /// channel it doesn't hold reads 0, alpha 1; outside the data window,
-    /// or in a tile of nothing, every channel reads 0.
+    /// in a tile of nothing, or of a held layer, every channel reads 0.
     pub fn read_pixel(&self, layer: usize, x: i32, y: i32) -> [f32; 4] {
         let Some(at) = self.layers.get(layer) else {
             return [0.0; 4];
@@ -365,9 +409,13 @@ impl Image {
 
     /// Layer `layer`'s pixels over the whole data window as stored (native
     /// order), row-major from the top: what [`ImageBuilder::plane`] takes.
-    /// None when there is no such layer.
+    /// None when there is no such layer, or its pixels are held.
     pub fn plane(&self, layer: usize) -> Option<Vec<u8>> {
-        let format = &self.layers.get(layer)?.format;
+        let at = self.layers.get(layer)?;
+        if at.held().is_some() {
+            return None;
+        }
+        let format = &at.format;
         let [width, height] = self.data.size().map(|n| n as usize);
         let (bytes, side) = (format.pixel_bytes(), TILE as usize);
         let mut out = vec![0; width * height * bytes];
@@ -384,11 +432,17 @@ impl Image {
         Some(out)
     }
 
-    /// Bytes of pixels it holds.
+    /// Bytes of pixels it holds in tiles.
     pub fn pixel_bytes(&self) -> usize {
         (self.layers.iter())
-            .map(|l| l.tiles.iter().flatten().map(Tile::len).sum::<usize>())
+            .map(|l| l.tiles().iter().flatten().map(Tile::len).sum::<usize>())
             .sum()
+    }
+
+    /// Whether the host holds a layer's pixels ([`HeldPixels`]): it has no
+    /// tiles to keep, save or sample.
+    pub fn is_held(&self) -> bool {
+        self.layers.iter().any(|l| l.held().is_some())
     }
 }
 
@@ -490,7 +544,16 @@ impl ImageBuilder {
     pub fn tiles(mut self, format: Format, tiles: Vec<Option<Tile>>) -> Self {
         self.layers.push(Layer {
             format,
-            tiles: tiles.into(),
+            pixels: Pixels::Tiles(tiles.into()),
+        });
+        self
+    }
+
+    /// A layer whose pixels the host holds, over the whole data window.
+    pub fn held(mut self, format: Format, pixels: Arc<dyn HeldPixels>) -> Self {
+        self.layers.push(Layer {
+            format,
+            pixels: Pixels::Held(pixels),
         });
         self
     }
@@ -548,15 +611,17 @@ impl ImageBuilder {
         let count = across[0] as usize * across[1] as usize;
         for (at, layer) in self.layers.iter().enumerate() {
             check_format(&layer.format)?;
-            if layer.tiles.len() != count {
-                return Err(Error::invalid(format_args!(
-                    "layer {:?} has {} tiles, not {count}",
-                    layer.format.name,
-                    layer.tiles.len()
-                )));
-            }
-            for tile in layer.tiles.iter().flatten() {
-                check_tile(tile, &layer.format)?;
+            if let Pixels::Tiles(tiles) = &layer.pixels {
+                if tiles.len() != count {
+                    return Err(Error::invalid(format_args!(
+                        "layer {:?} has {} tiles, not {count}",
+                        layer.format.name,
+                        tiles.len()
+                    )));
+                }
+                for tile in tiles.iter().flatten() {
+                    check_tile(tile, &layer.format)?;
+                }
             }
             if (self.layers[..at].iter()).any(|l| l.format.name == layer.format.name) {
                 return Err(Error::invalid(format_args!(

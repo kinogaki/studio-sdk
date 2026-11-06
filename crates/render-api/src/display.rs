@@ -8,10 +8,11 @@
 //! Images hold linear ACEScg, RGBA.
 //!
 //! A compositing host asks for the film instead ([`Display::acquire_film`]):
-//! the frame's images at the engine's own film size (one pixel a film
-//! pixel, before any upscale to the view), the beauty and the outputs it
-//! asks for, pinned the same way. By default an engine gives its shown
-//! image as the beauty, with no other outputs.
+//! the frame as an Image at the engine's own film size (one pixel a film
+//! pixel, before any upscale to the view), the beauty its main layer and the
+//! outputs it asks for beside it, each layer held as its texture
+//! ([`Texture`]) and pinned while any holds it. By default an engine gives
+//! its shown image as the beauty, with no other outputs.
 //!
 //! A host holds each engine it can make as an [`Engine`]: its description,
 //! and how to make it on the host's device and queue, waking the host once
@@ -19,14 +20,17 @@
 //!
 //! This module is the crate's `wgpu` feature (wgpu 30.0.1).
 
+use std::any::Any;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// The wgpu this contract's types are (30.0.1): what a host and its
 /// engines and runners build against.
 pub use wgpu;
 
-use crate::{Aov, EngineDescription, Frame, RenderEngine, ViewId, Wake};
+use crate::aov::standard;
+use crate::geometry::image::{Encoding, Format, HeldPixels, Image, Layer, Rect, Sample};
+use crate::{Aov, AovClass, EngineDescription, Frame, RenderEngine, ViewId, Wake};
 
 /// The images an engine shows its frames in.
 pub trait Display: Send {
@@ -36,13 +40,18 @@ pub trait Display: Send {
     /// keeps showing what it showed.
     fn acquire(&mut self, frame: &Arc<Frame>) -> Option<Shown>;
 
-    /// `frame`'s film, pinned as [`Display::acquire`] pins: the beauty and
-    /// those of `aovs` the engine keeps for its views (it may start keeping
-    /// one asked for from a later frame on). By default the shown image is
-    /// the beauty and nothing else is kept.
-    fn acquire_film(&mut self, frame: &Arc<Frame>, aovs: &[Aov]) -> Option<ShownFilm> {
+    /// `frame`'s film as an Image ([`film`]), pinned as [`Display::acquire`]
+    /// pins while any of its layers is held: the beauty and those of `aovs`
+    /// the engine keeps for its views (it may start keeping one asked for
+    /// from a later frame on). By default the shown image is the beauty and
+    /// nothing else is kept.
+    fn acquire_film(&mut self, frame: &Arc<Frame>, aovs: &[Aov]) -> Option<Image> {
         let _ = aovs;
-        self.acquire(frame).map(ShownFilm::beauty)
+        let shown = self.acquire(frame)?;
+        let (key, view) = (shown.key(), shown.view().clone());
+        let id = key.0 << 16 ^ u64::from(key.1);
+        let size = [frame.width, frame.height];
+        film(frame, size, vec![(standard::beauty(), view, id)], shown)
     }
 
     /// View `view` went ([`RenderEngine::drop_view`], which the host calls
@@ -95,96 +104,125 @@ impl Shown {
     }
 }
 
-/// One image of a film: which output it is, a view of its texture, and
-/// the texture's key (the same key is the same texture).
-#[derive(Clone, Debug)]
-pub struct FilmImage {
-    /// The output.
-    pub aov: Aov,
-    /// A view of the whole texture: Rgba16Float for colors and normals
-    /// (linear ACEScg colors), R32Float for depth and occlusion, R32Uint
-    /// for ids.
-    pub view: wgpu::TextureView,
-    /// Which texture it is.
-    pub key: (u64, u32),
+/// A layer's pixels held as a texture on the host's device
+/// ([`HeldPixels`]): an output of a frame a display pinned
+/// ([`Display::acquire_film`]), or a run's result. Nothing writes the texture
+/// while any of its holders lives, so an Image of them is frame-scoped: shown,
+/// read back or let go, never cached or saved.
+#[derive(Clone)]
+pub struct Texture {
+    view: wgpu::TextureView,
+    id: u64,
+    generation: u64,
+    _pin: Arc<dyn Any + Send + Sync>,
 }
 
-/// A frame's film as a compositing host reads it, pinned until dropped.
-pub struct ShownFilm {
-    frame: Arc<Frame>,
-    size: [u32; 2],
-    images: Vec<FilmImage>,
-    pixelated: bool,
-    _retire: Box<dyn Send>,
-}
-
-impl ShownFilm {
-    /// `frame`'s film of `size` pixels: `images`, the beauty first, held
-    /// until `retire` drops.
+impl Texture {
+    /// `view` of a whole texture (`Rgba16Float` for colors and vectors,
+    /// `R32Float` for other numbers, `R32Uint` for ids), `id` its texture's
+    /// identity, `generation` moving whenever its contents do, held by `pin`
+    /// until the last holder goes.
     pub fn new(
-        frame: Arc<Frame>,
-        size: [u32; 2],
-        images: Vec<FilmImage>,
-        retire: impl Send + 'static,
-    ) -> ShownFilm {
-        debug_assert!(images.first().is_some_and(|i| i.aov.is_beauty()));
-        ShownFilm {
-            frame,
-            size,
-            images,
-            pixelated: false,
-            _retire: Box::new(retire),
+        view: wgpu::TextureView,
+        id: u64,
+        generation: u64,
+        pin: Arc<dyn Any + Send + Sync>,
+    ) -> Texture {
+        Texture {
+            view,
+            id,
+            generation,
+            _pin: pin,
         }
     }
 
-    /// It, its pixels meant to be seen as pixels (pixel art): a host
-    /// magnifying it samples the nearest texel rather than blending.
-    pub fn pixelated(mut self) -> ShownFilm {
-        self.pixelated = true;
-        self
+    /// Layer `layer`'s texture, when its pixels are one.
+    pub fn of(layer: &Layer) -> Option<&Texture> {
+        let held: &dyn Any = &**layer.held()?;
+        held.downcast_ref()
     }
 
-    /// Whether a host magnifying it samples the nearest texel.
-    pub fn is_pixelated(&self) -> bool {
-        self.pixelated
+    /// A view of the whole texture.
+    pub fn view(&self) -> &wgpu::TextureView {
+        &self.view
     }
 
-    /// The shown image as the film's beauty, alone: the default for an
-    /// engine whose shown image is its film.
-    pub fn beauty(shown: Shown) -> ShownFilm {
-        let frame = shown.frame.clone();
-        let image = FilmImage {
-            aov: crate::aov::standard::beauty(),
-            view: shown.view.clone(),
-            key: shown.key,
-        };
-        ShownFilm {
-            size: [frame.width, frame.height],
-            frame,
-            images: vec![image],
-            pixelated: false,
-            _retire: Box::new(shown),
-        }
+    /// Which texture it is: the same id is the same texture (a host keeps
+    /// what it bound for it).
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
-    /// The frame it holds.
-    pub fn frame(&self) -> &Arc<Frame> {
-        &self.frame
+    /// Moves whenever its contents do.
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
+}
 
-    /// The film's size, in film pixels.
-    pub fn size(&self) -> [u32; 2] {
-        self.size
+impl HeldPixels for Texture {
+    fn key(&self) -> u64 {
+        self.id ^ self.generation.rotate_left(29)
     }
+}
 
-    /// Its images, the beauty first.
-    pub fn images(&self) -> &[FilmImage] {
-        &self.images
+impl std::fmt::Debug for Texture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (f.debug_struct("Texture").field("id", &self.id))
+            .field("generation", &self.generation)
+            .finish_non_exhaustive()
     }
+}
 
-    /// Output `id`'s image, when it holds one.
-    pub fn image(&self, id: &str) -> Option<&FilmImage> {
-        self.images.iter().find(|i| &*i.aov.id == id)
+/// `frame`'s film as an Image of `size` film pixels: each of `outputs` (an
+/// output, a view of its texture and the texture's id) a layer held as that
+/// texture, the beauty the main one, its format the texture's texels (colors
+/// in [`RENDER_SPACE`](crate::RENDER_SPACE), premultiplied); held by `pin`
+/// until the image's last holder goes. None when `size` holds no pixels.
+pub fn film(
+    frame: &Arc<Frame>,
+    size: [u32; 2],
+    outputs: Vec<(Aov, wgpu::TextureView, u64)>,
+    pin: impl Send + 'static,
+) -> Option<Image> {
+    let window = Rect::new([0, 0], size.map(|v| v as i32)).ok()?;
+    // The frame is held with the pin, so no other frame takes its place.
+    let pin: Arc<dyn Any + Send + Sync> = Arc::new(Mutex::new((frame.clone(), pin)));
+    let pass = pass(frame);
+    let mut builder = Image::builder(window);
+    for (aov, view, id) in outputs {
+        let format = format_of(&aov, view.texture().format());
+        let texture = Texture::new(view, id, pass, pin.clone());
+        builder = builder.held(format, Arc::new(texture));
+    }
+    builder.build().ok()
+}
+
+/// Which pass `frame` is, among those its view published and that live.
+fn pass(frame: &Arc<Frame>) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::hash::DefaultHasher::new();
+    (Arc::as_ptr(frame) as usize, frame.view, frame.generation).hash(&mut h);
+    (frame.image, frame.stats.samples).hash(&mut h);
+    h.finish()
+}
+
+/// The format of output `aov`'s layer held as a texture of `texels`.
+fn format_of(aov: &Aov, texels: wgpu::TextureFormat) -> Format {
+    let (channels, sample): (&[&str], Sample) = match texels {
+        wgpu::TextureFormat::R32Uint => (&["id"], Sample::U32),
+        wgpu::TextureFormat::R32Float if &*aov.id == standard::DEPTH => (&["Z"], Sample::F32),
+        wgpu::TextureFormat::R32Float => (&["Y"], Sample::F32),
+        _ if aov.class == AovClass::Vector => (&["X", "Y", "Z", "W"], Sample::F16),
+        _ => (&["R", "G", "B", "A"], Sample::F16),
+    };
+    Format {
+        name: crate::aov::layer(&aov.id).into(),
+        channels: channels.iter().map(|c| Arc::from(*c)).collect(),
+        sample,
+        encoding: match aov.is_color() {
+            true => Encoding::color(crate::RENDER_SPACE, true),
+            false => Encoding::Raw,
+        },
     }
 }
 
@@ -216,13 +254,4 @@ pub trait Engine: Send + Sync {
         wake: Wake,
         options: &Options,
     ) -> Result<Made, kinogaki_geometry::Error>;
-}
-
-/// What an image means.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Referred {
-    /// Scene light, linear ACEScg: the host still applies its view.
-    Scene,
-    /// Display code values, 0 to 1: shown as they are.
-    Display,
 }
