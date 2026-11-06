@@ -102,11 +102,13 @@ pub mod standard {
     pub const DEPTH: &str = "depth";
     /// World position at the first hit.
     pub(crate) const POSITION: &str = "position";
-    /// The Mesh prim's `id` at the first hit.
+    /// The shape's id at the first hit (the engine's own, one a shape or
+    /// instance); `u32::MAX` where the camera ray hits nothing.
     pub(crate) const OBJECT_ID: &str = "objectId";
     /// The material at the first hit, by its Material prim: its prim
     /// slot plus one, one id a material across every mesh, never a mesh's
-    /// own slot index; 0 for the engine's default material.
+    /// own slot index; 0 for the engine's default material, `u32::MAX`
+    /// where the camera ray hits nothing.
     pub(crate) const MATERIAL_ID: &str = "materialId";
     /// Samples each pixel took.
     pub(crate) const SAMPLES: &str = "samples";
