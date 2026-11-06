@@ -19,7 +19,7 @@ fn every_fixture_passes_the_sdk_consumers() {
 
 #[test]
 #[ignore = "1M faces: run with --ignored"]
-fn the_large_grid_passes_the_sdk_consumers() {
+fn hand_run_the_large_grid_passes_the_sdk_consumers() {
     let report = conformance::run(&[&Fixtures { large: true }], &[&Codecs, &Invariants]);
     assert!(report.failures().is_empty(), "{report}");
 }
