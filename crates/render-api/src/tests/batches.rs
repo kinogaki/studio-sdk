@@ -271,7 +271,10 @@ fn a_primvar_reads_at_each_corner_by_one_rule() {
     // value at each of its corners.
     let p = shape.corners::<3>(&triangles, "p").unwrap();
     assert_eq!(&p[3..], [[3.0, 4.0, 0.0]; 3]);
-    assert_eq!(shape.corners::<3>(&triangles, "w").unwrap(), vec![[0.5; 3]; 6]);
+    assert_eq!(
+        shape.corners::<3>(&triangles, "w").unwrap(),
+        vec![[0.5; 3]; 6]
+    );
     assert!(shape.corners::<3>(&triangles, "nothing").is_none());
 }
 

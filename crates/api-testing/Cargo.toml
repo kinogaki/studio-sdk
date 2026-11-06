@@ -14,3 +14,7 @@ kinogaki-studio-api.workspace = true
 kinogaki-geometry.workspace = true
 kinogaki-render-api.workspace = true
 kinogaki-viewport-api.workspace = true
+
+[features]
+# An engine's GPU tests: a device, and its wakes counted.
+wgpu = ["kinogaki-render-api/wgpu"]

@@ -1,5 +1,6 @@
 //! The SDK's test support (a dev-dependency only): [`assert_refused`] for
-//! admission tests, and the conformance suite of the standard data types:
+//! admission tests, with `wgpu` an engine's GPU tests' device and counted
+//! wakes (`engine`), and the conformance suite of the standard data types:
 //! producers make
 //! standard values, consumers check them, and [`run`] tries every pair.
 //!
@@ -21,6 +22,8 @@
 mod brep;
 mod checks;
 mod colors;
+#[cfg(feature = "wgpu")]
+pub mod engine;
 mod fixtures;
 mod refusals;
 

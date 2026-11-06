@@ -41,6 +41,7 @@ pub mod recording;
 pub mod settings;
 pub mod source;
 pub mod standard;
+pub mod thread;
 pub mod trace;
 pub mod update;
 

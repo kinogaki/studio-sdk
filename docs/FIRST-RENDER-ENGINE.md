@@ -98,6 +98,10 @@ An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a
 
 `RenderEngine::preview(PreviewRequest)` returns at once; a host shows the `PreviewImage` when it arrives. A request is the SDK's preview shape: `shape`, `lighting`, `side`, the `network` with its colors converted and files resolved, and the `textures` it names. A host asks previews of an engine it made for them and drops at rest, never of one showing its views, so render them as you render a view: `PreviewRequest::scene` gives the request as prims (a sphere on a floor, a dome and a key light, a camera) that replace the last request's, and a floor naming no material takes your default. No second engine is needed. Your settings for previews are yours.
 
+## The render thread
+
+An engine never blocks its caller: its renderer and scene live on a render thread of its own, and every `RenderEngine` call is a message to it. `render_api::thread` is that plumbing, written once: `EngineThread::start` runs your thread's loop on a `Mailbox` (the host's `Message`s in order, a sender back to itself for your completion callbacks, and the `Published` frames and problems), and the `EngineThread` it returns is the `RenderEngine` a host holds. Your own messages travel as `Message::Engine`, and what your handle offers besides (statistics, a helper for your display) is its `extra`. `finish` and `preview` arrive as a `Message::Read` of a `Reading` (a final render's outputs, or a swatch's beauty as its picture); a preview is a view of its own, `thread::PREVIEW`, whose scene `PreviewScene::replacing` swaps for the last request's, seen as your `preview_view` says. Publish through `Published::publish`, which drops a frame of a view the host dropped since it gave it, so a view id given again never shows the old view's frame.
+
 ## Views, results and being polite
 
 - `view` sets a view's camera, film, `ViewMode` and settings (`values`, by your descriptors' names); `drop_view` ends it, stopping its passes; `pause` holds its refinement. `Interactive` refines progressively, `Navigating` keeps one short pass in flight, `Final` runs to the settings' samples. A `realtime` engine's every pass is a whole frame, and it never gets a shrunken film.
@@ -120,4 +124,4 @@ An engine is tested with plain cargo against this crate alone, as a host drives 
 - one wake per published pass, none while idle; a dropped `Pending` stopping the work (`Deliver::wanted`), and `finish` delivering the AOVs it was asked for;
 - closed-form scenes where your engine allows them (a white furnace returns the light it is lit by).
 
-GPU tests need a device: mark them `#[ignore]` and run them on a machine with one. `RecordingEngine` is the opposite tool: it stores what it was sent, for tests of a host.
+GPU tests need a device: mark them `#[ignore]` and run them on a machine with one. The testing crate's `wgpu` feature gives them one (`engine::device`) and counts your wakes (`engine::Waiter`: wait until a condition holds, take a `Pending`'s value). `RecordingEngine` is the opposite tool: it stores what it was sent, for tests of a host.
