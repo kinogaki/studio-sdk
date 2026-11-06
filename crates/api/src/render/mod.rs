@@ -18,7 +18,7 @@ mod light_view;
 mod shader;
 
 pub use declared::DeclaredKind;
-pub use shader::{SHADER, SHADING, ShaderNode};
+pub use shader::{MATERIAL, SHADER, SHADING, ShaderNode, material_creation};
 
 use kinogaki_geometry::{Attributes, Column, Xform};
 use std::fmt;

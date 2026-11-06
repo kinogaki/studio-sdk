@@ -1,14 +1,14 @@
 use super::*;
 use crate::element::MemoryElement;
 use crate::params::ValueKind;
-use kinogaki_render_api::{Engines, SettingDescriptor, SettingGroup};
+use kinogaki_render_api::{Engines, PrimTypeId, SettingDescriptor, SettingGroup};
 
 const LIGHTS: ObjectKindId = ObjectKindId::declared("acme.ray.light");
 const FOG: ObjectKindId = ObjectKindId::declared("acme.ray.fog");
 
 /// The standard lights, and one of the engine's own (a glow, no shape).
 fn lights() -> DeclaredKind {
-    let glow = PrimType::new("acme.ray.glow", "Glow", Role::Light).group(
+    let glow = PrimType::new(PrimTypeId::declared("acme.ray.glow"), "Glow", Role::Light).group(
         SettingGroup::new("glow", "Glow", true),
         vec![SettingDescriptor::new(
             "strength",
@@ -48,7 +48,10 @@ fn a_new_light_is_its_first_type_and_edits_take_one_prim_of_its_types() {
     assert!(kind.with_declared(&*body, &[]).is_none());
     let fog = Declared::new(standard::FOG, standard::fog().defaults());
     assert!(kind.with_declared(&*body, &[fog]).is_none());
-    let rim = Declared::new("acme.other.rim_light", prim.values.clone());
+    let rim = Declared::new(
+        PrimTypeId::declared("acme.other.rim_light"),
+        prim.values.clone(),
+    );
     assert!(kind.with_declared(&*body, &[rim]).is_none());
     for bad in [f64::NAN, -1.0] {
         let mut wrong = prim.clone();
@@ -79,7 +82,7 @@ fn creations_are_the_kinds_types_under_its_prefix() {
     );
     assert!(made[0].aliases.contains(&"lamp".to_owned()));
     let glow = kind.create(made[4].id, &cx(&engines)).unwrap();
-    assert_eq!(&*kind.declared(&*glow)[0].type_id, "acme.ray.glow");
+    assert_eq!(kind.declared(&*glow)[0].type_id.as_str(), "acme.ray.glow");
     assert!(
         kind.create(CreationId::declared("acme.ray.fog"), &cx(&engines))
             .is_err()

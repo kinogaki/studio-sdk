@@ -10,7 +10,7 @@
 //!
 //! Each kind of id is its own type ([`DataTypeId`], [`ObjectKindId`],
 //! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`], [`StoredId`],
-//! [`MesherId`], [`VerbId`], [`CreationId`], [`EngineId`]), so a node type
+//! [`MesherId`], [`VerbId`], [`CreationId`], [`EngineId`], [`PrimTypeId`]), so a node type
 //! id can't be passed where a data type is meant. An id is a `Copy` value over `'static` text: one a package
 //! declares in code is its literal (made in a `const`, with no lock or
 //! allocation), and one parsed from a file is interned in one table (each
@@ -208,6 +208,15 @@ declare_id!(
     /// and files name it by. Registered by an `EngineDescription`.
     EngineId,
     "engine"
+);
+
+declare_id!(
+    /// A declared prim type (`kinogaki.render.area_light`,
+    /// `kinogaki.pixel.rim_light`): what a light or fog object and its prims
+    /// name their schema by. Declared by an `EngineDescription`, under its
+    /// package's vendor; the standard ones are the SDK's.
+    PrimTypeId,
+    "prim type"
 );
 
 /// A package: `<vendor>.<package>` (`kinogaki.mesh`, `acme.trees`).

@@ -23,7 +23,7 @@ use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::SessionSlot;
-use kinogaki_render_api::EngineId;
+use kinogaki_render_api::{EngineId, PrimTypeId, standard};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
@@ -38,6 +38,12 @@ impl<T: ?Sized> Entry<T> {
     fn new(package: PackageId, item: Arc<T>) -> Self {
         Self { package, item }
     }
+}
+
+/// Whether `id` is a standard prim type: every engine's to declare, under
+/// any vendor.
+fn standard_type(id: PrimTypeId) -> bool {
+    id == standard::FOG || standard::lights().iter().any(|t| t.id == id)
 }
 
 /// The package that registered `entry`, when there is one.
@@ -78,6 +84,9 @@ pub struct Registry {
     ui_contexts: BTreeMap<ContextId, PackageId>,
     /// The package describing each render engine, by engine id.
     engines: BTreeMap<EngineId, PackageId>,
+    /// The package declaring each engine's own prim type (the standard
+    /// types are every engine's).
+    prim_types: BTreeMap<PrimTypeId, PackageId>,
     /// Each package's icons' names.
     icons: BTreeMap<PackageId, BTreeSet<String>>,
 }
@@ -146,6 +155,9 @@ impl Registry {
         }
         for engine in package.engines {
             self.engines.insert(engine.id(), id);
+            for ty in (engine.capabilities().types.iter()).filter(|t| !standard_type(t.id)) {
+                self.prim_types.insert(ty.id, id);
+            }
         }
         let icons = package.icons.into_iter().map(|i| i.name).collect();
         self.icons.insert(id, icons);

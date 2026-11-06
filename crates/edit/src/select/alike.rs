@@ -2,7 +2,7 @@
 //! ones ([`similar`]), faces by their facing ([`by_normal`],
 //! [`flood_by_angle`]) and the hard edges of the pieces selected edges lie
 //! on ([`hard_edges`]).
-use super::{Expand, area_normal, at, expand, selection_of};
+use super::{Expand, at, expand, selection_of};
 use kinogaki_geometry::{Domain, Error, Geometry, Selection, Vec3};
 use std::collections::{BTreeMap, HashSet};
 
@@ -20,7 +20,10 @@ fn within() -> f64 {
 
 /// Polygon `face`'s unit normal (zero for a polygon without area).
 fn normal(value: &Geometry, face: u32) -> Vec3 {
-    area_normal(value, face).normalized().unwrap_or_default()
+    value
+        .polygon_normal(face as usize)
+        .normalized()
+        .unwrap_or_default()
 }
 
 /// What an element is compared by: its kind (corners, faces on an edge,
@@ -31,7 +34,7 @@ fn measure(value: &Geometry, domain: Domain, i: u32) -> (usize, f64) {
     match domain {
         Domain::Primitive => (
             table.primitive(i as usize).len(),
-            area_normal(value, i).length() * 0.5,
+            value.polygon_normal(i as usize).length() * 0.5,
         ),
         Domain::Edge => {
             let [a, b] = table.edge(i as usize).points;
@@ -84,7 +87,8 @@ pub fn similar(s: &Selection, value: &Geometry) -> Result<Selection, Error> {
 /// As [`Selection::validate`].
 pub fn by_normal(faces: &Selection, value: &Geometry) -> Result<Selection, Error> {
     faces.validate(value)?;
-    let sum = (faces.members().iter()).fold(Vec3::ZERO, |sum, f| sum + area_normal(value, f));
+    let sum =
+        (faces.members().iter()).fold(Vec3::ZERO, |sum, f| sum + value.polygon_normal(f as usize));
     let facing = sum.normalized().unwrap_or_default();
     let count = value.count(Domain::Primitive).unwrap_or(0) as u32;
     selection_of(

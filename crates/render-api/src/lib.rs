@@ -67,7 +67,7 @@ pub use kinogaki_geometry::Detail;
 /// Half floats, as [`Frame::pixels`] and Texture prims hold them.
 pub use kinogaki_geometry::image::{f32_to_half, half_to_f32};
 pub use kinogaki_value as value;
-pub use kinogaki_value::EngineId;
+pub use kinogaki_value::{EngineId, PrimTypeId};
 pub use material::preview::{
     PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
 };

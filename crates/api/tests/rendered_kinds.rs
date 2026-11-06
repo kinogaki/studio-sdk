@@ -2,7 +2,7 @@
 //! lights are: a lamp renders as a spot of a type its engine declares (and
 //! as nothing for an engine that declares none), and a kind without the
 //! facet answers none.
-use kinogaki_render_api::{EngineDescription, RecordingEngine, RenderEngine, standard};
+use kinogaki_render_api::{EngineDescription, PrimTypeId, RecordingEngine, RenderEngine, standard};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
 use kinogaki_studio_api::*;
 use std::sync::Arc;
@@ -124,7 +124,7 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     let lamp = Lamp { intensity: 4.0 };
     let mut declared = rendered.declared(&lamp);
     assert_eq!(declared.len(), 1);
-    assert_eq!(&*declared[0].type_id, standard::AREA_LIGHT);
+    assert_eq!(declared[0].type_id, standard::AREA_LIGHT);
     assert_eq!(declared[0].value("intensity"), Some(&Value::Number(4.0)));
     // An edit comes back as a new body.
     declared[0]
@@ -157,7 +157,10 @@ impl ObjectCodec for Lamps {
         let lamp = body
             .downcast_ref::<Lamp>()
             .ok_or_else(|| Error::invalid("not a lamp"))?;
-        out.set("type", element::Field::Text(standard::AREA_LIGHT.into()))?;
+        out.set(
+            "type",
+            element::Field::Text(standard::AREA_LIGHT.to_string()),
+        )?;
         out.set("intensity", element::Field::Float(lamp.intensity))
     }
     fn read(
@@ -166,7 +169,12 @@ impl ObjectCodec for Lamps {
         cx: &ReadCx<'_>,
     ) -> Result<Arc<dyn ObjectBody>, Error> {
         let ty = element.text("type")?;
-        if cx.engines().iter().all(|e| e.prim_type(ty).is_none()) {
+        let id = PrimTypeId::parse(ty);
+        if cx
+            .engines()
+            .iter()
+            .all(|e| id.is_none_or(|id| e.prim_type(id).is_none()))
+        {
             return Err(Error::missing(format!("light type {ty} isn't installed")));
         }
         Ok(Arc::new(Lamp {
@@ -204,5 +212,5 @@ fn a_codec_reads_what_is_installed_and_says_what_isnt() {
 /// The standard area light's prim type.
 fn area_light() -> kinogaki_render_api::PrimType {
     let mut lights = standard::lights().into_iter();
-    lights.find(|t| &*t.id == standard::AREA_LIGHT).unwrap()
+    lights.find(|t| t.id == standard::AREA_LIGHT).unwrap()
 }

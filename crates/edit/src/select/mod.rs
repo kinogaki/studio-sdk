@@ -246,10 +246,3 @@ fn selection_of(
 fn at(value: &Geometry, p: u32) -> Vec3 {
     value.positions()[p as usize].into()
 }
-
-/// Polygon `face`'s normal, its length twice the polygon's area (Newell's).
-fn area_normal(value: &Geometry, face: u32) -> Vec3 {
-    let row = value.primitives().primitive(face as usize);
-    let corner = |k: usize| at(value, row[k % row.len()]);
-    (0..row.len()).fold(Vec3::ZERO, |sum, k| sum + corner(k).cross(corner(k + 1)))
-}

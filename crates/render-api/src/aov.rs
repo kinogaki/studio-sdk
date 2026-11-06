@@ -86,32 +86,32 @@ pub mod standard {
     /// Albedo at the first non-specular hit.
     pub const ALBEDO: &str = "albedo";
     /// Light arriving straight from the lights, off a white diffuse surface.
-    pub(crate) const DIRECT: &str = "direct";
+    pub const DIRECT: &str = "direct";
     /// Indirect light (global illumination), off a white diffuse surface.
-    pub(crate) const INDIRECT: &str = "indirect";
+    pub const INDIRECT: &str = "indirect";
     /// Light scattered toward the camera by volumes and lit fog (R G B) and
     /// their opacity (A: 1 minus their transmittance), premultiplied: what
     /// lies behind shows as itself × (1 − A) + R G B.
     pub const VOLUME: &str = "volume";
     /// Ambient occlusion: the open share of the hemisphere (1 open, 0
     /// closed).
-    pub(crate) const OCCLUSION: &str = "occlusion";
+    pub const OCCLUSION: &str = "occlusion";
     /// Shading normal at the first non-specular hit.
-    pub(crate) const NORMAL: &str = "normal";
+    pub const NORMAL: &str = "normal";
     /// Camera distance at the first hit.
     pub const DEPTH: &str = "depth";
     /// World position at the first hit.
-    pub(crate) const POSITION: &str = "position";
+    pub const POSITION: &str = "position";
     /// The shape's id at the first hit (the engine's own, one a shape or
     /// instance); `u32::MAX` where the camera ray hits nothing.
-    pub(crate) const OBJECT_ID: &str = "objectId";
+    pub const OBJECT_ID: &str = "objectId";
     /// The material at the first hit, by its Material prim: its prim
     /// slot plus one, one id a material across every mesh, never a mesh's
     /// own slot index; 0 for the engine's default material, `u32::MAX`
     /// where the camera ray hits nothing.
-    pub(crate) const MATERIAL_ID: &str = "materialId";
+    pub const MATERIAL_ID: &str = "materialId";
     /// Samples each pixel took.
-    pub(crate) const SAMPLES: &str = "samples";
+    pub const SAMPLES: &str = "samples";
     /// Each pixel's estimated variance.
     pub(crate) const VARIANCE: &str = "variance";
 

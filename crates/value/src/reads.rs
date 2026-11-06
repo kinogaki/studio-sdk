@@ -61,6 +61,13 @@ pub trait ParametersExt {
     fn text(&self, name: &str) -> Result<&str, Error> {
         self.read(name, "text", Value::text)
     }
+    /// Value `name` as a color (linear RGB).
+    ///
+    /// # Errors
+    /// When it isn't one.
+    fn color(&self, name: &str) -> Result<[f64; 3], Error> {
+        self.read(name, "a color", Value::color)
+    }
     /// Value `name` as three numbers (a vector).
     ///
     /// # Errors

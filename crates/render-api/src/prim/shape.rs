@@ -19,7 +19,9 @@
 use crate::id::Id;
 use crate::prim::{Material, PrimKind, Visibility};
 use kinogaki_geometry::names;
-use kinogaki_geometry::{Attribute, Attributes, Column, Domain, Error, Primitives, Sampled, Xform};
+use kinogaki_geometry::{
+    Attribute, Attributes, Column, Domain, Error, Primitives, Sampled, Tuple, Xform,
+};
 use std::sync::Arc;
 
 /// The primvars a host always offers an engine, where a shape has them,
@@ -244,6 +246,48 @@ impl Shape {
             Domain::Detail,
         ];
         (BINDING.into_iter()).find_map(|d| Some((d, self.primvars.get(d, name)?)))
+    }
+
+    /// Primvar `name` at each corner of `triangles` (the shape's, three a
+    /// triangle in corner order) as `N` floats: one number spreads to all
+    /// `N` (a grey), a wider value fills from its first numbers and the rest
+    /// are 0. None when it has no such primvar, or it holds no numbers (text,
+    /// arrays). What every engine reads a corner's primvar as.
+    pub fn corners<const N: usize>(
+        &self,
+        triangles: &[[u32; 3]],
+        name: &str,
+    ) -> Option<Vec<[f32; N]>>
+    where
+        [f32; N]: Tuple,
+    {
+        let (domain, attribute) = self.primvar(name)?;
+        let numbers = attribute.items() == 0 || attribute.values().real(0).is_some();
+        if attribute.ty().array || !numbers {
+            return None;
+        }
+        let width = usize::from(attribute.ty().width);
+        if domain == Domain::Vertex
+            && width == N
+            && let Some(values) = attribute.as_tuples::<[f32; N]>()
+        {
+            return Some(values.to_vec());
+        }
+        let value = |at: usize| -> [f32; N] {
+            std::array::from_fn(|k| {
+                let k = if width == 1 { 0 } else { k };
+                let read = (k < width).then(|| attribute.values().real(at * width + k));
+                read.flatten().unwrap_or(0.0) as f32
+            })
+        };
+        Some(match domain {
+            Domain::Vertex => (0..triangles.len() * 3).map(value).collect(),
+            Domain::Point => (triangles.iter().flatten())
+                .map(|p| value(*p as usize))
+                .collect(),
+            Domain::Primitive => (0..triangles.len()).flat_map(|t| [value(t); 3]).collect(),
+            _ => vec![value(0); triangles.len() * 3],
+        })
     }
 
     /// Which material each primitive renders with.

@@ -158,7 +158,7 @@ mod tests {
         );
         DeclaredBody {
             kind: ObjectKindId::declared("acme.ray.light"),
-            prim: Declared::new(&ty.id, held),
+            prim: Declared::new(ty.id, held),
         }
     }
 

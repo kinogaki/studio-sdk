@@ -249,6 +249,33 @@ fn a_result_dropped_is_no_longer_wanted_and_a_preview_answers() {
 }
 
 #[test]
+fn a_primvar_reads_at_each_corner_by_one_rule() {
+    use crate::geometry::{Attribute, Domain, Meaning};
+    let points: crate::geometry::Column<[f32; 3]> = vec![[0.0f32; 3]; 4].into();
+    let triangles = [[0u32, 1, 2], [0, 2, 3]];
+    let topology = Topology::Triangles(triangles.to_vec().into());
+    let grey = Attribute::tuples(vec![0.1f32, 0.2, 0.3, 0.4], Meaning::None).unwrap();
+    let pairs = Attribute::tuples(vec![[1.0f32, 2.0], [3.0, 4.0]], Meaning::None).unwrap();
+    let wide = Attribute::tuples(vec![[0.5f32; 3]; 6], Meaning::None).unwrap();
+    let shape = Shape::builder(points, topology)
+        .primvar(Domain::Point, "g", grey)
+        .primvar(Domain::Primitive, "p", pairs)
+        .primvar(Domain::Vertex, "w", wide)
+        .build()
+        .unwrap();
+    // One number spreads to every component, by point, in corner order.
+    let g = shape.corners::<3>(&triangles, "g").unwrap();
+    assert_eq!(g[2], [0.3; 3]);
+    assert_eq!(g[5], [0.4; 3]);
+    // A narrower value fills its first components, the rest 0, a triangle's
+    // value at each of its corners.
+    let p = shape.corners::<3>(&triangles, "p").unwrap();
+    assert_eq!(&p[3..], [[3.0, 4.0, 0.0]; 3]);
+    assert_eq!(shape.corners::<3>(&triangles, "w").unwrap(), vec![[0.5; 3]; 6]);
+    assert!(shape.corners::<3>(&triangles, "nothing").is_none());
+}
+
+#[test]
 fn a_shape_is_refused_unless_whole() {
     use crate::geometry::{Attribute, Domain, Kind, Meaning, Primitives, Sampled, Xform};
     let points = || -> crate::geometry::Column<[f32; 3]> { vec![[0.0f32; 3]; 4].into() };

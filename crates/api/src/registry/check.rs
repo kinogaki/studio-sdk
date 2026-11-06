@@ -1,5 +1,5 @@
 //! Admission: whether a package may register ([`Registry::check`]).
-use super::{Registry, owner};
+use super::{Registry, owner, standard_type};
 use crate::Error;
 use crate::cook::SPARE;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
@@ -7,7 +7,7 @@ use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
 use crate::params::ValueKind;
-use kinogaki_render_api::Engines;
+use kinogaki_render_api::{Engines, aov};
 use std::collections::BTreeSet;
 
 /// Id `text` `package` declares as an id's text, when well formed (a
@@ -30,9 +30,11 @@ impl Registry {
     /// declares a parameter named as spares are ([`SPARE`]) or holding an
     /// object ([`ValueKind::Object`]), each compiler
     /// and runner it brings serves a compiled context (its own or a
-    /// registered package's) that has no other, and every data type
-    /// it names is registered (by it or an earlier package). Changes
-    /// nothing.
+    /// registered package's) that has no other, every data type
+    /// it names is registered (by it or an earlier package), and each
+    /// engine's own prim types are new and under its vendor (the standard
+    /// types are any engine's) and the standard outputs it declares are the
+    /// standard ones. Changes nothing.
     pub fn check(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         if self.packages.iter().any(|(p, _)| *p == id) {
@@ -135,6 +137,21 @@ impl Registry {
         for e in &package.engines {
             let first = self.engines.get(&e.id()).copied();
             declare("render engine", declared_id(id, e.id().as_str())?, first)?;
+            for ty in (e.capabilities().types.iter()).filter(|t| !standard_type(t.id)) {
+                let first = self.prim_types.get(&ty.id).copied();
+                declare("prim type", ty.id.as_str(), first)?;
+            }
+            for spec in &e.capabilities().aovs {
+                if let Some(standard) = aov::standard::get(&spec.aov.id)
+                    && standard != spec.aov
+                {
+                    return Err(Error::refused(format_args!(
+                        "{id}: render engine {} declares output {} unlike the standard one",
+                        e.id(),
+                        spec.aov.id
+                    )));
+                }
+            }
             let own = kinogaki_render_api::settings::OUTPUT_SETTINGS;
             if let Some(d) = (e.settings().iter()).find(|d| own.contains(&&*d.name)) {
                 return Err(Error::refused(format_args!(

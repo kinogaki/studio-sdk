@@ -1,7 +1,7 @@
 //! The standard prim types: UsdLux's lights and exponential height fog,
 //! as schemas (`area_light`, `dome_light`, `distant_light`,
 //! `spot_light`, `fog`) every engine that renders them declares as
-//! they are here, and as typed values ([`Light`], `Fog`) an engine
+//! they are here, and as typed values ([`Light`], [`Fog`]) an engine
 //! decodes a [`Declared`] prim into and a host or test encodes one from.
 //!
 //! Lights are shaped as UsdLux shapes them: an area light is a RectLight
@@ -28,18 +28,18 @@ pub use emission::{Emission, ILLUMINANTS, blackbody, illuminant};
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
 use crate::settings::{SettingDescriptor, SettingGroup};
-use kinogaki_value::{Choice, Condition, Number, NumberLook, Unit, Value, ValueKind};
+use kinogaki_value::{Choice, Condition, Number, NumberLook, PrimTypeId, Unit, Value, ValueKind};
 
 /// The area light's id.
-pub const AREA_LIGHT: &str = "kinogaki.render.area_light";
+pub const AREA_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.area_light");
 /// The dome light's id.
-pub const DOME_LIGHT: &str = "kinogaki.render.dome_light";
+pub const DOME_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.dome_light");
 /// The distant light's id.
-pub const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
+pub const DISTANT_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.distant_light");
 /// The spot light's id.
-pub const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
+pub const SPOT_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.spot_light");
 /// The fog's id.
-pub const FOG: &str = "kinogaki.render.fog";
+pub const FOG: PrimTypeId = PrimTypeId::declared("kinogaki.render.fog");
 
 /// The parameter saying where an emitter's spectrum comes from.
 pub const EMISSION: &str = "emission";
@@ -151,7 +151,7 @@ fn toggle(name: &str, label: &str, group: &str, default: bool) -> SettingDescrip
 /// A standard light type: its `shape` parameters, then the emission's,
 /// then Normalize (on when `normalize`), then `after`.
 fn light_type(
-    id: &str,
+    id: PrimTypeId,
     label: &str,
     shape: Vec<SettingDescriptor>,
     intensity: f64,
@@ -163,7 +163,7 @@ fn light_type(
     params.push(toggle("normalize", "Normalize", LIGHT_GROUP, normalize));
     params.extend(after);
     PrimType {
-        id: Arc::from(id),
+        id,
         label: Arc::from(label),
         role: Role::Light,
         groups: vec![SettingGroup::new(LIGHT_GROUP, "Light", true)],
@@ -285,7 +285,7 @@ pub fn lights() -> Vec<PrimType> {
 pub fn fog() -> PrimType {
     const GROUP: &str = "fog";
     PrimType {
-        id: Arc::from(FOG),
+        id: FOG,
         label: Arc::from("Fog"),
         role: Role::Atmosphere,
         groups: vec![SettingGroup::new(GROUP, "Fog", true)],
@@ -309,6 +309,42 @@ pub fn fog() -> PrimType {
                 "Used with In-scatter on",
             ),
         ],
+    }
+}
+
+/// A standard fog ([`FOG`]) as a typed value: exponential height fog, its
+/// values within [`fog`]'s limits as a host sends them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Fog {
+    /// Extinction per scene unit at [`height`](Self::height).
+    pub density: f32,
+    /// Its color, linear (ACEScg in a prim an engine receives).
+    pub color: [f32; 3],
+    /// How far from the camera it begins.
+    pub start: f32,
+    /// Where it has its density; above, it thins by
+    /// [`falloff`](Self::falloff) per unit.
+    pub height: f32,
+    /// How fast it thins with height.
+    pub falloff: f32,
+    /// It scatters the lights' light toward the camera.
+    pub inscatter: bool,
+    /// Its phase's anisotropy, with in-scatter (−0.9 back to 0.9 forward).
+    pub anisotropy: f32,
+}
+
+impl Fog {
+    /// `prim` as a standard fog (none when it is of another type).
+    pub fn decode(prim: &Declared) -> Option<Fog> {
+        (prim.type_id == FOG).then(|| Fog {
+            density: prim.float("density"),
+            color: prim.color("color"),
+            start: prim.float("start"),
+            height: prim.float("height"),
+            falloff: prim.float("falloff"),
+            inscatter: prim.bool("inscatter"),
+            anisotropy: prim.float("anisotropy"),
+        })
     }
 }
 
@@ -403,7 +439,7 @@ impl Default for Light {
 impl Light {
     /// `prim` as a standard light (none when it is of another type).
     pub fn decode(prim: &Declared) -> Option<Light> {
-        let shape = match &*prim.type_id {
+        let shape = match prim.type_id {
             AREA_LIGHT if prim.choice("shape") == "disk" => Shape::Disk {
                 radius: prim.float("radius"),
             },

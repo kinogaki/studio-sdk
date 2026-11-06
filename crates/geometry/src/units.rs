@@ -1,5 +1,6 @@
 //! [`Units`]: the one length unit and up axis.
 use crate::Error;
+use crate::Vec3;
 
 /// Which axis points up.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -9,6 +10,16 @@ pub enum UpAxis {
     Y,
     /// Z up.
     Z,
+}
+
+impl UpAxis {
+    /// The unit vector pointing up.
+    pub fn direction(self) -> Vec3 {
+        match self {
+            UpAxis::Y => Vec3::new(0.0, 1.0, 0.0),
+            UpAxis::Z => Vec3::new(0.0, 0.0, 1.0),
+        }
+    }
 }
 
 /// A project's units: how long one scene unit is, and the axis that is up.

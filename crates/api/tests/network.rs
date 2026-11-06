@@ -424,6 +424,55 @@ fn an_engine_setting_is_never_named_as_a_render_outputs_own() {
     );
 }
 
+/// An engine with its own prim type `ty` beside the standard ones, and
+/// output `aov` among its outputs.
+fn engine_with(
+    id: &'static str,
+    ty: &'static str,
+    aov: kinogaki_render_api::Aov,
+) -> kinogaki_render_api::EngineDescription {
+    use kinogaki_render_api::{AovSpec, PrimType, PrimTypeId, Role};
+    let d = engine(id);
+    let mut capabilities = d.capabilities().clone();
+    capabilities
+        .types
+        .push(PrimType::new(PrimTypeId::declared(ty), "Glow", Role::Light));
+    capabilities.aovs.push(AovSpec {
+        aov,
+        default: false,
+    });
+    d.rebuilt().capabilities(capabilities).build()
+}
+
+#[test]
+fn an_engines_own_prim_type_is_declared_once_under_its_vendor_and_its_outputs_are_standard() {
+    use kinogaki_render_api::{Aov, AovClass};
+    let own = || Aov::new("glowMask", "Glow Mask", AovClass::Scalar);
+    let package = |id: &'static str, engine: kinogaki_render_api::EngineDescription| {
+        Package::new(PackageId::declared(id), id).with_engine_description(engine)
+    };
+    let mut registry = Registry::new();
+    let first = engine_with("acme.glow.engine", "acme.glow.glow", own());
+    assert!(registry.register(package("acme.glow", first)).is_ok());
+    let again = engine_with("acme.other.engine", "acme.glow.glow", own());
+    assert_refused(
+        registry.register(package("acme.other", again)),
+        &["prim type acme.glow.glow", "which acme.glow declared"],
+    );
+    let foreign = engine_with("rival.glow.engine", "acme.glow.halo", own());
+    assert_refused(
+        registry.register(package("rival.glow", foreign)),
+        &["under another vendor's name", "acme.glow.halo"],
+    );
+    // The standard lights are every engine's; a standard output is as the SDK has it.
+    let unlike = Aov::new("albedo", "Albedo", AovClass::Scalar);
+    let odd = engine_with("acme.odd.engine", "acme.odd.glow", unlike);
+    assert_refused(
+        registry.register(package("acme.odd", odd)),
+        &["output albedo unlike the standard one"],
+    );
+}
+
 #[test]
 fn an_engine_id_is_declared_once_under_its_vendor() {
     let package = |id: &'static str, engines: &[&'static str]| {

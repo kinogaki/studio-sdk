@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crate::prim::Visibility;
 use crate::settings::{SettingDescriptor, SettingGroup, Textures, defaults};
-use kinogaki_value::{Parameters, Value};
+use kinogaki_value::{Parameters, ParametersExt, PrimTypeId, Value};
 
 /// What a declared type is to a host: where it sits and how a viewport
 /// shows it.
@@ -29,7 +29,7 @@ pub enum Role {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrimType {
     /// Its id (`kinogaki.render.area_light`, `kinogaki.pixel.rim_light`).
-    pub id: Arc<str>,
+    pub id: PrimTypeId,
     /// What a UI calls it (`Area Light`).
     pub label: Arc<str>,
     /// Its role.
@@ -41,12 +41,13 @@ pub struct PrimType {
 }
 
 impl PrimType {
-    /// Type `id` (under the declaring package's vendor) that a UI calls
-    /// `label`, of `role`, with no parameter yet: an engine's own type (a rim
-    /// light).
-    pub fn new(id: &str, label: &str, role: Role) -> PrimType {
+    /// Type `id` (under the declaring package's vendor: the registry
+    /// refuses another's, and an own type two packages declare) that a UI
+    /// calls `label`, of `role`, with no parameter yet: an engine's own type
+    /// (a rim light).
+    pub fn new(id: PrimTypeId, label: &str, role: Role) -> PrimType {
         PrimType {
-            id: Arc::from(id),
+            id,
             label: Arc::from(label),
             role,
             groups: Vec::new(),
@@ -72,7 +73,7 @@ impl PrimType {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Declared {
     /// Its type's id.
-    pub type_id: Arc<str>,
+    pub type_id: PrimTypeId,
     /// Its values, by parameter name. A host sends every parameter the
     /// engine declares for the type; one missing takes its default. An
     /// image value is its file's path; an engine reads its texture.
@@ -89,9 +90,9 @@ pub struct Declared {
 
 impl Declared {
     /// A prim of type `type_id` holding `values`, at the origin, visible.
-    pub fn new(type_id: &str, values: Parameters) -> Declared {
+    pub fn new(type_id: PrimTypeId, values: Parameters) -> Declared {
         Declared {
-            type_id: Arc::from(type_id),
+            type_id,
             values,
             textures: Textures::new(),
             xform: Sampled::still(Xform::IDENTITY),
@@ -104,25 +105,29 @@ impl Declared {
         self.values.get(name)
     }
 
-    /// Number `name`, as `f32` (0 when missing or not a number).
+    // An engine reads its values through `ParametersExt` on `values`; these
+    // say a default on a miss, which a host's prim never has (it sends every
+    // value the engine declares, within its limits).
+
+    /// Number `name`, as `f32`; 0 on a miss.
     pub fn float(&self, name: &str) -> f32 {
-        self.value(name).and_then(Value::number).unwrap_or(0.0) as f32
+        self.values.number(name).unwrap_or(0.0) as f32
     }
 
-    /// Toggle `name` (off when missing).
+    /// Toggle `name`; off on a miss.
     pub fn bool(&self, name: &str) -> bool {
-        self.value(name).and_then(Value::bool).unwrap_or(false)
+        self.values.toggle(name).unwrap_or(false)
     }
 
-    /// Choice `name`'s key (empty when missing).
+    /// Choice `name`'s key; empty on a miss.
     pub fn choice(&self, name: &str) -> &str {
-        self.value(name).and_then(Value::choice).unwrap_or("")
+        self.values.choice(name).unwrap_or("")
     }
 
-    /// Color `name`, as `f32` (black when missing).
+    /// Color `name`, as `f32`; black on a miss.
     pub fn color(&self, name: &str) -> [f32; 3] {
-        self.value(name)
-            .and_then(Value::color)
+        self.values
+            .color(name)
             .unwrap_or([0.0; 3])
             .map(|c| c as f32)
     }

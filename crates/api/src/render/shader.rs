@@ -4,7 +4,8 @@
 //! [`MaterialNetwork`](kinogaki_render_api::MaterialNetwork).
 use crate::cook::{Category, Description, Port, SchemaCx};
 use crate::data::Data;
-use crate::id::{ContextId, DataTypeId, NodeTypeId};
+use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
+use crate::network::{NewNode, NodeCreation};
 use crate::params::{Parameter, Parameters, Schema, SchemaItem};
 use crate::{CookCx, Error, NodeType, Outputs};
 use kinogaki_render_api::{Input, NodeDef};
@@ -12,6 +13,25 @@ use std::sync::Arc;
 
 /// Inside a Material node: its shading network.
 pub const SHADING: ContextId = ContextId::declared("kinogaki.core.shading");
+
+/// Core's Material node: what holds a shading network ([`SHADING`]).
+pub const MATERIAL: NodeTypeId = NodeTypeId::declared("kinogaki.core.material");
+
+/// A starting material an engine offers in Tab and the menus: a Material node
+/// labelled `label` with `inside` seeded in it, displayed, listed under
+/// `family` and found by `aliases`.
+pub fn material_creation(
+    id: CreationId,
+    label: &str,
+    family: &str,
+    aliases: &[&str],
+    inside: NewNode,
+) -> NodeCreation {
+    NodeCreation::new(id, label, NewNode::new(MATERIAL))
+        .family(family)
+        .aliases(aliases.iter().copied())
+        .inside(inside.displayed())
+}
 
 /// What a shading wire carries, as the network pane sees it: which sockets
 /// meet is checked as a Material compiles.

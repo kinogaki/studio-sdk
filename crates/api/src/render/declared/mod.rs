@@ -73,7 +73,7 @@ fn finite(values: &Parameters) -> bool {
 
 /// Words other applications use for a light of a standard shape.
 fn aliases(ty: &PrimType) -> &'static [&'static str] {
-    let prim = Declared::new(&ty.id, ty.defaults());
+    let prim = Declared::new(ty.id, ty.defaults());
     match standard::Light::decode(&prim).map(|light| light.shape) {
         Some(Shape::Rect { .. } | Shape::Disk { .. }) => {
             &["usdlux", "lamp", "rect", "disk", "rectlight", "disklight"]
@@ -117,9 +117,9 @@ impl DeclaredKind {
         }
     }
 
-    /// Its type `id`.
+    /// Its type of id `id` (as stored).
     fn type_of(&self, id: &str) -> Option<&PrimType> {
-        self.types.iter().find(|t| &*t.id == id)
+        self.types.iter().find(|t| t.id.as_str() == id)
     }
 
     /// The creation making an object of type `ty`: under the kind's own
@@ -127,18 +127,18 @@ impl DeclaredKind {
     /// type's last step.
     fn creation_of(&self, ty: &PrimType) -> Option<CreationId> {
         let prefix = self.id.as_str().rsplit_once('.')?.0;
-        let name = ty.id.rsplit('.').next()?;
+        let name = ty.id.name();
         CreationId::parse(&format!("{prefix}.{name}"))
     }
 
     /// A body of `prim`, when it fits the kind: one of its types, every value
     /// its type declares within its limits, every number finite.
     fn body(&self, prim: &Declared) -> Option<Arc<dyn ObjectBody>> {
-        let ty = self.type_of(&prim.type_id)?;
+        let ty = self.type_of(prim.type_id.as_str())?;
         let fits =
             (ty.params.iter()).all(|d| prim.value(&d.name).is_none_or(|value| d.accepts(value)));
         (fits && finite(&prim.values)).then(|| {
-            let prim = Declared::new(&ty.id, prim.values.clone());
+            let prim = Declared::new(ty.id, prim.values.clone());
             Arc::new(DeclaredBody {
                 kind: self.id,
                 prim,
@@ -180,7 +180,7 @@ impl ObjectKindSpec for DeclaredKind {
     }
     fn new_body(&self) -> Arc<dyn ObjectBody> {
         let prim = match self.types.first() {
-            Some(ty) => Declared::new(&ty.id, ty.defaults()),
+            Some(ty) => Declared::new(ty.id, ty.defaults()),
             None => standard::Light::default().declared(),
         };
         Arc::new(DeclaredBody {
@@ -252,7 +252,7 @@ impl ObjectKindSpec for DeclaredKind {
         let ty = (self.types.iter())
             .find(|ty| self.creation_of(ty) == Some(id))
             .ok_or_else(|| Error::invalid(format_args!("{} makes no {id}", self.label)))?;
-        let prim = Declared::new(&ty.id, ty.defaults());
+        let prim = Declared::new(ty.id, ty.defaults());
         Ok(Arc::new(DeclaredBody {
             kind: self.id,
             prim,
@@ -298,7 +298,7 @@ impl ObjectCodec for DeclaredKind {
             ))
         })?;
         let values = element::read_values(&*at.required_child(VALUES)?, &ty.params)?;
-        self.body(&Declared::new(&ty.id, values)).ok_or_else(|| {
+        self.body(&Declared::new(ty.id, values)).ok_or_else(|| {
             Error::invalid(format_args!(
                 "{}: a value doesn't fit its type",
                 at.location()

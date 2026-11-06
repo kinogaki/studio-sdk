@@ -15,8 +15,8 @@ use crate::declared::PrimType;
 use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef};
 use crate::prim::PrimKind;
 use crate::settings::{SettingDescriptor, SettingGroup};
-use kinogaki_value::EngineId;
 use kinogaki_value::NodeTypeId;
+use kinogaki_value::{EngineId, PrimTypeId};
 
 /// What an engine's materials are to a host: the rules only its code knows.
 pub trait MaterialRules: Send + Sync {
@@ -212,13 +212,13 @@ impl EngineDescription {
     }
 
     /// Its prim type `id`, when it declares it.
-    pub fn prim_type(&self, id: &str) -> Option<&PrimType> {
-        self.capabilities.types.iter().find(|t| &*t.id == id)
+    pub fn prim_type(&self, id: PrimTypeId) -> Option<&PrimType> {
+        self.capabilities.types.iter().find(|t| t.id == id)
     }
 
     /// Type `id`'s groups and parameters as it renders them (none when it
     /// does not declare the type).
-    pub fn schema(&self, id: &str) -> Option<(Vec<SettingGroup>, Vec<SettingDescriptor>)> {
+    pub fn schema(&self, id: PrimTypeId) -> Option<(Vec<SettingGroup>, Vec<SettingDescriptor>)> {
         let ty = self.prim_type(id)?;
         Some((ty.groups.clone(), ty.params.clone()))
     }

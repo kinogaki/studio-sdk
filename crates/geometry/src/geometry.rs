@@ -5,6 +5,7 @@ use crate::attributes::{Attributes, Domain};
 use crate::column::Column;
 use crate::positions;
 use crate::primitives::Primitives;
+use crate::vec3::Vec3;
 use std::sync::Arc;
 
 /// Geometry, polylines and curves in one value: positions, a shared
@@ -177,6 +178,14 @@ impl Geometry {
             primitives: Arc::new(Primitives::empty()),
             attributes: Arc::default(),
         }
+    }
+
+    /// Polygon `face`'s normal by Newell's method: its length is twice the
+    /// polygon's area (zero for a polygon with none).
+    pub fn polygon_normal(&self, face: usize) -> Vec3 {
+        let row = self.primitives().primitive(face);
+        let at = |k: usize| Vec3::from(self.positions()[row[k % row.len()] as usize]);
+        (0..row.len()).fold(Vec3::ZERO, |sum, k| sum + at(k).cross(at(k + 1)))
     }
 
     /// The points' positions.
