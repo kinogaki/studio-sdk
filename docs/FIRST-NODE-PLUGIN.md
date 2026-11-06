@@ -466,6 +466,18 @@ rustc --edition 2024 --crate-type dylib --crate-name boxes -C prefer-dynamic \
 
 A plugin with UI adds `--extern studio_ui_api="$(ls "$KIT"/deps/libstudio_ui_api-*.rmeta)"` the same way.
 
+A plugin's own dependencies (crates.io crates) are built by cargo against the kit's standard library, then named to `rustc` beside the kit's. List them in the plugin's `Cargo.toml` as usual and build each with `-p` (cargo builds what they need with them; the plugin's own code, which cargo can't build, is left out), with the compiler the kit names:
+
+```sh
+RUSTFLAGS="--sysroot $KIT/sysroot" cargo build --release -p bytemuck
+rustc ... (as above) \
+    --extern bytemuck="$(ls target/release/deps/libbytemuck-*.rlib)" \
+    -L dependency=target/release/deps \
+    target/root.rs -o target/boxes.dylib
+```
+
+They link into the plugin's library. A dependency the SDK holds too (the kit's `deps/` names each) is still the plugin's own copy: pass the SDK's values across the boundary, never that crate's.
+
 ## 8. Install it
 
 Studio looks for plugins in the user's plugin folder (macOS: `~/Library/Application Support/Kinogaki Studio/plugins`; Windows: `%APPDATA%\Kinogaki Studio\plugins`; Linux: `$XDG_CONFIG_HOME/kinogaki-studio/plugins`, else `~/.config/kinogaki-studio/plugins`), in one folder per kind: `kernels/`, `nodes/`, `formats/` and `renders/`. A plugin is its library and a manifest beside it, named alike. The Boxes plugin is a node plugin:

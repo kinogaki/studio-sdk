@@ -1,0 +1,25 @@
+[package]
+name = "example-flat-engine"
+description = "An example Kinogaki Studio render engine: Flat, a CPU ray caster shading triangles by a headlight, checked by the SDK's engine conformance"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+# A Rust dylib: Studio and its plugins share one standard library and one
+# copy of the SDK.
+crate-type = ["dylib"]
+
+[lints]
+workspace = true
+
+[dependencies]
+# The render contract and its wgpu display.
+kinogaki-render-api = { workspace = true, features = ["wgpu"] }
+# The package that carries the engine to Studio.
+kinogaki-studio-api = { workspace = true, features = ["wgpu"] }
+
+[dev-dependencies]
+# The engine conformance and a device for it.
+kinogaki-studio-api-testing = { workspace = true, features = ["wgpu"] }

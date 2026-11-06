@@ -1,8 +1,8 @@
 # Your first render engine
 
-A render engine is a package that renders what a host sends it. It depends on `kinogaki-render-api` alone, and sees no kernel, no document and no network: only prims, in batches, with what changed about each.
+A render engine is a package that renders what a host sends it. Its renderer depends on `kinogaki-render-api` alone, and sees no kernel, no document and no network: only prims, in batches, with what changed about each. Its package (the lights it brings as object kinds, `export_package!`) depends on `kinogaki-studio-api` too, with its `wgpu` feature.
 
-Studio's own engine, Spectre (a spectral path tracer, in Studio's Spectre plugin), is written against this page and nothing else; so will Pixel be, Studio's realtime engine, which is open source. The snippets below are an engine called Ray under the `acme` vendor.
+Studio's engines, Spectre (a spectral path tracer) and Pixel (a realtime pixel-art engine, open source), are written against this page and nothing else. [`examples/flat-engine`](../examples/flat-engine) is a whole engine in three files: a CPU ray caster on the SDK's render thread, shown through a texture on the host's device. The snippets below are an engine called Ray under the `acme` vendor.
 
 ## What a host knows of an engine
 
@@ -125,3 +125,16 @@ An engine is tested with plain cargo against this crate alone, as a host drives 
 - closed-form scenes where your engine allows them (a white furnace returns the light it is lit by).
 
 GPU tests need a device: mark them `#[ignore]` and run them on a machine with one. The testing crate's `wgpu` feature gives them one (`engine::device`) and counts your wakes (`engine::Waiter`: wait until a condition holds, take a `Pending`'s value). `RecordingEngine` is the opposite tool: it stores what it was sent, for tests of a host.
+
+`engine::conformance` is the check Studio's engines pass: a scene of prims for each prim kind and standard light type your description declares, each rendered as a final frame beside the same scene without its subject. A scene passes when your engine renders it without failing, its beauty is finite, and its subject shows:
+
+```rust
+let (device, queue) = engine::device();
+let make = |wake| Ray.make(&device, &queue, wake, &Options::default());
+let report = engine::conformance("Ray", &make);
+assert!(report.failures().is_empty(), "{report}");
+```
+
+## Build against the kit
+
+An engine builds against the plugin kit as a node plugin does ([FIRST-NODE-PLUGIN.md §7](FIRST-NODE-PLUGIN.md#7-build-against-the-kit), which also builds a plugin's own dependencies), with the render interface added to the externs: `--extern kinogaki_render_api="$(ls "$KIT"/deps/libkinogaki_render_api-*.rmeta)"`. The kit's render interface carries its `wgpu` feature, and `kinogaki_render_api::display::wgpu` is the wgpu your engine draws with. Install the library in the `renders/` folder.

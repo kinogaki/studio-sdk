@@ -1,6 +1,7 @@
 //! What an engine's GPU tests share: this machine's device, offscreen, the
-//! tests' turns on it, and the engine's wakes counted with a way to wait on
-//! them.
+//! tests' turns on it, the engine's wakes counted with a way to wait on
+//! them, and the engine conformance ([`conformance`]): what a host sends,
+//! rendered.
 use kinogaki_render_api::display::wgpu;
 use kinogaki_render_api::{Pending, Wake};
 use std::future::Future;
@@ -8,7 +9,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
+mod conformance;
 mod turns;
+pub use conformance::{Make, conformance};
 pub use turns::{alone, share};
 
 /// `future`'s output, polled to completion (wgpu's requests resolve without

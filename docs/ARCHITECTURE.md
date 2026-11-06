@@ -329,7 +329,7 @@ Engines never see kernel types. A data type's `Renderable` facet is asked throug
 
 The source contract (`ShapeSource`, `Topology`, `Ranges`) is `kinogaki-render-api`'s, the render interface engines build on, and `render` re-exports it; so a source a data type makes is what a host hands its engines, with no conversion. `RenderItem` stays here.
 
-An engine itself builds on `kinogaki-render-api` alone: [FIRST-RENDER-ENGINE.md](FIRST-RENDER-ENGINE.md) is the contract, end to end, from the description to previews.
+An engine's renderer builds on `kinogaki-render-api` alone, and its package (its lights, its export) on `kinogaki-studio-api` too: [FIRST-RENDER-ENGINE.md](FIRST-RENDER-ENGINE.md) is the contract, end to end, from the description to previews.
 
 The host keeps engine scenes in step cheaply: a source with the last identity is skipped; one with the same topology is a points update narrowed by `moved_since`; primvars and subsets are resent only when their columns change. Shading normals (`N`) are asked for lazily, after a drag ends.
 

@@ -206,6 +206,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-flat-engine"
+version = "0.1.0"
+dependencies = [
+ "kinogaki-render-api",
+ "kinogaki-studio-api",
+ "kinogaki-studio-api-testing",
+]
+
+[[package]]
 name = "example-pin-board"
 version = "0.1.0"
 dependencies = [
@@ -213,6 +222,14 @@ dependencies = [
  "kinogaki-studio-api",
  "kinogaki-studio-ui-api",
  "kinogaki-studio-ui-api-testing",
+]
+
+[[package]]
+name = "example-points-format"
+version = "0.1.0"
+dependencies = [
+ "kinogaki-studio-api",
+ "kinogaki-studio-api-testing",
 ]
 
 [[package]]
