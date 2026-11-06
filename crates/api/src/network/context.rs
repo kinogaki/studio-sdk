@@ -35,7 +35,8 @@ pub struct NetworkContext {
     /// How its nodes are drawn in the network pane.
     pub layout: NodeLayout,
     /// Other packages' node types its networks offer too, each listed under
-    /// a section of this context's (CAM's networks take Mesh's Import).
+    /// a section of this context's (a trees context's networks taking a mesh
+    /// package's Import).
     pub adopts: Vec<Adopted>,
     /// Its networks' results show on the 2D canvas, not in the views: the
     /// canvas comes to the front while one is open.

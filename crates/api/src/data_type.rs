@@ -1,12 +1,13 @@
 //! [`DataType`]: everything the environment needs to handle values it
-//! can't look inside: identity, a wire color, a content stamp, memory,
+//! can't look inside: identity, a wire color ([`WireColor`]), a content stamp, memory,
 //! bounds, info rows and how the value saves, plus optional facets for
 //! display, picking, the spreadsheet and rendering.
 //!
-//! A kernel package implements one `DataType` per kind of value it defines
-//! (Studio's Mesh plugin registers `kinogaki.mesh.geometry` over its mesh
-//! kernel's meshes, its CAD plugin `kinogaki.cad.body` over its solid
-//! bodies) and registers it in its [`Package`](crate::Package).
+//! A package implements one `DataType` per kind of value it defines beyond
+//! the standard types (the Mesh plugin's `kinogaki.mesh.steps`, Edit Mesh's
+//! held steps) and registers it in its [`Package`](crate::Package); a
+//! kernel's operations work on the standard values and register no type of
+//! their own for the same data.
 //! A facet a type doesn't offer is simply absent: a type without
 //! [`Displayable`] isn't drawn, one without [`Renderable`] isn't rendered,
 //! and nothing fails.
@@ -18,10 +19,11 @@ use crate::facets::{
 use crate::id::DataTypeId;
 use kinogaki_geometry::Bounds;
 
-/// A display color: 8-bit sRGB. Wires of a data type, and the tiles of
-/// object kinds, are drawn in it.
+/// The color a data type's wires and ports are drawn in, 8-bit sRGB and
+/// opaque ([`DataType::wire_color`]). What else shows on screen takes its
+/// colors from the theme, and a part draws in the UI layer's own color.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Color {
+pub struct WireColor {
     /// Red, sRGB-encoded.
     pub r: u8,
     /// Green, sRGB-encoded.
@@ -30,7 +32,7 @@ pub struct Color {
     pub b: u8,
 }
 
-impl Color {
+impl WireColor {
     /// The color with sRGB components `r`, `g`, `b`.
     pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
@@ -95,7 +97,7 @@ pub trait DataType: Send + Sync {
     fn label(&self) -> &str;
 
     /// The color its wires and ports are drawn in.
-    fn wire_color(&self) -> Color;
+    fn wire_color(&self) -> WireColor;
 
     /// `data`'s content hash ([`Stamp`]).
     fn stamp(&self, data: &Data) -> Stamp;

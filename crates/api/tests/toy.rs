@@ -73,8 +73,8 @@ impl DataType for CloudType {
     fn label(&self) -> &str {
         "Cloud"
     }
-    fn wire_color(&self) -> Color {
-        Color::rgb(90, 160, 220)
+    fn wire_color(&self) -> WireColor {
+        WireColor::rgb(90, 160, 220)
     }
     fn stamp(&self, data: &Data) -> Stamp {
         let mut stamp = [0; 32];
@@ -114,8 +114,8 @@ impl DataType for CountType {
     fn label(&self) -> &str {
         "Count"
     }
-    fn wire_color(&self) -> Color {
-        Color::rgb(200, 200, 200)
+    fn wire_color(&self) -> WireColor {
+        WireColor::rgb(200, 200, 200)
     }
     fn stamp(&self, _: &Data) -> Stamp {
         [0; 32]

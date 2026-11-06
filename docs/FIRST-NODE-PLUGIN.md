@@ -111,8 +111,8 @@ impl DataType for BoxType {
     fn label(&self) -> &str {
         "Box"
     }
-    fn wire_color(&self) -> Color {
-        Color::rgb(232, 164, 58)
+    fn wire_color(&self) -> WireColor {
+        WireColor::rgb(232, 164, 58)
     }
     fn stamp(&self, data: &Data) -> Stamp {
         // The six numbers' bytes, hashed (FNV-1a).

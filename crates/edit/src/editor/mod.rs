@@ -33,7 +33,8 @@
 //! ([`Numbers::of`] says where a number went). Sources always mean the base
 //! value's data, whatever else the same edit changes. A bad number is
 //! remembered and reported by [`finish`](Editor::finish), so a tool's loops
-//! stay plain.
+//! stay plain: a reader answers a neutral value for it (the origin, no
+//! corners, a polygon) and a change does nothing.
 //!
 //! ```
 //! use kinogaki_edit::editor::{Corner, Editor};
@@ -80,6 +81,7 @@ pub use gather::{NOTHING, Placed, gather, gather_table, picked, spread};
 use kinogaki_geometry::{Basis, Error, Geometry, Kind, Vec3, Xform};
 use layout::{Blends, Source, Span};
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 
 /// One corner of a new or rewired primitive: the point it names, and the
 /// base value's vertices its Vertex attributes come from.
@@ -104,7 +106,7 @@ struct Row {
 pub struct Editor {
     base: Geometry,
     /// The first fault: what [`finish`](Self::finish) reports.
-    fault: Option<Error>,
+    fault: OnceLock<Error>,
     /// Base points' new positions.
     moved: HashMap<u32, [f64; 3]>,
     added_points: Vec<[f64; 3]>,
@@ -150,7 +152,7 @@ impl Editor {
     pub fn new(base: &Geometry) -> Self {
         Self {
             base: base.clone(),
-            fault: None,
+            fault: OnceLock::new(),
             moved: HashMap::new(),
             added_points: Vec::new(),
             point_from: Vec::new(),
@@ -192,11 +194,12 @@ impl Editor {
         self.base_primitives() + self.added_rows.len() as u32
     }
 
-    /// Point `p`'s position as the edit has it.
-    ///
-    /// # Panics
-    /// When `p` is not a point.
+    /// Point `p`'s position as the edit has it; the origin, remembering a
+    /// fault, when `p` is not a point.
     pub fn position(&self, p: u32) -> [f64; 3] {
+        if !self.check_point(p) {
+            return [0.0; 3];
+        }
         match p.checked_sub(self.base_points()) {
             Some(k) => self.added_points[k as usize],
             None => (self.moved.get(&p).copied()).unwrap_or(self.base.positions()[p as usize]),
@@ -204,22 +207,23 @@ impl Editor {
     }
 
     /// Primitive `p`'s corners as the edit has them (welds show at the
-    /// finish).
-    ///
-    /// # Panics
-    /// When `p` is not a primitive.
+    /// finish); none, remembering a fault, when `p` is not a primitive.
     pub fn corners(&self, p: u32) -> &[u32] {
+        if !self.check_primitive(p) {
+            return &[];
+        }
         match self.row(p) {
             Some(row) => &self.corners[row.start as usize..(row.start + row.len) as usize],
             None => self.base.primitives().primitive(p as usize),
         }
     }
 
-    /// Primitive `p`'s kind.
-    ///
-    /// # Panics
-    /// When `p` is not a primitive.
+    /// Primitive `p`'s kind; a polygon, remembering a fault, when `p` is
+    /// not a primitive.
     pub fn kind(&self, p: u32) -> Kind {
+        if !self.check_primitive(p) {
+            return Kind::POLYGON;
+        }
         match self.row(p) {
             Some(row) => row.kind,
             None => self.base.primitives().kind(p as usize),
@@ -244,12 +248,12 @@ impl Editor {
     }
 
     /// Remembers the first fault.
-    fn refuse(&mut self, why: String) {
-        self.fault.get_or_insert(Error::invalid(why));
+    fn refuse(&self, why: String) {
+        self.fault.get_or_init(|| Error::invalid(why));
     }
 
     /// Whether `p` is a numbered point, remembering a fault if not.
-    fn check_point(&mut self, p: u32) -> bool {
+    fn check_point(&self, p: u32) -> bool {
         let known = p < self.point_count();
         if !known {
             self.refuse(format!(
@@ -261,7 +265,7 @@ impl Editor {
     }
 
     /// Whether `p` is a numbered primitive, remembering a fault if not.
-    fn check_primitive(&mut self, p: u32) -> bool {
+    fn check_primitive(&self, p: u32) -> bool {
         let known = p < self.primitive_count();
         if !known {
             let last = self.primitive_count();

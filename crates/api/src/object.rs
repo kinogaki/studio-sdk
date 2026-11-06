@@ -1,5 +1,5 @@
 //! Scene objects a package contributes: [`ObjectKindSpec`] describes a
-//! kind (Mesh, CAD, a CAM setup), [`ObjectBody`] is one object's own state
+//! kind (Mesh, Camera, Render Output), [`ObjectBody`] is one object's own state
 //! (a Mesh object's display settings). A kind whose objects are render prims
 //! themselves (an engine's lights and fog) says so through its optional
 //! [`RenderedKind`] facet.
@@ -94,8 +94,8 @@ pub trait ObjectKindSpec: Send + Sync {
         None
     }
 
-    /// Whether its objects live only at the scene's root (Fog, Render
-    /// Settings).
+    /// Whether its objects live only at the scene's root (an engine's fog,
+    /// Render Output).
     fn at_root(&self) -> bool {
         false
     }

@@ -135,8 +135,8 @@ pub const fn brep() -> Typed<Brep> {
 }
 
 /// The handle on a file's materials as a format reads them beside its
-/// geometry (`PREVIEW_MATERIALS`): each keyed by the name the file's
-/// polygons' `material` values give it, with its preview surface.
+/// geometry (`kinogaki.core.materials`): each keyed by the name the file's
+/// polygons' `material` values give it, with what starts its inside.
 pub const fn materials() -> Typed<Vec<ImportedMaterial>> {
     Typed::new(DataTypeId::declared(MATERIALS))
 }

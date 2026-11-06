@@ -108,7 +108,7 @@ An engine never blocks its caller: its renderer and scene live on a render threa
 - One engine holds one scene and any number of views over it: two views of different settings and cameras share every prim. Views take turns: render one for a few samples, then the next that still needs them, a `Navigating` one ahead of any turn. After a restart the view last named by `focus` goes first. `focus` itself restarts nothing.
 - A view that can't render says why through `problem` and wakes the host once. The other views render on.
 - Publish each whole pass as a `Frame` (`latest`), and call the `Wake` **once**. Nothing else may wake the host.
-- `finish` returns a `Pending<Outputs>`: the requested AOVs once its samples are done. Every `Pending` is yours to resolve with its `Deliver`; drop one you won't answer and the host sees `Cancelled`.
+- `finish` returns a `Pending<FinalOutputs>`: the requested AOVs once its samples are done. Every `Pending` is yours to resolve with its `Deliver`; drop one you won't answer and the host sees `Cancelled`.
 - A host cancels by dropping the `Pending`: `Deliver::wanted` turns false. Ask it between passes and stop.
 - With nothing to do, sleep on a condition: an idle engine costs nothing and wakes no one.
 - Engines output linear ACEScg.

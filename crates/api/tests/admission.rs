@@ -70,8 +70,8 @@ impl DataType for Wood {
     fn label(&self) -> &str {
         "Wood"
     }
-    fn wire_color(&self) -> Color {
-        Color::rgb(0, 0, 0)
+    fn wire_color(&self) -> WireColor {
+        WireColor::rgb(0, 0, 0)
     }
     fn stamp(&self, _: &Data) -> Stamp {
         [0; 32]

@@ -170,8 +170,8 @@ impl DataType for Bare {
     fn label(&self) -> &str {
         self.0.name()
     }
-    fn wire_color(&self) -> Color {
-        Color::rgb(0, 0, 0)
+    fn wire_color(&self) -> WireColor {
+        WireColor::rgb(0, 0, 0)
     }
     fn stamp(&self, _: &Data) -> Stamp {
         [0; 32]

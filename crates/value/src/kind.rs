@@ -49,7 +49,7 @@ pub enum ValueKind {
     Reference(RefFilter),
     /// [`Value::Object`]: one object the filter says fits, or none, held
     /// by the host's id; the host shows and takes it by the object's path.
-    /// A row of an object's kind (a render setup's Camera): a node names
+    /// A row of an object's kind (a Render Output's Camera): a node names
     /// what it reads by a [`Reference`](Self::Reference) path.
     Object(RefFilter),
     /// [`Value::Text`]: attribute names (a name or a pattern), the

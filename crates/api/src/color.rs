@@ -6,7 +6,7 @@
 //!
 //! **One rule.** Authored colors (parameters, attributes, lights' and
 //! settings' values, material constants) are linear in the project's
-//! working space, wherever they are held: objects, render setups, a
+//! working space, wherever they are held: objects, Render Outputs, a
 //! `Value::Color` in a body. Colors
 //! reaching an engine (prims, materials, render settings) are linear
 //! ACEScg (`kinogaki_render_api::RENDER_SPACE`), and engines output it: the host converts

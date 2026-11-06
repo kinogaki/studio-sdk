@@ -465,3 +465,17 @@ fn curves_stay_as_they_are_around_what_changes() {
     assert!(out.primitives().curves().is_none());
     assert_eq!(out.primitives().primitive(1), [7, 8]);
 }
+
+/// A bad number read is remembered as a bad number written is: the reader
+/// answers a neutral value and the finish reports the first fault.
+#[test]
+fn reading_a_bad_number_answers_neutrally_and_the_finish_reports_it() {
+    let edit = Editor::new(&sheet(1, 1));
+    assert_eq!(edit.position(4), [0.0; 3]);
+    assert_eq!((edit.corners(1), edit.kind(1)), (&[][..], Kind::POLYGON));
+    let refused = edit.finish().unwrap_err();
+    assert_eq!(refused.message(), "point 4 is past the last of 4");
+    let edit = Editor::new(&sheet(1, 1));
+    assert_eq!(edit.corners(0).len(), 4);
+    assert!(edit.finish().is_ok());
+}

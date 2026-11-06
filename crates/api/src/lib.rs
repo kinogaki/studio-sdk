@@ -123,7 +123,7 @@ pub use cook::{
     SchemaCx,
 };
 pub use data::{Data, Typed};
-pub use data_type::{Color, DataType, InfoRow, Stamp, stamp_of};
+pub use data_type::{DataType, InfoRow, Stamp, WireColor, stamp_of};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use facets::{
     Canvas, CanvasPiece, CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn,

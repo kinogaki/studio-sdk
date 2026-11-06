@@ -71,8 +71,7 @@ pub fn light_value(light: Light) -> Result<Light, Error> {
     })
 }
 
-/// The codec of light values: the light as UsdLux's fields. Core's Light
-/// objects save their light with it too.
+/// The codec of light values: the light as UsdLux's fields.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LightCodec;
 
