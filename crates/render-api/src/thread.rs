@@ -22,11 +22,11 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 
 use crate::aov::standard as aovs;
+use crate::geometry::image::{Image, Sample};
 use crate::geometry::{Diagnostic, Error};
 use crate::{
-    AovDesc, AovFormat, Deliver, EngineDescription, FinalOutputs, Frame, Pending, PreviewImage,
-    PreviewRequest, PreviewScene, PrimId, RenderEngine, SceneUpdate, ViewDesc, ViewId, Wake,
-    pending,
+    AovDesc, AovFormat, Deliver, EngineDescription, Frame, Pending, PreviewImage, PreviewRequest,
+    PreviewScene, PrimId, RenderEngine, SceneUpdate, ViewDesc, ViewId, Wake, pending,
 };
 
 /// The preview's view, apart from a host's.
@@ -39,7 +39,7 @@ pub struct Reading(Read);
 /// What a [`Reading`] is.
 enum Read {
     /// A final render's outputs.
-    Outputs(Vec<AovDesc>, Deliver<FinalOutputs>),
+    Outputs(Vec<AovDesc>, Deliver<Image>),
     /// A preview's beauty, as its picture.
     Preview(Deliver<PreviewImage>),
 }
@@ -64,15 +64,12 @@ impl Reading {
         }
     }
 
-    /// Hands `outputs` over (a preview its first plane, the beauty).
-    pub fn deliver(self, outputs: FinalOutputs) {
+    /// Hands `outputs` over (a preview its beauty, the main layer, as floats).
+    pub fn deliver(self, outputs: Image) {
         match self.0 {
             Read::Outputs(_, deliver) => deliver.deliver(outputs),
-            Read::Preview(deliver) => match outputs.planes.into_iter().next() {
-                Some((_, pixels)) => deliver.deliver(PreviewImage {
-                    side: outputs.width,
-                    pixels,
-                }),
+            Read::Preview(deliver) => match picture(&outputs) {
+                Some(picture) => deliver.deliver(picture),
                 None => deliver.fail(Error::invalid("the preview has no beauty")),
             },
         }
@@ -85,6 +82,22 @@ impl Reading {
             Read::Preview(deliver) => deliver.fail(why),
         }
     }
+}
+
+/// `outputs`' beauty as a preview's picture: its main layer, RGBA floats, of
+/// a square frame.
+fn picture(outputs: &Image) -> Option<PreviewImage> {
+    let layer = outputs.layers().first()?;
+    let format = layer.format();
+    if !format.name.is_empty() || format.channels.len() != 4 || format.sample != Sample::F32 {
+        return None;
+    }
+    let bytes = outputs.plane(0)?;
+    let pixels = (bytes.as_chunks::<4>().0.iter()).map(|b| f32::from_ne_bytes(*b));
+    Some(PreviewImage {
+        side: outputs.data().size()[0],
+        pixels: pixels.collect(),
+    })
 }
 
 impl PreviewScene {
@@ -313,7 +326,7 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         lock(&self.published).problem(view).cloned()
     }
 
-    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<FinalOutputs> {
+    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Image> {
         let (deliver, result) = pending(self.wake.clone());
         let reading = Reading(Read::Outputs(outputs.to_vec(), deliver));
         self.send(Message::Read(view, reading));

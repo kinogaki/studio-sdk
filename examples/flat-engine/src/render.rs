@@ -5,8 +5,8 @@
 use kinogaki_render_api::geometry::{Vec3, Xform};
 use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Reading, lock};
 use kinogaki_render_api::{
-    Camera, FinalOutputs, Frame, PreviewScene, Prim, PrimId, Projection, RenderStats,
-    SceneSettings, Topology, ViewCamera, ViewDesc, ViewId, ViewMode, Wake, f32_to_half,
+    Camera, Frame, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, Topology,
+    ViewCamera, ViewDesc, ViewId, ViewMode, Wake, aov, f32_to_half,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -140,16 +140,14 @@ impl Scene {
                 )),
                 Some((_, None)) => self.reads.push((id, reading)),
                 Some((desc, Some(pixels))) => {
-                    let planes = (reading.outputs().into_iter())
+                    let planes: Vec<_> = (reading.outputs().into_iter())
                         .filter(|o| o.aov.is_beauty())
                         .map(|o| (o, pixels.clone()))
                         .collect();
-                    reading.deliver(FinalOutputs {
-                        width: desc.width,
-                        height: desc.height,
-                        planes,
-                        names: Vec::new(),
-                    });
+                    match aov::image([desc.width, desc.height], &planes, &[]) {
+                        Ok(image) => reading.deliver(image),
+                        Err(why) => reading.fail(why),
+                    }
                 }
             }
         }

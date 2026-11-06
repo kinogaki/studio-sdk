@@ -8,13 +8,14 @@ use std::sync::Arc;
 use crate::aov::{AovDesc, AovSpec, standard as aov};
 use crate::description::{Capabilities, EngineDescription, Motion};
 use crate::dirty::Dirty;
-use crate::engine::{FinalOutputs, Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
+use crate::engine::{Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
 use crate::id::PrimId;
 use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::{Prim, PrimKind, Topology};
 use crate::settings::SceneSettings;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::Diagnostic;
+use kinogaki_geometry::image::Image;
 use kinogaki_value::EngineId;
 
 /// What a [`RecordingEngine`] was sent.
@@ -172,29 +173,25 @@ impl RenderEngine for RecordingEngine {
         None
     }
 
-    /// Delivers black outputs of the view's size at once.
-    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<FinalOutputs> {
+    /// Delivers black outputs of the view's size at once (a view it wasn't
+    /// given fails).
+    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Image> {
         let (deliver, result) = pending(self.wake.clone());
-        let (width, height) = self
-            .views
-            .get(&view)
-            .map_or((0, 0), |(d, _)| (d.width, d.height));
-        let pixels = width as usize * height as usize;
-        let planes = outputs
-            .iter()
+        let size = self.views.get(&view).map(|(d, _)| [d.width, d.height]);
+        let pixels = size.map_or(0, |[w, h]| w as usize * h as usize);
+        let planes: Vec<_> = (outputs.iter())
             .map(|desc| {
                 (
                     desc.clone(),
-                    Arc::from(vec![0.0f32; pixels * desc.aov.channels()]),
+                    vec![0.0f32; pixels * desc.aov.channels()].into(),
                 )
             })
             .collect();
-        deliver.deliver(FinalOutputs {
-            width,
-            height,
-            planes,
-            names: Vec::new(),
-        });
+        let image = size.ok_or_else(|| kinogaki_geometry::Error::missing("no such view"));
+        match image.and_then(|size| crate::aov::image(size, &planes, &[])) {
+            Ok(image) => deliver.deliver(image),
+            Err(why) => deliver.fail(why),
+        }
         result
     }
 

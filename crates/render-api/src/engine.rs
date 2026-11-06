@@ -14,6 +14,7 @@ use crate::id::Id;
 use crate::material::preview::{PreviewImage, PreviewRequest};
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
+use kinogaki_geometry::image::Image;
 use kinogaki_geometry::{Diagnostic, Error, ErrorKind};
 use kinogaki_value::Parameters;
 
@@ -103,21 +104,6 @@ pub struct Frame {
     pub image: u64,
     /// What it cost.
     pub stats: RenderStats,
-}
-
-/// A final frame's outputs.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct FinalOutputs {
-    /// Width, in pixels.
-    pub width: u32,
-    /// Height, in pixels.
-    pub height: u32,
-    /// Each requested output: its values, interleaved per pixel
-    /// ([`crate::Aov::channels`] a pixel), f32 or u32 bits as its
-    /// format says (f16 widened).
-    pub planes: Vec<(AovDesc, Arc<[f32]>)>,
-    /// Cryptomatte names: the paths whose hashes appear in its planes.
-    pub names: Vec<Arc<str>>,
 }
 
 /// What a pending result holds: nothing yet, its outcome, or its outcome
@@ -239,9 +225,10 @@ pub trait RenderEngine: Send {
     /// when it does); its neighbours render on.
     fn problem(&self, view: ViewId) -> Option<Diagnostic>;
     /// Read a view's outputs once its samples are done. The result
-    /// resolves once: the outputs, or why there are none (a failed read,
-    /// or the request dropped with the view or the engine).
-    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<FinalOutputs>;
+    /// resolves once: the outputs as one Image, a layer each (the beauty the
+    /// main one; [`crate::aov::image`] makes it), or why there are none (a
+    /// failed read, or the request dropped with the view or the engine).
+    fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Image>;
     /// A picture of a material, rendered off the caller's thread; never
     /// blocks. The host drops the result to cancel it ([`Deliver::wanted`]).
     /// A host asks previews of an engine it made for them, never of one

@@ -2,8 +2,9 @@
 //! prims built with the SDK's builders, one for each prim kind and standard
 //! type the engine declares, each rendered as a final frame and read back
 //! beside the same scene without its subject. A scene passes when the
-//! engine renders it without failing, its beauty is finite, and its subject
-//! shows (the two beauties differ).
+//! engine renders it without failing, its final frame is an Image of the
+//! view's size whose main layer is the beauty (RGBA colors), its beauty is
+//! finite, and its subject shows (the two beauties differ).
 //!
 //! The subjects stand on a quad facing +Z, lit by the standard dome when
 //! the engine declares it, seen by an orthographic camera from above a
@@ -134,7 +135,22 @@ fn beauty(
     if let Some(why) = engine.problem(VIEW) {
         return Err(why.message);
     }
-    let (_, beauty) = outputs.planes.into_iter().next().ok_or("no beauty")?;
+    if outputs.data().size() != [SIDE; 2] {
+        return Err(format!(
+            "a frame of {:?}, not the view's",
+            outputs.data().size()
+        ));
+    }
+    let main = outputs.layers().first().map(|l| l.format());
+    if !main
+        .is_some_and(|f| f.name.is_empty() && f.channels.len() == 4 && f.encoding.space().is_some())
+    {
+        return Err("its main layer isn't the beauty".into());
+    }
+    let side = SIDE as i32;
+    let beauty: Arc<[f32]> = (0..side * side)
+        .flat_map(|p| outputs.read_pixel(0, p % side, p / side))
+        .collect();
     match beauty.iter().all(|v| v.is_finite()) {
         true => Ok(beauty),
         false => Err("the beauty isn't finite".into()),

@@ -224,7 +224,8 @@ fn the_recording_engine_counts_what_it_was_sent() {
         }],
     );
     let outputs = result.take().expect("delivered at once").unwrap();
-    assert_eq!(outputs.planes[0].1.len(), 4 * 2 * 4);
+    assert_eq!(outputs.data().size(), [4, 2]);
+    assert_eq!(outputs.plane(0).map(|p| p.len()), Some(4 * 2 * 4 * 4));
     assert_eq!(wakes.load(Ordering::SeqCst), 1);
 }
 

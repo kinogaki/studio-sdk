@@ -5,7 +5,7 @@
 //!   window frames them (OpenEXR's windows, Nuke's bbox), so a blur or a
 //!   transform grows without a crop.
 //! - **Layers.** One or more [`Layer`]s: `""` the main one, others by name
-//!   (`N`, `Z`, `crypto00`). A layer holds 1–4 interleaved channels of one
+//!   (`normal`, `depth`, `CryptoObject00`). A layer holds 1–4 interleaved channels of one
 //!   [`Sample`], its colors named by [`Encoding`]: tagged ([`ColorTag`]) with
 //!   a space of the project's color configuration (what a file says until
 //!   the host resolves it), or raw data that is never converted.
@@ -17,7 +17,8 @@
 //!   upload or a mip level derived from it is keyed by.
 //! - **Levels.** A [`Pyramid`] derives smaller levels of tiles on demand,
 //!   keeping each while the tiles under it are the same.
-//! - **Attributes.** An image's metadata is its Detail [`Attributes`].
+//! - **Attributes.** An image's metadata is its Detail [`Attributes`]: every
+//!   attribute a file carries, and the standard names ([`metadata`]).
 //! - **Sampling.** Where a texture names an image, [`Sampling`] says how it
 //!   is read past its edges and between its texels.
 //!
@@ -35,6 +36,7 @@
 //! assert_eq!(image.read_pixel(0, 100, 0), [0.0; 4]); // outside the data window
 //! ```
 mod encoding;
+pub mod metadata;
 mod pyramid;
 mod sample;
 mod sampling;
@@ -105,7 +107,8 @@ impl Rect {
 /// How a layer holds its pixels.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Format {
-    /// Its name: `""` the main layer, else `N`, `Z`, `crypto00`, ….
+    /// Its name: `""` the main layer, else `normal`, `depth`,
+    /// `CryptoObject00`, ….
     pub name: Arc<str>,
     /// Its channels' names, interleaved in this order: 1 to 4.
     pub channels: Arc<[Arc<str>]>,

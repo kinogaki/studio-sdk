@@ -298,6 +298,10 @@ kinogaki-geometry/values test tolerances_are_in_their_ranges
 kinogaki-render-api/display test engines_and_displays_are_objects_hosts_can_share
 kinogaki-render-api/display test options_default_to_nothing
 kinogaki-render-api/doc test crates/render-api/src/source.rs - source::PlainTriangles
+kinogaki-render-api/lib test aov::tests::cryptomatte_ranks_fill_layers_of_two_and_name_what_they_hold
+kinogaki-render-api/lib test aov::tests::each_output_class_is_its_layer_and_sample
+kinogaki-render-api/lib test aov::tests::the_specifications_hashes_and_keys
+kinogaki-render-api/lib test aov::tests::values_not_of_the_frame_are_refused
 kinogaki-render-api/lib test engine::tests::a_dropped_deliverer_resolves_its_result_and_wakes_once
 kinogaki-render-api/lib test engine::tests::a_failure_resolves_once_saying_why
 kinogaki-render-api/lib test material::preview::tests::a_request_is_a_scene_of_its_own

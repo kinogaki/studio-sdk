@@ -108,7 +108,7 @@ An engine never blocks its caller: its renderer and scene live on a render threa
 - One engine holds one scene and any number of views over it: two views of different settings and cameras share every prim. Views take turns: render one for a few samples, then the next that still needs them, a `Navigating` one ahead of any turn. After a restart the view last named by `focus` goes first. `focus` itself restarts nothing.
 - A view that can't render says why through `problem` and wakes the host once. The other views render on.
 - Publish each whole pass as a `Frame` (`latest`), and call the `Wake` **once**. Nothing else may wake the host.
-- `finish` returns a `Pending<FinalOutputs>`: the requested AOVs once its samples are done. Every `Pending` is yours to resolve with its `Deliver`; drop one you won't answer and the host sees `Cancelled`.
+- `finish` returns a `Pending<Image>`: the requested AOVs once its samples are done, as one `Image` of the view's size. `aov::image` makes it from each output's values (interleaved, `Aov::channels` a pixel, ids as their bits) and the paths your Cryptomatte IDs name: the beauty is the main layer (`""`, `R G B A`), every other output a layer of its id (`X Y Z` for vectors, `Z` for depth, `Y` for other numbers, `id` as U32 for ids), and a Cryptomatte output of *n* ranks is `n.div_ceil(2)` layers `<id>00`, `<id>01`… of two (ID, coverage) ranks each, its manifest the image's metadata under Cryptomatte 1.2's keys (`aov::cryptomatte`: the names whose IDs the layers hold, each ID `cryptomatte::id` of its name). Every `Pending` is yours to resolve with its `Deliver`; drop one you won't answer and the host sees `Cancelled`.
 - A host cancels by dropping the `Pending`: `Deliver::wanted` turns false. Ask it between passes and stop.
 - With nothing to do, sleep on a condition: an idle engine costs nothing and wakes no one.
 - Engines output linear ACEScg.
@@ -126,7 +126,7 @@ An engine is tested with plain cargo against this crate alone, as a host drives 
 
 GPU tests need a device: mark them `#[ignore]` and run them on a machine with one. The testing crate's `wgpu` feature gives them one (`engine::device`) and counts your wakes (`engine::Waiter`: wait until a condition holds, take a `Pending`'s value). `RecordingEngine` is the opposite tool: it stores what it was sent, for tests of a host.
 
-`engine::conformance` is the check Studio's engines pass: a scene of prims for each prim kind and standard light type your description declares, each rendered as a final frame beside the same scene without its subject. A scene passes when your engine renders it without failing, its beauty is finite, and its subject shows:
+`engine::conformance` is the check Studio's engines pass: a scene of prims for each prim kind and standard light type your description declares, each rendered as a final frame beside the same scene without its subject. A scene passes when your engine renders it without failing, its final frame is an `Image` of the view's size whose main layer is the beauty, its beauty is finite, and its subject shows:
 
 ```rust
 let (device, queue) = engine::device();

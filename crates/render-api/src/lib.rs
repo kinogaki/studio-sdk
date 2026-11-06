@@ -56,8 +56,8 @@ pub use description::{
 };
 pub use dirty::Dirty;
 pub use engine::{
-    Deliver, FinalOutputs, Frame, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
-    ViewMode, Wake, pending,
+    Deliver, Frame, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId, ViewMode,
+    Wake, pending,
 };
 pub use id::{Id, IdAllocator, PrimId};
 /// The standard geometry values, which engines read prims' data as.

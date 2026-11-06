@@ -2,8 +2,15 @@
 //! the ones it writes ([`crate::Capabilities::aovs`]); the standard
 //! ones ([`standard`]) are the contract hosts and compositing read by.
 //! Colors (the beauty, albedo and the light passes) are linear ACEScg
-//! whatever the engine.
+//! whatever the engine. A final frame is one [`Image`], each output its
+//! layers ([`image`]).
+pub mod cryptomatte;
+#[cfg(test)]
+mod tests;
 
+use crate::RENDER_SPACE;
+use crate::geometry::Error;
+use crate::geometry::image::{Encoding, Format, Image, Rect, Sample, f32_to_half};
 use std::sync::Arc;
 
 /// What an output's values are, and so how many a pixel takes.
@@ -49,7 +56,7 @@ impl Aov {
         }
     }
 
-    /// Values a pixel ([`crate::FinalOutputs`]' interleaving): RGBA 4, other
+    /// Values a pixel, as an engine hands them to [`image`]: RGBA 4, other
     /// colors and vectors 3, Cryptomatte 2 a level, the rest 1.
     pub fn channels(&self) -> usize {
         match self.class {
@@ -74,6 +81,124 @@ impl Aov {
     pub fn is_beauty(&self) -> bool {
         &*self.id == standard::BEAUTY
     }
+
+    /// Its channels' names in its layer (Cryptomatte's are its own).
+    fn channel_names(&self) -> &'static [&'static str] {
+        match self.class {
+            AovClass::Rgba => &["R", "G", "B", "A"],
+            AovClass::Color => &["R", "G", "B"],
+            AovClass::Vector => &["X", "Y", "Z"],
+            AovClass::Scalar if &*self.id == standard::DEPTH => &["Z"],
+            AovClass::Scalar => &["Y"],
+            AovClass::Id => &["id"],
+            AovClass::Cryptomatte { .. } => &["R", "G", "B", "A"],
+        }
+    }
+}
+
+/// The layer of a frame's Image output `id` fills: `""` the beauty's, else
+/// the id itself (a Cryptomatte's numbered on from it: [`cryptomatte`]).
+pub fn layer(id: &str) -> &str {
+    if id == standard::BEAUTY { "" } else { id }
+}
+
+/// The output whose layer is `layer` ([`layer`]'s inverse).
+pub fn output(layer: &str) -> &str {
+    if layer.is_empty() {
+        standard::BEAUTY
+    } else {
+        layer
+    }
+}
+
+/// A final frame's outputs as one Image of `size` pixels (rows from the top):
+/// each of `planes` (an output, and its values interleaved
+/// [`Aov::channels`] a pixel, ids as their bits) as its layers, in order, and
+/// the Cryptomatte manifests naming those of `names` its layers hold as
+/// metadata. The layers:
+///
+/// | Output | Layer | Channels | Sample, encoding |
+/// |---|---|---|---|
+/// | the beauty, volume (RGBA) | `""`, `volume` | `R G B A` | as asked; colors in [`RENDER_SPACE`], premultiplied |
+/// | albedo, the light passes (color) | their ids | `R G B` | as asked; colors in [`RENDER_SPACE`] |
+/// | normal, position (vectors) | their ids | `X Y Z` | as asked; raw |
+/// | depth, and other numbers | `depth`, their ids | `Z`, `Y` | as asked; raw |
+/// | object and material ids | their ids | `id` | U32; raw |
+/// | Cryptomatte | `<id>00`, `<id>01`… | `R G B A` | F32; raw |
+///
+/// # Errors
+/// Values not of the size's pixels, or a size of none.
+pub fn image(
+    size: [u32; 2],
+    planes: &[(AovDesc, Arc<[f32]>)],
+    names: &[Arc<str>],
+) -> Result<Image, Error> {
+    let wide = |v: u32| i32::try_from(v).map_err(|_| Error::invalid("a frame too large"));
+    let window = Rect::new([0, 0], [wide(size[0])?, wide(size[1])?])?;
+    let pixels = size[0] as usize * size[1] as usize;
+    let mut builder = Image::builder(window);
+    let mut metadata = crate::geometry::Attributes::new();
+    for (desc, values) in planes {
+        let aov = &desc.aov;
+        if values.len() != pixels * aov.channels() {
+            return Err(Error::invalid(format_args!(
+                "output {} holds {} values over {pixels} pixels",
+                aov.id,
+                values.len()
+            )));
+        }
+        if let AovClass::Cryptomatte { levels } = aov.class {
+            for set in 0..usize::from(levels).div_ceil(2) {
+                let format = Format {
+                    name: format!("{}{set:02}", aov.id).into(),
+                    channels: names_of(aov),
+                    sample: Sample::F32,
+                    encoding: Encoding::Raw,
+                };
+                let ranks = 2 * usize::from(levels);
+                let bytes: Vec<u8> = (values.chunks_exact(ranks))
+                    .flat_map(|px| (0..4).map(move |k| px.get(set * 4 + k).copied().unwrap_or(0.0)))
+                    .flat_map(f32::to_ne_bytes)
+                    .collect();
+                builder = builder.plane(format, &bytes);
+            }
+            metadata = cryptomatte::manifest(metadata, &aov.id, names, values)?;
+            continue;
+        }
+        let sample = match (aov.class, desc.format) {
+            (AovClass::Id, _) | (_, AovFormat::U32) => Sample::U32,
+            (_, AovFormat::F16) => Sample::F16,
+            (_, AovFormat::F32) => Sample::F32,
+        };
+        let format = Format {
+            name: layer(&aov.id).into(),
+            channels: names_of(aov),
+            sample,
+            encoding: match aov.class {
+                AovClass::Rgba => Encoding::color(RENDER_SPACE, true),
+                AovClass::Color => Encoding::color(RENDER_SPACE, false),
+                _ => Encoding::Raw,
+            },
+        };
+        let bytes: Vec<u8> = match sample {
+            Sample::U32 => values
+                .iter()
+                .flat_map(|v| v.to_bits().to_ne_bytes())
+                .collect(),
+            Sample::F16 => values
+                .iter()
+                .flat_map(|v| f32_to_half(*v).to_ne_bytes())
+                .collect(),
+            _ => values.iter().flat_map(|v| v.to_ne_bytes()).collect(),
+        };
+        builder = builder.plane(format, &bytes);
+    }
+    builder.attributes(metadata).build()
+}
+
+/// `aov`'s channel names, as a layer's format holds them.
+fn names_of(aov: &Aov) -> Arc<[Arc<str>]> {
+    aov.channel_names().iter().map(|c| Arc::from(*c)).collect()
 }
 
 /// The standard outputs: their ids, and each one's [`Aov`]. An engine that
