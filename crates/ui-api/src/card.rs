@@ -47,7 +47,7 @@ pub enum Order {
     /// Over the panes: cards and popovers.
     #[default]
     Foreground,
-    /// Over everything: tooltips and drag previews.
+    /// Over everything: drag previews.
     Tooltip,
 }
 

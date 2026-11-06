@@ -69,8 +69,9 @@ pub trait Ui {
     /// the result with [`Ui::painter`].
     fn allocate(&mut self, size: Vec2, sense: Sense) -> Response;
 
-    /// Show `text` beside the pointer while it rests on `response`'s
-    /// widget, enabled or not: a disabled widget's tooltip says why it is.
+    /// Show `text` while the pointer rests on `response`'s widget, enabled
+    /// or not: a disabled widget's tooltip says why it is. One line; the
+    /// host shows it at once (Studio: at its status bar's left).
     fn tooltip(&mut self, response: &Response, text: &str);
 
     /// Give the keyboard focus to widget `id`.
