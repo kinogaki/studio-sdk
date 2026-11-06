@@ -77,6 +77,9 @@ pub struct Capabilities {
     pub realtime: bool,
     /// The motion it blurs (none: hosts send still placements).
     pub motion: Motion,
+    /// The bytes it holds for a view a pixel of its film, every buffer and
+    /// kept image counted: hosts budget the films rendering at a time by it.
+    pub film_bytes: u32,
 }
 
 impl Capabilities {

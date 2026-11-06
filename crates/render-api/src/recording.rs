@@ -99,6 +99,8 @@ fn description() -> EngineDescription {
                 transforms: true,
                 velocities: true,
             },
+            // It keeps no film.
+            film_bytes: 0,
             ..Capabilities::default()
         })
         .build()
