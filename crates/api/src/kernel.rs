@@ -129,8 +129,9 @@ impl Verb {
     /// [`Tolerances`](kinogaki_geometry::Tolerances)).
     ///
     /// # Errors
-    /// Inputs that don't fit its ports, a row it doesn't have, cancelled,
-    /// or what the verb refuses.
+    /// Inputs that don't fit its ports, a row it doesn't have or a value its
+    /// row doesn't take ([`Parameter::check`](crate::params::Parameter::check)),
+    /// cancelled, or what the verb refuses.
     pub fn run(
         &self,
         parameters: &Parameters,
@@ -140,13 +141,13 @@ impl Verb {
     ) -> Result<Outputs, Error> {
         let mut rows = self.rows.values();
         for (name, value) in parameters {
-            match rows.get_mut(name) {
-                Some(row) => *row = value.clone(),
-                None => {
-                    let id = self.id;
-                    return Err(Error::invalid(format_args!("{id} has no row {name:?}")));
-                }
-            }
+            let id = self.id;
+            let row = (self.rows.parameters()).find(|row| row.name == *name);
+            let row =
+                row.ok_or_else(|| Error::invalid(format_args!("{id} has no row {name:?}")))?;
+            row.check(value)
+                .map_err(|why| Error::invalid(format_args!("{id}: {why}")))?;
+            rows.insert(name.clone(), value.clone());
         }
         self.check_inputs(inputs, &rows)?;
         let mut scratch = None;
@@ -240,4 +241,36 @@ pub fn run(
         Error::missing(format_args!("{id}: the kernel {package} isn't loaded"))
     })?;
     verb.run(parameters, inputs, cancel, project)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::params::{Number, Parameter, ValueKind};
+    use crate::value::Value;
+
+    /// A run takes only what its rows take: a value of another kind, or past
+    /// a row's limits, is refused before the verb sees it.
+    #[test]
+    fn a_run_refuses_values_its_rows_dont_take() {
+        let rows = Schema::default().parameter(Parameter::new(
+            "count",
+            "Count",
+            ValueKind::Number(Number::plain().range(1.0, 10.0)),
+            2.0,
+        ));
+        let verb = Verb::new(VerbId::declared("acme.test.count"), rows, |cx, _| {
+            let count = cx.number("count")?;
+            assert!((1.0..=10.0).contains(&count), "the verb sees {count}");
+            Ok(Outputs::default())
+        });
+        let run = |value: Value| {
+            let parameters = Parameters::from([("count".to_owned(), value)]);
+            verb.run(&parameters, &[], &CancelToken::default(), None)
+        };
+        assert!(run(Value::Number(3.0)).is_ok());
+        assert!(run(Value::Number(0.0)).is_err(), "below its least");
+        assert!(run(Value::Text("three".into())).is_err(), "another kind");
+        assert!(run(Value::Number(f64::NAN)).is_err());
+    }
 }
