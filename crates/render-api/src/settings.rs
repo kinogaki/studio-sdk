@@ -12,7 +12,7 @@
 //! it to, in the prim's or node's `textures`, by the value's name.
 
 use kinogaki_geometry::{Error, Rate, Units};
-use kinogaki_value::{Condition, NumberLook, Parameters, Value, ValueKind};
+use kinogaki_value::{Condition, Number, NumberLook, Parameters, Value, ValueKind};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -139,6 +139,52 @@ impl SettingDescriptor {
             look: NumberLook::default(),
             default: default.into(),
         }
+    }
+
+    /// A slider `name` over `min..=max`, dragged over `soft`, shown with
+    /// `decimals` places, at `default`.
+    pub fn slider(
+        (name, label, group): (&str, &str, &str),
+        (min, max): (f64, f64),
+        soft: (f64, f64),
+        decimals: u8,
+        default: f64,
+    ) -> SettingDescriptor {
+        let kind = ValueKind::Number(Number::plain().range(min, max).soft(soft.0, soft.1));
+        SettingDescriptor::new(name, label, group, kind, default)
+            .look(NumberLook::slider().decimals(decimals).speed(0.01))
+    }
+
+    /// A length `name` in scene units over `min..=max`, dragged over `soft`
+    /// when given, shown with `decimals` places, at `default`.
+    pub fn length(
+        (name, label, group): (&str, &str, &str),
+        (min, max): (f64, f64),
+        soft: Option<(f64, f64)>,
+        decimals: u8,
+        default: f64,
+    ) -> SettingDescriptor {
+        let number = Number::length().range(min, max);
+        let kind = ValueKind::Number(match soft {
+            Some((a, b)) => number.soft(a, b),
+            None => number,
+        });
+        SettingDescriptor::new(name, label, group, kind, default)
+            .look(NumberLook::default().decimals(decimals).speed(0.01))
+    }
+
+    /// A whole number `name` over `min..=max`, at `default`.
+    pub fn integer(
+        (name, label, group): (&str, &str, &str),
+        (min, max): (i64, i64),
+        default: i64,
+    ) -> SettingDescriptor {
+        SettingDescriptor::new(name, label, group, ValueKind::integer(min, max), default)
+    }
+
+    /// A toggle `name`, at `default`.
+    pub fn toggle((name, label, group): (&str, &str, &str), default: bool) -> SettingDescriptor {
+        SettingDescriptor::new(name, label, group, ValueKind::Toggle, default)
     }
 
     /// It, animatable or not (see [`animatable`](Self::animatable)).

@@ -107,45 +107,12 @@ pub fn choice(key: &str) -> Value {
     Value::Choice(Arc::from(key))
 }
 
-/// Length setting `name` in scene units, `min..=max`, at `default`,
-/// dragged 0.01 a point.
-fn length(
-    name: &str,
-    label: &str,
-    group: &str,
-    (min, max): (f64, f64),
-    default: f64,
-) -> SettingDescriptor {
-    let kind = ValueKind::Number(Number::length().range(min, max));
-    SettingDescriptor::new(name, label, group, kind, default)
-        .look(NumberLook::default().decimals(3).speed(0.01))
-}
-
 /// Angle setting `name` in degrees, 0 to 180, at `default`, its drag over
 /// `soft`.
 fn angle(name: &str, label: &str, soft: (f64, f64), default: f64) -> SettingDescriptor {
     let kind = ValueKind::Number(Number::angle().range(0.0, 180.0).soft(soft.0, soft.1));
     SettingDescriptor::new(name, label, LIGHT_GROUP, kind, default)
         .look(NumberLook::default().decimals(4).speed(0.5))
-}
-
-/// Slider setting `name` over `min..=max`, its span `soft`, with
-/// `decimals`, at `default`.
-fn slider(
-    name: &str,
-    label: &str,
-    group: &str,
-    (min, max, soft): (f64, f64, (f64, f64)),
-    decimals: u8,
-    default: f64,
-) -> SettingDescriptor {
-    let kind = ValueKind::Number(Number::plain().range(min, max).soft(soft.0, soft.1));
-    SettingDescriptor::new(name, label, group, kind, default)
-        .look(NumberLook::slider().decimals(decimals).speed(0.01))
-}
-
-fn toggle(name: &str, label: &str, group: &str, default: bool) -> SettingDescriptor {
-    SettingDescriptor::new(name, label, group, ValueKind::Toggle, default)
 }
 
 /// A standard light type: its `shape` parameters, then the emission's,
@@ -160,7 +127,10 @@ fn light_type(
 ) -> PrimType {
     let mut params = shape;
     params.extend(emission_params(intensity));
-    params.push(toggle("normalize", "Normalize", LIGHT_GROUP, normalize));
+    params.push(SettingDescriptor::toggle(
+        ("normalize", "Normalize", LIGHT_GROUP),
+        normalize,
+    ));
     params.extend(after);
     PrimType {
         id,
@@ -188,7 +158,9 @@ pub(crate) fn area_light() -> PrimType {
     );
     let shaped = |key| Condition::when("shape", choice(key));
     // Above 0: a light of no size is no light value.
-    let size = |name, label, default| length(name, label, LIGHT_GROUP, (1e-6, 1e12), default);
+    let size = |name, label, default| {
+        SettingDescriptor::length((name, label, LIGHT_GROUP), (1e-6, 1e12), None, 3, default)
+    };
     light_type(
         AREA_LIGHT,
         "Area Light",
@@ -218,7 +190,7 @@ pub(crate) fn dome_light() -> PrimType {
         1.0,
         false,
         vec![
-            toggle("ground", "Ground", LIGHT_GROUP, false),
+            SettingDescriptor::toggle(("ground", "Ground", LIGHT_GROUP), false),
             SettingDescriptor::new(
                 "groundColor",
                 "Ground Color",
@@ -256,13 +228,18 @@ pub(crate) fn spot_light() -> PrimType {
         SPOT_LIGHT,
         "Spot Light",
         vec![
-            length("radius", "Radius", LIGHT_GROUP, (1e-6, 1e12), 0.1),
+            SettingDescriptor::length(
+                ("radius", "Radius", LIGHT_GROUP),
+                (1e-6, 1e12),
+                None,
+                3,
+                0.1,
+            ),
             angle("coneAngle", "Cone Angle", (0.0, 90.0), 30.0),
-            slider(
-                "coneSoftness",
-                "Cone Softness",
-                LIGHT_GROUP,
-                (0.0, 1.0, (0.0, 1.0)),
+            SettingDescriptor::slider(
+                ("coneSoftness", "Cone Softness", LIGHT_GROUP),
+                (0.0, 1.0),
+                (0.0, 1.0),
                 2,
                 0.2,
             ),
@@ -290,17 +267,28 @@ pub fn fog() -> PrimType {
         role: Role::Atmosphere,
         groups: vec![SettingGroup::new(GROUP, "Fog", true)],
         params: vec![
-            slider("density", "Density", GROUP, (0.0, 1e6, (0.0, 1.0)), 3, 0.1),
+            SettingDescriptor::slider(
+                ("density", "Density", GROUP),
+                (0.0, 1e6),
+                (0.0, 1.0),
+                3,
+                0.1,
+            ),
             SettingDescriptor::new("color", "Color", GROUP, ValueKind::Color, [0.3, 0.34, 0.42]),
-            length("start", "Start", GROUP, (0.0, 1e6), 0.0),
-            length("height", "Height", GROUP, (-1e6, 1e6), 0.0),
-            slider("falloff", "Falloff", GROUP, (0.0, 1e6, (0.0, 4.0)), 3, 0.5),
-            toggle("inscatter", "In-scatter", GROUP, false),
-            slider(
-                "anisotropy",
-                "Anisotropy",
-                GROUP,
-                (-0.9, 0.9, (-0.9, 0.9)),
+            SettingDescriptor::length(("start", "Start", GROUP), (0.0, 1e6), None, 3, 0.0),
+            SettingDescriptor::length(("height", "Height", GROUP), (-1e6, 1e6), None, 3, 0.0),
+            SettingDescriptor::slider(
+                ("falloff", "Falloff", GROUP),
+                (0.0, 1e6),
+                (0.0, 4.0),
+                3,
+                0.5,
+            ),
+            SettingDescriptor::toggle(("inscatter", "In-scatter", GROUP), false),
+            SettingDescriptor::slider(
+                ("anisotropy", "Anisotropy", GROUP),
+                (-0.9, 0.9),
+                (-0.9, 0.9),
                 3,
                 0.3,
             )
