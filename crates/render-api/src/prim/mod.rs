@@ -1,5 +1,6 @@
 //! The prims a host sends: shapes (meshes and curves), instancers, cameras,
-//! materials and textures (the structural prims every scene is made of), and
+//! materials and textures (the structural prims every scene is made of; a
+//! texture is the SDK's one decoded picture, an [`Image`]), and
 //! prims of the types an engine declares (lights, fog: [`crate::declared`]).
 //! Payloads are shared columns, so sending a prim again costs a few reference
 //! counts, never a copy of its arrays. A prim is made by its builder, which
@@ -14,14 +15,13 @@
 mod camera;
 mod instancer;
 mod shape;
-mod texture;
 
 pub use camera::{Camera, Projection};
 pub use instancer::{Instancer, InstancerBuilder};
 pub use shape::{STANDARD_PRIMVARS, Shape, ShapeBuilder, Subsets, Topology};
-pub use texture::{TexelFormat, Texture, TextureColorSpace};
 
 use crate::declared::Declared;
+use crate::geometry::image::Image;
 use crate::material::MaterialNetwork;
 use std::sync::Arc;
 
@@ -79,8 +79,15 @@ pub enum Prim {
     Declared(Declared),
     /// A material.
     Material(Material),
-    /// A texture.
-    Texture(Texture),
+    /// A texture: decoded pixels, read over the image's data window (a host
+    /// sends one whose data window is its display window). Its main layer's
+    /// encoding says what the values are: colors in [`RENDER_SPACE`]
+    /// (linear ACEScg), 8-bit colors in [`SRGB_TEXTURE`] (sRGB-encoded
+    /// Rec.709, which an engine decodes), or data, read as stored.
+    ///
+    /// [`RENDER_SPACE`]: crate::RENDER_SPACE
+    /// [`SRGB_TEXTURE`]: crate::SRGB_TEXTURE
+    Texture(Image),
 }
 
 /// The kinds of prim: the structural ones, for what an engine supports

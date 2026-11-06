@@ -65,6 +65,26 @@ fn windows_and_refusals() {
 }
 
 #[test]
+fn a_plane_reads_back_as_it_was_built() {
+    for (w, h) in [(1, 1), (64, 64), (130, 70)] {
+        let image = ramp(w, h);
+        let plane = image.plane(0).unwrap();
+        let built = ramp(w, h);
+        assert_eq!(
+            Image::builder(window(w, h))
+                .plane(built.layers()[0].format().clone(), &plane)
+                .build()
+                .unwrap(),
+            built
+        );
+        let floats: &[f32] = bytemuck::cast_slice(&plane);
+        let at = ((h as usize - 1) * w as usize + w as usize - 1) * 4;
+        assert_eq!(floats[at..at + 2], [w as f32, h as f32]);
+    }
+    assert!(ramp(2, 2).plane(1).is_none());
+}
+
+#[test]
 fn a_data_window_apart_from_the_display_window() {
     let image = Image::builder(window(4, 4))
         .data(Rect::new([-1, -1], [1, 1]).unwrap())

@@ -16,13 +16,14 @@ use kinogaki_value::{Condition, NumberLook, Parameters, Value, ValueKind};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::geometry::image::Image;
 use crate::id::Id;
-use crate::prim::{Camera, Texture};
+use crate::prim::Camera;
 
 /// The Texture prims the host decoded image values to, by the value's
 /// name: what an engine reads for each [`ValueKind::File`] value (one
 /// missing: no image, or one not read yet).
-pub type Textures = BTreeMap<String, Id<Texture>>;
+pub type Textures = BTreeMap<String, Id<Image>>;
 
 /// What every view of an engine shares. What differs between views travels
 /// with the view ([`crate::ViewDesc::values`]).

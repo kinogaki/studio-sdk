@@ -378,6 +378,27 @@ impl Image {
         decode(format.sample, format.channels.len(), &tile.bytes()[place..])
     }
 
+    /// Layer `layer`'s pixels over the whole data window as stored (native
+    /// order), row-major from the top: what [`ImageBuilder::plane`] takes.
+    /// None when there is no such layer.
+    pub fn plane(&self, layer: usize) -> Option<Vec<u8>> {
+        let format = &self.layers.get(layer)?.format;
+        let [width, height] = self.data.size().map(|n| n as usize);
+        let (bytes, side) = (format.pixel_bytes(), TILE as usize);
+        let mut out = vec![0; width * height * bytes];
+        for y in 0..height {
+            for tx in 0..width.div_ceil(side) {
+                let Some(tile) = self.tile(layer, [tx as u32, (y / side) as u32]) else {
+                    continue;
+                };
+                let run = side.min(width - tx * side) * bytes;
+                let from = &tile.bytes()[(y % side) * side * bytes..][..run];
+                out[(y * width + tx * side) * bytes..][..run].copy_from_slice(from);
+            }
+        }
+        Some(out)
+    }
+
     /// Bytes of pixels it holds.
     pub fn pixel_bytes(&self) -> usize {
         (self.layers.iter())

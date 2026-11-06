@@ -4,9 +4,10 @@
 //! it arrives; it never renders a material itself. The engine renders on its
 //! own thread, by any means it likes; [`PreviewRequest::scene`] gives it the
 //! request as prims it can render as any other scene.
+use crate::geometry::image::Image;
 use crate::id::{Id, IdAllocator, PrimId};
 use crate::material::MaterialNetwork;
-use crate::prim::{Camera, Material, Prim, Shape, Subsets, Texture, Topology};
+use crate::prim::{Camera, Material, Prim, Shape, Subsets, Topology};
 use crate::standard;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::{Attribute, Domain, Meaning, Sampled, Vec3, Xform, names};
@@ -40,7 +41,7 @@ pub struct PreviewRequest {
     /// The material, its colors in the render space and its files resolved.
     pub network: Arc<MaterialNetwork>,
     /// The Texture prims its nodes name.
-    pub textures: Vec<(Id<Texture>, Texture)>,
+    pub textures: Vec<(Id<Image>, Image)>,
     /// What it is shown on.
     pub shape: PreviewShape,
     /// What it is lit by.
@@ -253,11 +254,12 @@ mod tests {
 
     #[test]
     fn a_request_is_a_scene_of_its_own() {
-        let pixels = Arc::from(vec![0u8; 4]);
-        let format = crate::prim::TexelFormat::U8;
-        let space = crate::prim::TextureColorSpace::Raw;
-        let texture = Texture::new([1, 1], 4, format, pixels, space).unwrap();
-        let id: Id<Texture> = Id::of(PrimId {
+        use kinogaki_geometry::image::{Encoding, Format, Rect, Sample};
+        let format = Format::rgba(Sample::U8, Encoding::Raw);
+        let window = Rect::new([0, 0], [1, 1]).unwrap();
+        let texture = Image::builder(window).plane(format, &[9; 4]).build();
+        let texture = texture.unwrap();
+        let id: Id<Image> = Id::of(PrimId {
             slot: 7,
             generation: 0,
         });

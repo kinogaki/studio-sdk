@@ -50,6 +50,10 @@ pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
 /// in the project's working space; the host converts them to this as it
 /// sends them, through its color service.
 pub const RENDER_SPACE: &str = "ACEScg";
+
+/// The space 8-bit color textures stay in, sRGB-encoded Rec.709: a host
+/// sends them as stored, and an engine decodes them to [`RENDER_SPACE`].
+pub const SRGB_TEXTURE: &str = "srgb_texture";
 pub use declared::{Declared, PrimType, Role};
 pub use description::{
     Capabilities, EngineBuilder, EngineDescription, Engines, MaterialRules, Motion,
@@ -75,7 +79,7 @@ pub use material::{
 };
 pub use prim::{
     Camera, Instancer, InstancerBuilder, Material, Prim, PrimKind, Projection, STANDARD_PRIMVARS,
-    Shape, ShapeBuilder, Subsets, TexelFormat, Texture, TextureColorSpace, Topology, Visibility,
+    Shape, ShapeBuilder, Subsets, Topology, Visibility,
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
