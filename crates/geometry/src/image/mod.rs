@@ -17,6 +17,8 @@
 //! - **Levels.** A [`Pyramid`] derives smaller levels of tiles on demand,
 //!   keeping each while the tiles under it are the same.
 //! - **Attributes.** An image's metadata is its Detail [`Attributes`].
+//! - **Sampling.** Where a texture names an image, [`Sampling`] says how it
+//!   is read past its edges and between its texels.
 //!
 //! ```
 //! use kinogaki_geometry::image::{Encoding, Format, Image, Rect, Sample};
@@ -33,11 +35,13 @@
 //! ```
 mod pyramid;
 mod sample;
+mod sampling;
 #[cfg(test)]
 mod tests;
 
 pub use pyramid::Pyramid;
 pub use sample::{Sample, f32_to_half, half_to_f32};
+pub use sampling::{Filter, Sampling, Wrap};
 
 use crate::attributes::Attributes;
 use crate::column::Column;

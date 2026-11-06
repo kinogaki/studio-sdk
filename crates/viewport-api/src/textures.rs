@@ -2,6 +2,7 @@
 //! a [`SurfaceImage`] a polygon's color multiplies by, read through a
 //! [`TextureCorner`] per polygon vertex.
 use crate::packet::{Column, SurfaceSource};
+use kinogaki_geometry::image::Sampling;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -130,14 +131,17 @@ fn coded(level: &[[f32; 3]]) -> Vec<u8> {
     level.iter().flat_map(opaque).collect()
 }
 
-/// What a polygon vertex reads: its texture coordinate and its image.
+/// What a polygon vertex reads: its texture coordinate, its image and how.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TextureCorner {
-    /// Its coordinates in the image: `v` 0 its first row. They repeat.
+    /// Its coordinates in the image: `v` 0 its first row.
     pub uv: [f32; 2],
     /// Its image in [`SurfaceTextures::images`], plus one (0: none, the
     /// polygon shows its color alone). All of a polygon's vertices name one.
     pub image: u32,
+    /// How coordinates outside the image and between its texels read it; one
+    /// for all of a polygon's vertices.
+    pub sampling: Sampling,
 }
 
 /// The images a surface's polygons show, each multiplying a polygon's color.

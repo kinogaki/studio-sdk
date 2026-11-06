@@ -1,14 +1,16 @@
 //! [`MaterialDisplay`]: what the shaded viewport shows of a material, a simple
 //! approximation its engine makes of its own material
-//! ([`MaterialRules::display`](crate::MaterialRules::display)). Render views
-//! show the real look.
+//! ([`MaterialRules::display`](crate::MaterialRules::display)): a color, a
+//! primvar and an image, read through its texture's transform and sampling.
+//! Render views show the real look.
 
+use kinogaki_geometry::image::Sampling;
 use kinogaki_geometry::names;
 use std::sync::Arc;
 
 /// The image a material's color shows: its file, as a node of the material
-/// holds it, and the coordinates it is read through.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// holds it, the coordinates it is read through and how.
+#[derive(Clone, Debug, PartialEq)]
 pub struct DisplayTexture {
     /// The file, as typed: relative paths read from the project's folder. The
     /// host reads it as a color (the color service's file rules) and shows it
@@ -16,15 +18,27 @@ pub struct DisplayTexture {
     pub file: Arc<str>,
     /// The primvar holding its coordinates.
     pub uv: Arc<str>,
+    /// Where a point of coordinates `(u, v)` reads the image: `transform` ·
+    /// `(u, v, 1)`, by rows.
+    pub transform: [[f32; 3]; 2],
+    /// How it is read past its edges and between its texels.
+    pub sampling: Sampling,
 }
 
 impl DisplayTexture {
-    /// `file`, read through the standard `uv`.
+    /// `file`, read through the standard `uv` as it is.
     pub fn new(file: &str) -> DisplayTexture {
         DisplayTexture {
             file: Arc::from(file),
             uv: Arc::from(names::UV),
+            transform: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            sampling: Sampling::default(),
         }
+    }
+
+    /// Where a point of coordinates `uv` reads the image.
+    pub fn at(&self, [u, v]: [f32; 2]) -> [f32; 2] {
+        self.transform.map(|[a, b, c]| a * u + b * v + c)
     }
 }
 
