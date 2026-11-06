@@ -191,8 +191,9 @@ pub trait Cx:
 pub trait ViewCx: Cx {
     /// The view.
     fn view(&self) -> &View;
-    /// This frame's input as the view's calls see it: the pointer, the
-    /// modifiers, the keys and typing the tools didn't take
+    /// This frame's input as the view's calls see it: the pointer (no
+    /// button of a press camera navigation has), the modifiers, the keys
+    /// and typing the tools didn't take
     /// ([`LiveTools::key`](crate::package::LiveTools::key)), the wheel.
     fn input(&self) -> &crate::Input;
     /// The best of `targets` within `radius` pixels of screen point `at`

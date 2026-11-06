@@ -106,7 +106,8 @@ pub struct View {
     pub interactive: bool,
     /// A menu, the Tab browser or a popover owns the input.
     pub modal: bool,
-    /// The view's own response this frame (its clicks and drags).
+    /// The view's own response this frame (its clicks and drags; none of
+    /// a press camera navigation has).
     pub response: Response,
     /// What the pointer is over in the view.
     pub over: PointerOver,

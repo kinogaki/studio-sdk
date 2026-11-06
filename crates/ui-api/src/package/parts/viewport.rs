@@ -21,11 +21,15 @@ part! {
     /// [`Panels`].
     pub trait LiveTools<S> {
         /// A live tool's input in a view, before camera navigation: its
-        /// drags, clicks and wheel (Alt's drags are the camera's), read
-        /// from the view ([`ViewCx::view`]) and this frame's input
-        /// ([`ViewCx::input`]). What it says it [`Takes`] keeps core's
-        /// picks, gizmo, handles, hover, wheel and right-click menu off
-        /// this frame. A drag edits in the tool's gesture, one undo step.
+        /// drags, clicks and wheel, read from the view ([`ViewCx::view`])
+        /// and this frame's input ([`ViewCx::input`]). A press is the
+        /// camera's or the tools', decided as it goes down: one with Alt
+        /// held, or of the middle button, navigates until it is let go, and
+        /// neither the view's response nor the input shows it. What the
+        /// tool says it [`Takes`] keeps core's picks, gizmo, handles, hover,
+        /// wheel and right-click menu off this frame; a tool that reads no
+        /// wheel leaves it to the camera. A drag edits in the tool's
+        /// gesture, one undo step.
         fn tools(&self, s: &mut S, cx: &mut dyn ViewCx) -> Takes;
         /// Ends live drags and gestures, for the reason `why` says
         /// ([`Ended`], with the order Escape is taken in).
