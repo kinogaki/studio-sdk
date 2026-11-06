@@ -21,6 +21,10 @@
 use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
+mod emission;
+
+pub use emission::{Emission, ILLUMINANTS, blackbody, illuminant};
+
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
 use crate::settings::{SettingDescriptor, SettingGroup};
@@ -43,62 +47,6 @@ pub const EMISSION: &str = "emission";
 /// The group a light's parameters sit in.
 pub const LIGHT_GROUP: &str = "light";
 
-/// The published illuminants an emission may name: their CIE names (the
-/// keys in files) and labels, in the order a UI lists them.
-pub(crate) const ILLUMINANTS: [(&str, &str); 13] = [
-    ("D50", "Daylight D50"),
-    ("D55", "Daylight D55"),
-    ("D65", "Daylight D65"),
-    ("D75", "Daylight D75"),
-    ("A", "Incandescent A"),
-    ("F2", "Fluorescent F2"),
-    ("F7", "Fluorescent F7"),
-    ("F11", "Fluorescent F11"),
-    ("LED-B1", "LED B1"),
-    ("LED-B2", "LED B2"),
-    ("LED-B3", "LED B3"),
-    ("LED-B4", "LED B4"),
-    ("LED-B5", "LED B5"),
-];
-
-/// Where an emitter's spectrum comes from. Each is normalized to
-/// luminance 1 before its intensity applies, so changing it changes the
-/// color and not the brightness.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
-pub enum Emission {
-    /// The emitter's color, upsampled to a smooth spectrum.
-    #[default]
-    Color,
-    /// A blackbody at the emitter's color temperature.
-    Temperature,
-    /// A published illuminant's spectrum, by its CIE name
-    /// (`ILLUMINANTS`).
-    Illuminant(Arc<str>),
-}
-
-impl Emission {
-    /// Its key in files (`color`, `temperature`, the CIE name).
-    pub fn key(&self) -> &str {
-        match self {
-            Emission::Color => "color",
-            Emission::Temperature => "temperature",
-            Emission::Illuminant(name) => name,
-        }
-    }
-
-    /// The emission of key `key`.
-    pub fn of_key(key: &str) -> Option<Emission> {
-        match key {
-            "color" => Some(Emission::Color),
-            "temperature" => Some(Emission::Temperature),
-            _ => ILLUMINANTS
-                .iter()
-                .find(|(name, _)| *name == key)
-                .map(|(name, _)| Emission::Illuminant(Arc::from(*name))),
-        }
-    }
-}
-
 /// The emission settings every standard light has, in [`LIGHT_GROUP`]
 /// (and an engine's own light takes): Emission, Color, Temperature,
 /// Intensity and Exposure, the light's intensity `intensity` by default.
@@ -108,7 +56,7 @@ pub fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
         Choice::new("temperature", "Color Temperature"),
     ]
     .into_iter()
-    .chain(ILLUMINANTS.iter().map(|(n, l)| Choice::new(n, l)))
+    .chain(ILLUMINANTS.iter().map(|(n, l, _)| Choice::new(n, l)))
     .collect();
     let number = |min, max, unit| ValueKind::Number(Number::new(unit).range(min, max));
     let look = |speed, decimals| NumberLook::default().speed(speed).decimals(decimals);
@@ -490,6 +438,17 @@ impl Light {
             xform: prim.xform.clone(),
             camera: prim.visibility.camera,
         })
+    }
+
+    /// Its radiance as an RGB engine takes it, linear ACEScg: the
+    /// emission's color × intensity × 2^exposure (white for an illuminant
+    /// [`ILLUMINANTS`] doesn't hold).
+    pub fn radiance(&self) -> [f32; 3] {
+        let color = self.color.map(f64::from);
+        let kelvin = f64::from(self.color_temperature);
+        let rgb = self.emission.color(color, kelvin).unwrap_or([1.0; 3]);
+        let k = f64::from(self.intensity) * f64::from(self.exposure).exp2();
+        rgb.map(|c| (c * k) as f32)
     }
 
     /// Its type: the standard type its shape is.
