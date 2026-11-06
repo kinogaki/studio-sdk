@@ -18,6 +18,38 @@ fn an_add_then_a_remove_cancel() {
     assert!(first.removed.is_empty() && first.changed.is_empty());
 }
 
+/// Batches of many prims fold by id, keeping each list's order: a drag of
+/// 20,000 objects folds in one pass, not one search a change.
+#[test]
+fn many_prims_fold_by_id_in_order() {
+    let count = 20_000;
+    let mut first = SceneUpdate::new();
+    let mut second = SceneUpdate::new();
+    for i in 0..count {
+        first
+            .changed
+            .push(Change::new(id(i), Dirty::TRANSFORM, mesh(3)));
+        second
+            .changed
+            .push(Change::new(id(count - 1 - i), Dirty::VISIBILITY, mesh(4)));
+    }
+    second.added.push((id(count), mesh(3)));
+    second.removed.extend([id(7), id(count)]);
+    first.merge(second);
+    let ids: Vec<PrimId> = first.changed.iter().map(|c| c.id).collect();
+    let kept: Vec<PrimId> = (0..count).filter(|&i| i != 7).map(id).collect();
+    assert_eq!(ids, kept, "held order, the removed one gone");
+    let both = Dirty::TRANSFORM | Dirty::VISIBILITY;
+    assert!(
+        first
+            .changed
+            .iter()
+            .all(|c| c.dirty == both && c.prim == mesh(4))
+    );
+    assert!(first.added.is_empty(), "added and removed: nothing");
+    assert_eq!(first.removed, [id(7)]);
+}
+
 #[test]
 fn a_change_to_an_added_prim_replaces_its_payload() {
     let mut first = SceneUpdate::new();

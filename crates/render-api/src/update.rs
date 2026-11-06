@@ -15,6 +15,7 @@ use crate::id::PrimId;
 use crate::prim::Prim;
 use crate::ranges::Ranges;
 use crate::settings::SceneSettings;
+use std::collections::{HashMap, HashSet};
 
 /// A changed prim: what changed, its new payload, and for a POINTS change
 /// the points that moved.
@@ -102,35 +103,44 @@ impl SceneUpdate {
 
     /// Fold `later` (sent after this batch) into this batch, so applying the
     /// result equals applying both in order. Within `later`, a removal wins
-    /// over a change of the same prim.
+    /// over a change of the same prim. Linear in both batches: each prim is
+    /// found by its id, and the lists keep their order (what a prim names is
+    /// sent before it).
     pub fn merge(&mut self, later: SceneUpdate) {
         let later_drags = later
             .changed
             .iter()
             .any(|c| c.dirty.contains(Dirty::POINTS));
+        let mut added = index(self.added.iter().map(|(id, _)| *id));
+        let mut changed = index(self.changed.iter().map(|c| c.id));
         for (id, prim) in later.added {
+            added.entry(id).or_insert(self.added.len());
             self.added.push((id, prim));
         }
         for change in later.changed {
-            if let Some(added) = self.added.iter_mut().find(|(a, _)| *a == change.id) {
-                added.1 = change.prim;
-            } else if let Some(held) = self.changed.iter_mut().find(|c| c.id == change.id) {
-                held.absorb(change);
+            if let Some(&at) = added.get(&change.id) {
+                self.added[at].1 = change.prim;
+            } else if let Some(&at) = changed.get(&change.id) {
+                self.changed[at].absorb(change);
             } else {
+                changed.insert(change.id, self.changed.len());
                 self.changed.push(change);
             }
         }
+        let mut removed: HashSet<PrimId> = self.removed.iter().copied().collect();
+        let (mut gone, mut cancelled) = (HashSet::new(), HashSet::new());
         for id in later.removed {
-            if let Some(at) = self.added.iter().position(|(a, _)| *a == id) {
+            gone.insert(id);
+            if added.remove(&id).is_some() {
                 // Added and removed before an engine saw it: nothing happened.
-                self.added.remove(at);
-                self.changed.retain(|c| c.id != id);
-                continue;
-            }
-            self.changed.retain(|c| c.id != id);
-            if !self.removed.contains(&id) {
+                cancelled.insert(id);
+            } else if removed.insert(id) {
                 self.removed.push(id);
             }
+        }
+        if !gone.is_empty() {
+            self.added.retain(|(id, _)| !cancelled.contains(id));
+            self.changed.retain(|c| !gone.contains(&c.id));
         }
         if later.settings.is_some() {
             self.settings = later.settings;
@@ -142,4 +152,13 @@ impl SceneUpdate {
             self.settled || later.settled
         };
     }
+}
+
+/// Each id's first place in a list of them.
+fn index(ids: impl Iterator<Item = PrimId>) -> HashMap<PrimId, usize> {
+    let mut at = HashMap::new();
+    for (i, id) in ids.enumerate() {
+        at.entry(id).or_insert(i);
+    }
+    at
 }
