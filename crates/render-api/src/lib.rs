@@ -50,10 +50,6 @@ pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
 /// in the project's working space; the host converts them to this as it
 /// sends them, through its color service.
 pub const RENDER_SPACE: &str = "ACEScg";
-
-/// The space 8-bit color textures stay in, sRGB-encoded Rec.709: a host
-/// sends them as stored, and an engine decodes them to [`RENDER_SPACE`].
-pub const SRGB_TEXTURE: &str = "srgb_texture";
 pub use declared::{Declared, PrimType, Role};
 pub use description::{
     Capabilities, EngineBuilder, EngineDescription, Engines, MaterialRules, Motion,
@@ -68,6 +64,8 @@ pub use id::{Id, IdAllocator, PrimId};
 pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.
 pub use kinogaki_geometry::Detail;
+/// Half floats, as [`Frame::pixels`] and Texture prims hold them.
+pub use kinogaki_geometry::image::{f32_to_half, half_to_f32};
 pub use kinogaki_value as value;
 pub use kinogaki_value::EngineId;
 pub use material::preview::{
@@ -83,7 +81,7 @@ pub use prim::{
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
-pub use settings::{SceneSettings, SettingDescriptor, SettingGroup, Textures};
+pub use settings::{SceneSettings, SettingDescriptor, SettingGroup};
 pub use source::{PlainTriangles, ShapeSource};
 pub use update::{Change, SceneUpdate};
 

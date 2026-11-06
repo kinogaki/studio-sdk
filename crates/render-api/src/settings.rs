@@ -9,7 +9,7 @@
 //! Values are authored [`Value`]s by name ([`Parameters`]). An image value
 //! of a declared prim or a material node ([`ValueKind::File`]) is authored
 //! as its file's path; an engine receives the Texture prim the host decoded
-//! it to, in the prim's or node's [`Textures`].
+//! it to, in the prim's or node's `textures`, by the value's name.
 
 use kinogaki_geometry::{Error, Rate, Units};
 use kinogaki_value::{Condition, NumberLook, Parameters, Value, ValueKind};
@@ -23,7 +23,7 @@ use crate::prim::Camera;
 /// The Texture prims the host decoded image values to, by the value's
 /// name: what an engine reads for each [`ValueKind::File`] value (one
 /// missing: no image, or one not read yet).
-pub type Textures = BTreeMap<String, Id<Image>>;
+pub(crate) type Textures = BTreeMap<String, Id<Image>>;
 
 /// What every view of an engine shares. What differs between views travels
 /// with the view ([`crate::ViewDesc::values`]).

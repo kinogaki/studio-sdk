@@ -92,7 +92,8 @@ pub struct Frame {
     pub width: u32,
     /// Display height, in pixels.
     pub height: u32,
-    /// RGBA half floats (their bits), linear ACEScg, rows from the top;
+    /// RGBA half floats (their bits; [`f32_to_half`](crate::f32_to_half)),
+    /// linear ACEScg, rows from the top;
     /// empty when the image reaches the display another way (a shared GPU
     /// texture).
     pub pixels: Arc<[u16]>,

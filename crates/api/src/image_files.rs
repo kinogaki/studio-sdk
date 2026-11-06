@@ -3,7 +3,8 @@
 //! premultiplied, RGBA: the host holds the decoders and the color maths (a
 //! file's own tag, its file rules, its working space). [`image`](ImageFiles::image)
 //! is linear ACEScg, for a scene-referred network; [`picture`](ImageFiles::picture)
-//! is what the file holds, for a page.
+//! is what the file holds, for a page. An engine receives the same answers as
+//! Texture prims, never a path: one decoded shape of a file for every package.
 use kinogaki_geometry::Error;
 use kinogaki_geometry::image::Image;
 

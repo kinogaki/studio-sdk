@@ -79,14 +79,15 @@ pub enum Prim {
     Declared(Declared),
     /// A material.
     Material(Material),
-    /// A texture: decoded pixels, read over the image's data window (a host
-    /// sends one whose data window is its display window). Its main layer's
-    /// encoding says what the values are: colors in [`RENDER_SPACE`]
-    /// (linear ACEScg), 8-bit colors in [`SRGB_TEXTURE`] (sRGB-encoded
-    /// Rec.709, which an engine decodes), or data, read as stored.
+    /// A texture: an image file as the host's image files answer it (as a
+    /// package's `ImageFiles` reader gets it), read over the image's data
+    /// window, which is its display window. RGBA half floats; its main
+    /// layer's encoding says what the values are: colors in
+    /// [`RENDER_SPACE`] (linear ACEScg), premultiplied, or data as stored
+    /// ([`Encoding::Raw`]), straight.
     ///
     /// [`RENDER_SPACE`]: crate::RENDER_SPACE
-    /// [`SRGB_TEXTURE`]: crate::SRGB_TEXTURE
+    /// [`Encoding::Raw`]: crate::geometry::image::Encoding::Raw
     Texture(Image),
 }
 
