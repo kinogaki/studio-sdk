@@ -2,6 +2,7 @@
 //! it was sent and each view's desc, and after the messages that arrived it
 //! renders every view they changed, publishes the frame, wakes the host
 //! once, and answers the reads waiting for it.
+use super::paint::Paint;
 use kinogaki_render_api::geometry::{Vec3, Xform};
 use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Reading, lock};
 use kinogaki_render_api::{
@@ -154,12 +155,19 @@ impl Scene {
     }
 }
 
-/// A triangle in the world.
-type Triangle = [Vec3; 3];
+/// A triangle in the world: its corners, their texture coordinates and its
+/// paint (an index into the world's paints).
+struct Triangle {
+    corners: [Vec3; 3],
+    uv: [[f32; 2]; 3],
+    paint: usize,
+}
 
-/// The world's triangles: every top-level shape's, and each Instancer's
-/// prototypes' through its placements.
-fn world(prims: &BTreeMap<PrimId, Prim>) -> Vec<Triangle> {
+/// The world's triangles and the paints they name: every top-level
+/// shape's, and each Instancer's prototypes' through its placements.
+fn world(prims: &BTreeMap<PrimId, Prim>) -> (Vec<Triangle>, Vec<Paint>) {
+    let mut paints = vec![Paint::of(prims, None)];
+    let mut painted: BTreeMap<PrimId, usize> = BTreeMap::new();
     let named: BTreeSet<PrimId> = (prims.values())
         .filter_map(|p| match p {
             Prim::Instancer(i) => Some(i.prototypes().iter().copied()),
@@ -181,7 +189,26 @@ fn world(prims: &BTreeMap<PrimId, Prim>) -> Vec<Triangle> {
                 let at = above.compose(&shape.xform().at(0.0));
                 let point =
                     |i: u32| at.apply_point(Vec3::from(shape.points()[i as usize].map(f64::from)));
-                triangles.extend(corners.iter().map(|t| t.map(point)));
+                let uv =
+                    shape.corners::<2>(&corners.to_vec(), kinogaki_render_api::geometry::names::UV);
+                for (p, t) in corners.iter().enumerate() {
+                    let material = shape.subsets().of(p).map(|m| m.prim());
+                    let paint = match material {
+                        None => 0,
+                        Some(m) => *painted.entry(m).or_insert_with(|| {
+                            paints.push(Paint::of(prims, Some(m)));
+                            paints.len() - 1
+                        }),
+                    };
+                    let uv = uv
+                        .as_ref()
+                        .map_or([[0.0; 2]; 3], |uv| std::array::from_fn(|k| uv[p * 3 + k]));
+                    triangles.push(Triangle {
+                        corners: t.map(point),
+                        uv,
+                        paint,
+                    });
+                }
             }
             Some(Prim::Instancer(inst)) if inst.visibility().visible => {
                 let at = above.compose(&inst.xform().at(0.0));
@@ -192,11 +219,12 @@ fn world(prims: &BTreeMap<PrimId, Prim>) -> Vec<Triangle> {
             _ => {}
         }
     }
-    triangles
+    (triangles, paints)
 }
 
 /// The view's image: RGBA floats, rows from the top, each pixel the
-/// facing ratio of the nearest triangle its ray hits (black where none).
+/// facing ratio of the nearest triangle its ray hits times its paint there
+/// (black where none).
 fn render(prims: &BTreeMap<PrimId, Prim>, settings: &SceneSettings, desc: &ViewDesc) -> Arc<[f32]> {
     let camera = match &desc.camera {
         ViewCamera::Free(camera) => Some(camera),
@@ -205,7 +233,7 @@ fn render(prims: &BTreeMap<PrimId, Prim>, settings: &SceneSettings, desc: &ViewD
             _ => None,
         },
     };
-    let triangles = world(prims);
+    let (triangles, paints) = world(prims);
     let (width, height) = (desc.width.max(1), desc.height.max(1));
     let mut pixels = Vec::with_capacity((width * height * 4) as usize);
     for y in 0..height {
@@ -214,11 +242,17 @@ fn render(prims: &BTreeMap<PrimId, Prim>, settings: &SceneSettings, desc: &ViewD
                 (f64::from(x) + 0.5) / f64::from(width) * 2.0 - 1.0,
                 1.0 - (f64::from(y) + 0.5) / f64::from(height) * 2.0,
             ];
-            let shade = camera
+            let hit = camera
                 .map(|c| ray(c, settings, film))
-                .and_then(|(from, toward)| nearest(&triangles, from, toward))
-                .unwrap_or(0.0) as f32;
-            pixels.extend([shade, shade, shade, 1.0]);
+                .and_then(|(from, toward)| nearest(&triangles, from, toward));
+            let color = hit.map_or([0.0; 3], |(shade, triangle, [u, v])| {
+                let t = &triangles[triangle];
+                let uv: [f32; 2] = std::array::from_fn(|k| {
+                    (1.0 - u - v) * t.uv[0][k] + u * t.uv[1][k] + v * t.uv[2][k]
+                });
+                paints[t.paint].at(uv).map(|c| c * shade as f32)
+            });
+            pixels.extend([color[0], color[1], color[2], 1.0]);
         }
     }
     pixels.into()
@@ -248,10 +282,17 @@ fn ray(camera: &Camera, settings: &SceneSettings, [u, v]: [f64; 2]) -> (Vec3, Ve
 }
 
 /// The facing ratio at the nearest hit of the ray from `from` along
-/// `toward` (Möller–Trumbore), if it hits.
-fn nearest(triangles: &[Triangle], from: Vec3, toward: Vec3) -> Option<f64> {
-    let mut best: Option<(f64, f64)> = None;
-    for [a, b, c] in triangles {
+/// `toward` (Möller–Trumbore), the triangle hit and the hit's barycentric
+/// coordinates, if it hits.
+fn nearest(triangles: &[Triangle], from: Vec3, toward: Vec3) -> Option<(f64, usize, [f32; 2])> {
+    let mut best: Option<(f64, f64, usize, [f32; 2])> = None;
+    for (
+        at,
+        Triangle {
+            corners: [a, b, c], ..
+        },
+    ) in triangles.iter().enumerate()
+    {
         let (ab, ac) = (*b - *a, *c - *a);
         let p = toward.cross(ac);
         let det = ab.dot(p);
@@ -266,13 +307,13 @@ fn nearest(triangles: &[Triangle], from: Vec3, toward: Vec3) -> Option<f64> {
         if u < 0.0 || v < 0.0 || u + v > 1.0 || t <= 1e-9 {
             continue;
         }
-        if best.is_none_or(|(near, _)| t < near) {
+        if best.is_none_or(|(near, ..)| t < near) {
             let facing = ab
                 .cross(ac)
                 .normalized()
                 .map_or(0.0, |n| n.dot(toward).abs());
-            best = Some((t, 0.1 + 0.8 * facing));
+            best = Some((t, 0.1 + 0.8 * facing, at, [u as f32, v as f32]));
         }
     }
-    best.map(|(_, shade)| shade)
+    best.map(|(_, shade, at, uv)| (shade, at, uv))
 }

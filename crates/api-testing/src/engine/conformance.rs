@@ -8,19 +8,26 @@
 //!
 //! The subjects stand on a quad facing +Z, lit by the standard dome when
 //! the engine declares it, seen by an orthographic camera from above a
-//! corner; a light is placed above the quad, emitting down -Z.
+//! corner; a light is placed above the quad, emitting down -Z. An engine
+//! taking materials also renders MaterialX materials as a host sends them,
+//! adopted ([`Engines::adopt`]): an OpenPBR Surface; a glTF PBR of an
+//! occlusion-roughness-metallic texture, cut out by its alpha; a Surface
+//! Unlit.
 use super::Waiter;
 use crate::{Outcome, Report};
 use kinogaki_render_api::aov::standard as aovs;
 use kinogaki_render_api::display::Made;
+use kinogaki_render_api::geometry::image::{Encoding, Format, Image, Rect, Sample};
 use kinogaki_render_api::geometry::{
     Attribute, Domain, Error, Kind, Meaning, Primitives, Sampled, Vec3, Xform, names,
 };
+use kinogaki_render_api::material::mtlx;
 use kinogaki_render_api::settings::defaults;
+use kinogaki_render_api::value::{Parameters, Value, ValueKind};
 use kinogaki_render_api::{
-    AovDesc, AovFormat, Camera, Declared, EngineDescription, Id, Instancer, Material, Prim, PrimId,
-    PrimKind, Projection, SceneSettings, SceneUpdate, Shape, Subsets, Topology, ViewCamera,
-    ViewDesc, ViewId, ViewMode, Wake, standard,
+    AovDesc, AovFormat, Camera, Declared, EngineDescription, Engines, Id, Instancer, Material,
+    MaterialNetwork, Prim, PrimId, PrimKind, Projection, SceneSettings, SceneUpdate, Shape,
+    Subsets, Topology, ViewCamera, ViewDesc, ViewId, ViewMode, Wake, standard,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -206,6 +213,7 @@ fn scenes(description: &EngineDescription) -> Vec<Scene> {
         let material = Material {
             network: Arc::default(),
             path: "/default".into(),
+            double_sided: true,
         };
         let first = dome.iter().count();
         let slots = Subsets::new(vec![0u16; 2].into(), vec![Id::of(id(first))]);
@@ -218,6 +226,13 @@ fn scenes(description: &EngineDescription) -> Vec<Scene> {
             "a default material",
             lit(vec![Prim::Material(material), Prim::Shape(shape)]),
         );
+        for (name, which) in [
+            ("an OpenPBR Surface", Model::OpenPbr),
+            ("a glTF PBR of an ORM texture, cut out", Model::Gltf),
+            ("a Surface Unlit", Model::Unlit),
+        ] {
+            add(name, lit(materialx(description, first, which)));
+        }
     }
     let floor = Prim::Shape(quad(1.0));
     for ty in standard::lights() {
@@ -236,6 +251,127 @@ fn scenes(description: &EngineDescription) -> Vec<Scene> {
         add("dome light", (vec![floor.clone()], vec![dome]));
     }
     scenes
+}
+
+/// The MaterialX materials a scene shows.
+#[derive(Clone, Copy)]
+enum Model {
+    OpenPbr,
+    Gltf,
+    Unlit,
+}
+
+/// A node of MaterialX signature `signature` holding `values`.
+fn node(
+    built: &mut kinogaki_render_api::NetworkBuilder,
+    signature: &str,
+    values: &[(&str, Value)],
+) -> u32 {
+    let def = mtlx::def(signature).expect("MaterialX defines it");
+    let values: Parameters = values
+        .iter()
+        .map(|(n, v)| ((*n).to_owned(), v.clone()))
+        .collect();
+    built.node(&def, &values).expect("its values")
+}
+
+/// A MaterialX material on the dressed quad, the subject's prims from prim
+/// `first` on: an orange OpenPBR Surface; an orange glTF PBR whose metallic
+/// and roughness come from a 2 × 2 texture, its alpha 0.8 cut out at 0.5; an
+/// orange Surface Unlit. Adopted for the engine as a host adopts it, its
+/// file read as the texture.
+fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec<Prim> {
+    let orange = Value::Color([0.9, 0.4, 0.1]);
+    let mut built = MaterialNetwork::builder();
+    let surface = match model {
+        Model::OpenPbr => node(
+            &mut built,
+            "ND_open_pbr_surface_surfaceshader",
+            &[("base_color", orange)],
+        ),
+        Model::Unlit => node(
+            &mut built,
+            "ND_surface_unlit",
+            &[("emission_color", orange)],
+        ),
+        Model::Gltf => {
+            let gltf = node(
+                &mut built,
+                "ND_gltf_pbr_surfaceshader",
+                &[
+                    ("base_color", orange),
+                    ("alpha", Value::Number(0.8)),
+                    ("alpha_mode", Value::Integer(1)),
+                ],
+            );
+            let orm = node(
+                &mut built,
+                "ND_gltf_image_vector3_vector3_1_0",
+                &[
+                    ("file", Value::Text("orm.png".into())),
+                    ("filecolorspace", Value::Choice(Arc::from("raw"))),
+                ],
+            );
+            for (index, input) in [(2, "metallic"), (1, "roughness")] {
+                let extract = node(
+                    &mut built,
+                    "ND_extract_vector3",
+                    &[("index", Value::Integer(index))],
+                );
+                built.link(orm, "out", extract, "in").expect("a vector");
+                built.link(extract, "out", gltf, input).expect("a number");
+            }
+            gltf
+        }
+    };
+    let material = node(&mut built, "ND_surfacematerial", &[]);
+    built
+        .link(surface, "out", material, "surfaceshader")
+        .expect("a surface");
+    let network = built.build(material).expect("a whole material");
+    let mut network = Engines::new(vec![description.clone()]).adopt(&network, description.id());
+    let mut prims = Vec::new();
+    if matches!(model, Model::Gltf) {
+        let texture: Id<Image> = Id::of(id(first));
+        let window = Rect::new([0, 0], [2, 2]).expect("a window");
+        let format = Format::rgba(Sample::F32, Encoding::Raw);
+        // Occlusion 1; rough, then smooth; metal, then not.
+        let (a, b) = ([1.0f32, 0.9, 1.0, 1.0], [1.0f32, 0.1, 0.0, 1.0]);
+        let texels: Vec<u8> = ([a, b, b, a].iter().flatten())
+            .flat_map(|v| v.to_ne_bytes())
+            .collect();
+        let image = Image::builder(window)
+            .plane(format, &texels)
+            .build()
+            .expect("a texture");
+        prims.push(Prim::Texture(image));
+        for node in network.nodes_mut() {
+            let files = node.def.inputs.iter().filter_map(|i| i.value());
+            let read = files
+                .filter(|p| p.kind == ValueKind::File)
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>();
+            for name in read {
+                if node.values.get(&name).and_then(Value::text) == Some("orm.png") {
+                    node.textures.insert(name, texture);
+                }
+            }
+        }
+    }
+    let material = Id::of(id(first + prims.len()));
+    prims.push(Prim::Material(Material {
+        network: Arc::new(network),
+        path: "/materialx".into(),
+        double_sided: true,
+    }));
+    let slots = Subsets::new(vec![0u16; 2].into(), vec![material]);
+    let shape = dressed()
+        .rebuilt()
+        .subsets(slots)
+        .build()
+        .expect("one slot");
+    prims.push(Prim::Shape(shape));
+    prims
 }
 
 /// `prim` with every value `description`'s schema of its type names: the

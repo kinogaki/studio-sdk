@@ -264,16 +264,25 @@ impl NetworkSeed {
 }
 
 impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
-    /// A Material's inside making `network`: its nodes as it holds them, the
-    /// one it shows displayed.
+    /// A Material's inside making `network`: its nodes as it holds them (a
+    /// MaterialX node's signature among its parameters), the one it shows
+    /// displayed.
     fn from(network: &kinogaki_render_api::MaterialNetwork) -> Self {
+        use kinogaki_render_api::material::mtlx::SIGNATURE;
         let shown = network.output_index();
         let nodes = (network.nodes().iter().enumerate())
-            .map(|(at, node)| NewNode {
-                node_type: node.def,
-                name: None,
-                parameters: node.values.clone(),
-                display: shown == Some(at as u32),
+            .map(|(at, node)| {
+                let mut parameters = node.values.clone();
+                if let Some(def) = node.def.mtlx() {
+                    let signature = crate::Value::Choice(std::sync::Arc::from(def.name.as_str()));
+                    parameters.insert(SIGNATURE.to_owned(), signature);
+                }
+                NewNode {
+                    node_type: node.def.id,
+                    name: None,
+                    parameters,
+                    display: shown == Some(at as u32),
+                }
             })
             .collect();
         let wires = (network.links().iter())

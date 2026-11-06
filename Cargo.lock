@@ -428,10 +428,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kinogaki-mtlx"
+version = "0.1.0"
+
+[[package]]
 name = "kinogaki-render-api"
 version = "0.1.0"
 dependencies = [
  "kinogaki-geometry",
+ "kinogaki-mtlx",
  "kinogaki-value",
  "wgpu",
 ]

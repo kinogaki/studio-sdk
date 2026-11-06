@@ -75,24 +75,36 @@ Sample times are frames from the frame rendered. `Camera::shutter` says when it 
 
 ## Materials
 
-The SDK has no shading model. An engine declares its nodes as data; a host makes one node type of each, listed under the engine's label in a Material's network, and compiles what the user wires:
+A material is a MaterialX 1.39 network ([`kinogaki-mtlx`](../crates/mtlx): MaterialX 1.39.5's libraries and Kinogaki's, `render_api::material::mtlx` their nodes as `NodeDef`s, one a signature), with nodes of engines' own beside MaterialX's. List the MaterialX nodes you implement as they are, by node or, where you implement some of a node's signatures, by signature; everything else reaches you adopted:
+
+```rust
+Capabilities {
+    standard_nodes: ["open_pbr_surface", "surfacematerial", "ND_image_color3"].map(Arc::from).to_vec(),
+    ..
+}
+```
+
+A host sends you a material as you adopt it (`Engines::adopt`): each node you list as it is; another expanded into the graph MaterialX defines it by, where you render what that graph is made of; a shading model translated into one you render (Standard Surface, glTF PBR, USD Preview Surface and Surface Unlit into OpenPBR Surface; approximations, as MaterialX's own are); else cut, what it fed holding its own value, its node named in `MaterialNetwork::cut` for you to report once. A node of values alone reaches you as its value, folded by MaterialX's formulas. An engine implementing MaterialX's leaves (the nodes it defines without a graph) renders every model; one implementing OpenPBR Surface and the Surface Material renders every model's constant material through translation.
+
+Nodes of your own are data too; a host makes one node type of each, listed under your label in a Material's network, beside MaterialX's:
 
 ```rust
 let surface = NodeDef::new(NodeTypeId::declared("acme.ray.surface"), "Surface", "Surface")
-    .input(Input::Driven(color, Socket::Color))      // a value a wire may drive
-    .input(Input::Setting(reads))                    // ValueKind::Attribute: a primvar it reads
-    .output(Output::new("out", "Out", Socket::Closure("surface".into())));
+    .input(Input::Driven(color, Socket::Color3))      // a value a wire may drive
+    .input(Input::Setting(reads))                     // ValueKind::Attribute: a primvar it reads
+    .output(Output::new("out", "Out", Socket::surface()));
 ```
 
-A value's kind is the SDK's `ValueKind`, its descriptor the one lights use, so a row needs no UI code. `Socket::Closure` is yours to name: closures meet only their own name. Numbers drive numbers. An image is `ValueKind::File`, a color unless `NodeDef::data_file` says otherwise.
+A value's kind is the SDK's `ValueKind`, its descriptor the one lights use, so a row needs no UI code. `Socket` is MaterialX's types; a surface's output is `Socket::surface()` (MaterialX's `surfaceshader`), so it feeds a Surface Material, and `Socket::Closure` of another name is yours alone: closures meet only their own name. Numbers drive numbers. An image is `ValueKind::File`, a color unless `NodeDef::data_file` says otherwise (a MaterialX node's file has a color space row, `<input>colorspace`: Raw reads it as data).
 
-`Prim::Material` holds a `MaterialNetwork`: `nodes()` (each `def`, every value by name, `textures` by input name), `links()`, `output()` (the node shown: your own output node, if you want several terminals). Translate it to your shaders. A network with no nodes is your default material: what a look naming nothing renders. A node whose file isn't read yet isn't there (its links gone, what it drove holding its value), and the host sends the Material again once it is; colors are linear ACEScg.
+`Prim::Material` holds a `MaterialNetwork`: `nodes()` (each `def`, its `NodeDef` and, for a MaterialX node, `def.mtlx()` its definition; every value by name; `textures` by input name), `links()`, `output()` (the node shown: a Surface Material where a surface is shown) and `surface()` (the surface it shows). Translate it to your shaders. A network with no nodes is your default material: what a look naming nothing renders. A node whose file isn't read yet isn't there (its links gone, what it drove holding its value), and the host sends the Material again once it is; colors are linear ACEScg. `Material::double_sided` says whether a surface's back shows it: a realtime engine culls the back when it doesn't.
 
 What needs your code is `MaterialRules`:
-- `display`: a simple approximation of your material for the shaded viewport: a color, the primvar it multiplies by, the image it multiplies by (`DisplayTexture`: the file value a node holds, the primvar of its coordinates, by default `uv`, the transform that moves them before the image is read, and its `Sampling`: each axis's wrap past the image's edges, and smooth or nearest texels) and whether it fills its shape as a volume. All of it multiplies, linear. The host reads the file through the color service as it reads a render's, once, and shows the color alone until it is read; you never decode or upload anything for it. Name one image, the one that says most about the material's color. Render views show the real look.
-- `translate`: a material of yours from a network holding nodes you don't declare (another engine's, a file's). None renders your default.
+- `standard`: one of your own materials in the standard form, an OpenPBR Surface (`material::standard::open_pbr`), as close as it comes: what another engine renders, the shaded viewport shows and formats write of it. None: nothing standard approximates it (a volume).
+- `translate`: a material of yours from the standard form, when you render a vocabulary of your own and adoption cut what you don't. None renders what adoption made of it.
+- `display`: a simple approximation of your material for the shaded viewport, by default your standard form's (`material::standard::display`): a color, the primvar it multiplies by, the image it multiplies by (`DisplayTexture`: the file value a node holds, the primvar of its coordinates, by default `uv`, the transform that moves them before the image is read, and its `Sampling`: each axis's wrap past the image's edges, and smooth or nearest texels) and whether it fills its shape as a volume. All of it multiplies, linear. The host reads the file through the color service as it reads a render's, once, and shows the color alone until it is read; you never decode or upload anything for it. Render views show the real look.
 
-An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a Material with its inside seeded.
+An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a Material with its inside seeded. A host offers MaterialX's shading models first (`material::standard::MODELS`).
 
 ## Previews
 
@@ -119,7 +131,7 @@ An engine is tested with plain cargo against this crate alone, as a host drives 
 
 - each prim kind you declare, added, changed by each dirty bit you handle, and removed; an Instancer's prototypes rendering only through it, and an instance edit sending a new `xforms` column alone;
 - motion across the shutter: sampled placements and the `v` primvar;
-- a Material sent with `PARAMS` alone updating constants, and with `NETWORK` translating again; `translate` and `display` for a network of nodes you don't declare;
+- a Material sent with `PARAMS` alone updating constants, and with `NETWORK` translating again; `standard`, `translate` and `display`; MaterialX materials as a host adopts them (the conformance's OpenPBR Surface, glTF PBR of an ORM texture cut out by its alpha, and Surface Unlit);
 - previews, two views sharing one scene, `focus`, `pause`, `drop_view`;
 - one wake per published pass, none while idle; a dropped `Pending` stopping the work (`Deliver::wanted`), and `finish` delivering the AOVs it was asked for;
 - closed-form scenes where your engine allows them (a white furnace returns the light it is lit by).

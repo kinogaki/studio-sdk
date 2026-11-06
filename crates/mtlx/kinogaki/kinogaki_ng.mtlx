@@ -1,0 +1,329 @@
+<?xml version="1.0"?>
+<materialx version="1.39">
+  <!--
+    The graphs implementing Kinogaki's definitions (kinogaki_defs.mtlx).
+  -->
+
+  <!-- Phong Surface through Standard Surface, by Autodesk's own mapping. -->
+  <nodegraph name="NG_kinogaki_phong_surface_surfaceshader" nodedef="ND_kinogaki_phong_surface_surfaceshader">
+    <multiply name="base_color" type="color3">
+      <input name="in1" type="color3" interfacename="diffuse_color" />
+      <input name="in2" type="float" interfacename="diffuse_factor" />
+    </multiply>
+    <multiply name="specular_color" type="color3">
+      <input name="in1" type="color3" interfacename="specular_color" />
+      <input name="in2" type="float" interfacename="specular_factor" />
+    </multiply>
+    <add name="shininess_plus_two" type="float">
+      <input name="in1" type="float" interfacename="shininess" />
+      <input name="in2" type="float" value="2" />
+    </add>
+    <divide name="two_over_shininess" type="float">
+      <input name="in1" type="float" value="2" />
+      <input name="in2" type="float" nodename="shininess_plus_two" />
+    </divide>
+    <sqrt name="roughness" type="float">
+      <input name="in" type="float" nodename="two_over_shininess" />
+    </sqrt>
+    <multiply name="emission_color" type="color3">
+      <input name="in1" type="color3" interfacename="emissive_color" />
+      <input name="in2" type="float" interfacename="emissive_factor" />
+    </multiply>
+    <convert name="opacity" type="color3">
+      <input name="in" type="float" interfacename="opacity" />
+    </convert>
+    <standard_surface name="surface" type="surfaceshader">
+      <input name="base" type="float" value="1" />
+      <input name="base_color" type="color3" nodename="base_color" />
+      <input name="specular" type="float" value="1" />
+      <input name="specular_color" type="color3" nodename="specular_color" />
+      <input name="specular_roughness" type="float" nodename="roughness" />
+      <input name="specular_IOR" type="float" interfacename="ior" />
+      <input name="emission" type="float" value="1" />
+      <input name="emission_color" type="color3" nodename="emission_color" />
+      <input name="opacity" type="color3" nodename="opacity" />
+      <input name="normal" type="vector3" interfacename="normal" />
+    </standard_surface>
+    <output name="out" type="surfaceshader" nodename="surface" />
+  </nodegraph>
+
+  <!-- glTF's texture nodes with a minification filter: their parents' graphs. -->
+  <implementation name="IM_kinogaki_gltf_image_color3" nodedef="ND_kinogaki_gltf_image_color3" nodegraph="NG_NG_gltf_image_color3_color3_1_0" />
+  <implementation name="IM_kinogaki_gltf_image_color4" nodedef="ND_kinogaki_gltf_image_color4" nodegraph="NG_gltf_image_color4_color4_1_0" />
+  <implementation name="IM_kinogaki_gltf_image_float" nodedef="ND_kinogaki_gltf_image_float" nodegraph="NG_gltf_image_float_float_1_0" />
+  <implementation name="IM_kinogaki_gltf_image_vector3" nodedef="ND_kinogaki_gltf_image_vector3" nodegraph="NG_gltf_image_vector3_vector3_1_0" />
+  <implementation name="IM_kinogaki_gltf_colorimage" nodedef="ND_kinogaki_gltf_colorimage" nodegraph="NG_gltf_colorimage" />
+  <implementation name="IM_kinogaki_gltf_normalmap" nodedef="ND_kinogaki_gltf_normalmap" nodegraph="NG_gltf_normalmap_vector3_1_0" />
+  <implementation name="IM_kinogaki_gltf_anisotropy_image" nodedef="ND_kinogaki_gltf_anisotropy_image" nodegraph="NG_gltf_anisotropy_image_1_0" />
+  <implementation name="IM_kinogaki_gltf_iridescence_thickness" nodedef="ND_kinogaki_gltf_iridescence_thickness" nodegraph="NG_gltf_iridescence_thickness_float_1_0" />
+
+  <!-- Surface Unlit cut out by glTF's alpha mode, as glTF PBR cuts out. -->
+  <nodegraph name="NG_kinogaki_surface_unlit" nodedef="ND_kinogaki_surface_unlit">
+    <ifgreatereq name="opacity_mask_cutoff" type="float">
+      <input name="value1" type="float" interfacename="opacity" />
+      <input name="value2" type="float" interfacename="alpha_cutoff" />
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" value="0" />
+    </ifgreatereq>
+    <ifequal name="opacity_mask" type="float">
+      <input name="value1" type="integer" interfacename="alpha_mode" />
+      <input name="value2" type="integer" value="1" />
+      <input name="in1" type="float" nodename="opacity_mask_cutoff" />
+      <input name="in2" type="float" interfacename="opacity" />
+    </ifequal>
+    <ifequal name="opacity_mode" type="float">
+      <input name="value1" type="integer" interfacename="alpha_mode" />
+      <input name="value2" type="integer" value="0" />
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" nodename="opacity_mask" />
+    </ifequal>
+    <surface_unlit name="surface" type="surfaceshader">
+      <input name="emission" type="float" interfacename="emission" />
+      <input name="emission_color" type="color3" interfacename="emission_color" />
+      <input name="transmission" type="float" interfacename="transmission" />
+      <input name="transmission_color" type="color3" interfacename="transmission_color" />
+      <input name="opacity" type="float" nodename="opacity_mode" />
+    </surface_unlit>
+    <output name="out" type="surfaceshader" nodename="surface" />
+  </nodegraph>
+
+  <!--
+    glTF PBR into OpenPBR Surface. The dielectric specular is glTF's
+    KHR_materials_specular as OpenPBR's weight and tint; a sheen's color
+    is OpenPBR's fuzz at full weight where it isn't black; iridescence is a
+    thin film, its thickness from nanometres to micrometres; the cutout
+    follows glTF's alpha mode.
+  -->
+  <nodegraph name="NG_gltf_pbr_to_open_pbr_surface" nodedef="ND_gltf_pbr_to_open_pbr_surface">
+    <dot name="base_color" type="color3">
+      <input name="in" type="color3" interfacename="base_color" />
+    </dot>
+    <dot name="base_metalness" type="float">
+      <input name="in" type="float" interfacename="metallic" />
+    </dot>
+    <dot name="specular_weight" type="float">
+      <input name="in" type="float" interfacename="specular" />
+    </dot>
+    <dot name="specular_color" type="color3">
+      <input name="in" type="color3" interfacename="specular_color" />
+    </dot>
+    <dot name="specular_roughness" type="float">
+      <input name="in" type="float" interfacename="roughness" />
+    </dot>
+    <dot name="specular_ior" type="float">
+      <input name="in" type="float" interfacename="ior" />
+    </dot>
+    <dot name="anisotropy" type="float">
+      <input name="in" type="float" interfacename="anisotropy_strength" />
+    </dot>
+    <dot name="transmission_weight" type="float">
+      <input name="in" type="float" interfacename="transmission" />
+    </dot>
+    <dot name="transmission_color" type="color3">
+      <input name="in" type="color3" interfacename="attenuation_color" />
+    </dot>
+    <convert name="sheen_vector" type="vector3">
+      <input name="in" type="color3" interfacename="sheen_color" />
+    </convert>
+    <dotproduct name="sheen_sum" type="float">
+      <input name="in1" type="vector3" nodename="sheen_vector" />
+      <input name="in2" type="vector3" value="1, 1, 1" />
+    </dotproduct>
+    <ifgreater name="fuzz_weight" type="float">
+      <input name="value1" type="float" nodename="sheen_sum" />
+      <input name="value2" type="float" value="0" />
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" value="0" />
+    </ifgreater>
+    <dot name="fuzz_color" type="color3">
+      <input name="in" type="color3" interfacename="sheen_color" />
+    </dot>
+    <dot name="fuzz_roughness" type="float">
+      <input name="in" type="float" interfacename="sheen_roughness" />
+    </dot>
+    <dot name="coat_weight" type="float">
+      <input name="in" type="float" interfacename="clearcoat" />
+    </dot>
+    <dot name="coat_roughness" type="float">
+      <input name="in" type="float" interfacename="clearcoat_roughness" />
+    </dot>
+    <dot name="thin_film_weight" type="float">
+      <input name="in" type="float" interfacename="iridescence" />
+    </dot>
+    <multiply name="thin_film_thickness" type="float">
+      <input name="in1" type="float" interfacename="iridescence_thickness" />
+      <input name="in2" type="float" value="0.001" />
+    </multiply>
+    <dot name="thin_film_ior" type="float">
+      <input name="in" type="float" interfacename="iridescence_ior" />
+    </dot>
+    <dot name="emission_luminance" type="float">
+      <input name="in" type="float" interfacename="emissive_strength" />
+    </dot>
+    <dot name="emission_color" type="color3">
+      <input name="in" type="color3" interfacename="emissive" />
+    </dot>
+    <ifgreatereq name="opacity_mask_cutoff" type="float">
+      <input name="value1" type="float" interfacename="alpha" />
+      <input name="value2" type="float" interfacename="alpha_cutoff" />
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" value="0" />
+    </ifgreatereq>
+    <ifequal name="opacity_mask" type="float">
+      <input name="value1" type="integer" interfacename="alpha_mode" />
+      <input name="value2" type="integer" value="1" />
+      <input name="in1" type="float" nodename="opacity_mask_cutoff" />
+      <input name="in2" type="float" interfacename="alpha" />
+    </ifequal>
+    <ifequal name="opacity" type="float">
+      <input name="value1" type="integer" interfacename="alpha_mode" />
+      <input name="value2" type="integer" value="0" />
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" nodename="opacity_mask" />
+    </ifequal>
+    <dot name="normal" type="vector3">
+      <input name="in" type="vector3" interfacename="normal" />
+    </dot>
+    <dot name="coat_normal" type="vector3">
+      <input name="in" type="vector3" interfacename="clearcoat_normal" />
+    </dot>
+    <dot name="tangent" type="vector3">
+      <input name="in" type="vector3" interfacename="tangent" />
+    </dot>
+    <output name="base_color_out" type="color3" nodename="base_color" />
+    <output name="base_metalness_out" type="float" nodename="base_metalness" />
+    <output name="specular_weight_out" type="float" nodename="specular_weight" />
+    <output name="specular_color_out" type="color3" nodename="specular_color" />
+    <output name="specular_roughness_out" type="float" nodename="specular_roughness" />
+    <output name="specular_ior_out" type="float" nodename="specular_ior" />
+    <output name="specular_roughness_anisotropy_out" type="float" nodename="anisotropy" />
+    <output name="transmission_weight_out" type="float" nodename="transmission_weight" />
+    <output name="transmission_color_out" type="color3" nodename="transmission_color" />
+    <output name="fuzz_weight_out" type="float" nodename="fuzz_weight" />
+    <output name="fuzz_color_out" type="color3" nodename="fuzz_color" />
+    <output name="fuzz_roughness_out" type="float" nodename="fuzz_roughness" />
+    <output name="coat_weight_out" type="float" nodename="coat_weight" />
+    <output name="coat_roughness_out" type="float" nodename="coat_roughness" />
+    <output name="thin_film_weight_out" type="float" nodename="thin_film_weight" />
+    <output name="thin_film_thickness_out" type="float" nodename="thin_film_thickness" />
+    <output name="thin_film_ior_out" type="float" nodename="thin_film_ior" />
+    <output name="emission_luminance_out" type="float" nodename="emission_luminance" />
+    <output name="emission_color_out" type="color3" nodename="emission_color" />
+    <output name="geometry_opacity_out" type="float" nodename="opacity" />
+    <output name="geometry_normal_out" type="vector3" nodename="normal" />
+    <output name="geometry_coat_normal_out" type="vector3" nodename="coat_normal" />
+    <output name="geometry_tangent_out" type="vector3" nodename="tangent" />
+  </nodegraph>
+
+  <!--
+    USD Preview Surface into OpenPBR Surface: the specular workflow as a
+    dielectric of the specular color, the metallic one as OpenPBR's metalness;
+    emission at a luminance of one, its color the emissive color; the normal
+    from tangent space as USD's own graph reads it; opacity cut at its
+    threshold as USD cuts it.
+  -->
+  <nodegraph name="NG_UsdPreviewSurface_to_open_pbr_surface" nodedef="ND_UsdPreviewSurface_to_open_pbr_surface">
+    <dot name="base_color" type="color3">
+      <input name="in" type="color3" interfacename="diffuseColor" />
+    </dot>
+    <ifequal name="base_metalness" type="float">
+      <input name="value1" type="integer" interfacename="useSpecularWorkflow" />
+      <input name="value2" type="integer" value="1" />
+      <input name="in1" type="float" value="0" />
+      <input name="in2" type="float" interfacename="metallic" />
+    </ifequal>
+    <ifequal name="specular_color" type="color3">
+      <input name="value1" type="integer" interfacename="useSpecularWorkflow" />
+      <input name="value2" type="integer" value="1" />
+      <input name="in1" type="color3" interfacename="specularColor" />
+      <input name="in2" type="color3" value="1, 1, 1" />
+    </ifequal>
+    <dot name="specular_roughness" type="float">
+      <input name="in" type="float" interfacename="roughness" />
+    </dot>
+    <dot name="specular_ior" type="float">
+      <input name="in" type="float" interfacename="ior" />
+    </dot>
+    <dot name="coat_weight" type="float">
+      <input name="in" type="float" interfacename="clearcoat" />
+    </dot>
+    <dot name="coat_roughness" type="float">
+      <input name="in" type="float" interfacename="clearcoatRoughness" />
+    </dot>
+    <constant name="emission_luminance" type="float">
+      <input name="value" type="float" value="1" />
+    </constant>
+    <dot name="emission_color" type="color3">
+      <input name="in" type="color3" interfacename="emissiveColor" />
+    </dot>
+    <ifgreatereq name="cutout_opacity" type="float">
+      <input name="value1" type="float" interfacename="opacity" />
+      <input name="value2" type="float" interfacename="opacityThreshold" />
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" value="0" />
+    </ifgreatereq>
+    <ifgreater name="opacity" type="float">
+      <input name="value1" type="float" interfacename="opacityThreshold" />
+      <input name="value2" type="float" value="0" />
+      <input name="in1" type="float" nodename="cutout_opacity" />
+      <input name="in2" type="float" interfacename="opacity" />
+    </ifgreater>
+    <multiply name="scale_normal" type="vector3">
+      <input name="in1" type="vector3" interfacename="normal" />
+      <input name="in2" type="float" value="0.5" />
+    </multiply>
+    <add name="bias_normal" type="vector3">
+      <input name="in1" type="vector3" nodename="scale_normal" />
+      <input name="in2" type="float" value="0.5" />
+    </add>
+    <normalmap name="normal" type="vector3">
+      <input name="in" type="vector3" nodename="bias_normal" />
+    </normalmap>
+    <output name="base_color_out" type="color3" nodename="base_color" />
+    <output name="base_metalness_out" type="float" nodename="base_metalness" />
+    <output name="specular_color_out" type="color3" nodename="specular_color" />
+    <output name="specular_roughness_out" type="float" nodename="specular_roughness" />
+    <output name="specular_ior_out" type="float" nodename="specular_ior" />
+    <output name="coat_weight_out" type="float" nodename="coat_weight" />
+    <output name="coat_roughness_out" type="float" nodename="coat_roughness" />
+    <output name="emission_luminance_out" type="float" nodename="emission_luminance" />
+    <output name="emission_color_out" type="color3" nodename="emission_color" />
+    <output name="geometry_opacity_out" type="float" nodename="opacity" />
+    <output name="geometry_normal_out" type="vector3" nodename="normal" />
+  </nodegraph>
+
+  <!--
+    Surface Unlit into OpenPBR Surface: no base and no specular, its emission
+    as OpenPBR's, its transmission and cutout as they are.
+  -->
+  <nodegraph name="NG_surface_unlit_to_open_pbr_surface" nodedef="ND_surface_unlit_to_open_pbr_surface">
+    <constant name="base_weight" type="float">
+      <input name="value" type="float" value="0" />
+    </constant>
+    <constant name="specular_weight" type="float">
+      <input name="value" type="float" value="0" />
+    </constant>
+    <dot name="transmission_weight" type="float">
+      <input name="in" type="float" interfacename="transmission" />
+    </dot>
+    <dot name="transmission_color" type="color3">
+      <input name="in" type="color3" interfacename="transmission_color" />
+    </dot>
+    <dot name="emission_luminance" type="float">
+      <input name="in" type="float" interfacename="emission" />
+    </dot>
+    <dot name="emission_color" type="color3">
+      <input name="in" type="color3" interfacename="emission_color" />
+    </dot>
+    <dot name="opacity" type="float">
+      <input name="in" type="float" interfacename="opacity" />
+    </dot>
+    <output name="base_weight_out" type="float" nodename="base_weight" />
+    <output name="specular_weight_out" type="float" nodename="specular_weight" />
+    <output name="transmission_weight_out" type="float" nodename="transmission_weight" />
+    <output name="transmission_color_out" type="color3" nodename="transmission_color" />
+    <output name="emission_luminance_out" type="float" nodename="emission_luminance" />
+    <output name="emission_color_out" type="color3" nodename="emission_color" />
+    <output name="geometry_opacity_out" type="float" nodename="opacity" />
+  </nodegraph>
+</materialx>

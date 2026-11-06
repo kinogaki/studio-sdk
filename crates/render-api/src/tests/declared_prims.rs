@@ -48,13 +48,24 @@ fn a_later_declared_prim_replaces_the_one_a_batch_sends() {
     assert_eq!(first.added, vec![(id, Prim::Declared(thick))]);
 }
 
-/// Rules approximating every material as one color, translating another
-/// engine's material to an empty network of a node of its own.
+/// Rules approximating every material as one color, whose standard form is
+/// an OpenPBR Surface of that color, and which translate the standard form to
+/// a node of their own.
 struct Rules(NodeDef);
 
 impl MaterialRules for Rules {
     fn display(&self, _: &MaterialNetwork) -> MaterialDisplay {
         MaterialDisplay::color([0.1, 0.2, 0.3])
+    }
+    fn standard(&self, _: &MaterialNetwork) -> Option<MaterialNetwork> {
+        crate::material::standard::open_pbr(
+            &[(
+                "base_color".to_owned(),
+                value::Value::Color([0.1, 0.2, 0.3]),
+            )]
+            .into(),
+        )
+        .ok()
     }
     fn translate(&self, _: &MaterialNetwork) -> Option<MaterialNetwork> {
         let mut built = MaterialNetwork::builder();
@@ -72,7 +83,7 @@ fn def(engine: &str) -> NodeDef {
     } else {
         "toy.there.paint"
     });
-    NodeDef::new(id, "Paint", "Surface")
+    NodeDef::new(id, "Paint", "Surface").output(Output::new("out", "Out", Socket::surface()))
 }
 
 /// The network of `def` alone.
@@ -83,7 +94,7 @@ fn single(def: NodeDef) -> MaterialNetwork {
 }
 
 #[test]
-fn an_engine_keeps_its_own_material_and_translates_anothers() {
+fn an_engine_keeps_its_own_material_and_translates_anothers_standard_form() {
     let base = RecordingEngine::new(Arc::new(|| {})).description().clone();
     let here = (base.rebuilt().id(EngineId::declared("toy.here.engine")))
         .materials(vec![def("here")], Arc::new(Rules(def("here"))))
@@ -91,16 +102,19 @@ fn an_engine_keeps_its_own_material_and_translates_anothers() {
     let there = (base.rebuilt().id(EngineId::declared("toy.there.engine")))
         .materials(vec![def("there")], Arc::new(Rules(def("there"))))
         .build();
+    let all = Engines::new(vec![here.clone(), there.clone(), (*base).clone()]);
     let own = single(def("here"));
-    assert_eq!(here.adopt(&own), own, "its own: as it is");
+    assert_eq!(all.adopt(&own, here.id()), own, "its own: as it is");
     assert_eq!(
-        here.adopt(&single(def("there"))),
+        all.adopt(&single(def("there")), here.id()),
         own,
-        "another's: translated"
+        "another's: its standard form, translated"
     );
     assert_eq!(here.display(&own), MaterialDisplay::color([0.1, 0.2, 0.3]));
-    // An engine with no rules for it renders its default: an empty network.
-    assert_eq!(base.adopt(&own), MaterialNetwork::default());
+    // An engine with no rules for it renders its default: an empty network,
+    // naming what it couldn't render.
+    let unrendered = all.adopt(&own, base.id());
+    assert!(unrendered.output().is_none() && !unrendered.cut().is_empty());
     let engines = Engines::new(vec![here.clone(), there]);
     assert_eq!(
         engines.owner(&own).map(|e| e.id().as_str()),

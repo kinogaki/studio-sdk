@@ -1,0 +1,10 @@
+[package]
+name = "kinogaki-mtlx"
+description = "MaterialX 1.39 for Kinogaki Studio: the document model and its XML, the vendored standard libraries, and resolving, expanding, translating and evaluating node definitions"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

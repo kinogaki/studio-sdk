@@ -9,11 +9,13 @@
 //! Each engine describes itself without a device ([`EngineDescription`]):
 //! its settings ([`Parameter`]s), the prim types it declares
 //! (lights and fog, [`PrimType`]s; the [`standard`] ones shared), its
-//! material nodes ([`NodeDef`]s) and outputs ([`Aov`]s, by id). The crate
-//! holds no shading model: materials are networks of engine-declared nodes
-//! ([`MaterialNetwork`]), which an engine translates to its shaders and
-//! approximates for the viewport ([`MaterialRules`]), and renders a
-//! [`PreviewImage`] of. Engines output linear ACEScg.
+//! material nodes ([`NodeDef`]s) and outputs ([`Aov`]s, by id). Materials
+//! are networks of MaterialX's nodes and engines' own
+//! ([`MaterialNetwork`]): an engine implements the MaterialX nodes it lists
+//! and receives the rest expanded or translated ([`Engines::adopt`]), says
+//! what its own materials come to in the standard form, an OpenPBR Surface
+//! ([`MaterialRules`]), and renders a [`PreviewImage`] of a material.
+//! Engines output linear ACEScg.
 //! Hosts make shape prims from [`ShapeSource`]s: triangles or curves, from a
 //! polygon value, a CAD tessellation or a toolpath preview alike.
 //! [`RecordingEngine`] stores what it is sent, for hosts' tests.

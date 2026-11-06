@@ -83,6 +83,7 @@ impl PreviewRequest {
         let prim = Material {
             network: self.network.clone(),
             path: Arc::from("/preview/material"),
+            double_sided: true,
         };
         added.push((material.prim(), Prim::Material(prim)));
         added.push((ids.allocate(), Prim::Shape(sphere(material))));

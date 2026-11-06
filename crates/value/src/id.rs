@@ -3,7 +3,9 @@
 //! Every id is `<vendor>.<package>.<name>`: three dot-separated segments,
 //! each a lowercase ASCII letter followed by lowercase letters, digits and
 //! `_` (`kinogaki.mesh.extrude`, `kinogaki.cad.body`,
-//! `kinogaki.format.obj`). An id is declared by the package and never
+//! `kinogaki.format.obj`); the name may also hold uppercase letters, for a
+//! name a standard spells so (MaterialX's `kinogaki.mtlx.UsdUVTexture`). An
+//! id is declared by the package and never
 //! derived from a Rust identifier, so renaming code never changes what a
 //! project file or a shelf stores. A package's own id ([`PackageId`]) is
 //! the first two segments.
@@ -21,25 +23,30 @@ use std::fmt;
 use std::sync::Mutex;
 
 /// Whether `text` is a well-formed id: three dot-separated segments, each
-/// a lowercase ASCII letter followed by lowercase letters, digits and `_`.
+/// a lowercase ASCII letter followed by lowercase letters, digits and `_`,
+/// the last also taking uppercase letters.
 const fn well_formed(text: &str) -> bool {
-    segments_well_formed(text, 3)
+    segments_well_formed(text, 3, true)
 }
 
-/// Whether `text` is a well-formed package id: two segments of the form
-/// [`well_formed`] describes (`kinogaki.mesh`).
+/// Whether `text` is a well-formed package id: two segments, each a
+/// lowercase ASCII letter followed by lowercase letters, digits and `_`
+/// (`kinogaki.mesh`).
 const fn package_well_formed(text: &str) -> bool {
-    segments_well_formed(text, 2)
+    segments_well_formed(text, 2, false)
 }
 
 /// Whether `text` is `segments` dot-separated segments, each a lowercase
-/// ASCII letter followed by lowercase letters, digits and `_` (a `const
-/// fn`, so a declared id is checked where it is made).
-const fn segments_well_formed(text: &str, segments: usize) -> bool {
+/// ASCII letter followed by lowercase letters, digits and `_`, the last also
+/// taking uppercase letters when `named` (a `const fn`, so a declared id is
+/// checked where it is made).
+const fn segments_well_formed(text: &str, segments: usize, named: bool) -> bool {
     let bytes = text.as_bytes();
     let (mut count, mut start, mut i) = (1, true, 0);
     while i < bytes.len() {
         let b = bytes[i];
+        let letter =
+            b.is_ascii_lowercase() || (named && count == segments && b.is_ascii_uppercase());
         if b == b'.' {
             if start {
                 return false;
@@ -47,11 +54,11 @@ const fn segments_well_formed(text: &str, segments: usize) -> bool {
             count += 1;
             start = true;
         } else if start {
-            if !b.is_ascii_lowercase() {
+            if !letter {
                 return false;
             }
             start = false;
-        } else if !(b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_') {
+        } else if !(letter || b.is_ascii_digit() || b == b'_') {
             return false;
         }
         i += 1;
@@ -269,13 +276,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ids_are_three_lowercase_segments() {
-        for good in ["kinogaki.mesh.extrude", "acme.trees.l2_system", "a.b.c"] {
+    fn ids_are_three_lowercase_segments_the_name_also_uppercase() {
+        for good in [
+            "kinogaki.mesh.extrude",
+            "acme.trees.l2_system",
+            "a.b.c",
+            "kinogaki.mtlx.UsdUVTexture",
+        ] {
             assert!(well_formed(good), "{good}");
         }
         for bad in [
             "kinogaki.mesh",
-            "kinogaki.mesh.Extrude",
+            "kinogaki.Mesh.extrude",
+            "Kinogaki.mesh.extrude",
             "kinogaki..extrude",
             "kinogaki.mesh.extrude.2",
             "kinogaki.mesh.2d",
@@ -293,6 +306,7 @@ mod tests {
         assert!(package_well_formed("kinogaki.mesh"));
         assert!(!package_well_formed("kinogaki"));
         assert!(!package_well_formed("kinogaki.mesh.extrude"));
+        assert!(!package_well_formed("kinogaki.Mesh"));
         let id = PackageId::declared("acme.trees");
         assert_eq!(id.vendor(), "acme");
         assert_eq!(id.to_string(), "acme.trees");

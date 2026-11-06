@@ -1,0 +1,188 @@
+<?xml version="1.0"?>
+<materialx version="1.39">
+  <!--
+    Kinogaki's definitions: what MaterialX 1.39 has no home for, so a game
+    asset's material reads and writes back losslessly. Each is implemented by
+    a graph over stdlib and pbrlib (kinogaki_ng.mtlx), so it renders wherever
+    MaterialX does; each goes when MaterialX covers what it covers.
+  -->
+
+  <!--
+    Phong Surface: FBX's Lambert and Phong materials and MTL's classic
+    statements, by their own fields, rendered through Autodesk's Standard
+    Surface. `model` records which FBX class it came from (a Lambert's
+    specular is read at zero); ambient, reflection, transparency, the
+    transmission filter and the illumination model are kept, not rendered.
+  -->
+  <nodedef name="ND_kinogaki_phong_surface_surfaceshader" node="kinogaki_phong_surface" nodegroup="pbr" uiname="Phong Surface"
+           doc="FBX's Lambert and Phong materials and MTL's classic statements, rendered through Standard Surface">
+    <input name="model" type="string" value="phong" enum="lambert,phong" uniform="true" uiname="Model" uifolder="Surface" />
+    <input name="diffuse_color" type="color3" value="0.8, 0.8, 0.8" uimin="0,0,0" uimax="1,1,1" uiname="Diffuse Color" uifolder="Diffuse" />
+    <input name="diffuse_factor" type="float" value="1" uimin="0" uisoftmax="1" uiname="Diffuse Factor" uifolder="Diffuse" />
+    <input name="ambient_color" type="color3" value="0, 0, 0" uimin="0,0,0" uimax="1,1,1" uiname="Ambient Color" uifolder="Ambient" />
+    <input name="ambient_factor" type="float" value="1" uimin="0" uisoftmax="1" uiname="Ambient Factor" uifolder="Ambient" />
+    <input name="specular_color" type="color3" value="0.2, 0.2, 0.2" uimin="0,0,0" uimax="1,1,1" uiname="Specular Color" uifolder="Specular" />
+    <input name="specular_factor" type="float" value="1" uimin="0" uisoftmax="1" uiname="Specular Factor" uifolder="Specular" />
+    <input name="shininess" type="float" value="20" uimin="0" uisoftmax="1000" uiname="Shininess" uifolder="Specular"
+           doc="The Phong exponent: rendered as a roughness of sqrt(2 / (shininess + 2))." />
+    <input name="ior" type="float" value="1.5" uimin="0" uisoftmin="1" uisoftmax="3" uiname="Index of Refraction" uifolder="Specular" />
+    <input name="emissive_color" type="color3" value="0, 0, 0" uimin="0,0,0" uisoftmax="1,1,1" uiname="Emissive Color" uifolder="Emission" />
+    <input name="emissive_factor" type="float" value="1" uimin="0" uisoftmax="1" uiname="Emissive Factor" uifolder="Emission" />
+    <input name="reflection_color" type="color3" value="0, 0, 0" uimin="0,0,0" uimax="1,1,1" uiname="Reflection Color" uifolder="Reflection" />
+    <input name="reflection_factor" type="float" value="1" uimin="0" uisoftmax="1" uiname="Reflection Factor" uifolder="Reflection" />
+    <input name="transparent_color" type="color3" value="0, 0, 0" uimin="0,0,0" uimax="1,1,1" uiname="Transparent Color" uifolder="Opacity" />
+    <input name="transparency_factor" type="float" value="0" uimin="0" uimax="1" uiname="Transparency Factor" uifolder="Opacity" />
+    <input name="opacity" type="float" value="1" uimin="0" uimax="1" uiname="Opacity" uifolder="Opacity" />
+    <input name="transmission_filter" type="color3" value="1, 1, 1" uimin="0,0,0" uimax="1,1,1" uiname="Transmission Filter" uifolder="Opacity" />
+    <input name="illum" type="integer" value="2" uimin="0" uimax="10" uniform="true" uiname="Illumination Model" uifolder="Surface" />
+    <input name="normal" type="vector3" defaultgeomprop="Nworld" uiname="Normal" uifolder="Geometry" />
+    <output name="out" type="surfaceshader" />
+  </nodedef>
+
+  <!--
+    glTF's texture nodes with its minification filter, and an undefined
+    magnification filter (`filtertype` empty): what a sampler holds that
+    MaterialX's one filter doesn't. Engines that don't mipmap read the
+    parent's graph alone.
+  -->
+  <nodedef name="ND_kinogaki_gltf_image_color3" node="kinogaki_gltf_image" nodegroup="texture2d" inherit="ND_gltf_image_color3_color3_1_0" uiname="glTF Image">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_image_color4" node="kinogaki_gltf_image" nodegroup="texture2d" inherit="ND_gltf_image_color4_color4_1_0" uiname="glTF Image">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_image_float" node="kinogaki_gltf_image" nodegroup="texture2d" inherit="ND_gltf_image_float_float_1_0" uiname="glTF Image">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_image_vector3" node="kinogaki_gltf_image" nodegroup="texture2d" inherit="ND_gltf_image_vector3_vector3_1_0" uiname="glTF Image">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_colorimage" node="kinogaki_gltf_colorimage" nodegroup="texture2d" inherit="ND_gltf_colorimage" uiname="glTF Color Image">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" uifolder="Image" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" uifolder="Image" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_normalmap" node="kinogaki_gltf_normalmap" nodegroup="texture2d" inherit="ND_gltf_normalmap_vector3_1_0" uiname="glTF Normal Map">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_anisotropy_image" node="kinogaki_gltf_anisotropy_image" nodegroup="texture2d" inherit="ND_gltf_anisotropy_image" uiname="glTF Anisotropy Image">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
+  </nodedef>
+  <nodedef name="ND_kinogaki_gltf_iridescence_thickness" node="kinogaki_gltf_iridescence_thickness" nodegroup="texture2d" inherit="ND_gltf_iridescence_thickness_float_1_0" uiname="glTF Iridescence Thickness">
+    <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" uifolder="Image" />
+    <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" uifolder="Image" />
+  </nodedef>
+
+  <!--
+    Surface Unlit with glTF's alpha mode: a cutout (MASK) of an unlit surface,
+    sprites and foliage cards.
+  -->
+  <nodedef name="ND_kinogaki_surface_unlit" node="kinogaki_surface_unlit" nodegroup="shader" inherit="ND_surface_unlit" uiname="Surface Unlit Cutout"
+           doc="Surface Unlit with glTF's alpha modes: opaque, a cutout at the alpha cutoff, or blended.">
+    <input name="alpha_mode" type="integer" uniform="true" value="2" enum="OPAQUE, MASK, BLEND" enumvalues="0, 1, 2" uiname="Alpha Mode" />
+    <input name="alpha_cutoff" type="float" uniform="true" value="0.5" uimin="0" uimax="1" uiname="Alpha Cutoff" />
+  </nodedef>
+
+  <!--
+    Translations into OpenPBR Surface, the standard form every engine meets
+    in: approximate where the models differ, as MaterialX's own are. glTF's
+    occlusion, thickness and dispersion, and USD's displacement and occlusion
+    have no OpenPBR input and aren't translated.
+  -->
+  <nodedef name="ND_gltf_pbr_to_open_pbr_surface" node="gltf_pbr_to_open_pbr_surface" nodegroup="translation">
+    <input name="base_color" type="color3" value="1, 1, 1" />
+    <input name="metallic" type="float" value="1" />
+    <input name="roughness" type="float" value="1" />
+    <input name="normal" type="vector3" defaultgeomprop="Nworld" />
+    <input name="tangent" type="vector3" defaultgeomprop="Tworld" />
+    <input name="transmission" type="float" value="0" />
+    <input name="specular" type="float" value="1" />
+    <input name="specular_color" type="color3" value="1, 1, 1" />
+    <input name="ior" type="float" value="1.5" />
+    <input name="alpha" type="float" value="1" />
+    <input name="alpha_mode" type="integer" value="0" />
+    <input name="alpha_cutoff" type="float" value="0.5" />
+    <input name="iridescence" type="float" value="0" />
+    <input name="iridescence_ior" type="float" value="1.3" />
+    <input name="iridescence_thickness" type="float" value="100" />
+    <input name="sheen_color" type="color3" value="0, 0, 0" />
+    <input name="sheen_roughness" type="float" value="0" />
+    <input name="clearcoat" type="float" value="0" />
+    <input name="clearcoat_roughness" type="float" value="0" />
+    <input name="clearcoat_normal" type="vector3" defaultgeomprop="Nworld" />
+    <input name="emissive" type="color3" value="0, 0, 0" />
+    <input name="emissive_strength" type="float" value="1" />
+    <input name="attenuation_color" type="color3" value="1, 1, 1" />
+    <input name="anisotropy_strength" type="float" value="0" />
+    <output name="base_color_out" type="color3" />
+    <output name="base_metalness_out" type="float" />
+    <output name="specular_weight_out" type="float" />
+    <output name="specular_color_out" type="color3" />
+    <output name="specular_roughness_out" type="float" />
+    <output name="specular_ior_out" type="float" />
+    <output name="specular_roughness_anisotropy_out" type="float" />
+    <output name="transmission_weight_out" type="float" />
+    <output name="transmission_color_out" type="color3" />
+    <output name="fuzz_weight_out" type="float" />
+    <output name="fuzz_color_out" type="color3" />
+    <output name="fuzz_roughness_out" type="float" />
+    <output name="coat_weight_out" type="float" />
+    <output name="coat_roughness_out" type="float" />
+    <output name="thin_film_weight_out" type="float" />
+    <output name="thin_film_thickness_out" type="float" />
+    <output name="thin_film_ior_out" type="float" />
+    <output name="emission_luminance_out" type="float" />
+    <output name="emission_color_out" type="color3" />
+    <output name="geometry_opacity_out" type="float" />
+    <output name="geometry_normal_out" type="vector3" />
+    <output name="geometry_coat_normal_out" type="vector3" />
+    <output name="geometry_tangent_out" type="vector3" />
+  </nodedef>
+
+  <nodedef name="ND_UsdPreviewSurface_to_open_pbr_surface" node="UsdPreviewSurface_to_open_pbr_surface" nodegroup="translation">
+    <input name="diffuseColor" type="color3" value="0.18, 0.18, 0.18" />
+    <input name="emissiveColor" type="color3" value="0, 0, 0" />
+    <input name="useSpecularWorkflow" type="integer" value="0" />
+    <input name="specularColor" type="color3" value="0, 0, 0" />
+    <input name="metallic" type="float" value="0" />
+    <input name="roughness" type="float" value="0.5" />
+    <input name="clearcoat" type="float" value="0" />
+    <input name="clearcoatRoughness" type="float" value="0.01" />
+    <input name="opacity" type="float" value="1" />
+    <input name="opacityMode" type="integer" value="0" />
+    <input name="opacityThreshold" type="float" value="0" />
+    <input name="ior" type="float" value="1.5" />
+    <input name="normal" type="vector3" value="0, 0, 1" />
+    <output name="base_color_out" type="color3" />
+    <output name="base_metalness_out" type="float" />
+    <output name="specular_color_out" type="color3" />
+    <output name="specular_roughness_out" type="float" />
+    <output name="specular_ior_out" type="float" />
+    <output name="coat_weight_out" type="float" />
+    <output name="coat_roughness_out" type="float" />
+    <output name="emission_luminance_out" type="float" />
+    <output name="emission_color_out" type="color3" />
+    <output name="geometry_opacity_out" type="float" />
+    <output name="geometry_normal_out" type="vector3" />
+  </nodedef>
+
+  <nodedef name="ND_surface_unlit_to_open_pbr_surface" node="surface_unlit_to_open_pbr_surface" nodegroup="translation">
+    <input name="emission" type="float" value="1" />
+    <input name="emission_color" type="color3" value="1, 1, 1" />
+    <input name="transmission" type="float" value="0" />
+    <input name="transmission_color" type="color3" value="1, 1, 1" />
+    <input name="opacity" type="float" value="1" />
+    <output name="base_weight_out" type="float" />
+    <output name="specular_weight_out" type="float" />
+    <output name="transmission_weight_out" type="float" />
+    <output name="transmission_color_out" type="color3" />
+    <output name="emission_luminance_out" type="float" />
+    <output name="emission_color_out" type="color3" />
+    <output name="geometry_opacity_out" type="float" />
+  </nodedef>
+</materialx>

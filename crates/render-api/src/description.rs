@@ -1,9 +1,15 @@
 //! What an engine is, without a device: [`EngineDescription`]. A host
 //! builds its UI, files, catalog and inspector from it, and holds the
 //! engines it can make in [`Engines`]. A description is data an engine
-//! may build at run time; what needs the engine's code (how its materials
-//! look in a viewport, what it makes of another engine's) is its
-//! [`MaterialRules`].
+//! may build at run time; what needs the engine's code (what its own
+//! materials come to in the standard form, what it makes of that form) is
+//! its [`MaterialRules`].
+//!
+//! Engines meet in MaterialX: each lists the MaterialX nodes it implements
+//! ([`Capabilities::standard_nodes`]), and a material reaches it as it adopts
+//! it ([`Engines::adopt`]): its own nodes and those it implements as they
+//! are, the others expanded, translated or cut; another engine's material as
+//! that engine's standard form, an OpenPBR Surface ([`Engines::standard`]).
 //!
 //! Every engine outputs linear ACEScg (the beauty and color AOVs): what a
 //! host shows through its view transform and what compositing reads.
@@ -12,7 +18,7 @@ use std::sync::Arc;
 
 use crate::aov::{Aov, AovSpec};
 use crate::declared::PrimType;
-use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef};
+use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef, standard};
 use crate::prim::PrimKind;
 use kinogaki_value::NodeTypeId;
 use kinogaki_value::{EngineId, PrimTypeId};
@@ -20,27 +26,33 @@ use kinogaki_value::{Parameter, Section};
 
 /// What an engine's materials are to a host: the rules only its code knows.
 pub trait MaterialRules: Send + Sync {
-    /// A simple approximation of one of its materials, for the shaded
-    /// viewport: its color, and the primvar it reads, where it can say.
-    fn display(&self, network: &MaterialNetwork) -> MaterialDisplay;
-
-    /// A material of its own from `foreign`, a network holding nodes it
-    /// doesn't declare (another engine's, a file's). None: it renders it as
-    /// its default material.
-    fn translate(&self, foreign: &MaterialNetwork) -> Option<MaterialNetwork> {
-        let _ = foreign;
+    /// One of its own materials in the standard form ([`standard`]), as
+    /// close as OpenPBR Surface comes. None: nothing standard approximates
+    /// it (a volume).
+    fn standard(&self, own: &MaterialNetwork) -> Option<MaterialNetwork> {
+        let _ = own;
         None
+    }
+
+    /// A material of its own from `standard`, a material in the standard form
+    /// it doesn't render as it is: an engine of a vocabulary of its own
+    /// translates it here. None: it renders what adoption made of it.
+    fn translate(&self, standard: &MaterialNetwork) -> Option<MaterialNetwork> {
+        let _ = standard;
+        None
+    }
+
+    /// A simple approximation of one of its materials, for the shaded
+    /// viewport: by default, its standard form's.
+    fn display(&self, own: &MaterialNetwork) -> MaterialDisplay {
+        (self.standard(own)).map_or(MaterialDisplay::color([0.5; 3]), |s| standard::display(&s))
     }
 }
 
 /// The rules of an engine bringing no material of its own.
 struct NoMaterials;
 
-impl MaterialRules for NoMaterials {
-    fn display(&self, _: &MaterialNetwork) -> MaterialDisplay {
-        MaterialDisplay::color([0.5; 3])
-    }
-}
+impl MaterialRules for NoMaterials {}
 
 /// The motion an engine blurs while a camera's shutter is open.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -80,6 +92,11 @@ pub struct Capabilities {
     /// The bytes it holds for a view a pixel of its film, every buffer and
     /// kept image counted: hosts budget the films rendering at a time by it.
     pub film_bytes: u32,
+    /// The MaterialX nodes it implements as they are, each by its node
+    /// (`open_pbr_surface`) or, where it implements only some of a node's
+    /// signatures, by signature (`ND_image_color3`); a material holding
+    /// others reaches it adopted ([`Engines::adopt`]).
+    pub standard_nodes: Vec<Arc<str>>,
 }
 
 impl Capabilities {
@@ -226,20 +243,6 @@ impl EngineDescription {
         Some((ty.groups.clone(), ty.params.clone()))
     }
 
-    /// `network` as this engine renders it: as it is when it declares every
-    /// node of it; else what it translates it to, or empty (its default
-    /// material) when it can't.
-    pub fn adopt(&self, network: &MaterialNetwork) -> MaterialNetwork {
-        let own = network
-            .nodes()
-            .iter()
-            .all(|n| self.node_def(n.def).is_some());
-        if own {
-            return network.clone();
-        }
-        (self.material_rules.translate(network)).unwrap_or_default()
-    }
-
     /// What the shaded viewport shows of `network`, one of its materials.
     pub fn display(&self, network: &MaterialNetwork) -> MaterialDisplay {
         self.material_rules.display(network)
@@ -273,11 +276,54 @@ impl Engines {
         self.0.is_empty()
     }
 
-    /// The engine whose material `network` is: the one declaring the node it
-    /// shows.
+    /// The engine whose material `network` is: the one declaring the surface
+    /// it shows (none for a MaterialX one).
     pub fn owner(&self, network: &MaterialNetwork) -> Option<&Arc<EngineDescription>> {
-        let shown = network.output()?;
-        self.iter().find(|e| e.node_def(shown.def).is_some())
+        let shown = &network.nodes()[network.surface()? as usize];
+        self.iter().find(|e| e.node_def(shown.def.id).is_some())
+    }
+
+    /// `network` in the standard form, an OpenPBR Surface ([`standard`]): a
+    /// MaterialX material's surface translated; an engine's own material as
+    /// its rules say. None: its surface translates to none, its owner isn't
+    /// installed, or its owner says nothing standard approximates it.
+    pub fn standard(&self, network: &MaterialNetwork) -> Option<MaterialNetwork> {
+        let own = network.nodes().iter().any(|n| n.def.mtlx().is_none());
+        match own {
+            true => self.owner(network)?.material_rules.standard(network),
+            false => crate::material::adopt::standard(network),
+        }
+    }
+
+    /// `network` as engine `to` renders it: its MaterialX nodes adopted
+    /// ([`material`](crate::material): as they are, expanded, translated or
+    /// cut, then folded) and its own as they are; another engine's material
+    /// adopted as its standard form. Where adoption cut something and `to`
+    /// translates the standard form itself ([`MaterialRules::translate`]),
+    /// its translation. Empty, `to`'s default material, when nothing
+    /// renders.
+    pub fn adopt(&self, network: &MaterialNetwork, to: EngineId) -> MaterialNetwork {
+        let Some(engine) = self.get(to) else {
+            return MaterialNetwork::default();
+        };
+        let foreign = (network.nodes().iter())
+            .any(|n| n.def.mtlx().is_none() && engine.node_def(n.def.id).is_none());
+        let standard = match foreign {
+            true => self.standard(network),
+            false => None,
+        };
+        let source = match (foreign, &standard) {
+            (true, None) => return MaterialNetwork::default(),
+            (true, Some(s)) => s,
+            (false, _) => network,
+        };
+        let adopted = crate::material::adopt::adopt(source, engine);
+        if adopted.cut().is_empty() {
+            return adopted;
+        }
+        let standard = standard.or_else(|| self.standard(network));
+        let translated = standard.and_then(|s| engine.material_rules.translate(&s));
+        translated.unwrap_or(adopted)
     }
 
     /// Every engine, in order.

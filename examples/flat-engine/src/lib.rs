@@ -1,13 +1,17 @@
 //! Flat: an example render engine. It ray-casts the triangles a host sends,
 //! through the view's camera, on the CPU, and shades each hit by a light at
-//! the eye (its facing ratio); what it renders shows through a texture it
-//! writes on the host's device. It declares no lights, no materials and one
-//! output, the beauty, and renders each view once a change.
+//! the eye (its facing ratio) times its material's base color, an OpenPBR
+//! Surface's constant or image (the MaterialX nodes it implements; a host
+//! adopts every other material into them); what it renders shows through a
+//! texture it writes on the host's device. It declares no lights, no nodes of
+//! its own and one output, the beauty, and renders each view once a change.
 //!
 //! Its parts are those of every engine: a description ([`description`]),
-//! a render thread over the SDK's plumbing (`render`), and a display
-//! (`display`). `export_package!` hands the package to Studio.
+//! what it paints materials as (`paint`), a render thread over the SDK's
+//! plumbing (`render`), and a display (`display`). `export_package!` hands
+//! the package to Studio.
 mod display;
+mod paint;
 mod render;
 
 use kinogaki_render_api::display::{Engine, Made, Options, wgpu};
@@ -24,7 +28,14 @@ pub const ENGINE: EngineId = EngineId::declared("example.flat.engine");
 pub fn description() -> EngineDescription {
     EngineDescription::builder(ENGINE, "Flat")
         .capabilities(Capabilities {
-            prims: vec![PrimKind::Triangles, PrimKind::Instancer, PrimKind::Camera],
+            prims: vec![
+                PrimKind::Triangles,
+                PrimKind::Instancer,
+                PrimKind::Camera,
+                PrimKind::Material,
+                PrimKind::Texture,
+            ],
+            standard_nodes: paint::NODES.map(std::sync::Arc::from).to_vec(),
             aovs: vec![AovSpec::new(aov::standard::beauty(), true)],
             // Every pass is the whole frame.
             realtime: true,

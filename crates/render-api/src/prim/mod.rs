@@ -63,6 +63,10 @@ pub struct Material {
     pub network: Arc<MaterialNetwork>,
     /// The host's path of the material: the name Cryptomatte gives it.
     pub path: Arc<str>,
+    /// Whether both sides of a surface show it (MaterialX has no single
+    /// sidedness; a Material says): a path tracer renders both sides
+    /// whatever it says, a realtime engine culls back faces when it doesn't.
+    pub double_sided: bool,
 }
 
 /// A prim's payload.

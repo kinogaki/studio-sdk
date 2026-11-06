@@ -1,10 +1,16 @@
-//! Material networks: the DAG machinery, with no shading model in it. A
-//! network is nodes of engine-declared types ([`NodeDef`], by id), each
-//! holding its inputs' values, links between their ports by name, and the one
-//! node it shows. What the nodes mean is their engine's: it translates a
-//! network to its shaders. Made by [`MaterialNetwork::builder`], which checks
-//! every value against its port, every link's sockets, and that nothing
-//! cycles; an engine never reads a half-formed network.
+//! Material networks: MaterialX's nodes ([`mtlx`]) and engines' own, wired.
+//! A network is nodes of declared types ([`NodeDef`]), each holding its
+//! inputs' values, links between their ports by name, and the one node it
+//! shows: a `surfacematerial`, or a surface. Made by
+//! [`MaterialNetwork::builder`], which checks every value against its port,
+//! every link's sockets, and that nothing cycles; an engine never reads a
+//! half-formed network.
+//!
+//! A host sends an engine a network as the engine adopts it
+//! ([`Engines::adopt`](crate::Engines::adopt)): the MaterialX nodes it
+//! implements as they are, the others expanded into the graphs defining them
+//! or a shading model translated into one it renders ([`standard`]), and what
+//! is left out named ([`MaterialNetwork::cut`]).
 //!
 //! An empty network ([`MaterialNetwork::default`]) renders as the engine's
 //! default material: what a look naming nothing shows.
@@ -12,33 +18,56 @@
 //! Colors are linear: authored in the working space, ACEScg in a network
 //! an engine receives (the host converts them as it sends the network;
 //! [`crate::RENDER_SPACE`]).
+pub(crate) mod adopt;
 mod def;
 mod display;
+pub mod mtlx;
 pub mod preview;
+pub mod standard;
 
 pub use def::{Input, NodeDef, Output, Socket};
 pub use display::{DisplayTexture, MaterialDisplay};
 
 use crate::settings::Textures;
 use kinogaki_geometry::Error;
-use kinogaki_value::{NodeTypeId, Parameters, Value, ValueKind};
+use kinogaki_value::{Parameters, Value, ValueKind};
 use std::collections::BTreeSet;
+use std::fmt;
 use std::sync::Arc;
 
 /// A node's index in its network.
 pub type NodeIndex = u32;
 
-/// A node: its type, every input's value (its default when never set), and,
-/// as an engine receives it, the Texture prims its image files were decoded
-/// to, by input name.
-#[derive(Clone, Debug, PartialEq)]
+/// A node: its definition, every input's value (its default when never
+/// set), and, as an engine receives it, the Texture prims its image files
+/// were decoded to, by input name.
+#[derive(Clone)]
 pub struct Node {
-    /// Its type.
-    pub def: NodeTypeId,
+    /// Its definition: its type and, for a MaterialX node, its signature.
+    pub def: Arc<NodeDef>,
     /// Every input's value that isn't a wire alone, by name.
     pub values: Parameters,
     /// Its files' Texture prims, filled by the host as it sends the network.
     pub textures: Textures,
+}
+
+impl PartialEq for Node {
+    /// Equal definitions ([`NodeDef::same`]), values and textures.
+    fn eq(&self, other: &Node) -> bool {
+        self.def.same(&other.def) && self.values == other.values && self.textures == other.textures
+    }
+}
+
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let signature = self.def.mtlx().map(|d| d.name.as_str());
+        (f.debug_struct("Node"))
+            .field("def", &self.def.id)
+            .field("signature", &signature)
+            .field("values", &self.values)
+            .field("textures", &self.textures)
+            .finish()
+    }
 }
 
 /// One link: output `output` of node `from` drives input `input` of `to`.
@@ -61,6 +90,7 @@ pub struct MaterialNetwork {
     links: Vec<Link>,
     output: Option<NodeIndex>,
     primvars: Arc<[Arc<str>]>,
+    cut: Arc<[Arc<str>]>,
 }
 
 impl MaterialNetwork {
@@ -95,6 +125,24 @@ impl MaterialNetwork {
         self.output
     }
 
+    /// The surface it shows: the node wired into its shown Surface
+    /// Material's `surfaceshader`, else the shown node itself.
+    pub fn surface(&self) -> Option<NodeIndex> {
+        let shown = self.output?;
+        let material = self.nodes[shown as usize]
+            .def
+            .mtlx()
+            .is_some_and(|d| d.node == "surfacematerial");
+        if !material {
+            return Some(shown);
+        }
+        let link = self
+            .links
+            .iter()
+            .find(|l| l.to == shown && &*l.input == "surfaceshader");
+        link.map(|l| l.from)
+    }
+
     /// The primvars its values name ([`ValueKind::Attribute`]): what a host
     /// sends the shapes using it, beside the
     /// [standard ones](crate::STANDARD_PRIMVARS).
@@ -102,13 +150,20 @@ impl MaterialNetwork {
         &self.primvars
     }
 
-    /// Whether `other` has the same nodes' types and links, so only values
-    /// differ.
+    /// The MaterialX nodes adoption left out for the engine it was adopted
+    /// for, by node (`hextiledimage`), each once: what the engine says it
+    /// doesn't render. The inputs they fed hold their own values.
+    pub fn cut(&self) -> &[Arc<str>] {
+        &self.cut
+    }
+
+    /// Whether `other` has the same nodes' definitions and links, so only
+    /// values differ.
     pub fn same_wiring(&self, other: &MaterialNetwork) -> bool {
         self.links == other.links
             && self.output == other.output
             && self.nodes.len() == other.nodes.len()
-            && (self.nodes.iter().zip(&other.nodes)).all(|(a, b)| a.def == b.def)
+            && (self.nodes.iter().zip(&other.nodes)).all(|(a, b)| a.def.same(&b.def))
     }
 
     /// The network without the nodes `out` and every link to or from them:
@@ -138,6 +193,7 @@ impl MaterialNetwork {
                 .collect(),
             output: self.output.map(renumbered),
             primvars: self.primvars.clone(),
+            cut: self.cut.clone(),
         }
     }
 }
@@ -145,7 +201,6 @@ impl MaterialNetwork {
 /// Makes a [`MaterialNetwork`], checking it whole.
 #[derive(Clone, Debug, Default)]
 pub struct NetworkBuilder {
-    defs: Vec<Arc<NodeDef>>,
     network: MaterialNetwork,
     primvars: BTreeSet<Arc<str>>,
 }
@@ -176,9 +231,8 @@ impl NetworkBuilder {
             }
             held.insert(descriptor.name.to_string(), value.clone());
         }
-        self.defs.push(def.clone());
         self.network.nodes.push(Node {
-            def: def.id,
+            def: def.clone(),
             values: held,
             textures: Textures::new(),
         });
@@ -198,7 +252,8 @@ impl NetworkBuilder {
         input: &str,
     ) -> Result<(), Error> {
         let def = |at: NodeIndex| {
-            (self.defs.get(at as usize))
+            (self.network.nodes.get(at as usize))
+                .map(|n| &n.def)
                 .ok_or_else(|| Error::invalid(format_args!("no node {at} to link")))
         };
         let (source, driven) = (def(from)?, def(to)?);
@@ -290,7 +345,7 @@ mod tests {
     fn defs() -> [Arc<NodeDef>; 3] {
         let closure = || Socket::Closure(Arc::from("surface"));
         let surface = NodeDef::new(NodeTypeId::declared("toy.m.surface"), "Surface", "Surface")
-            .input(Input::Driven(color("base"), Socket::Color))
+            .input(Input::Driven(color("base"), Socket::Color3))
             .output(Output::new("out", "Out", closure()));
         let attribute = ValueKind::Attribute {
             menu: Vec::new(),
@@ -299,8 +354,8 @@ mod tests {
         let read = Parameter::new("name", "Name", attribute, "Cd");
         let reader = NodeDef::new(NodeTypeId::declared("toy.m.read"), "Read", "Input")
             .input(Input::Setting(read))
-            .input(Input::Driven(color("gain"), Socket::Color))
-            .output(Output::new("out", "Out", Socket::Color));
+            .input(Input::Driven(color("gain"), Socket::Color3))
+            .output(Output::new("out", "Out", Socket::Color3));
         let output = NodeDef::new(NodeTypeId::declared("toy.m.output"), "Output", "Output")
             .input(Input::wire("surface", "Surface", closure()));
         [Arc::new(surface), Arc::new(reader), Arc::new(output)]
@@ -319,7 +374,7 @@ mod tests {
         b.link(r, "out", s, "base").unwrap();
         b.link(s, "out", o, "surface").unwrap();
         let network = b.build(o).unwrap();
-        assert_eq!(network.output().map(|n| n.def), Some(output.id));
+        assert_eq!(network.output().map(|n| n.def.id), Some(output.id));
         assert_eq!(network.primvars()[..], [Arc::from("Cd")]);
         // Every value is there, a default never asked for.
         assert_eq!(network.nodes()[1].values["base"], Value::Color([0.5; 3]));
@@ -381,8 +436,11 @@ mod tests {
     #[test]
     fn sockets_meet_by_kind() {
         let closure = |n: &str| Socket::Closure(Arc::from(n));
-        assert!(Socket::Float.drives(&Socket::Color));
-        assert!(Socket::Color.drives(&Socket::Vector { width: 3 }));
+        assert!(Socket::Float.drives(&Socket::Color3));
+        assert!(Socket::Color4.drives(&Socket::Vector2));
+        assert!(Socket::Filename.drives(&Socket::String));
+        assert!(!Socket::Matrix33.drives(&Socket::Matrix44));
+        assert!(!Socket::Float.drives(&Socket::String));
         assert!(closure("a").drives(&closure("a")));
         assert!(!closure("a").drives(&closure("b")));
         assert!(!closure("a").drives(&Socket::Float));

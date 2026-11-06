@@ -9,6 +9,10 @@ Parts of `kinogaki-studio-ui-api` (`crates/ui-api`) follow [egui](https://github
 
 egui is Copyright (c) 2018-2021 Emil Ernerfeldt <emil.ernerfeldt@gmail.com> and the egui contributors, dual-licensed under the MIT license ([licenses/egui-LICENSE-MIT](licenses/egui-LICENSE-MIT)) or the Apache License 2.0 ([licenses/egui-LICENSE-APACHE](licenses/egui-LICENSE-APACHE)), at your option.
 
+## MaterialX
+
+`kinogaki-mtlx` (`crates/mtlx`) vendors MaterialX 1.39.5's node definition libraries as data, verbatim: every `.mtlx` file of the release's `libraries/` but its shader-generation targets (`gen*/`, `targets/`), in `crates/mtlx/libraries/`, with MaterialX's licence beside them ([crates/mtlx/libraries/LICENSE](crates/mtlx/libraries/LICENSE)). MaterialX is copyright Contributors to the MaterialX Project, under the Apache License 2.0; the release carries no NOTICE file, and its THIRD-PARTY.md names the projects its C++ source incorporates, none of which the libraries hold. They came from the release's source archive, `MaterialX-1.39.5.tar.gz` (github.com/AcademySoftwareFoundation/MaterialX, tag v1.39.5, SHA-256 `d66c45f942472182c09e5c60461a78d52060d9143dc90f7157688c4ddbebba06`); `crates/mtlx/libraries.sha256` holds each file's SHA-256 (`shasum -a 256 -c libraries.sha256` from `crates/mtlx`). The test documents in `crates/mtlx/tests/documents/read` are from the same release's `resources/Materials` (its test suite and examples), under the same licence; those in `written` are MaterialX 1.39.5's own writing of them. Kinogaki's own definitions (`crates/mtlx/kinogaki/`) and the crate's code are the SDK's.
+
 ## Dependencies
 
 The SDK contains no third-party code beyond the above. Its crates.io dependencies carry their own licenses and are not copied into this repository. Its default build depends on two, which `kinogaki-geometry` needs:
