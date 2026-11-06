@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// engines and runners build against.
 pub use wgpu;
 
-use crate::{Aov, EngineDescription, Frame, RenderEngine, Wake};
+use crate::{Aov, EngineDescription, Frame, RenderEngine, ViewId, Wake};
 
 /// The images an engine shows its frames in.
 pub trait Display: Send {
@@ -44,6 +44,12 @@ pub trait Display: Send {
         let _ = aovs;
         self.acquire(frame).map(ShownFilm::beauty)
     }
+
+    /// View `view` went ([`RenderEngine::drop_view`], which the host calls
+    /// first): whatever the display keeps for it (wrapped images, the
+    /// outputs it was asked for) goes. A later view the host gives the same
+    /// id starts with nothing of it.
+    fn drop_view(&mut self, view: ViewId);
 }
 
 /// An image the host shows. The engine does not write it while this
