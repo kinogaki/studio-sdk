@@ -1,0 +1,603 @@
+# Every test of this repository: <package>/<target> <kind> <name>.
+# Written by `python3 tools/check_all.py --inventory`; every check compares its tests with it.
+example-box-node/lib test tests::a_box_saves_and_reads_back
+example-box-node/lib test tests::a_flat_box_is_an_error
+example-box-node/lib test tests::a_moved_box_has_its_own_bounds_and_stamp
+example-box-node/lib test tests::boxes_are_made_empty_or_holding_a_box
+example-box-node/lib test tests::the_entry_point_makes_the_package
+example-box-node/lib test tests::the_node_binds_a_box_handle_to_its_center_and_sides
+example-box-node/lib test tests::the_node_cooks_in_a_network
+example-box-node/lib test tests::the_node_is_listed_in_its_context
+example-box-node/lib test tests::the_node_makes_a_box_that_renders_as_twelve_triangles
+example-box-node/lib test tests::the_node_shows_by_the_package_icon
+example-box-node/lib test tests::the_package_registers
+example-flat-engine/lib gpu tests::flat_renders_what_a_host_sends
+example-pin-board/lib test tests::levels_choose_and_commands_are_undo_steps
+example-pin-board/lib test tests::the_inspector_shows_the_count
+example-pin-board/lib test tests::the_package_registers_whole
+example-points-format/lib test tests::a_file_reads_in_the_projects_units_scaled_by_its_option
+example-points-format/lib test tests::a_line_of_two_numbers_is_refused_naming_it
+example-points-format/lib test tests::every_fixtures_points_survive_a_round_trip
+kinogaki-edit/doc test crates/edit/src/deform.rs - deform
+kinogaki-edit/doc test crates/edit/src/editor/carry.rs - editor::carry::rule
+kinogaki-edit/doc test crates/edit/src/editor/finish.rs - editor::finish::place
+kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::gather
+kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::gather_table
+kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::picked
+kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::spread
+kinogaki-edit/doc test crates/edit/src/editor/mod.rs - editor
+kinogaki-edit/doc test crates/edit/src/ids.rs - ids::elements
+kinogaki-edit/doc test crates/edit/src/ids.rs - ids::fresh
+kinogaki-edit/doc test crates/edit/src/ids.rs - ids::id_of
+kinogaki-edit/doc test crates/edit/src/ids.rs - ids::numbered
+kinogaki-edit/doc test crates/edit/src/select/mod.rs - select
+kinogaki-edit/doc test crates/edit/src/select/mod.rs - select::reresolve
+kinogaki-edit/doc test crates/edit/src/select/near.rs - select::near::boundary
+kinogaki-edit/doc test crates/edit/src/select/near.rs - select::near::grow
+kinogaki-edit/editor test model::seeded_edits_agree_with_a_model_kept_by_ids
+kinogaki-edit/editor test rows::a_new_primitive_brings_its_vertices_and_leaves_the_point_columns_shared
+kinogaki-edit/editor test rows::a_polygon_splits_between_two_corners_and_a_point_splits_for_some_rows
+kinogaki-edit/editor test rows::a_polyline_among_polygons_starts_a_kind_column
+kinogaki-edit/editor test rows::a_removal_patches_the_index_to_what_a_whole_build_makes
+kinogaki-edit/editor test rows::a_removed_primitive_takes_its_values_and_the_last_row_fills_its_number
+kinogaki-edit/editor test rows::curves_stay_as_they_are_around_what_changes
+kinogaki-edit/editor test rows::reading_a_bad_number_answers_neutrally_and_the_finish_reports_it
+kinogaki-edit/editor test rows::removing_a_point_takes_its_corners_and_a_row_too_short_goes
+kinogaki-edit/editor test rows::rewiring_with_a_corners_own_vertex_keeps_its_values_shared
+kinogaki-edit/editor test rows::splitting_an_edge_reaches_every_row_on_it_and_blends_their_vertices
+kinogaki-edit/editor test rows::welding_joins_points_and_collapses_what_became_one
+kinogaki-edit/editor test values::a_bad_number_or_source_is_reported_at_the_finish
+kinogaki-edit/editor test values::a_deform_places_each_point_by_its_weight_where_a_preview_shows_it
+kinogaki-edit/editor test values::a_deform_turns_typed_values_as_the_move_does
+kinogaki-edit/editor test values::a_new_element_without_sources_takes_its_types_default
+kinogaki-edit/editor test values::a_new_point_takes_each_attribute_by_its_rule
+kinogaki-edit/editor test values::each_rule_is_declared_by_storage_and_meaning
+kinogaki-edit/editor test values::moving_points_copies_the_positions_alone
+kinogaki-edit/editor test values::nothing_changed_is_the_value_itself
+kinogaki-edit/editor test values::numbers_stay_put_during_an_edit_and_the_change_says_where_they_went
+kinogaki-edit/editor test values::placing_turns_values_by_their_meaning_and_shares_the_rest
+kinogaki-edit/editor test values::selections_find_their_elements_again_through_ids
+kinogaki-edit/editor test values::sources_may_name_elements_the_same_edit_added
+kinogaki-edit/ids test a_repeated_id_is_refused_and_fresh_ids_are_above_the_maximum
+kinogaki-edit/lib test deform::tests::a_move_gives_back_its_rotation_on_the_shortest_arc
+kinogaki-edit/lib test deform::tests::a_rotation_and_its_negation_move_alike
+kinogaki-edit/lib test deform::tests::a_symmetry_with_every_side_primary_mirrors_nothing
+kinogaki-edit/lib test deform::tests::axes_index_coordinates
+kinogaki-edit/lib test deform::tests::full_weight_is_the_matrix_and_none_is_still
+kinogaki-edit/lib test deform::tests::half_weight_goes_half_way
+kinogaki-edit/lib test deform::tests::mirrored_sides_move_as_images_and_the_plane_holds
+kinogaki-edit/lib test deform::tests::scale_acts_along_the_axes
+kinogaki-edit/lib test editor::extract::tests::a_piece_keeps_what_its_elements_held
+kinogaki-edit/lib test editor::gather::tests::a_placement_moves_what_turns_with_it
+kinogaki-edit/lib test editor::gather::tests::a_transform_composes_after_the_placement
+kinogaki-edit/lib test editor::gather::tests::another_type_counts_as_lacking_it
+kinogaki-edit/lib test editor::gather::tests::arrays_gather_with_their_offsets
+kinogaki-edit/lib test editor::gather::tests::curves_keep_their_data_beside_polygons
+kinogaki-edit/lib test editor::gather::tests::elements_append_and_a_lacking_input_takes_the_default
+kinogaki-edit/lib test editor::gather::tests::groups_and_edge_values_follow_their_elements
+kinogaki-edit/lib test editor::gather::tests::ids_keep_the_first_and_refresh_the_rest
+kinogaki-edit/lib test editor::gather::tests::one_value_where_it_is_is_that_value
+kinogaki-edit/lib test editor::gather::tests::text_tables_join_and_details_are_the_first_holders
+kinogaki-edit/lib test ids::tests::merge_keeps_the_first_inputs_ids_and_renames_later_collisions
+kinogaki-edit/select test a_boundary_is_a_regions_outline
+kinogaki-edit/select test a_few_elements_convert_as_the_whole_value_says
+kinogaki-edit/select test a_selection_is_valid_on_its_own_topology_and_within_its_elements
+kinogaki-edit/select test a_selection_with_ids_is_found_again_after_an_insert_upstream
+kinogaki-edit/select test all_stays_all_and_the_same_domain_is_the_selection_itself
+kinogaki-edit/select test connected_grows_a_pick_to_its_pieces_and_a_name_keeps_one_together
+kinogaki-edit/select test coverage_chooses_between_any_and_whole
+kinogaki-edit/select test grow_takes_what_lies_next_to_a_selection_in_every_domain
+kinogaki-edit/select test loop_and_ring_grow_an_edge_selection_along_its_walks
+kinogaki-edit/select test points_become_whole_polygons_and_edges_by_the_standard_rule
+kinogaki-edit/select test polygons_become_their_points_edges_and_vertices
+kinogaki-edit/select test resolved_lists_the_members_and_spells_out_all
+kinogaki-edit/select test shrink_and_grow_leave_a_stale_selection_alone
+kinogaki-edit/select test shrink_is_growing_the_rest_in_every_domain
+kinogaki-edit/select_commands test a_border_is_the_open_rim_a_selection_touches
+kinogaki-edit/select_commands test a_rim_is_a_faces_outline_and_the_outer_points
+kinogaki-edit/select_commands test by_normal_finds_what_faces_the_same_way_and_no_other
+kinogaki-edit/select_commands test flooding_by_angle_stops_at_a_cubes_edges
+kinogaki-edit/select_commands test hard_edges_are_every_edge_of_a_cube_and_none_of_a_plane
+kinogaki-edit/select_commands test similar_faces_have_as_many_corners_and_about_the_area
+kinogaki-edit/select_commands test similar_points_have_as_many_edges
+kinogaki-edit/select_commands test the_shortest_way_between_points_edges_and_faces
+kinogaki-edit/select_commands test two_neighbouring_faces_make_their_loop
+kinogaki-edit/select_commands test two_neighbouring_points_make_their_edge_loop
+kinogaki-edit/select_commands test ways_reach_no_further_than_their_limit_and_lead_back_to_a_start
+kinogaki-geometry/attributes test a_value_refuses_a_domain_it_does_not_have
+kinogaki-geometry/attributes test arrays_index_items_through_offsets
+kinogaki-geometry/attributes test domains_storages_and_meanings_name_themselves
+kinogaki-geometry/attributes test every_storage_width_and_meaning_is_checked
+kinogaki-geometry/attributes test names_follow_the_rule
+kinogaki-geometry/attributes test replacing_ids_with_some_of_them_and_higher_ones_is_checked_as_well
+kinogaki-geometry/attributes test replacing_one_column_shares_the_rest_and_checks_it_alone
+kinogaki-geometry/attributes test standard_groups_are_on_their_domain
+kinogaki-geometry/attributes test standard_names_fix_their_type_and_domains
+kinogaki-geometry/attributes test text_rules_are_checked
+kinogaki-geometry/attributes test texts_are_equal_by_their_values_whatever_their_tables
+kinogaki-geometry/attributes test tuples_adopt_without_copying_and_read_back_typed
+kinogaki-geometry/attributes test values_are_whole_items_of_their_storage_and_finite
+kinogaki-geometry/column test a_cache_is_built_once_for_every_clone
+kinogaki-geometry/column test a_dropped_column_drops_its_caches
+kinogaki-geometry/column test a_range_across_a_written_cell_is_not_one_run
+kinogaki-geometry/column test a_run_kept_after_a_removal_shares_its_source
+kinogaki-geometry/column test a_slice_past_the_end_panics
+kinogaki-geometry/column test a_slice_shares_the_buffer_but_not_the_slots
+kinogaki-geometry/column test a_vec_is_adopted_without_reallocating
+kinogaki-geometry/column test an_edit_copies_only_the_cells_it_writes
+kinogaki-geometry/column test any_mix_of_edits_reads_as_a_vec
+kinogaki-geometry/column test appending_reads_on_and_truncating_cuts
+kinogaki-geometry/column test caches_built_on_many_threads_keep_one_value
+kinogaki-geometry/column test clones_share_the_column_and_its_key
+kinogaki-geometry/column test threads_asking_at_once_build_a_cache_once
+kinogaki-geometry/curve test a_rational_quadratic_is_exactly_a_circle
+kinogaki-geometry/curve test an_open_bspline_is_clamped_and_a_straight_one_straight
+kinogaki-geometry/curve test bezier_ends_on_its_end_points_and_follows_bernstein
+kinogaki-geometry/curve test catmull_rom_passes_through_every_point
+kinogaki-geometry/curve test closed_curves_meet_and_linear_primitives_are_their_segments
+kinogaki-geometry/doc test crates/geometry/src/attributes/attribute.rs - attributes::attribute::Attribute
+kinogaki-geometry/doc test crates/geometry/src/attributes/mod.rs - attributes::Attributes
+kinogaki-geometry/doc test crates/geometry/src/attributes/names.rs - attributes::names::check_name
+kinogaki-geometry/doc test crates/geometry/src/attributes/names.rs - attributes::names::standard_type
+kinogaki-geometry/doc test crates/geometry/src/attributes/text.rs - attributes::text::Text
+kinogaki-geometry/doc test crates/geometry/src/attributes/text.rs - attributes::text::Text::compacted
+kinogaki-geometry/doc test crates/geometry/src/attributes/text.rs - attributes::text::Text::iter
+kinogaki-geometry/doc test crates/geometry/src/attributes/types.rs - attributes::types::AttributeType
+kinogaki-geometry/doc test crates/geometry/src/bounds.rs - bounds::Bounds
+kinogaki-geometry/doc test crates/geometry/src/brep/mod.rs - brep
+kinogaki-geometry/doc test crates/geometry/src/brep/names.rs - brep::names::Name
+kinogaki-geometry/doc test crates/geometry/src/brep/nurbs.rs - brep::nurbs::NurbsCurve
+kinogaki-geometry/doc test crates/geometry/src/brep/nurbs.rs - brep::nurbs::NurbsCurve #2
+kinogaki-geometry/doc test crates/geometry/src/column.rs - column::Column
+kinogaki-geometry/doc test crates/geometry/src/curve.rs - curve::Curve
+kinogaki-geometry/doc test crates/geometry/src/detail.rs - detail::Detail::render
+kinogaki-geometry/doc test crates/geometry/src/detail.rs - detail::DisplayQuality
+kinogaki-geometry/doc test crates/geometry/src/elements.rs - elements::Elements
+kinogaki-geometry/doc test crates/geometry/src/elements.rs - elements::Elements::from_fn
+kinogaki-geometry/doc test crates/geometry/src/elements.rs - elements::Elements::union
+kinogaki-geometry/doc test crates/geometry/src/frame.rs - frame::Frame
+kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry
+kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry::with_moved
+kinogaki-geometry/doc test crates/geometry/src/image/mod.rs - image
+kinogaki-geometry/doc test crates/geometry/src/instancing.rs - instancing::placements
+kinogaki-geometry/doc test crates/geometry/src/lib.rs -
+kinogaki-geometry/doc test crates/geometry/src/primitives/components.rs - primitives::components::Components
+kinogaki-geometry/doc test crates/geometry/src/primitives/index/mod.rs - primitives::index::Index
+kinogaki-geometry/doc test crates/geometry/src/primitives/index/walk.rs - primitives::index::walk::Index::edge_loop
+kinogaki-geometry/doc test crates/geometry/src/primitives/index/walk.rs - primitives::index::walk::Index::edge_ring
+kinogaki-geometry/doc test crates/geometry/src/primitives/kind.rs - primitives::kind::Kind
+kinogaki-geometry/doc test crates/geometry/src/primitives/mod.rs - primitives::Primitives::new
+kinogaki-geometry/doc test crates/geometry/src/sampled.rs - sampled::Sampled
+kinogaki-geometry/doc test crates/geometry/src/selection/mod.rs - selection::Selection
+kinogaki-geometry/doc test crates/geometry/src/time.rs - time::Time
+kinogaki-geometry/doc test crates/geometry/src/tolerances.rs - tolerances::Tolerances
+kinogaki-geometry/doc test crates/geometry/src/units.rs - units::Units
+kinogaki-geometry/doc test crates/geometry/src/vec3.rs - vec3::Vec3
+kinogaki-geometry/doc test crates/geometry/src/xform.rs - xform::Xform
+kinogaki-geometry/elements test a_set_grows_by_what_is_added_in_every_form
+kinogaki-geometry/elements test set_algebra_matches_a_btree_model_in_every_form
+kinogaki-geometry/elements test the_rules_are_checked
+kinogaki-geometry/geometry test a_shared_table_is_reused_unchecked
+kinogaki-geometry/geometry test attributes_are_sized_to_their_domain
+kinogaki-geometry/geometry test counts_are_the_domains_elements
+kinogaki-geometry/geometry test moved_points_are_those_whose_bits_changed
+kinogaki-geometry/geometry test one_past_the_point_limit_is_refused
+kinogaki-geometry/geometry test positions_must_be_finite_and_one_a_point
+kinogaki-geometry/geometry test the_first_bad_attribute_value_is_reported_on_large_values
+kinogaki-geometry/geometry test the_first_bad_position_is_reported_on_large_values
+kinogaki-geometry/geometry test with_moved_copies_the_positions_once_and_knows_what_moved
+kinogaki-geometry/geometry test with_points_keeps_the_rows_and_their_columns
+kinogaki-geometry/geometry test with_positions_shares_the_topology_the_attributes_and_their_caches
+kinogaki-geometry/lib test across::tests::axes_carried_round_a_bend_stay_across_and_never_spin
+kinogaki-geometry/lib test across::tests::up_seeds_the_first_axes_and_a_straight_line_keeps_them
+kinogaki-geometry/lib test attributes::tests::only_replaced_entries_are_checked
+kinogaki-geometry/lib test bounds::tests::boxes_join_center_and_have_corners
+kinogaki-geometry/lib test brep::eval_tests::a_closed_nurbs_direction_wraps
+kinogaki-geometry/lib test brep::eval_tests::analytic_charts_follow_the_contract
+kinogaki-geometry/lib test brep::eval_tests::geometry_curves_and_brep_nurbs_evaluate_alike
+kinogaki-geometry/lib test brep::eval_tests::offset_partials_follow_the_displaced_surface
+kinogaki-geometry/lib test brep::eval_tests::provenance_surfaces_sweep_their_profiles
+kinogaki-geometry/lib test brep::eval_tests::rational_nurbs_hold_arcs_exactly
+kinogaki-geometry/lib test brep::tests::reading::a_box_reads_back_by_the_conventions
+kinogaki-geometry/lib test brep::tests::reading::a_cone_closes_at_its_apex_with_a_pole_edge
+kinogaki-geometry/lib test brep::tests::reading::a_cylinder_has_no_seam_and_its_loops_wrap
+kinogaki-geometry/lib test brep::tests::reading::a_trimmed_patch_is_a_sheet_on_its_surface
+kinogaki-geometry/lib test brep::tests::reading::a_value_holds_bodies_curves_and_datums
+kinogaki-geometry/lib test brep::tests::reading::a_whole_sphere_needs_no_loops
+kinogaki-geometry/lib test brep::tests::reading::an_edit_reads_one_body_and_builds_another
+kinogaki-geometry/lib test brep::tests::reading::attributes_follow_the_body_classes
+kinogaki-geometry/lib test brep::tests::reading::caches_live_on_the_shared_parts
+kinogaki-geometry/lib test brep::tests::reading::fingerprints_follow_structure_and_names_never_geometry
+kinogaki-geometry/lib test brep::tests::reading::fingerprints_name_datums_and_free_curves_in_order
+kinogaki-geometry/lib test brep::tests::refusals::consistency_is_checked_at_ends_and_joins
+kinogaki-geometry/lib test brep::tests::refusals::structure_is_checked
+kinogaki-geometry/lib test curve::tests::a_span_reads_only_its_own_knots
+kinogaki-geometry/lib test diagnostic::tests::messages_say_where
+kinogaki-geometry/lib test error::tests::an_error_is_its_diagnostic_and_its_kind
+kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
+kinogaki-geometry/lib test image::tests::a_plane_reads_back_as_it_was_built
+kinogaki-geometry/lib test image::tests::a_pyramid_means_tiles_and_derives_only_what_an_edit_touched
+kinogaki-geometry/lib test image::tests::edges_of_a_level_are_not_darkened_by_padding
+kinogaki-geometry/lib test image::tests::half_floats_round_trip
+kinogaki-geometry/lib test image::tests::metadata_lives_in_detail
+kinogaki-geometry/lib test image::tests::pixel_decodes_every_sample_and_fills_missing_channels
+kinogaki-geometry/lib test image::tests::windows_and_refusals
+kinogaki-geometry/lib test image::tests::with_tiles_shares_what_it_did_not_touch
+kinogaki-geometry/lib test image::tests::zero_tiles_stay_absent
+kinogaki-geometry/lib test instancing::tests::placements_follow_the_standard_attributes
+kinogaki-geometry/lib test limits::tests::a_count_past_its_limit_is_refused
+kinogaki-geometry/lib test nearest::tests::a_search_over_spots_agrees_with_trying_them_all
+kinogaki-geometry/lib test nearest::tests::the_nearest_place_and_a_ray_find_a_cubes_face
+kinogaki-geometry/lib test parallel::tests::every_item_is_visited_once_with_its_index
+kinogaki-geometry/lib test parallel::tests::maps_come_back_in_order_and_errors_stop
+kinogaki-geometry/lib test parallel::tests::prepared_blocks_and_chunks_cover_everything
+kinogaki-geometry/lib test parallel::tests::the_first_refused_value_is_found_in_any_block
+kinogaki-geometry/lib test primitives::changes::tests::a_kind_counts_as_a_rewiring
+kinogaki-geometry/lib test primitives::changes::tests::rows_rewired_added_and_shifted_are_told_apart
+kinogaki-geometry/lib test primitives::index::tests::a_patched_index_is_the_whole_one
+kinogaki-geometry/lib test primitives::index::tests::a_renumbered_table_builds_its_index_when_asked
+kinogaki-geometry/lib test primitives::index::tests::fewer_points_patch_the_index_and_cut_its_last_block
+kinogaki-geometry/lib test primitives::index::tests::lines_before_and_between_polygons_split_their_edges_alike
+kinogaki-geometry/lib test primitives::index::tests::more_points_share_the_index_and_answer_for_the_new_ones
+kinogaki-geometry/lib test primitives::index::tests::polyline_validation_rejects_degenerate_curves
+kinogaki-geometry/lib test primitives::index::tests::the_index_is_its_definition_on_grids
+kinogaki-geometry/lib test primitives::index::tests::the_index_is_its_definition_on_irregular_topology
+kinogaki-geometry/lib test sampled::tests::a_turn_blends_along_its_arc
+kinogaki-geometry/lib test sampled::tests::samples_are_checked
+kinogaki-geometry/lib test sampled::tests::stretches_origins_and_mirrors_blend
+kinogaki-geometry/lib test time::tests::moments_sit_on_the_tick_grid
+kinogaki-geometry/lib test time::tests::only_finite_moments_and_rates_are_made
+kinogaki-geometry/lib test vec3::tests::a_column_of_arrays_views_as_vectors
+kinogaki-geometry/lib test vec3::tests::arithmetic_and_products
+kinogaki-geometry/lib test xform::tests::a_projection_divides_by_w
+kinogaki-geometry/lib test xform::tests::layouts_convert_by_name
+kinogaki-geometry/lib test xform::tests::the_inverse_undoes_and_singular_ones_have_none
+kinogaki-geometry/primitives test a_topology_cache_is_built_once_and_dropped_with_it
+kinogaki-geometry/primitives test curves_follow_their_basis_rules
+kinogaki-geometry/primitives test edges_are_canonical_on_random_topologies
+kinogaki-geometry/primitives test every_primitive_has_one_kind
+kinogaki-geometry/primitives test kinds_hold_a_basis_and_closed_and_any_order_is_kept
+kinogaki-geometry/primitives test offsets_must_run_from_zero_to_the_vertex_count
+kinogaki-geometry/primitives test one_past_each_limit_is_refused
+kinogaki-geometry/primitives test polygons_never_repeat_a_point_and_polylines_never_consecutively
+kinogaki-geometry/primitives test primitives_have_enough_vertices
+kinogaki-geometry/primitives test the_edge_count_needs_no_index
+kinogaki-geometry/primitives test the_fingerprint_follows_every_input
+kinogaki-geometry/primitives test the_first_fault_in_primitive_order_is_reported_on_large_topologies
+kinogaki-geometry/primitives test the_nurbs_knot_rule_is_the_breps_too
+kinogaki-geometry/primitives test valid_topologies_are_accepted
+kinogaki-geometry/primitives test vertices_name_existing_points
+kinogaki-geometry/shading test a_primitive_normal_is_each_primitives_own
+kinogaki-geometry/shading test a_smooth_fold_averages_by_angle_and_a_fold_past_the_cusp_stays_hard
+kinogaki-geometry/shading test fans_never_join_across_an_edge_of_three_polygons
+kinogaki-geometry/shading test normals_are_kept_and_follow_n_and_sharp_without_new_positions
+kinogaki-geometry/shading test one_rule_with_or_without_an_empty_group
+kinogaki-geometry/shading test sharp_edges_split_fans_and_authored_normals_come_first
+kinogaki-geometry/shading test smooth_edges_join_past_the_cusp_and_sharp_edges_win
+kinogaki-geometry/shading test the_refresh_after_a_drag_matches_a_whole_build
+kinogaki-geometry/topology test a_border_edge_loop_goes_round_the_border
+kinogaki-geometry/topology test a_loop_follows_a_polyline_and_stops_at_its_branches
+kinogaki-geometry/topology test a_loop_round_a_closed_band_closes_and_a_loop_along_it_stops_at_its_rims
+kinogaki-geometry/topology test a_ring_crosses_quads_and_closes_round_a_band
+kinogaki-geometry/topology test an_edge_loop_crosses_regular_points_and_stops_at_the_border
+kinogaki-geometry/topology test components_number_pieces_by_their_smallest_point_and_are_kept_on_the_table
+kinogaki-geometry/topology test walks_stop_where_the_surface_stops_being_regular
+kinogaki-geometry/topology test what_touches_what_agrees_with_the_table_on_a_mixed_value
+kinogaki-geometry/triangulation test a_drag_that_flips_no_diagonal_keeps_the_triangle_columns
+kinogaki-geometry/triangulation test a_skew_outline_that_collapses_in_every_axis_plane_clips_in_its_own_plane
+kinogaki-geometry/triangulation test concave_outlines_with_coincident_and_collinear_points_triangulate_exactly
+kinogaki-geometry/triangulation test damaged_polygons_show_as_a_fan
+kinogaki-geometry/triangulation test exact_polygons_keep_their_vertex_ids
+kinogaki-geometry/triangulation test the_triangulation_is_kept_and_its_refresh_after_a_drag_matches_a_whole_build
+kinogaki-geometry/triangulation test triangles_are_n_minus_two_and_wind_with_the_polygon
+kinogaki-geometry/values test render_detail_is_in_range
+kinogaki-geometry/values test selections_are_sorted_distinct_and_hold_their_active_element
+kinogaki-geometry/values test tolerances_are_in_their_ranges
+kinogaki-render-api/display test engines_and_displays_are_objects_hosts_can_share
+kinogaki-render-api/display test options_default_to_nothing
+kinogaki-render-api/doc test crates/render-api/src/source.rs - source::PlainTriangles
+kinogaki-render-api/lib test engine::tests::a_dropped_deliverer_resolves_its_result_and_wakes_once
+kinogaki-render-api/lib test engine::tests::a_failure_resolves_once_saying_why
+kinogaki-render-api/lib test material::preview::tests::a_request_is_a_scene_of_its_own
+kinogaki-render-api/lib test material::preview::tests::the_sphere_is_closed_unit_and_faces_out
+kinogaki-render-api/lib test material::tests::a_builder_refuses_what_isnt_whole
+kinogaki-render-api/lib test material::tests::a_network_is_whole_once_built
+kinogaki-render-api/lib test material::tests::sockets_meet_by_kind
+kinogaki-render-api/lib test source::tests::plain_triangles_are_flat_and_default_material
+kinogaki-render-api/lib test standard::emission::tests::blackbodies_warm_below_white_and_cool_above
+kinogaki-render-api/lib test standard::emission::tests::every_illuminant_has_a_color_by_its_key
+kinogaki-render-api/lib test standard::emission::tests::the_flat_spectrum_is_white
+kinogaki-render-api/lib test standard::tests::a_light_keeps_its_motion_through_its_prim
+kinogaki-render-api/lib test tests::batches::a_change_to_an_added_prim_replaces_its_payload
+kinogaki-render-api/lib test tests::batches::a_primvar_reads_at_each_corner_by_one_rule
+kinogaki-render-api/lib test tests::batches::a_result_dropped_is_no_longer_wanted_and_a_preview_answers
+kinogaki-render-api/lib test tests::batches::a_shape_is_refused_unless_whole
+kinogaki-render-api/lib test tests::batches::an_add_then_a_remove_cancel
+kinogaki-render-api/lib test tests::batches::an_instancer_is_refused_unless_whole
+kinogaki-render-api/lib test tests::batches::dirty_bits_or_and_the_later_payload_wins
+kinogaki-render-api/lib test tests::batches::ids_are_reused_only_with_a_new_generation
+kinogaki-render-api/lib test tests::batches::many_prims_fold_by_id_in_order
+kinogaki-render-api/lib test tests::batches::pending_delivers_once_and_wakes_once
+kinogaki-render-api/lib test tests::batches::point_ranges_merge_and_fall_back_to_whole_past_the_cap
+kinogaki-render-api/lib test tests::batches::settling_survives_later_non_drag_batches
+kinogaki-render-api/lib test tests::batches::the_recording_engine_counts_what_it_was_sent
+kinogaki-render-api/lib test tests::declared_prims::a_camera_blurs_while_its_shutter_is_open
+kinogaki-render-api/lib test tests::declared_prims::a_later_declared_prim_replaces_the_one_a_batch_sends
+kinogaki-render-api/lib test tests::declared_prims::an_engine_keeps_its_own_material_and_translates_anothers
+kinogaki-render-api/lib test tests::declared_prims::engines_declare_types
+kinogaki-render-api/lib test tests::declared_prims::outputs_have_one_id_each_and_engines_list_theirs
+kinogaki-render-api/lib test tests::descriptors::colors_and_color_ramps_fit_their_descriptors
+kinogaki-render-api/lib test tests::descriptors::rows_show_and_apply_by_the_values_beside_them
+kinogaki-render-api/lib test tests::descriptors::settings_fit_their_descriptors
+kinogaki-render-api/lib test tests::descriptors::standard_lights_and_fog_round_trip_through_their_prims
+kinogaki-studio-api-testing/doc test crates/api-testing/src/lib.rs -
+kinogaki-studio-api-testing/turns test alone_waits_for_the_shared_turns_and_ends_with_its_thread
+kinogaki-studio-api/admission test a_context_adopts_a_node_type_once
+kinogaki-studio-api/admission test a_node_type_is_offered_in_declared_contexts
+kinogaki-studio-api/admission test a_ports_data_type_is_registered
+kinogaki-studio-api/admission test a_well_formed_package_registers
+kinogaki-studio-api/admission test an_object_kind_holds_a_declared_context
+kinogaki-studio-api/admission test icons_are_well_formed_named_once_and_found
+kinogaki-studio-api/brep test a_broken_save_does_not_read
+kinogaki-studio-api/brep test a_display_request_carries_the_default_tolerances
+kinogaki-studio-api/brep test a_value_with_every_part_keeps_each_part
+kinogaki-studio-api/brep test counts_and_selections_span_the_bodies
+kinogaki-studio-api/brep test every_fixture_reads_back_equal_with_its_ids
+kinogaki-studio-api/brep test meshers_register_once_under_their_vendor_in_order
+kinogaki-studio-api/cook test a_cancelled_cook_reports_cancelled
+kinogaki-studio-api/cook test a_cook_reads_parameters_ports_and_scratch
+kinogaki-studio-api/cook test a_node_parameter_holding_an_object_is_refused
+kinogaki-studio-api/cook test a_parameter_named_as_spares_are_is_refused
+kinogaki-studio-api/cook test held_edits_need_their_types_registered
+kinogaki-studio-api/cook test the_registry_holds_cooks_and_held_edits
+kinogaki-studio-api/cook test withheld_and_wrong_parameters_fail_by_name
+kinogaki-studio-api/creations test a_kinds_creations_are_its_vendors_and_new
+kinogaki-studio-api/creations test node_creations_are_their_vendors_and_new
+kinogaki-studio-api/doc test crates/api/src/cancel.rs - cancel::CancelToken
+kinogaki-studio-api/doc test crates/api/src/cook/description.rs - cook::description::Description
+kinogaki-studio-api/doc test crates/api/src/cook/handle.rs - cook::handle::Handle
+kinogaki-studio-api/doc test crates/api/src/cook/placement.rs - cook::placement::Placement
+kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement
+kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::is_name
+kinogaki-studio-api/doc test crates/api/src/format/options.rs - format::options
+kinogaki-studio-api/doc test crates/api/src/icon.rs - icon
+kinogaki-studio-api/doc test crates/api/src/kernel.rs - kernel
+kinogaki-studio-api/doc test crates/api/src/network/context.rs - network::context::NetworkContext
+kinogaki-studio-api/doc test crates/api/src/package.rs - package::Package
+kinogaki-studio-api/doc test crates/api/src/standard/brep/mod.rs - standard::brep::BrepCodec
+kinogaki-studio-api/doc test crates/api/src/standard/color.rs - standard::color::ColorConfiguration
+kinogaki-studio-api/doc test crates/api/src/standard/geometry.rs - standard::geometry::GeometryCodec
+kinogaki-studio-api/doc test crates/api/src/standard/image.rs - standard::image::ImageCodec
+kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances
+kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances::gathered
+kinogaki-studio-api/doc test crates/api/src/standard/materials.rs - standard::materials::MaterialsCodec
+kinogaki-studio-api/doc test crates/api/src/standard/mod.rs - standard
+kinogaki-studio-api/doc test crates/api/src/standard/output.rs - standard::output::DisplayOutput
+kinogaki-studio-api/doc test crates/api/src/standard/quality.rs - standard::quality::DisplayQuality
+kinogaki-studio-api/doc test crates/api/src/viewport.rs - viewport::Surface::polygons
+kinogaki-studio-api/image_codec test an_image_round_trips_byte_exact_and_sparse_stays_sparse
+kinogaki-studio-api/image_codec test reading_is_strict
+kinogaki-studio-api/instances test a_move_shares_the_prototypes_and_attributes
+kinogaki-studio-api/instances test instances_refuse_what_they_cant_place
+kinogaki-studio-api/instances test instances_round_trip_with_each_prototype_written_once
+kinogaki-studio-api/lib test components::tests::a_selection_reads_back_only_as_its_own_representation
+kinogaki-studio-api/lib test cook::binding::tests::a_component_reads_and_writes_one_number_of_a_vector
+kinogaki-studio-api/lib test cook::binding::tests::mixed_vectors_write_only_their_parameters
+kinogaki-studio-api/lib test cook::binding::tests::vectors_read_and_write_one_or_three_parameters
+kinogaki-studio-api/lib test cook::context::tests::a_holder_reads_its_inside_when_core_sets_it
+kinogaki-studio-api/lib test cook::context::tests::resolved_paths_are_read_by_parameter_name
+kinogaki-studio-api/lib test cook::description::tests::a_listed_type_says_where_tab_shows_it
+kinogaki-studio-api/lib test cook::handle::tests::a_handle_checks_the_parameters_it_binds
+kinogaki-studio-api/lib test cook::handle::tests::a_handle_shows_while_every_condition_holds
+kinogaki-studio-api/lib test cook::handle::tests::a_turn_reads_its_angle_then_its_ring
+kinogaki-studio-api/lib test cook::handle::tests::an_angle_reads_its_angle_and_the_cone_it_is_a_fraction_of
+kinogaki-studio-api/lib test cook::handle::tests::frames_and_anchors_bind_with_the_handle
+kinogaki-studio-api/lib test cook::placement::tests::orienting_writes_the_up_and_turn_of_the_axes
+kinogaki-studio-api/lib test cook::placement::tests::placements_are_right_handed_and_turn_about_up
+kinogaki-studio-api/lib test cook::sheet::tests::a_new_node_reads_the_render_outputs
+kinogaki-studio-api/lib test cook::sheet::tests::ports_past_the_ends_are_unwired_and_uncooked
+kinogaki-studio-api/lib test element::memory::tests::a_shared_value_is_written_once_and_read_once
+kinogaki-studio-api/lib test element::memory::tests::bad_names_and_rows_are_refused
+kinogaki-studio-api/lib test element::memory::tests::fields_children_and_metadata_round_trip
+kinogaki-studio-api/lib test element::values::tests::a_damaged_ramp_or_curve_is_refused
+kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused
+kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back
+kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewports_detail_unless_told
+kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values
+kinogaki-studio-api/lib test format::tests::a_writer_has_no_options_by_default_whatever_its_reading_has
+kinogaki-studio-api/lib test format::tests::options_save_and_read_back_by_default
+kinogaki-studio-api/lib test format::tests::readings_lend_settings_by_type_and_poll_cancellation
+kinogaki-studio-api/lib test icon::tests::a_well_formed_icon_checks_as_its_text
+kinogaki-studio-api/lib test icon::tests::documents_are_bounded_utf8_text
+kinogaki-studio-api/lib test icon::tests::names_are_lowercase_words_joined_by_dashes
+kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_take
+kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup
+kinogaki-studio-api/lib test params::schema::tests::a_data_parameter_takes_values_of_its_type_alone
+kinogaki-studio-api/lib test params::schema::tests::a_parameter_check_names_it_by_its_label
+kinogaki-studio-api/lib test params::schema::tests::a_schema_lists_its_parameters_and_values
+kinogaki-studio-api/lib test render::lights::kind::tests::a_new_light_is_its_first_type_and_edits_take_one_prim_of_its_types
+kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_light_is_a_light_value_and_one_is_adopted
+kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_lights_rows_take_only_what_its_codec_reads
+kinogaki-studio-api/lib test render::lights::kind::tests::an_atmosphere_is_one_type_at_the_root
+kinogaki-studio-api/lib test render::lights::kind::tests::an_object_round_trips_keeping_what_its_type_doesnt_declare
+kinogaki-studio-api/lib test render::lights::kind::tests::creations_are_the_kinds_types_under_its_prefix
+kinogaki-studio-api/lib test render::lights::value::tests::a_value_is_unplaced_and_keeps_its_image_file
+kinogaki-studio-api/lib test render::lights::value::tests::an_unknown_type_or_emission_is_refused
+kinogaki-studio-api/lib test render::lights::value::tests::every_shape_saves_and_reads_back
+kinogaki-studio-api/lib test render::lights::value::tests::only_lights_in_range_are_light_values
+kinogaki-studio-api/lib test render::lights::view::tests::glyphs_follow_the_light_shape
+kinogaki-studio-api/lib test render::lights::view::tests::handles_bind_to_the_light_shape
+kinogaki-studio-api/lib test standard::camera::tests::a_lens_saves_and_reads_back
+kinogaki-studio-api/lib test standard::camera::tests::only_lenses_are_cameras
+kinogaki-studio-api/lib test standard::materials::tests::every_value_and_wire_round_trips
+kinogaki-studio-api/lib test viewport::tests::a_drag_patches_only_the_moved_points_even_over_skipped_frames
+kinogaki-studio-api/lib test viewport::tests::a_faces_triangles_are_its_own_contiguous_run
+kinogaki-studio-api/lib test viewport::tests::a_surface_is_a_packet_over_its_own_arrays
+kinogaki-studio-api/lib test viewport::tests::a_surface_refuses_what_indexes_past_its_arrays
+kinogaki-studio-api/lib test viewport::tests::new_lines_or_markers_make_a_new_surface
+kinogaki-studio-api/lib test viewport::tests::polygons_share_edges_and_face_their_normals
+kinogaki-studio-api/network test a_compiled_context_registers_with_one_compiler_and_plans_a_flat_network
+kinogaki-studio-api/network test a_compiled_context_takes_its_compiler_from_another_package
+kinogaki-studio-api/network test a_context_registers_once_under_its_vendor
+kinogaki-studio-api/network test a_held_node_type_names_a_registered_delta
+kinogaki-studio-api/network test a_library_holds_unwired_results_without_flags
+kinogaki-studio-api/network test a_package_adds_ways_to_make_another_packages_nodes
+kinogaki-studio-api/network test a_package_makes_the_engines_it_describes
+kinogaki-studio-api/network test a_port_required_while_a_parameter_holds_a_value
+kinogaki-studio-api/network test a_runner_runs_a_compiled_context_its_package_declares
+kinogaki-studio-api/network test an_engine_id_is_declared_once_under_its_vendor
+kinogaki-studio-api/network test an_engine_setting_is_never_named_as_a_render_outputs_own
+kinogaki-studio-api/network test an_engines_own_prim_type_is_declared_once_under_its_vendor_and_its_outputs_are_standard
+kinogaki-studio-api/network test nodes_hold_networks_of_declared_contexts_without_loops
+kinogaki-studio-api/render test a_drag_is_a_points_update_of_the_same_topology
+kinogaki-studio-api/render test an_item_names_its_part_and_says_what_it_is
+kinogaki-studio-api/rendered_kinds test a_codec_reads_what_is_installed_and_says_what_isnt
+kinogaki-studio-api/rendered_kinds test a_kind_without_the_facet_answers_none
+kinogaki-studio-api/rendered_kinds test a_rendered_kind_says_what_its_objects_are_and_takes_edits
+kinogaki-studio-api/standard hand hand_run_the_large_grid_passes_the_sdk_consumers
+kinogaki-studio-api/standard test a_failing_consumer_is_reported
+kinogaki-studio-api/standard test a_saved_value_breaking_a_rule_does_not_read
+kinogaki-studio-api/standard test attributes_read_by_storage_width_and_meaning_strictly
+kinogaki-studio-api/standard test components_hold_a_standard_selection
+kinogaki-studio-api/standard test equal_texts_save_alike_whatever_their_tables
+kinogaki-studio-api/standard test every_fixture_passes_the_sdk_consumers
+kinogaki-studio-api/standard test saved_kinds_and_curve_data_read_strictly
+kinogaki-studio-api/standard test the_display_quality_saves_as_a_project_value_by_its_label
+kinogaki-studio-api/standard test the_tolerances_save_as_a_project_value
+kinogaki-studio-api/standard test values_sharing_a_topology_share_it_once_read
+kinogaki-studio-api/stored test a_package_registers_its_stored_values
+kinogaki-studio-api/stored test a_stored_id_is_declared_once_among_the_installed_packages
+kinogaki-studio-api/stored test a_table_holds_defaults_and_copies_shared_values_on_write
+kinogaki-studio-api/stored test a_table_refuses_two_values_of_one_id
+kinogaki-studio-api/stored test a_value_writes_and_reads_through_its_registration
+kinogaki-studio-api/toy test a_duplicate_id_refuses_the_whole_package
+kinogaki-studio-api/toy test data_saves_into_a_project_and_reads_back
+kinogaki-studio-api/toy test display_prepares_highlights_and_cancels
+kinogaki-studio-api/toy test facets_a_type_does_not_offer_are_absent
+kinogaki-studio-api/toy test objects_adopt_imported_values_of_their_result_type
+kinogaki-studio-api/toy test packages_declare_only_their_vendors_ids
+kinogaki-studio-api/toy test session_slots_start_initial_and_are_copied_on_write
+kinogaki-studio-api/toy test the_environment_reaches_values_only_through_their_type
+kinogaki-studio-ui-api-testing/doc test crates/ui-api-testing/src/lib.rs -
+kinogaki-studio-ui-api-testing/doc test crates/ui-api-testing/src/network.rs - network::FakeNetwork
+kinogaki-studio-ui-api-testing/lib test painter::tests::a_reserved_place_holds_many_shapes_and_text_wraps
+kinogaki-studio-ui-api-testing/lib test painter::tests::draws_are_recorded_in_order_with_their_clip
+kinogaki-studio-ui-api/capabilities test a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step
+kinogaki-studio-ui-api/capabilities test a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it
+kinogaki-studio-ui-api/capabilities test a_held_node_takes_a_new_base_and_reports_its_result
+kinogaki-studio-ui-api/capabilities test a_library_without_a_viewport_spec_gets_cores_scene_view
+kinogaki-studio-ui-api/capabilities test row_actions_and_typing_reach_the_contexts_parts
+kinogaki-studio-ui-api/capabilities test the_newest_ask_of_a_kind_wins_lands_once_and_an_ask_again_runs_nothing
+kinogaki-studio-ui-api/capabilities test views_render_consoles_record_and_the_clipboard_holds_text
+kinogaki-studio-ui-api/doc test crates/ui-api/src/package/display.rs - package::display
+kinogaki-studio-ui-api/doc test crates/ui-api/src/package/mod.rs - package
+kinogaki-studio-ui-api/host test a_body_is_set_whole_and_only_of_its_kind
+kinogaki-studio-ui-api/host test a_gesture_is_one_step_and_a_cancelled_one_none
+kinogaki-studio-ui-api/host test a_tools_card_shows_its_nodes_rows_and_more_while_some_are_left_out
+kinogaki-studio-ui-api/host test a_views_calls_answer_its_own_display_options_and_place
+kinogaki-studio-ui-api/host test an_inspector_click_is_one_undo_step_of_its_slot
+kinogaki-studio-ui-api/host test polls_reach_the_state_and_workers_wake_the_host
+kinogaki-studio-ui-api/host test registering_reads_the_contexts_once_and_erases_the_state
+kinogaki-studio-ui-api/host test settings_pages_edit_the_stored_values_they_are_lent
+kinogaki-studio-ui-api/host test shown_polygons_are_the_ones_the_object_draws
+kinogaki-studio-ui-api/host test the_registry_admits_a_ui_s_contexts_once_and_under_its_vendor
+kinogaki-studio-ui-api/host test the_viewport_parts_read_the_views_input_and_draw_through_the_painter
+kinogaki-studio-ui-api/lib test color::tests::additive_colors_brighten_and_opaque_ones_cover
+kinogaki-studio-ui-api/lib test color::tests::black_and_white_alphas_agree_with_their_definitions
+kinogaki-studio-ui-api/lib test color::tests::blending_is_in_srgb
+kinogaki-studio-ui-api/lib test color::tests::every_srgb_byte_survives_linear_and_back
+kinogaki-studio-ui-api/lib test color::tests::linear_light_round_trips
+kinogaki-studio-ui-api/lib test color::tests::multiplying_fades
+kinogaki-studio-ui-api/lib test color::tests::the_integer_fraction_matches_float_rounding
+kinogaki-studio-ui-api/lib test color::tests::unmultiplied_round_trips_within_rounding
+kinogaki-studio-ui-api/lib test geom::tests::anchors_place_sizes
+kinogaki-studio-ui-api/lib test geom::tests::rectangles_measure_and_combine
+kinogaki-studio-ui-api/lib test geom::tests::vectors_measure
+kinogaki-studio-ui-api/lib test gizmo::geometry::tests::a_free_drag_stays_in_the_view_plane
+kinogaki-studio-ui-api/lib test gizmo::geometry::tests::dragging_to_axis_end_moves_one_handle_length_in_both_views
+kinogaki-studio-ui-api/lib test gizmo::geometry::tests::plane_drag_keeps_excluded_axis_and_scale_keeps_other_axes
+kinogaki-studio-ui-api/lib test gizmo::geometry::tests::points_measure_to_segments_and_polygons
+kinogaki-studio-ui-api/lib test gizmo::geometry::tests::rotation_crosses_angle_seam_without_reversing
+kinogaki-studio-ui-api/lib test gizmo::hit::tests::single_tools_hit_their_handles_and_hidden_axes_are_skipped
+kinogaki-studio-ui-api/lib test gizmo::hit::tests::the_manipulator_hits_each_part_and_resolves_it_to_a_single_tool
+kinogaki-studio-ui-api/lib test gizmo::step::tests::a_step_moves_once_it_is_more_than_none
+kinogaki-studio-ui-api/lib test id::tests::ids_are_stable_and_children_differ
+kinogaki-studio-ui-api/lib test input::tests::keys_and_text_read_from_the_events
+kinogaki-studio-ui-api/lib test input::tests::pointer_buttons_by_name
+kinogaki-studio-ui-api/lib test labels::tests::a_million_points_give_one_label_per_cell_quickly
+kinogaki-studio-ui-api/lib test labels::tests::empty_views_and_cells_label_nothing
+kinogaki-studio-ui-api/lib test labels::tests::few_points_are_all_labelled_and_hidden_or_offscreen_ones_never
+kinogaki-studio-ui-api/lib test labels::tests::scatter_visits_every_index_once
+kinogaki-studio-ui-api/lib test package::display::tests::a_choice_holds_its_options_and_a_toggle_two_values
+kinogaki-studio-ui-api/lib test package::edited::tests::a_ghost_starts_plain
+kinogaki-studio-ui-api/lib test package::library::tests::the_data_conditions_hold_against_the_situation
+kinogaki-studio-ui-api/lib test package::library::tests::when_holds_where_every_condition_does
+kinogaki-studio-ui-api/lib test projection::test_camera::the_inverse_undoes_the_matrix
+kinogaki-studio-ui-api/lib test projection::tests::points_behind_the_eye_do_not_project
+kinogaki-studio-ui-api/lib test projection::tests::the_target_projects_to_the_middle_and_rays_pass_through_it
+kinogaki-studio-ui-api/lib test sheet::edits::tests::edits_read_and_map
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::conditions_hide_and_disable_rows
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::curves_channels_and_texts_become_their_fields
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::parameters_become_fields_keyed_by_name
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::shaped_rows_show_their_menus_and_buttons
+kinogaki-studio-ui-api/lib test sheet::keyed::tests::equal_hashes_get_distinct_field_keys
+kinogaki-studio-ui-api/lib test sheet::keyed::tests::field_keys_follow_the_key_not_the_row
+kinogaki-studio-ui-api/lib test sheet::keyed::tests::schemas_and_edits_come_back_with_the_owners_keys
+kinogaki-studio-ui-api/lib test sheet::schema::tests::keys_map_and_filter
+kinogaki-studio-ui-api/lib test sheet::schema::tests::values_read_by_key
+kinogaki-studio-ui-api/lib test theme::tests::light_fills_take_dark_ink_and_dark_fills_light
+kinogaki-studio-ui-api/lib test theme::tests::the_ink_follows_the_theme_text
+kinogaki-studio-ui-api/network test a_cooks_handles_are_checked_and_read_back
+kinogaki-studio-ui-api/network test a_cycle_fails_the_commit_check
+kinogaki-studio-ui-api/network test a_node_holds_a_network_of_another_context
+kinogaki-studio-ui-api/network test nodes_cook_through_their_types_and_core_flags
+kinogaki-studio-ui-api/network test placing_after_a_node_takes_its_readers_and_deleting_heals
+kinogaki-studio-ui-api/network test the_host_edits_networks_as_undo_steps
+kinogaki-studio-ui-api/parts test a_context_has_the_parts_it_gives_and_no_other
+kinogaki-studio-ui-api/parts test a_tool_reads_the_views_input_from_its_view_call
+kinogaki-studio-ui-api/parts test every_call_reaches_the_packages_own_part_with_its_state
+kinogaki-studio-ui-api/recording test a_sheet_keyed_by_the_plugins_type_applies_scripted_edits
+kinogaki-studio-ui-api/recording test layouts_return_their_bodies_values_and_widgets_report_clicks
+kinogaki-studio-ui-api/recording test menus_run_only_while_open
+kinogaki-studio-ui-api/recording test overlays_are_recorded_as_shapes
+kinogaki-studio-ui-api/recording test text_and_choices_take_scripted_input
+kinogaki-studio-ui-api/recording test value_fields_show_what_was_typed_and_hold_the_keys
+kinogaki-value/doc test crates/value/src/data.rs - data::Typed
+kinogaki-value/lib test condition::tests::a_condition_holds_while_every_value_does
+kinogaki-value/lib test data::tests::another_type_reads_as_none
+kinogaki-value/lib test data::tests::clones_share_the_value
+kinogaki-value/lib test data::tests::wrapped_values_read_back
+kinogaki-value/lib test id::tests::a_malformed_declaration_panics
+kinogaki-value/lib test id::tests::declared_and_parsed_ids_of_one_text_are_one_id
+kinogaki-value/lib test id::tests::ids_are_three_lowercase_segments
+kinogaki-value/lib test id::tests::ids_split_into_package_and_name
+kinogaki-value/lib test id::tests::package_ids_are_two_segments
+kinogaki-value/lib test kind::tests::choices_take_their_keys_alone
+kinogaki-value/lib test kind::tests::colors_ramps_and_curves_check_their_structure
+kinogaki-value/lib test kind::tests::integers_are_exact_and_within_their_limits
+kinogaki-value/lib test kind::tests::kinds_give_the_animatable_default
+kinogaki-value/lib test kind::tests::numbers_take_finite_values_within_their_limits
+kinogaki-value/lib test ramp::tests::color_ramps_interpolate_each_channel
+kinogaki-value/lib test ramp::tests::each_interpolation_takes_its_exact_values
+kinogaki-value/lib test ramp::tests::interpolations_meet_the_keys_and_hold_past_the_ends
+kinogaki-value/lib test ramp::tests::keys_insert_and_remove_in_order
+kinogaki-value/lib test ramp::tests::steps_single_keys_and_strange_places
+kinogaki-value/lib test reads::tests::a_value_reads_as_its_variant_or_names_itself
+kinogaki-value/lib test tone_curve::tests::a_curve_runs_through_its_keys_and_straight_past_its_ends
+kinogaki-value/lib test value::tests::integers_are_exact
+kinogaki-value/lib test value::tests::values_read_back_only_as_their_variant
+kinogaki-viewport-api/doc test crates/viewport-api/src/packet.rs - packet::ElementSet
+kinogaki-viewport-api/doc test crates/viewport-api/src/packet.rs - packet::ElementSet #2
+kinogaki-viewport-api/lib test color::tests::packed_colors_round_trip_within_a_mantissa_step_and_are_never_zero
+kinogaki-viewport-api/lib test lines::tests::classes_map_ids_both_ways_and_refuse_overlaps_and_bad_styles
+kinogaki-viewport-api/lib test looks::tests::runs_are_whole_ordered_triangles_inside_the_indices
+kinogaki-viewport-api/lib test packet::tests::a_packet_reads_back_as_its_own_type_only
+kinogaki-viewport-api/lib test packet::tests::a_vertex_writes_its_fields_in_order_and_sets_answer_membership
+kinogaki-viewport-api/lib test selection::tests::misplaced_sets_and_objects_beside_components_are_refused
+kinogaki-viewport-api/lib test selection::tests::sets_go_to_their_kinds_slots
+kinogaki-viewport-api/lib test textures::tests::a_row_that_fails_says_why
+kinogaki-viewport-api/lib test textures::tests::a_small_image_repeats_its_texels_and_a_large_one_averages_them
+kinogaki-viewport-api/lib test textures::tests::it_takes_the_smallest_side_holding_it_and_every_level
+kinogaki-viewport-api/lib test textures::tests::levels_average_in_linear_light
+kinogaki-viewport-api/lib test updates::tests::ranges_coalesce_small_gaps_and_fall_back_to_one_full_write
+kinogaki-viewport-api/lib test updates::tests::updates_bridge_undisplayed_packets_with_the_union_of_their_changes

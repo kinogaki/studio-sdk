@@ -26,7 +26,7 @@ pub type Entry = fn() -> std::thread::Result<Package>;
 /// in it. The package is the plugin's one package, its UI included
 /// ([`Package::ui`], added with the UI interface's `WithUi::with_ui`).
 ///
-/// ```ignore
+/// ```text
 /// fn package() -> kinogaki_studio_api::Package {
 ///     kinogaki_studio_api::Package::new(
 ///         kinogaki_studio_api::PackageId::declared("acme.trees"),
