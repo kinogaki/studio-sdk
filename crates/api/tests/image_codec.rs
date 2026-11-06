@@ -2,7 +2,7 @@
 //! encoding, strict about what it reads.
 use kinogaki_studio_api::DataCodec;
 use kinogaki_studio_api::element::{Field, MemoryElement};
-use kinogaki_studio_api::geometry::image::{Encoding, Format, Image, Rect, Sample, Tile};
+use kinogaki_studio_api::geometry::image::{ColorTag, Encoding, Format, Image, Rect, Sample, Tile};
 use kinogaki_studio_api::geometry::{Attribute, Attributes, Domain, Meaning};
 use kinogaki_studio_api::standard::{self, ImageCodec};
 use std::sync::Arc;
@@ -46,6 +46,44 @@ fn an_image_round_trips_byte_exact_and_sparse_stays_sparse() {
     assert_eq!(read, image);
     assert!(read.layers()[0].tiles()[0].is_none(), "sparse stays sparse");
     assert_eq!(read.pixel_bytes(), image.pixel_bytes());
+}
+
+#[test]
+fn every_color_tag_and_sample_round_trips() {
+    let tags = [
+        ColorTag::Space("sRGB".into()),
+        ColorTag::Icc(Arc::from(&b"profile bytes"[..])),
+        ColorTag::Primaries([0.64, 0.33, 0.3, 0.6, 0.15, 0.06, 0.3127, 0.329]),
+        ColorTag::Unknown { linear: true },
+        ColorTag::Unknown { linear: false },
+    ];
+    let window = Rect::new([0, 0], [3, 2]).unwrap();
+    for tag in tags {
+        let encoding = Encoding::Color {
+            tag,
+            premultiplied: false,
+        };
+        let format = Format::rgba(Sample::U16, encoding);
+        let image = Image::builder(window)
+            .plane(format, &[9; 3 * 2 * 8])
+            .build()
+            .unwrap();
+        assert_eq!(round_trip(&image), image);
+    }
+    let ids = Format {
+        name: "objectId".into(),
+        channels: Arc::new([Arc::from("id")]),
+        sample: Sample::U32,
+        encoding: Encoding::Raw,
+    };
+    let values: Vec<u8> = [7u32, u32::MAX, 0, 1 << 30, 3, 4]
+        .iter()
+        .flat_map(|v| v.to_ne_bytes())
+        .collect();
+    let image = Image::builder(window).plane(ids, &values).build().unwrap();
+    let read = round_trip(&image);
+    assert_eq!(read, image);
+    assert_eq!(read.plane(0).unwrap(), values, "ids keep every bit");
 }
 
 #[test]

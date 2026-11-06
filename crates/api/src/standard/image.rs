@@ -5,15 +5,17 @@ use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use kinogaki_geometry::image::{
-    Encoding, Format, Image, ImageBuilder, Rect, Sample, Tile, tiles_of,
+    ColorTag, Encoding, Format, Image, ImageBuilder, Rect, Sample, Tile, tiles_of,
 };
 use std::sync::Arc;
 
 /// Saves [`Image`]: the fields `display` and `data` (each `I32s` min x, min
 /// y, max x, max y) and `aspect`, the metadata's attributes as children, and
 /// a child `layer<k>` (kind `layer`) for each layer: `name`, `channels`,
-/// `sample`, `encoding` (`color` with `space` and `premultiplied`, or
-/// `raw`), `tiles` (the places of the tiles it stores, ascending) and
+/// `sample`, `encoding` (`color` with `premultiplied` and its tag, one of
+/// `space`, `icc` (the profile's bytes), `primaries` (eight floats) or
+/// `linear` (an untagged layer's), or `raw`), `tiles` (the places of the
+/// tiles it stores, ascending) and
 /// `pixels` (their bytes, in order), so sparse layers stay sparse. A round
 /// trip is byte-exact.
 ///
@@ -78,12 +80,9 @@ impl DataCodec for ImageCodec {
             child.set("channels", Field::Texts(channels))?;
             child.set("sample", Field::Text(format.sample.name().into()))?;
             match &format.encoding {
-                Encoding::Color {
-                    space,
-                    premultiplied,
-                } => {
+                Encoding::Color { tag, premultiplied } => {
                     child.set("encoding", Field::Text("color".into()))?;
-                    child.set("space", Field::Text(space.to_string()))?;
+                    write_tag(tag, &mut *child)?;
                     child.set("premultiplied", Field::Bool(*premultiplied))?;
                 }
                 _ => child.set("encoding", Field::Text("raw".into()))?,
@@ -142,7 +141,10 @@ fn read_format(child: &dyn ElementReader) -> Result<Format, Error> {
         .ok_or_else(|| invalid(child, format_args!("unknown sample {sample:?}")))?;
     let encoding = match child.text("encoding")? {
         "raw" => Encoding::Raw,
-        "color" => Encoding::color(child.text("space")?, child.bool("premultiplied")?),
+        "color" => Encoding::Color {
+            tag: read_tag(child)?,
+            premultiplied: child.bool("premultiplied")?,
+        },
         other => return Err(invalid(child, format_args!("unknown encoding {other:?}"))),
     };
     let channels: Arc<[Arc<str>]> = (child.texts("channels")?.iter())
@@ -156,5 +158,34 @@ fn read_format(child: &dyn ElementReader) -> Result<Format, Error> {
         channels,
         sample,
         encoding,
+    })
+}
+
+fn write_tag(tag: &ColorTag, out: &mut dyn ElementWriter) -> Result<(), Error> {
+    match tag {
+        ColorTag::Space(space) => out.set("space", Field::Text(space.to_string())),
+        ColorTag::Icc(profile) => out.set("icc", Field::U8s(profile.to_vec())),
+        ColorTag::Primaries(xy) => out.set("primaries", Field::F32s(xy.to_vec())),
+        ColorTag::Unknown { linear } => out.set("linear", Field::Bool(*linear)),
+        _ => Err(Error::invalid("a color tag this build can't save")),
+    }
+}
+
+fn read_tag(from: &dyn ElementReader) -> Result<ColorTag, Error> {
+    if from.field("space").is_some() {
+        return Ok(ColorTag::Space(from.text("space")?.into()));
+    }
+    if from.field("icc").is_some() {
+        return Ok(ColorTag::Icc(attributes::u8s(from, "icc")?.into()));
+    }
+    if from.field("primaries").is_some() {
+        let xy = from.f32s("primaries")?;
+        let xy = xy
+            .try_into()
+            .map_err(|_| invalid(from, "primaries aren't 8 numbers"))?;
+        return Ok(ColorTag::Primaries(xy));
+    }
+    Ok(ColorTag::Unknown {
+        linear: from.bool("linear")?,
     })
 }

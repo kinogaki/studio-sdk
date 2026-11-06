@@ -171,16 +171,14 @@ pub enum ProbedColor {
 }
 
 impl ProbedColor {
-    /// The color of pixel `rgba`, held as `encoding` says; none for data.
+    /// The color of pixel `rgba`, held as `encoding` says; none for data or
+    /// a tag naming no space.
     pub fn of(
         encoding: &Encoding,
         [r, g, b, a]: [f32; 4],
         colors: &dyn ColorService,
     ) -> Option<Self> {
-        let Encoding::Color {
-            space,
-            premultiplied,
-        } = encoding
+        let (Some(space), Encoding::Color { premultiplied, .. }) = (encoding.space(), encoding)
         else {
             return None;
         };
@@ -188,7 +186,7 @@ impl ProbedColor {
         let mut held = [[r, g, b].map(|v| f64::from(v / under))];
         if colors.display_referred(space) {
             return Some(Self::Display {
-                space: space.clone(),
+                space: space.into(),
                 codes: held[0],
             });
         }

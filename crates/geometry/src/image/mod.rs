@@ -6,8 +6,9 @@
 //!   transform grows without a crop.
 //! - **Layers.** One or more [`Layer`]s: `""` the main one, others by name
 //!   (`N`, `Z`, `crypto00`). A layer holds 1–4 interleaved channels of one
-//!   [`Sample`], its colors named by [`Encoding`]: a space of the project's
-//!   color configuration, or raw data that is never converted.
+//!   [`Sample`], its colors named by [`Encoding`]: tagged ([`ColorTag`]) with
+//!   a space of the project's color configuration (what a file says until
+//!   the host resolves it), or raw data that is never converted.
 //! - **Tiles.** A layer's pixels live in [`TILE`]-sided [`Tile`]s, row-major
 //!   over the data window, each its own shared [`Column`], a
 //!   tile of nothing but zeros absent. An edit ([`Image::with_tiles`]) makes
@@ -33,12 +34,14 @@
 //! assert_eq!(image.read_pixel(0, 99, 79), [0.25; 4]);
 //! assert_eq!(image.read_pixel(0, 100, 0), [0.0; 4]); // outside the data window
 //! ```
+mod encoding;
 mod pyramid;
 mod sample;
 mod sampling;
 #[cfg(test)]
 mod tests;
 
+pub use encoding::{ColorTag, Encoding};
 pub use pyramid::Pyramid;
 pub use sample::{Sample, f32_to_half, half_to_f32};
 pub use sampling::{Filter, Sampling, Wrap};
@@ -96,31 +99,6 @@ impl Rect {
     /// Whether pixel (`x`, `y`) lies inside.
     pub fn contains(&self, x: i32, y: i32) -> bool {
         (self.min[0]..self.max[0]).contains(&x) && (self.min[1]..self.max[1]).contains(&y)
-    }
-}
-
-/// What a layer's values mean.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Encoding {
-    /// Colors in a space of the project's color configuration.
-    Color {
-        /// The space, by its name in the configuration.
-        space: Arc<str>,
-        /// Whether the colors are premultiplied by their alpha.
-        premultiplied: bool,
-    },
-    /// Data (normals, depth, ids): never converted, shown as they are.
-    Raw,
-}
-
-impl Encoding {
-    /// Colors in `space`.
-    pub fn color(space: &str, premultiplied: bool) -> Self {
-        Self::Color {
-            space: space.into(),
-            premultiplied,
-        }
     }
 }
 
@@ -459,7 +437,10 @@ fn check_format(format: &Format) -> Result<(), Error> {
             format.name
         )));
     }
-    if let Encoding::Color { space, .. } = &format.encoding
+    if let Encoding::Color {
+        tag: ColorTag::Space(space),
+        ..
+    } = &format.encoding
         && space.is_empty()
     {
         return Err(Error::invalid(format_args!(

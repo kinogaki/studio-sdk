@@ -12,6 +12,8 @@ pub enum Sample {
     F16,
     /// A float.
     F32,
+    /// 32 bits, a whole number (an id; OpenEXR's UINT).
+    U32,
 }
 
 impl Sample {
@@ -20,7 +22,7 @@ impl Sample {
         match self {
             Self::U8 => 1,
             Self::U16 | Self::F16 => 2,
-            Self::F32 => 4,
+            Self::F32 | Self::U32 => 4,
         }
     }
 
@@ -31,27 +33,32 @@ impl Sample {
             Self::U16 => "u16",
             Self::F16 => "f16",
             Self::F32 => "f32",
+            Self::U32 => "u32",
         }
     }
 
     /// The sample named `name` ([`name`](Self::name)).
     pub fn named(name: &str) -> Option<Self> {
-        [Self::U8, Self::U16, Self::F16, Self::F32]
+        [Self::U8, Self::U16, Self::F16, Self::F32, Self::U32]
             .into_iter()
             .find(|s| s.name() == name)
     }
 
-    /// The first value of `bytes` (native order), as a float.
+    /// The first value of `bytes` (native order), as a float: a U32 its
+    /// number, exact up to 2²⁴.
     pub fn read(self, bytes: &[u8]) -> f32 {
+        let four = || [bytes[0], bytes[1], bytes[2], bytes[3]];
         match self {
             Self::U8 => f32::from(bytes[0]) / 255.0,
             Self::U16 => f32::from(u16::from_ne_bytes([bytes[0], bytes[1]])) / 65535.0,
             Self::F16 => half_to_f32(u16::from_ne_bytes([bytes[0], bytes[1]])),
-            Self::F32 => f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            Self::F32 => f32::from_ne_bytes(four()),
+            Self::U32 => u32::from_ne_bytes(four()) as f32,
         }
     }
 
-    /// `value` written over the first value of `bytes` (native order).
+    /// `value` written over the first value of `bytes` (native order): a
+    /// U32 its nearest whole number, saturated.
     pub fn write(self, value: f32, bytes: &mut [u8]) {
         let unit = |top: f32| (value.clamp(0.0, 1.0) * top).round();
         match self {
@@ -59,6 +66,7 @@ impl Sample {
             Self::U16 => bytes[..2].copy_from_slice(&(unit(65535.0) as u16).to_ne_bytes()),
             Self::F16 => bytes[..2].copy_from_slice(&f32_to_half(value).to_ne_bytes()),
             Self::F32 => bytes[..4].copy_from_slice(&value.to_ne_bytes()),
+            Self::U32 => bytes[..4].copy_from_slice(&(value.round() as u32).to_ne_bytes()),
         }
     }
 }

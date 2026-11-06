@@ -150,6 +150,40 @@ fn pixel_decodes_every_sample_and_fills_missing_channels() {
     let f = 2.5f32.to_ne_bytes();
     let two = [f[0], f[1], f[2], f[3], f[0], f[1], f[2], f[3]];
     assert_eq!(at(Sample::F32, &two, &["U", "V"]), [2.5, 2.5, 0.0, 1.0]);
+    let id = 4_000_000u32.to_ne_bytes();
+    assert_eq!(
+        at(Sample::U32, &id, &["id"])[0],
+        4_000_000.0,
+        "an id's number"
+    );
+}
+
+#[test]
+fn a_whole_number_writes_rounded_and_saturated() {
+    let mut bytes = [0; 4];
+    for (value, written) in [(6.6f32, 7u32), (-3.0, 0), (5e9, u32::MAX)] {
+        Sample::U32.write(value, &mut bytes);
+        assert_eq!(u32::from_ne_bytes(bytes), written);
+    }
+    assert_eq!(Sample::named("u32"), Some(Sample::U32));
+}
+
+#[test]
+fn color_tags_name_their_space_and_compare_by_bits() {
+    let space = Encoding::color("sRGB", false);
+    assert_eq!(space.space(), Some("sRGB"));
+    assert_eq!(Encoding::Raw.space(), None);
+    let xy = [0.64, 0.33, 0.3, 0.6, 0.15, 0.06, 0.3127, 0.329];
+    let primaries = ColorTag::Primaries(xy);
+    assert_eq!(primaries.space(), None);
+    assert_eq!(primaries, ColorTag::Primaries(xy));
+    assert_ne!(ColorTag::Primaries([f32::NAN; 8]), primaries);
+    assert_eq!(
+        ColorTag::Primaries([f32::NAN; 8]),
+        ColorTag::Primaries([f32::NAN; 8])
+    );
+    assert_eq!(primaries.to_string(), "primaries");
+    assert_eq!(ColorTag::Space("ACEScg".into()).to_string(), "ACEScg");
 }
 
 #[test]
