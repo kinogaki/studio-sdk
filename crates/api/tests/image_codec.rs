@@ -2,11 +2,13 @@
 //! encoding, strict about what it reads.
 use kinogaki_studio_api::DataCodec;
 use kinogaki_studio_api::element::{Field, MemoryElement};
+use kinogaki_studio_api::facets::{Live, LiveResult};
 use kinogaki_studio_api::geometry::image::{
     ColorTag, Encoding, Format, HeldPixels, Image, Rect, Sample, Tile,
 };
 use kinogaki_studio_api::geometry::{Attribute, Attributes, Domain, Meaning};
 use kinogaki_studio_api::standard::{self, ImageCodec};
+use kinogaki_studio_api::{NodeRef, ObjectRef};
 use std::sync::Arc;
 
 fn round_trip(image: &Image) -> Image {
@@ -124,7 +126,19 @@ impl HeldPixels for OnTheGpu {
 }
 
 #[test]
-fn held_pixels_are_refused() {
+fn a_live_layer_saves_its_result_and_held_pixels_are_refused() {
+    let result = LiveResult {
+        object: ObjectRef(4),
+        node: Some(NodeRef(9)),
+    };
+    for file in [None, Some(Arc::from("/renders/beauty.0001.exr"))] {
+        let shown = Live { result, file };
+        let live = shown.clone().image([40, 30]).unwrap();
+        let read = round_trip(&live);
+        assert_eq!(read, live);
+        assert_eq!(Live::of(&read.layers()[0]), Some(&shown));
+    }
+
     let format = Format::rgba(Sample::F16, Encoding::color("ACEScg", true));
     let image = Image::builder(Rect::new([0, 0], [4, 4]).unwrap())
         .held(format, Arc::new(OnTheGpu))

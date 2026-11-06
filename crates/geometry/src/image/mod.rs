@@ -438,12 +438,6 @@ impl Image {
             .map(|l| l.tiles().iter().flatten().map(Tile::len).sum::<usize>())
             .sum()
     }
-
-    /// Whether the host holds a layer's pixels ([`HeldPixels`]): it has no
-    /// tiles to keep, save or sample.
-    pub fn is_held(&self) -> bool {
-        self.layers.iter().any(|l| l.held().is_some())
-    }
 }
 
 /// `bytes`' first pixel of `channels` channels of `sample`, as four floats.

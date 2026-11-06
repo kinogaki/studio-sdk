@@ -413,9 +413,9 @@ kinogaki-studio-api/doc test crates/api/src/standard/mod.rs - standard
 kinogaki-studio-api/doc test crates/api/src/standard/output.rs - standard::output::DisplayOutput
 kinogaki-studio-api/doc test crates/api/src/standard/quality.rs - standard::quality::DisplayQuality
 kinogaki-studio-api/doc test crates/api/src/viewport.rs - viewport::Surface::polygons
+kinogaki-studio-api/image_codec test a_live_layer_saves_its_result_and_held_pixels_are_refused
 kinogaki-studio-api/image_codec test an_image_round_trips_byte_exact_and_sparse_stays_sparse
 kinogaki-studio-api/image_codec test every_color_tag_and_sample_round_trips
-kinogaki-studio-api/image_codec test held_pixels_are_refused
 kinogaki-studio-api/image_codec test reading_is_strict
 kinogaki-studio-api/instances test a_move_shares_the_prototypes_and_attributes
 kinogaki-studio-api/instances test instances_refuse_what_they_cant_place

@@ -24,7 +24,8 @@ mod snap;
 mod table;
 
 pub use canvas::{
-    Canvas, CanvasPiece, LiveResult, Picture, PieceSource, Probe, ProbedColor, TextAlign, TextFace,
+    Canvas, CanvasPiece, Live, LiveResult, Picture, PieceSource, Probe, ProbedColor, TextAlign,
+    TextFace,
 };
 pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally};
 pub use glyph::{GlyphScale, Glyphs};

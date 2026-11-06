@@ -2,7 +2,8 @@
 //! in canvas units, back to front: images and text under a placement.
 //! Pieces share their tiles with the value, never copying them; core uploads
 //! and derives the levels it shows, sets text, composites in linear light and
-//! applies the view transform.
+//! applies the view transform. A piece whose image's layer is [`Live`] shows a
+//! result live: core draws the result's current image in its place.
 //!
 //! **Arranging.** A piece that says which node placed it ([`PieceSource`]) can
 //! be selected and arranged on the canvas with no package code: clicks and
@@ -11,12 +12,13 @@
 //! [`Rotate`](crate::cook::HandleKind::Rotate) (the Z of `angles`, degrees,
 //! clockwise as Y runs down) and [`Scale`](crate::cook::HandleKind::Scale)
 //! (the X and Y of `factors`) handles.
+use crate::Error;
 use crate::color::ColorService;
 use crate::data::Data;
 use crate::data_type::InfoRow;
 use crate::refs::NodeRef;
 use kinogaki_geometry::Xform;
-use kinogaki_geometry::image::{Encoding, Image, Rect};
+use kinogaki_geometry::image::{Encoding, Format, HeldPixels, Image, Layer, Rect, Sample};
 use std::sync::Arc;
 
 /// What a surface chooses to show live: an object's result, or one node of the
@@ -27,6 +29,49 @@ pub struct LiveResult {
     pub object: crate::ObjectRef,
     /// The node of its network; none: the object's own result.
     pub node: Option<crate::NodeRef>,
+}
+
+/// A layer's pixels shown live ([`HeldPixels`]): what a cooked value showing
+/// a render holds (a Layout piece placing a Render Output), so a new pass
+/// recooks nothing. The canvas draws the result's current image in its place
+/// each frame; a picture written reads the file the result last wrote in its
+/// place. It saves as the reference, without pixels.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Live {
+    /// The result it shows.
+    pub result: LiveResult,
+    /// The file the result last wrote, when there is one on disk.
+    pub file: Option<Arc<str>>,
+}
+
+impl Live {
+    /// An Image of `size` pixels showing it: its main layer, colors in
+    /// [`RENDER_SPACE`](kinogaki_render_api::RENDER_SPACE), premultiplied.
+    ///
+    /// # Errors
+    /// A size of no pixels, or past an image's largest.
+    pub fn image(self, size: [u32; 2]) -> Result<Image, Error> {
+        let wide = |v: u32| i32::try_from(v).map_err(|_| Error::invalid("a result too large"));
+        let window = Rect::new([0, 0], [wide(size[0])?, wide(size[1])?])?;
+        let space = kinogaki_render_api::RENDER_SPACE;
+        let format = Format::rgba(Sample::F16, Encoding::color(space, true));
+        Image::builder(window).held(format, Arc::new(self)).build()
+    }
+
+    /// What `layer` shows live, when its pixels are.
+    pub fn of(layer: &Layer) -> Option<&Live> {
+        let held: &dyn std::any::Any = &**layer.held()?;
+        held.downcast_ref()
+    }
+}
+
+impl HeldPixels for Live {
+    fn key(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::hash::DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 /// One piece a [`Picture`] paints.
@@ -46,9 +91,6 @@ pub enum CanvasPiece {
         opacity: f32,
         /// The node that placed it, when one did and it can be arranged.
         source: Option<PieceSource>,
-        /// What shows over its plane while it is live; `image` shows when it
-        /// isn't.
-        live: Option<LiveResult>,
     },
     /// A block of text, composited with the images in its place among the
     /// pieces. Its plane has X 0 at the alignment point of its lines and
@@ -97,6 +139,14 @@ impl CanvasPiece {
     pub fn source(&self) -> Option<PieceSource> {
         match self {
             Self::Image { source, .. } | Self::Text { source, .. } => *source,
+        }
+    }
+
+    /// What it shows live, when its image's layer is [`Live`].
+    pub fn live(&self) -> Option<&Live> {
+        match self {
+            Self::Image { image, layer, .. } => Live::of(image.layers().get(*layer)?),
+            Self::Text { .. } => None,
         }
     }
 }

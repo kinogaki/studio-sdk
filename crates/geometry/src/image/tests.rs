@@ -300,7 +300,7 @@ fn a_held_layer_has_no_tiles_and_compares_by_its_key() {
             .unwrap()
     };
     let image = held(7);
-    assert!(image.is_held() && !ramp(2, 2).is_held());
+    assert!(ramp(2, 2).layers()[0].held().is_none());
     let layer = &image.layers()[0];
     assert!(layer.tiles().is_empty() && layer.held().is_some_and(|h| h.key() == 7));
     assert_eq!(image.plane(0), None, "no pixels to give");
