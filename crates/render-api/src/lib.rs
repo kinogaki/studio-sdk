@@ -42,7 +42,6 @@ pub mod settings;
 pub mod source;
 pub mod standard;
 pub mod thread;
-pub mod trace;
 pub mod update;
 
 pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};

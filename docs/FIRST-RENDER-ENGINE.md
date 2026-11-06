@@ -2,7 +2,7 @@
 
 A render engine is a package that renders what a host sends it. Its renderer depends on `kinogaki-render-api` alone, and sees no kernel, no document and no network: only prims, in batches, with what changed about each. Its package (the lights it brings as object kinds, `export_package!`) depends on `kinogaki-studio-api` too, with its `wgpu` feature.
 
-Studio's engines, Spectre (a spectral path tracer) and Pixel (a realtime pixel-art engine, open source), are written against this page and nothing else. [`examples/flat-engine`](../examples/flat-engine) is a whole engine in three files: a CPU ray caster on the SDK's render thread, shown through a texture on the host's device. The snippets below are an engine called Ray under the `acme` vendor.
+Studio's engines, Spectre (a spectral path tracer) and Pixel (a realtime pixel-art engine, open source, building beside this repository alone: [plugin-pixel](https://github.com/kinogaki/plugin-pixel)), are written against this page and nothing else. [`examples/flat-engine`](../examples/flat-engine) is a whole engine in three files: a CPU ray caster on the SDK's render thread, shown through a texture on the host's device. The snippets below are an engine called Ray under the `acme` vendor.
 
 ## What a host knows of an engine
 
@@ -61,7 +61,7 @@ Any batch restarts a view's film unless it changes nothing the view sees.
 | `Primitive` | triangle or curve | constant |
 | `Detail` | the whole shape | constant |
 
-`Shape::primvar(name)` finds it, whichever its domain; `Shape::corners::<N>(triangles, name)` reads it at each triangle corner as every engine does (one number spreads to all `N`, a narrower value fills its first components and the rest are 0). A normal moves with `Xform::apply_normal`, and `Units::up().direction()` is the world's up. Storage (F32, F64, I32, I64, Text), width (1 to 255) and arrays are the attribute's own: nothing narrows on the way, an integer never blends, and colors (`Meaning::Color`) are linear ACEScg. Sent: `N` (shading normals; none: flat), `uv` (`v` 0 is an image's bottom row, as USD lays them out), `v` when `Motion::velocities`, a curve's `width` (none: your thinnest), and what the shape's materials read (`MaterialNetwork::primvars`).
+`Shape::primvar(name)` finds it, whichever its domain; `Shape::corners::<N>(triangles, name)` reads it at each triangle corner as every engine does (one number spreads to all `N`, a narrower value fills its first components and the rest are 0). `Units::up().direction()` is the world's up. Storage (F32, F64, I32, I64, Text), width (1 to 255) and arrays are the attribute's own: nothing narrows on the way, an integer never blends, and colors (`Meaning::Color`) are linear ACEScg. Sent: `N` (shading normals; none: flat), `uv` (`v` 0 is an image's bottom row, as USD lays them out), `v` when `Motion::velocities`, a curve's `width` (none: your thinnest), and what the shape's materials read (`MaterialNetwork::primvars`).
 
 `Subsets::of(primitive)` is the material a primitive renders with; none is your default material. `Visibility { visible: false }` removes a prim; `camera: false` keeps it lighting, shadowing and reflecting.
 

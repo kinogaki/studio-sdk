@@ -117,21 +117,6 @@ impl Xform {
         Vec3::new(row(0), row(1), row(2))
     }
 
-    /// Normal `n` carried by it: through its inverse's transpose, so it
-    /// stays perpendicular to what it was perpendicular to (not unit length);
-    /// through its linear part when that is singular.
-    pub fn apply_normal(&self, n: Vec3) -> Vec3 {
-        let Some(inverse) = self.inverse() else {
-            return self.apply_vector(n);
-        };
-        let r = &inverse.0;
-        Vec3::new(
-            r[0][0] * n.x + r[1][0] * n.y + r[2][0] * n.z,
-            r[0][1] * n.x + r[1][1] * n.y + r[2][1] * n.z,
-            r[0][2] * n.x + r[1][2] * n.y + r[2][2] * n.z,
-        )
-    }
-
     /// The placement undoing it; `None` when its linear part is singular
     /// (or the inverse isn't finite).
     pub fn inverse(&self) -> Option<Xform> {
