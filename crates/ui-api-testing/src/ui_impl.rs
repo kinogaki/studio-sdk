@@ -56,9 +56,8 @@ impl Ui for RecordingUi {
         self.place(id, size, sense)
     }
 
-    fn tooltip(&mut self, _response: &Response, text: &str) {
-        self.record(Call::Tooltip(text.to_owned()));
-    }
+    /// Not recorded: no test reads a widget's hover text.
+    fn tooltip(&mut self, _response: &Response, _text: &str) {}
 
     fn request_focus(&mut self, id: Id) {
         self.shared.borrow_mut().focus = Some(id);

@@ -65,8 +65,6 @@ pub enum Call {
     Popover(Id),
     /// [`Ui::value_fields`]: what each drawn field shows.
     ValueFields(Vec<String>),
-    /// [`Ui::tooltip`].
-    Tooltip(String),
     /// [`Ui::interact`].
     Interact(Id, Rect),
     /// [`Ui::allocate`].
