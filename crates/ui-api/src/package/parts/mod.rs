@@ -1,8 +1,7 @@
 //! A context's parts, one trait each, over the package's state `S`: the
 //! selection [`Levels`]; in the viewport its [`LiveTools`], [`Panels`],
 //! [`Transforms`] and [`Display`]; the
-//! [`Inspector`], the [`Vocabulary`] and the [`ObjectRows`] of the object
-//! kinds it owns. A context has the parts it gives and nothing else: what
+//! [`Inspector`] and the [`Vocabulary`]. A context has the parts it gives and nothing else: what
 //! a part does is there only where the part is.
 //!
 //! Each method gets the package's state and the call's context (`cx`);
@@ -30,7 +29,7 @@ mod content;
 mod levels;
 mod viewport;
 
-pub use content::{Inspector, Invoked, ObjectRows, RowAction, Vocabulary};
+pub use content::{Inspector, Invoked, RowAction, Vocabulary};
 pub use levels::Levels;
 pub use viewport::{Display, LiveTools, Panels, Transforms};
 

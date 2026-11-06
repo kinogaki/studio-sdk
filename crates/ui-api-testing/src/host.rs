@@ -120,8 +120,6 @@ pub struct FakeHost {
     pub stored: kinogaki_studio_api::StoredValues,
     /// The user's stored values.
     pub user_stored: kinogaki_studio_api::StoredValues,
-    /// Each view's stored values.
-    pub view_stored: Vec<kinogaki_studio_api::StoredValues>,
     /// A text field has the keyboard.
     pub keyboard_taken: bool,
     /// The open network displays a held edit.
@@ -191,7 +189,6 @@ impl FakeHost {
             theme: studio_ui_api::Theme::default(),
             stored: Default::default(),
             user_stored: Default::default(),
-            view_stored: Vec::new(),
             keyboard_taken: false,
             editing: false,
             space: TransformSpace::World,
@@ -447,25 +444,13 @@ impl HostDoc for FakeHost {
             .map(|(&id, _)| id)
             .collect()
     }
-    fn stored_any(&self, id: StoredId, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)> {
-        match view {
-            None => (self.stored.get_any(id)).or_else(|| self.user_stored.get_any(id)),
-            Some(v) => self.view_stored.get(v)?.get_any(id),
-        }
+    fn stored_any(&self, id: StoredId) -> Option<&(dyn Any + Send + Sync)> {
+        (self.stored.get_any(id)).or_else(|| self.user_stored.get_any(id))
     }
-    fn set_stored_any(
-        &mut self,
-        id: StoredId,
-        view: Option<usize>,
-        value: Arc<dyn Any + Send + Sync>,
-    ) -> bool {
-        match view {
-            None if self.stored.get_any(id).is_some() => self.stored.set_any(id, value),
+    fn set_stored_any(&mut self, id: StoredId, value: Arc<dyn Any + Send + Sync>) -> bool {
+        match self.stored.get_any(id) {
+            Some(_) => self.stored.set_any(id, value),
             None => self.user_stored.set_any(id, value),
-            Some(v) => self
-                .view_stored
-                .get_mut(v)
-                .is_some_and(|s| s.set_any(id, value)),
         }
     }
     fn shown(&self, object: ObjectRef) -> Option<(Data, Drawn)> {

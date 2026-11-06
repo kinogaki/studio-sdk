@@ -4,7 +4,7 @@
 //! A package's author never meets these: they are the host's (Studio's,
 //! and the testing crate's `Hosting`).
 use super::{ContextPart, PageRows, SettingsPage, UiPackage};
-use super::{Display, Inspector, Levels, LiveTools, ObjectRows, Panels};
+use super::{Display, Inspector, Levels, LiveTools, Panels};
 use super::{Transforms, Vocabulary};
 use crate::host::{Cx, Waker};
 use kinogaki_studio_api::Package;
@@ -49,7 +49,7 @@ macro_rules! erase {
 impl<S: 'static> ContextPart<S> {
     /// The same context over the host's erased state.
     fn erase(self) -> ContextPart<dyn Any> {
-        erase!(self, S, {levels: Levels, tools: LiveTools, panels: Panels, transforms: Transforms, display: Display, inspector: Inspector, vocabulary: Vocabulary, objects: ObjectRows})
+        erase!(self, S, {levels: Levels, tools: LiveTools, panels: Panels, transforms: Transforms, display: Display, inspector: Inspector, vocabulary: Vocabulary})
     }
 }
 

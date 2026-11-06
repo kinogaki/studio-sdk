@@ -41,9 +41,8 @@
 //! **A context** ([`ContextPart`]) is an id, its [`Library`] (what it
 //! offers the host's menus, keys, Tab and viewport chrome, as data) and a
 //! set of optional parts: the selection [`Levels`]; in the viewport its
-//! [`LiveTools`], [`Panels`], [`Transforms`] and [`Display`]; the [`Inspector`], the [`Vocabulary`] that runs
-//! its items, the [`ObjectRows`] for the object
-//! kinds it owns (their creations are the kinds' own,
+//! [`LiveTools`], [`Panels`], [`Transforms`] and [`Display`]; the [`Inspector`] and the [`Vocabulary`] that runs
+//! its items (the creations of the object kinds it owns are the kinds' own,
 //! `ObjectKindSpec::creations`). A part a
 //! context leaves out is never another context's. In a context whose
 //! networks are core's, the host's own UI is there without a part: its
@@ -87,8 +86,7 @@ pub use library::{
     ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
 pub use parts::{
-    Display, Inspector, Invoked, Levels, LiveTools, ObjectRows, Panels, RowAction, Transforms,
-    Vocabulary,
+    Display, Inspector, Invoked, Levels, LiveTools, Panels, RowAction, Transforms, Vocabulary,
 };
 pub use settings::{PageRows, SettingsPage};
 pub use view::{Holds, KeyPress};
@@ -152,8 +150,6 @@ pub struct ContextPart<S: ?Sized> {
     pub inspector: Option<Box<dyn Inspector<S>>>,
     /// Its tools and commands.
     pub vocabulary: Option<Box<dyn Vocabulary<S>>>,
-    /// Inspector rows of the object kinds it owns.
-    pub objects: Option<Box<dyn ObjectRows<S>>>,
 }
 
 /// `with_*`: the context with part `$field` given.
@@ -182,7 +178,6 @@ impl<S: ?Sized> ContextPart<S> {
             display: None,
             inspector: None,
             vocabulary: None,
-            objects: None,
         }
     }
 
@@ -207,8 +202,6 @@ impl<S: ?Sized> ContextPart<S> {
         with_inspector: inspector: Inspector,
         /// With a vocabulary.
         with_vocabulary: vocabulary: Vocabulary,
-        /// With object rows.
-        with_objects: objects: ObjectRows,
     }
 }
 
@@ -225,7 +218,6 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("display", &has(self.display.is_some()))
             .field("inspector", &has(self.inspector.is_some()))
             .field("vocabulary", &has(self.vocabulary.is_some()))
-            .field("objects", &has(self.objects.is_some()))
             .finish()
     }
 }

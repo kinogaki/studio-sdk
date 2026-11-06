@@ -4,7 +4,7 @@
 //! another type a ring) and their handles (an area light's size, a spot's
 //! cone and softness, a distant light's angle), by their standard shapes.
 //! Studio places, picks, frames and drags them.
-use super::declared::DeclaredBody;
+use super::kind::DeclaredBody;
 use crate::cook::{Handle, HandleKind, Scalar, Vector};
 use crate::facets::{GlyphScale, Glyphs};
 use crate::{ObjectBody, Vec3};

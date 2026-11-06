@@ -14,7 +14,6 @@
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
-use crate::stored::{Stored, StoredValues};
 use crate::{Diagnostic, Error};
 use kinogaki_render_api::{Declared, Engines};
 use std::any::Any;
@@ -86,8 +85,7 @@ pub trait ObjectKindSpec: Send + Sync {
     /// (`/Workshop/X1C`), when its kind holds no network
     /// ([`context`](Self::context) `None`) and has a
     /// [`result`](Self::result): a reference naming the object reads it,
-    /// and core reads it again when the body or the path changes (a
-    /// printer's value). With it come
+    /// and core reads it again when the body or the path changes. With it come
     /// lines for what the value leaves out of the body (an engine's own
     /// parameters on a standard light), which Export reports. `None` by
     /// default: a reference to it names nothing.
@@ -167,8 +165,8 @@ pub struct KindCreation {
     pub start: Option<NodeTypeId>,
     /// Where menus list it: by family (each family where its lowest member
     /// is), then by this, lowest first; equal values keep install order.
-    /// Studio's own creations use negative values (Mesh −1000 … Printer
-    /// −100, lights −600) and Mesh's primitives 100 and up, so a plugin's
+    /// Studio's own creations use negative values (Mesh −1000 … lights
+    /// −600) and Mesh's primitives 100 and up, so a plugin's
     /// creation, 0 by default, lists after Studio's objects and before the
     /// primitives unless it says otherwise.
     pub order: i32,
@@ -250,35 +248,18 @@ impl Adoption {
     }
 }
 
-/// What a kind's creations may depend on: the installed render engines
-/// and the user's stored values.
+/// What a kind's creations may depend on: the installed render engines.
 #[derive(Clone, Copy)]
 pub struct CreateCx<'a> {
     engines: &'a Engines,
-    user: Option<&'a StoredValues>,
 }
 
 impl<'a> CreateCx<'a> {
-    /// Creating with `engines` installed, no user values.
+    /// Creating with `engines` installed.
     pub fn new(engines: &'a Engines) -> Self {
-        Self {
-            engines,
-            user: None,
-        }
+        Self { engines }
     }
 
-    /// Reading the user's stored values ([`Scope::User`](crate::Scope::User))
-    /// from `user`.
-    pub fn with_user(mut self, user: &'a StoredValues) -> Self {
-        self.user = Some(user);
-        self
-    }
-
-    /// The user's value `T`, when the host lent the user's values and a
-    /// package registered `T` for the user.
-    pub fn user<T: Stored>(&self) -> Option<&'a T> {
-        self.user?.get::<T>()
-    }
     /// The installed engines.
     pub fn engines(&self) -> &'a Engines {
         self.engines

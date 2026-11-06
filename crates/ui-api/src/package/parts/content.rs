@@ -1,11 +1,8 @@
-//! A context's inspector ([`Inspector`]), how its items run
-//! ([`Vocabulary`]) and the inspector rows of the object kinds it owns
-//! ([`ObjectRows`]).
+//! A context's inspector ([`Inspector`]) and how its items run
+//! ([`Vocabulary`]).
 use super::part;
 use crate::Ui;
-use crate::host::{Cx, InspectorCx, NodeRef, ObjectRef};
-use crate::sheet::{Edits, Schema};
-use kinogaki_studio_api::ObjectKindId;
+use crate::host::{Cx, InspectorCx, NodeRef};
 
 part! {
     /// The inspector panel while the context is open, drawn under the node
@@ -86,24 +83,4 @@ pub enum Invoked {
     /// shelves: the item runs on the selected objects it takes
     /// ([`Places::objects`](crate::package::Places::objects)).
     Objects,
-}
-
-part! {
-    /// The inspector rows of the object kinds a context owns, below an
-    /// object's Name and Type.
-    pub trait ObjectRows<S> {
-        /// The kinds whose rows it gives. Read once.
-        fn kinds(&self) -> Vec<ObjectKindId>;
-        /// Object `object`'s rows.
-        fn rows(&self, s: &S, cx: &dyn Cx, object: ObjectRef) -> Schema<u32>;
-        /// The edits of those rows.
-        fn apply(
-            &self,
-            s: &mut S,
-            cx: &mut dyn Cx,
-            object: ObjectRef,
-            rows: &Schema<u32>,
-            edits: &Edits<u32>,
-        );
-    }
 }

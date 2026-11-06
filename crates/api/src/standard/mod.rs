@@ -17,7 +17,8 @@
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
 //! here ([`GeometryCodec`], [`ImageCodec`], [`InstancesCodec`], [`BrepCodec`], [`CameraCodec`],
-//! [`LightCodec`], [`MaterialsCodec`]) are the ones core registers,
+//! [`MaterialsCodec`], and the lights' [`LightCodec`](crate::render::lights::LightCodec))
+//! are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
 //! [`ColorConfiguration`], [`DisplayOutput`],
@@ -35,7 +36,6 @@ mod color;
 mod geometry;
 mod image;
 mod instances;
-mod light;
 mod materials;
 mod output;
 mod quality;
@@ -48,7 +48,6 @@ pub use color::ColorConfiguration;
 pub use geometry::GeometryCodec;
 pub use image::ImageCodec;
 pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
-pub use light::{LightCodec, light_value};
 pub use materials::{ImportedMaterial, MaterialsCodec};
 pub use output::{BackgroundSpace, DisplayOutput};
 
@@ -118,11 +117,14 @@ pub const fn camera() -> Typed<kinogaki_render_api::Camera> {
 
 /// The id of light values: an unplaced light ([`light_value`],
 /// [`LightCodec`]).
+///
+/// [`light_value`]: crate::render::lights::light_value
+/// [`LightCodec`]: crate::render::lights::LightCodec
 pub(crate) const LIGHT: &str = "kinogaki.core.light";
 
 /// The handle on light values (`LIGHT`): render-api's standard
 /// [`Light`](kinogaki_render_api::standard::Light), unplaced, in UsdLux's
-/// terms; make one with [`light_value`].
+/// terms; make one with [`light_value`](crate::render::lights::light_value).
 pub const fn light() -> Typed<kinogaki_render_api::standard::Light> {
     Typed::new(DataTypeId::declared(LIGHT))
 }

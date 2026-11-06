@@ -1,11 +1,10 @@
 //! Stored values: package-owned values the host saves in the project or
 //! the user's settings, headless.
 //!
-//! What a project keeps for a package outside its objects: CAD's
-//! tolerances (one value for the project), CAD's
-//! rows of each view (one value per view); and what a user keeps across
-//! projects that cooks read (CAM's printers and filaments, one value for
-//! the user). A package declares each as a
+//! What a project keeps for a package outside its objects: a kernel's
+//! tolerances (one value for the project), a context's rows of each view
+//! (one value per view); and what a user keeps across projects (a tool's
+//! preferences, one value for the user). A package declares each as a
 //! value type implementing [`Stored`] and registers it
 //! ([`StoredValue::of`], [`Package::with_stored`]). The host keeps every
 //! registered value in a [`StoredValues`] table (the project's, and one
@@ -20,9 +19,9 @@
 //!
 //! **For the user.** A [`Scope::User`] value is that element in the
 //! user's settings folder, kept beside the user's settings, never in a
-//! project: a user without one starts from its defaults. Cooks read it
-//! with the project's ([`Project::user`](crate::cook::Project::user)), and
-//! a change recooks the nodes that read the project.
+//! project: a user without one starts from its defaults. A package's UI
+//! reads and edits it (its settings pages, `Cx`'s stored values); cooks
+//! never do, so a project cooks alike for every user.
 //!
 //! Values are shared and copy-on-write, as session slots are: a clone of
 //! the table shares each value.

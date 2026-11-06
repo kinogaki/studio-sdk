@@ -199,9 +199,11 @@ fn a_standard_lights_rows_take_only_what_its_codec_reads() {
     let least = kind.with_declared(&*body, &[sized(1e-6)]).unwrap();
     let valued = kind.value(&*least, "/Area").unwrap().value;
     let mut e = MemoryElement::new("light");
-    e.write(|w| data::LightCodec.write(&valued, None, w))
+    e.write(|w| crate::render::lights::LightCodec.write(&valued, None, w))
         .unwrap();
-    let back = e.read(|r| data::LightCodec.read(r, None)).unwrap();
+    let back = e
+        .read(|r| crate::render::lights::LightCodec.read(r, None))
+        .unwrap();
     assert_eq!(data::light().get(&back), data::light().get(&valued));
     let mut bright = area();
     bright

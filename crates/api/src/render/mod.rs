@@ -13,11 +13,9 @@
 //! [`Parameter`](crate::params::Parameter)s, as node parameters are, and
 //! keyed over time as they are. A Material's nodes are engine
 //! declared ([`ShaderNode`]s over `NodeDef`s).
-mod declared;
-mod light_view;
+pub mod lights;
 mod shader;
 
-pub use declared::DeclaredKind;
 pub use shader::{MATERIAL, SHADER, SHADING, ShaderNode, material_creation};
 
 use kinogaki_geometry::{Attributes, Column, Xform};

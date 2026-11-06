@@ -189,8 +189,6 @@ pub struct Project<'a> {
     pub directory: Option<&'a std::path::Path>,
     /// The project's stored values ([`crate::Stored`]).
     pub stored: &'a crate::StoredValues,
-    /// The user's stored values ([`Scope::User`](crate::Scope::User)).
-    pub user: &'a crate::StoredValues,
     /// The host's image files: a cook waits for what it asks.
     pub files: &'a dyn crate::image_files::ImageFiles,
 }

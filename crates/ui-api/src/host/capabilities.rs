@@ -172,20 +172,13 @@ pub trait HostDoc {
     /// Every object of kind `kind`, in the scene's order.
     fn objects_of_kind(&self, kind: ObjectKindId) -> Vec<ObjectRef>;
     /// Stored value `id` (a package's [`Stored`]): the project's or the
-    /// user's (`view` `None`), or view `view`'s. `None` when no package
-    /// registered it in that scope.
-    fn stored_any(&self, id: StoredId, view: Option<usize>) -> Option<&(dyn Any + Send + Sync)>;
-    /// Sets stored value `id` (the project's or the user's, or view
-    /// `view`'s) to `value`: a project's value is a change to the project,
-    /// saved with it; a view's is not undone; a user's is saved with the
-    /// user's settings and recooks what reads it. `false`: no such value, or `value` is
-    /// not of its type.
-    fn set_stored_any(
-        &mut self,
-        id: StoredId,
-        view: Option<usize>,
-        value: Arc<dyn Any + Send + Sync>,
-    ) -> bool;
+    /// user's. `None` when no package registered it for either.
+    fn stored_any(&self, id: StoredId) -> Option<&(dyn Any + Send + Sync)>;
+    /// Sets stored value `id` (the project's or the user's) to `value`: a
+    /// project's value is a change to the project, saved with it; a user's
+    /// is saved with the user's settings. `false`: no such value, or
+    /// `value` is not of its type.
+    fn set_stored_any(&mut self, id: StoredId, value: Arc<dyn Any + Send + Sync>) -> bool;
     /// Object `object`'s shown result: the value its network yields (the
     /// open object: what it displays) and its draw pieces, as the host
     /// last published them.
@@ -219,16 +212,7 @@ pub trait HostDocExt: HostDoc {
     /// error: a package registers its values with
     /// [`Package::with_stored`](kinogaki_studio_api::Package::with_stored)).
     fn stored<T: Stored>(&self) -> &T {
-        self.stored_any(T::id(), None)
-            .and_then(|v| v.downcast_ref())
-            .unwrap_or_else(|| unstored::<T>())
-    }
-    /// View `view`'s value `T`.
-    ///
-    /// # Panics
-    /// When no package registered `T` for views, or there is no such view.
-    fn view_stored<T: Stored>(&self, view: usize) -> &T {
-        self.stored_any(T::id(), Some(view))
+        self.stored_any(T::id())
             .and_then(|v| v.downcast_ref())
             .unwrap_or_else(|| unstored::<T>())
     }

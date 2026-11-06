@@ -9,14 +9,14 @@
 //! holds, written back as read. A light of a standard type gives its light as
 //! a standard light value (where it is is the object's), which formats carry,
 //! and an imported light value is adopted as a light of its standard type.
-//! How lights show in the viewport is [`light_view`](super::light_view)'s.
+//! How lights show in the viewport is `view`'s.
 //!
 //! ```text
 //! def "acme.ray.light" "body" {   … type (its prim type's id)
 //!     def values "values" { … }   every value it holds, by name
 //! }
 //! ```
-use super::light_view;
+use super::view as light_view;
 use crate::cook::Handle;
 use crate::element::{self, ElementReader, ElementWriter, Field};
 use crate::facets::Glyphs;
@@ -205,10 +205,10 @@ impl ObjectKindSpec for DeclaredKind {
     }
     /// A light of a standard type as a light value, saying what it leaves
     /// out: the values no standard light type has (the engine's own). None
-    /// for a light no light value is ([`data::light_value`]).
+    /// for a light no light value is ([`light_value`](super::light_value)).
     fn value(&self, body: &dyn ObjectBody, _path: &str) -> Option<Valued> {
         let prim = self.prim(body).filter(|_| self.of_lights())?;
-        let light = data::light_value(standard::Light::decode(prim)?).ok()?;
+        let light = super::light_value(standard::Light::decode(prim)?).ok()?;
         let types = standard::lights();
         let own =
             |name: &String| (types.iter()).all(|t| t.params.iter().all(|d| *d.name != **name));

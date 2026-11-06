@@ -31,7 +31,7 @@ pub enum DrawPurpose {
 /// result (its display settings: a mesh's subdivision display), the
 /// project's tolerances, which an approximate display (a B-rep's mesh, a
 /// sampled surface) is made to, and the project's units, which a display
-/// of physical sizes (a printer's bed in millimetres) draws in.
+/// of physical sizes (a grid in millimetres) draws in.
 #[derive(Clone, Default)]
 pub struct DisplayRequest {
     /// How finely the object shows: types whose display is tessellated (a
