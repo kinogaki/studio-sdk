@@ -76,6 +76,12 @@ impl SettingGroup {
         }
     }
 
+    /// It, open whatever [`open`](Self::open) says while `when` holds.
+    pub fn open_when(mut self, when: Condition) -> SettingGroup {
+        self.open_when = Some(when);
+        self
+    }
+
     /// Whether it starts open, its settings holding `values`.
     pub fn is_open(&self, values: &Parameters) -> bool {
         self.open || self.open_when.as_ref().is_some_and(|c| c.met(values))

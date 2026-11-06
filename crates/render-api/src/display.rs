@@ -108,6 +108,7 @@ pub struct ShownFilm {
     frame: Arc<Frame>,
     size: [u32; 2],
     images: Vec<FilmImage>,
+    pixelated: bool,
     _retire: Box<dyn Send>,
 }
 
@@ -125,8 +126,21 @@ impl ShownFilm {
             frame,
             size,
             images,
+            pixelated: false,
             _retire: Box::new(retire),
         }
+    }
+
+    /// It, its pixels meant to be seen as pixels (pixel art): a host
+    /// magnifying it samples the nearest texel rather than blending.
+    pub fn pixelated(mut self) -> ShownFilm {
+        self.pixelated = true;
+        self
+    }
+
+    /// Whether a host magnifying it samples the nearest texel.
+    pub fn is_pixelated(&self) -> bool {
+        self.pixelated
     }
 
     /// The shown image as the film's beauty, alone: the default for an
@@ -142,6 +156,7 @@ impl ShownFilm {
             size: [frame.width, frame.height],
             frame,
             images: vec![image],
+            pixelated: false,
             _retire: Box::new(shown),
         }
     }

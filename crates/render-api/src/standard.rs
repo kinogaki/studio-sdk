@@ -31,9 +31,9 @@ pub const AREA_LIGHT: &str = "kinogaki.render.area_light";
 /// The dome light's id.
 pub const DOME_LIGHT: &str = "kinogaki.render.dome_light";
 /// The distant light's id.
-pub(crate) const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
+pub const DISTANT_LIGHT: &str = "kinogaki.render.distant_light";
 /// The spot light's id.
-pub(crate) const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
+pub const SPOT_LIGHT: &str = "kinogaki.render.spot_light";
 /// The fog's id.
 pub const FOG: &str = "kinogaki.render.fog";
 
@@ -41,7 +41,7 @@ pub const FOG: &str = "kinogaki.render.fog";
 pub const EMISSION: &str = "emission";
 
 /// The group a light's parameters sit in.
-pub(crate) const LIGHT_GROUP: &str = "light";
+pub const LIGHT_GROUP: &str = "light";
 
 /// The published illuminants an emission may name: their CIE names (the
 /// keys in files) and labels, in the order a UI lists them.
@@ -99,10 +99,10 @@ impl Emission {
     }
 }
 
-/// The emission settings every standard light has (and Pixel's rim):
-/// Emission, Color, Temperature, Intensity and Exposure, the light's
-/// intensity `intensity` by default.
-pub(crate) fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
+/// The emission settings every standard light has, in [`LIGHT_GROUP`]
+/// (and an engine's own light takes): Emission, Color, Temperature,
+/// Intensity and Exposure, the light's intensity `intensity` by default.
+pub fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
     let choices = [
         Choice::new("color", "Color"),
         Choice::new("temperature", "Color Temperature"),

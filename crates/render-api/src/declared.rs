@@ -41,6 +41,27 @@ pub struct PrimType {
 }
 
 impl PrimType {
+    /// Type `id` (under the declaring package's vendor) that a UI calls
+    /// `label`, of `role`, with no parameter yet: an engine's own type (a rim
+    /// light).
+    pub fn new(id: &str, label: &str, role: Role) -> PrimType {
+        PrimType {
+            id: Arc::from(id),
+            label: Arc::from(label),
+            role,
+            groups: Vec::new(),
+            params: Vec::new(),
+        }
+    }
+
+    /// It with `group` and its parameters `params` after what it has: an
+    /// engine's own section on a standard type (a gobo on a spot light).
+    pub fn group(mut self, group: SettingGroup, params: Vec<SettingDescriptor>) -> PrimType {
+        self.groups.push(group);
+        self.params.extend(params);
+        self
+    }
+
     /// Every parameter's default.
     pub fn defaults(&self) -> Parameters {
         defaults(&self.params)
