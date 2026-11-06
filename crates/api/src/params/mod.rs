@@ -9,7 +9,7 @@ pub mod code;
 mod schema;
 
 pub use kinogaki_value::{
-    Choice, CurveChannel, Fits, Number, NumberLook, NumberStyle, Parameters, ParametersExt,
-    RefFilter, Unit, Value, ValueKind, ramp, tone_curve,
+    Choice, CurveChannel, Fits, Number, NumberLook, NumberStyle, Parameter, Parameters,
+    ParametersExt, RefFilter, Section, Unit, Value, ValueKind, ramp, tone_curve,
 };
-pub use schema::{Button, Parameter, Schema, SchemaItem, Section};
+pub use schema::{Button, Schema, SchemaItem};

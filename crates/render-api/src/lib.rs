@@ -7,7 +7,7 @@
 //! ([`SceneUpdate::merge`]). Engines implement [`RenderEngine`], publish
 //! whole passes as [`Frame`]s and wake the host once per result ([`Wake`]).
 //! Each engine describes itself without a device ([`EngineDescription`]):
-//! its settings ([`SettingDescriptor`]s), the prim types it declares
+//! its settings ([`Parameter`]s), the prim types it declares
 //! (lights and fog, [`PrimType`]s; the [`standard`] ones shared), its
 //! material nodes ([`NodeDef`]s) and outputs ([`Aov`]s, by id). The crate
 //! holds no shading model: materials are networks of engine-declared nodes
@@ -68,6 +68,7 @@ pub use kinogaki_geometry::Detail;
 pub use kinogaki_geometry::image::{f32_to_half, half_to_f32};
 pub use kinogaki_value as value;
 pub use kinogaki_value::{EngineId, PrimTypeId};
+pub use kinogaki_value::{Parameter, Section};
 pub use material::preview::{
     PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
 };
@@ -81,7 +82,7 @@ pub use prim::{
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
-pub use settings::{SceneSettings, SettingDescriptor, SettingGroup};
+pub use settings::SceneSettings;
 pub use source::{PlainTriangles, ShapeSource};
 pub use update::{Change, SceneUpdate};
 

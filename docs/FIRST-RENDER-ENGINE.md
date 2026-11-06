@@ -18,7 +18,7 @@ let description = EngineDescription::builder(EngineId::declared("acme.ray.engine
         motion: Motion { transforms: true, velocities: true },
         ..Capabilities::default()
     })
-    .settings(vec![SettingGroup::new("main", "Main", true)], settings)
+    .settings(vec![Section::new("main", "Main", true)], settings)
     .materials(node_defs, Arc::new(MyRules))
     .build();
 ```

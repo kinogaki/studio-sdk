@@ -1,7 +1,7 @@
 use super::*;
 use crate::element::MemoryElement;
 use crate::params::ValueKind;
-use kinogaki_render_api::{Engines, PrimTypeId, SettingDescriptor, SettingGroup};
+use kinogaki_render_api::{Engines, Parameter, PrimTypeId, Section};
 
 const LIGHTS: ObjectKindId = ObjectKindId::declared("acme.ray.light");
 const FOG: ObjectKindId = ObjectKindId::declared("acme.ray.fog");
@@ -9,14 +9,16 @@ const FOG: ObjectKindId = ObjectKindId::declared("acme.ray.fog");
 /// The standard lights, and one of the engine's own (a glow, no shape).
 fn lights() -> DeclaredKind {
     let glow = PrimType::new(PrimTypeId::declared("acme.ray.glow"), "Glow", Role::Light).group(
-        SettingGroup::new("glow", "Glow", true),
-        vec![SettingDescriptor::new(
-            "strength",
-            "Strength",
-            "glow",
-            ValueKind::Number(crate::params::Number::plain()),
-            1.0,
-        )],
+        Section::new("glow", "Glow", true),
+        vec![
+            Parameter::new(
+                "strength",
+                "Strength",
+                ValueKind::Number(crate::params::Number::plain()),
+                1.0,
+            )
+            .group("glow"),
+        ],
     );
     let types = [standard::lights(), vec![standard::fog(), glow]].concat();
     DeclaredKind::lights(LIGHTS, "Ray Lights", types)

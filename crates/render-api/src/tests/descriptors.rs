@@ -10,13 +10,7 @@ fn values<const N: usize>(pairs: [(&str, Value); N]) -> Parameters {
 
 #[test]
 fn settings_fit_their_descriptors() {
-    let d = SettingDescriptor::new(
-        "samples",
-        "Samples",
-        "main",
-        ValueKind::integer(1, 64),
-        8_i64,
-    );
+    let d = Parameter::new("samples", "Samples", ValueKind::integer(1, 64), 8_i64).group("main");
     let ds = vec![d.clone()];
     assert_eq!(
         settings::defaults(&ds),
@@ -33,7 +27,11 @@ fn settings_fit_their_descriptors() {
     // Animatable by its kind's default, unless the engine says otherwise;
     // an image never.
     assert!(d.animatable && !d.clone().animatable(false).animatable);
-    assert!(!SettingDescriptor::new("t", "T", "main", ValueKind::File, "").animatable);
+    assert!(
+        !Parameter::new("t", "T", ValueKind::File, "")
+            .group("main")
+            .animatable
+    );
 }
 
 #[test]
@@ -50,8 +48,8 @@ fn colors_and_color_ramps_fit_their_descriptors() {
         most: Some(4),
     };
     let ds = vec![
-        SettingDescriptor::new("ramp", "Ramp", "main", kind, ramp(stops.clone())),
-        SettingDescriptor::new("sky", "Sky", "main", ValueKind::Color, [0.1, 0.2, 0.3]),
+        Parameter::new("ramp", "Ramp", kind, ramp(stops.clone())).group("main"),
+        Parameter::new("sky", "Sky", ValueKind::Color, [0.1, 0.2, 0.3]).group("main"),
     ];
     assert_eq!(
         settings::defaults(&ds)["sky"],
@@ -194,13 +192,12 @@ fn rows_show_and_apply_by_the_values_beside_them() {
         "a spot keeps a size to shine"
     );
     // A group may open with a toggle.
-    let mut group = SettingGroup::new("gobo", "Gobo", false);
-    group.open_when = Some(Condition::when("gobo", true));
+    let group = Section::new("gobo", "Gobo", false).open_when(Condition::when("gobo", true));
     assert!(!group.is_open(&Parameters::new()));
     assert!(group.is_open(&self::values([("gobo", Value::Bool(true))])));
 }
 
 /// The parameter of `ty` named `name`.
-fn param<'a>(ty: &'a PrimType, name: &str) -> Option<&'a SettingDescriptor> {
+fn param<'a>(ty: &'a PrimType, name: &str) -> Option<&'a Parameter> {
     ty.params.iter().find(|p| &*p.name == name)
 }

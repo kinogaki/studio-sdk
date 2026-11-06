@@ -9,6 +9,7 @@
 //! | [`reads`] | [`ParametersExt`]: a value of [`Parameters`] read by name as its variant, or an error naming it |
 //! | [`kind`] | [`ValueKind`]: what a value holds, its limits and the options its kind takes ([`Number`], [`Unit`], [`Choice`]) |
 //! | [`look`] | [`NumberLook`]: how a row of numbers shows and moves, carried beside a kind by what has a row |
+//! | [`parameter`] | [`Parameter`]: one value a person sets, described (a node's parameter, a format's option, an engine's setting, a declared prim's value, a material input), and the [`Section`]s parameters sit in |
 //! | [`condition`] | [`Condition`]: when something applies, as values holding values |
 //! | [`ramp`], [`tone_curve`] | the structured values: [`Ramp`] and [`ToneCurve`] |
 //! | [`reference`](mod@reference) | [`RefFilter`]: what a reference may name; [`ObjectRef`]: an object, by the host's id |
@@ -24,6 +25,7 @@ pub mod data;
 pub mod id;
 pub mod kind;
 pub mod look;
+pub mod parameter;
 pub mod ramp;
 pub mod reads;
 pub mod reference;
@@ -38,6 +40,7 @@ pub use id::{
 };
 pub use kind::{Choice, CurveChannel, Number, Unit, ValueKind};
 pub use look::{NumberLook, NumberStyle};
+pub use parameter::{Parameter, Section};
 pub use ramp::Ramp;
 pub use reads::ParametersExt;
 pub use reference::{Fits, ObjectRef, RefFilter};

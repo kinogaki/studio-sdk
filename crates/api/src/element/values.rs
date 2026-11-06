@@ -23,7 +23,7 @@ use crate::params::ramp::{Interpolation, Key, Ramp};
 use crate::params::tone_curve::{self, ToneCurve};
 use crate::params::{Value, ValueKind};
 use crate::{Error, Parameters};
-use kinogaki_render_api::SettingDescriptor;
+use kinogaki_render_api::Parameter;
 use std::collections::btree_map::Entry;
 
 /// `values` as fields of `out`, each under its name.
@@ -44,7 +44,7 @@ pub fn write_values(out: &mut dyn ElementWriter, values: &Parameters) -> Result<
 /// A setting missing, of another kind or out of range, naming it.
 pub fn read_values<'d>(
     e: &dyn ElementReader,
-    settings: impl IntoIterator<Item = &'d SettingDescriptor>,
+    settings: impl IntoIterator<Item = &'d Parameter>,
 ) -> Result<Parameters, Error> {
     let bad =
         |name: &str, why: String| Error::invalid(format_args!("{}: {name} {why}", e.location()));
@@ -243,15 +243,15 @@ mod tests {
     use crate::element::MemoryElement;
 
     /// `values` written, read back by `settings`.
-    fn back(values: &Parameters, settings: &[SettingDescriptor]) -> Result<Parameters, Error> {
+    fn back(values: &Parameters, settings: &[Parameter]) -> Result<Parameters, Error> {
         let mut e = MemoryElement::new("values");
         e.write(|out| write_values(out, values)).unwrap();
         e.read(|r| read_values(r, settings))
     }
 
-    fn width() -> SettingDescriptor {
+    fn width() -> Parameter {
         let kind = ValueKind::Number(crate::params::Number::plain().range(0.0, 10.0));
-        SettingDescriptor::new("width", "Width", "", kind, 1.0)
+        Parameter::new("width", "Width", kind, 1.0)
     }
 
     #[test]
@@ -271,7 +271,7 @@ mod tests {
             color: true,
             most: None,
         };
-        let d = SettingDescriptor::new("ramp", "Ramp", "", kind, ramp.clone());
+        let d = Parameter::new("ramp", "Ramp", kind, ramp.clone());
         let values = Parameters::from([("ramp".to_owned(), Value::Ramp(ramp))]);
         assert_eq!(back(&values, &[d]).unwrap(), values);
     }

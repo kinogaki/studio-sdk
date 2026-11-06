@@ -410,9 +410,9 @@ fn engine(id: &'static str) -> kinogaki_render_api::EngineDescription {
 
 #[test]
 fn an_engine_setting_is_never_named_as_a_render_outputs_own() {
-    use kinogaki_render_api::SettingDescriptor;
+    use kinogaki_render_api::Parameter;
     use kinogaki_studio_api::params::ValueKind;
-    let own = SettingDescriptor::new("output", "Output", "main", ValueKind::File, "a.exr");
+    let own = Parameter::new("output", "Output", ValueKind::File, "a.exr").group("main");
     let d = (engine("acme.lights.engine").rebuilt())
         .settings(Vec::new(), vec![own])
         .build();

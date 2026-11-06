@@ -27,8 +27,8 @@ pub use emission::{Emission, ILLUMINANTS, blackbody, illuminant};
 
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
-use crate::settings::{SettingDescriptor, SettingGroup};
 use kinogaki_value::{Choice, Condition, Number, NumberLook, PrimTypeId, Unit, Value, ValueKind};
+use kinogaki_value::{Parameter, Section};
 
 /// The area light's id.
 pub const AREA_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.area_light");
@@ -50,7 +50,7 @@ pub const LIGHT_GROUP: &str = "light";
 /// The emission settings every standard light has, in [`LIGHT_GROUP`]
 /// (and an engine's own light takes): Emission, Color, Temperature,
 /// Intensity and Exposure, the light's intensity `intensity` by default.
-pub fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
+pub fn emission_params(intensity: f64) -> Vec<Parameter> {
     let choices = [
         Choice::new("color", "Color"),
         Choice::new("temperature", "Color Temperature"),
@@ -62,42 +62,43 @@ pub fn emission_params(intensity: f64) -> Vec<SettingDescriptor> {
     let look = |speed, decimals| NumberLook::default().speed(speed).decimals(decimals);
     let emission = |key| Condition::when("emission", choice(key));
     vec![
-        SettingDescriptor::new(
+        Parameter::new(
             "emission",
             "Emission",
-            LIGHT_GROUP,
             ValueKind::choice(choices),
             choice("color"),
-        ),
-        SettingDescriptor::new("color", "Color", LIGHT_GROUP, ValueKind::Color, [1.0; 3])
+        )
+        .group(LIGHT_GROUP),
+        Parameter::new("color", "Color", ValueKind::Color, [1.0; 3])
+            .group(LIGHT_GROUP)
             .shown_when(emission("color")),
-        SettingDescriptor::new(
+        Parameter::new(
             "colorTemperature",
             "Temperature",
-            LIGHT_GROUP,
             number(1000.0, 40_000.0, Unit::Suffix(Arc::from(" K"))),
             6500.0,
         )
+        .group(LIGHT_GROUP)
         .look(look(10.0, 0))
         .requires(
             emission("temperature"),
             "Used by the Color Temperature emission",
         ),
-        SettingDescriptor::new(
+        Parameter::new(
             "intensity",
             "Intensity",
-            LIGHT_GROUP,
             number(0.0, 1e12, Unit::Plain),
             intensity,
         )
+        .group(LIGHT_GROUP)
         .look(look(0.05, 2)),
-        SettingDescriptor::new(
+        Parameter::new(
             "exposure",
             "Exposure",
-            LIGHT_GROUP,
             number(-100.0, 100.0, Unit::Suffix(Arc::from(" EV"))),
             0.0,
         )
+        .group(LIGHT_GROUP)
         .look(look(0.05, 2)),
     ]
 }
@@ -109,9 +110,10 @@ pub fn choice(key: &str) -> Value {
 
 /// Angle setting `name` in degrees, 0 to 180, at `default`, its drag over
 /// `soft`.
-fn angle(name: &str, label: &str, soft: (f64, f64), default: f64) -> SettingDescriptor {
+fn angle(name: &str, label: &str, soft: (f64, f64), default: f64) -> Parameter {
     let kind = ValueKind::Number(Number::angle().range(0.0, 180.0).soft(soft.0, soft.1));
-    SettingDescriptor::new(name, label, LIGHT_GROUP, kind, default)
+    Parameter::new(name, label, kind, default)
+        .group(LIGHT_GROUP)
         .look(NumberLook::default().decimals(4).speed(0.5))
 }
 
@@ -120,23 +122,20 @@ fn angle(name: &str, label: &str, soft: (f64, f64), default: f64) -> SettingDesc
 fn light_type(
     id: PrimTypeId,
     label: &str,
-    shape: Vec<SettingDescriptor>,
+    shape: Vec<Parameter>,
     intensity: f64,
     normalize: bool,
-    after: Vec<SettingDescriptor>,
+    after: Vec<Parameter>,
 ) -> PrimType {
     let mut params = shape;
     params.extend(emission_params(intensity));
-    params.push(SettingDescriptor::toggle(
-        ("normalize", "Normalize", LIGHT_GROUP),
-        normalize,
-    ));
+    params.push(Parameter::toggle("normalize", "Normalize", normalize).group(LIGHT_GROUP));
     params.extend(after);
     PrimType {
         id,
         label: Arc::from(label),
         role: Role::Light,
-        groups: vec![SettingGroup::new(LIGHT_GROUP, "Light", true)],
+        groups: vec![Section::new(LIGHT_GROUP, "Light", true)],
         params,
     }
 }
@@ -149,17 +148,17 @@ pub(crate) fn area_light() -> PrimType {
         Choice::new("rectangle", "Rectangle"),
         Choice::new("disk", "Disk"),
     ];
-    let shape = SettingDescriptor::new(
+    let shape = Parameter::new(
         "shape",
         "Shape",
-        LIGHT_GROUP,
         ValueKind::choice(shapes),
         choice("rectangle"),
-    );
+    )
+    .group(LIGHT_GROUP);
     let shaped = |key| Condition::when("shape", choice(key));
     // Above 0: a light of no size is no light value.
     let size = |name, label, default| {
-        SettingDescriptor::length((name, label, LIGHT_GROUP), (1e-6, 1e12), None, 3, default)
+        Parameter::length(name, label, (1e-6, 1e12), None, 3, default).group(LIGHT_GROUP)
     };
     light_type(
         AREA_LIGHT,
@@ -190,16 +189,17 @@ pub(crate) fn dome_light() -> PrimType {
         1.0,
         false,
         vec![
-            SettingDescriptor::toggle(("ground", "Ground", LIGHT_GROUP), false),
-            SettingDescriptor::new(
+            Parameter::toggle("ground", "Ground", false).group(LIGHT_GROUP),
+            Parameter::new(
                 "groundColor",
                 "Ground Color",
-                LIGHT_GROUP,
                 ValueKind::Color,
                 [0.1, 0.09, 0.07],
             )
+            .group(LIGHT_GROUP)
             .requires(ground(true), "Used with Ground on"),
-            SettingDescriptor::new("texture", "Image", LIGHT_GROUP, ValueKind::File, "")
+            Parameter::new("texture", "Image", ValueKind::File, "")
+                .group(LIGHT_GROUP)
                 .shown_when(ground(false)),
         ],
     )
@@ -228,21 +228,17 @@ pub(crate) fn spot_light() -> PrimType {
         SPOT_LIGHT,
         "Spot Light",
         vec![
-            SettingDescriptor::length(
-                ("radius", "Radius", LIGHT_GROUP),
-                (1e-6, 1e12),
-                None,
-                3,
-                0.1,
-            ),
+            Parameter::length("radius", "Radius", (1e-6, 1e12), None, 3, 0.1).group(LIGHT_GROUP),
             angle("coneAngle", "Cone Angle", (0.0, 90.0), 30.0),
-            SettingDescriptor::slider(
-                ("coneSoftness", "Cone Softness", LIGHT_GROUP),
+            Parameter::slider(
+                "coneSoftness",
+                "Cone Softness",
                 (0.0, 1.0),
                 (0.0, 1.0),
                 2,
                 0.2,
-            ),
+            )
+            .group(LIGHT_GROUP),
         ],
         100.0,
         true,
@@ -265,37 +261,20 @@ pub fn fog() -> PrimType {
         id: FOG,
         label: Arc::from("Fog"),
         role: Role::Atmosphere,
-        groups: vec![SettingGroup::new(GROUP, "Fog", true)],
+        groups: vec![Section::new(GROUP, "Fog", true)],
         params: vec![
-            SettingDescriptor::slider(
-                ("density", "Density", GROUP),
-                (0.0, 1e6),
-                (0.0, 1.0),
-                3,
-                0.1,
-            ),
-            SettingDescriptor::new("color", "Color", GROUP, ValueKind::Color, [0.3, 0.34, 0.42]),
-            SettingDescriptor::length(("start", "Start", GROUP), (0.0, 1e6), None, 3, 0.0),
-            SettingDescriptor::length(("height", "Height", GROUP), (-1e6, 1e6), None, 3, 0.0),
-            SettingDescriptor::slider(
-                ("falloff", "Falloff", GROUP),
-                (0.0, 1e6),
-                (0.0, 4.0),
-                3,
-                0.5,
-            ),
-            SettingDescriptor::toggle(("inscatter", "In-scatter", GROUP), false),
-            SettingDescriptor::slider(
-                ("anisotropy", "Anisotropy", GROUP),
-                (-0.9, 0.9),
-                (-0.9, 0.9),
-                3,
-                0.3,
-            )
-            .requires(
-                Condition::when("inscatter", true),
-                "Used with In-scatter on",
-            ),
+            Parameter::slider("density", "Density", (0.0, 1e6), (0.0, 1.0), 3, 0.1).group(GROUP),
+            Parameter::new("color", "Color", ValueKind::Color, [0.3, 0.34, 0.42]).group(GROUP),
+            Parameter::length("start", "Start", (0.0, 1e6), None, 3, 0.0).group(GROUP),
+            Parameter::length("height", "Height", (-1e6, 1e6), None, 3, 0.0).group(GROUP),
+            Parameter::slider("falloff", "Falloff", (0.0, 1e6), (0.0, 4.0), 3, 0.5).group(GROUP),
+            Parameter::toggle("inscatter", "In-scatter", false).group(GROUP),
+            Parameter::slider("anisotropy", "Anisotropy", (-0.9, 0.9), (-0.9, 0.9), 3, 0.3)
+                .group(GROUP)
+                .requires(
+                    Condition::when("inscatter", true),
+                    "Used with In-scatter on",
+                ),
         ],
     }
 }

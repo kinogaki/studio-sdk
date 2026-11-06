@@ -230,7 +230,7 @@ fn filled(prim: Declared, description: &EngineDescription) -> Declared {
     };
     let values = (params.iter())
         .map(|d| {
-            let value = prim.value(&d.name).unwrap_or(&d.default);
+            let value = prim.value(&d.name).unwrap_or(&d.value);
             (d.name.to_string(), value.clone())
         })
         .collect();

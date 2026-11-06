@@ -1,8 +1,6 @@
 //! [`Schema`]: how parameters are presented, as data. The host turns it
 //! into its inspector's rows; edits come back as new [`Value`]s.
-use super::{Choice, Number, NumberLook, Parameters, Value, ValueKind};
-use crate::Error;
-use crate::data::Data;
+use super::{Parameter, Parameters, Section};
 
 /// What a parameter dialog or inspector shows, top to bottom: sections and
 /// parameters.
@@ -17,11 +15,8 @@ impl Schema {
     /// With a section band `label` (remembered open or closed by `key`)
     /// next.
     pub fn section(mut self, key: impl Into<String>, label: impl Into<String>, open: bool) -> Self {
-        self.items.push(SchemaItem::Section(Section {
-            key: key.into(),
-            label: label.into(),
-            open,
-        }));
+        self.items
+            .push(SchemaItem::Section(Section::new(key, label, open)));
         self
     }
 
@@ -106,204 +101,10 @@ impl Button {
     }
 }
 
-/// A collapsible section band.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Section {
-    /// Remembers whether the band is open, across schemas.
-    pub key: String,
-    /// The band's text.
-    pub label: String,
-    /// Whether it starts open.
-    pub open: bool,
-}
-
-/// One parameter: its name, what it holds, and its current value.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Parameter {
-    /// Its stored name (`distance`, `merge_shells`), unique in its schema.
-    pub name: String,
-    /// What its row says.
-    pub label: String,
-    /// What it holds, with its kind's options (a choice's entries, an
-    /// attribute row's names on the input, filled by
-    /// [`NodeType::schema`](crate::NodeType::schema)).
-    pub kind: ValueKind,
-    /// Its current value (the default, in a description).
-    pub value: Value,
-    /// How its numbers show and move, for a number, vector or channels
-    /// kind; the host's defaults for its unit unless set.
-    pub look: NumberLook,
-    /// Its tooltip; empty for none.
-    pub help: String,
-    /// More words a search finds it by ("orientation" for an up axis);
-    /// empty for none.
-    pub keywords: String,
-    /// Whether it takes input; a disabled row shows its value greyed and
-    /// its help says why.
-    pub enabled: bool,
-    /// Whether it can be keyed over time. Its kind gives the default
-    /// ([`ValueKind::animatable`]); a type turns it off for a parameter
-    /// that shapes its ports or spares, or whose change should be one
-    /// deliberate edit.
-    pub animatable: bool,
-}
-
-impl Parameter {
-    /// Parameter `name` labelled `label`, of `kind`, at `value`: enabled,
-    /// with no help.
-    pub fn new(
-        name: impl Into<String>,
-        label: impl Into<String>,
-        kind: ValueKind,
-        value: impl Into<Value>,
-    ) -> Self {
-        let animatable = kind.animatable();
-        Self {
-            name: name.into(),
-            label: label.into(),
-            kind,
-            value: value.into(),
-            look: NumberLook::default(),
-            help: String::new(),
-            keywords: String::new(),
-            enabled: true,
-            animatable,
-        }
-    }
-
-    /// A number of `number`'s unit and limits, at `default`.
-    pub fn number(
-        name: impl Into<String>,
-        label: impl Into<String>,
-        number: Number,
-        default: f64,
-    ) -> Self {
-        Self::new(name, label, ValueKind::Number(number), default)
-    }
-
-    /// A whole number in `min..=max`, at `default`.
-    pub fn integer(
-        name: impl Into<String>,
-        label: impl Into<String>,
-        min: i64,
-        max: i64,
-        default: i64,
-    ) -> Self {
-        Self::new(name, label, ValueKind::integer(min, max), default)
-    }
-
-    /// Three numbers, each of `number`'s unit and limits, at `default`.
-    pub fn vector(
-        name: impl Into<String>,
-        label: impl Into<String>,
-        number: Number,
-        default: [f64; 3],
-    ) -> Self {
-        let kind = ValueKind::Vector {
-            components: 3,
-            number,
-        };
-        Self::new(name, label, kind, default.to_vec())
-    }
-
-    /// A toggle, at `default`.
-    pub fn toggle(name: impl Into<String>, label: impl Into<String>, default: bool) -> Self {
-        Self::new(name, label, ValueKind::Toggle, default)
-    }
-
-    /// A line of text, at `default`.
-    pub fn text(name: impl Into<String>, label: impl Into<String>, default: &str) -> Self {
-        Self::new(name, label, ValueKind::Text, default)
-    }
-
-    /// One of `choices` (`(key, label)`, in order), at key `default`.
-    pub fn choice(
-        name: impl Into<String>,
-        label: impl Into<String>,
-        choices: &[(&str, &str)],
-        default: &str,
-    ) -> Self {
-        let choices = choices.iter().map(|(key, label)| Choice::new(key, label));
-        let kind = ValueKind::choice(choices.collect());
-        Self::new(name, label, kind, Value::Choice(default.into()))
-    }
-
-    /// Attribute names of the input, one or (`list`) a list, at `default`;
-    /// the node type fills the menu ([`NodeType::schema`](crate::NodeType::schema)).
-    pub fn attribute(
-        name: impl Into<String>,
-        label: impl Into<String>,
-        list: bool,
-        default: &str,
-    ) -> Self {
-        let kind = ValueKind::Attribute {
-            menu: Vec::new(),
-            list,
-        };
-        Self::new(name, label, kind, default)
-    }
-
-    /// Data parameter `name` labelled `label` holding values of `empty`'s
-    /// data type, starting at `empty` (the type's
-    /// [`empty`](crate::DataType::empty)): [`ValueKind::Data`].
-    pub fn data(name: impl Into<String>, label: impl Into<String>, empty: Data) -> Self {
-        Self::new(name, label, ValueKind::Data(empty.ty()), empty)
-    }
-
-    /// Render setting (or declared prim value) `d` as a parameter at its
-    /// default: its kind, label and tooltip, animatable as `d` says.
-    pub fn setting(d: &kinogaki_render_api::SettingDescriptor) -> Self {
-        let p = Self::new(&*d.name, &*d.label, d.kind.clone(), d.default.clone());
-        let p = p.animatable(d.animatable).look(d.look);
-        match &d.tooltip {
-            Some(tip) => p.help(&**tip),
-            None => p,
-        }
-    }
-
-    /// Animatable or not (see [`animatable`](Self::animatable)).
-    pub fn animatable(mut self, on: bool) -> Self {
-        self.animatable = on;
-        self
-    }
-
-    /// Its numbers shown and moved as `look` says.
-    pub fn look(mut self, look: NumberLook) -> Self {
-        self.look = look;
-        self
-    }
-
-    /// With `help` as its tooltip.
-    pub fn help(mut self, help: impl Into<String>) -> Self {
-        self.help = help.into();
-        self
-    }
-
-    /// Found by search under `keywords` too.
-    pub fn keywords(mut self, keywords: impl Into<String>) -> Self {
-        self.keywords = keywords.into();
-        self
-    }
-
-    /// Disabled (or enabled again).
-    pub fn enabled(mut self, enabled: bool) -> Self {
-        self.enabled = enabled;
-        self
-    }
-
-    /// Whether `value` is one this parameter takes, as core checks every
-    /// node's parameters (when a node is made, edited or loaded): its
-    /// kind's [`check`](ValueKind::check). The error says why, naming the
-    /// parameter by its label.
-    pub fn check(&self, value: &Value) -> Result<(), Error> {
-        Ok(self.kind.check(value, &self.label)?)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::params::Number;
+    use crate::params::{Number, Value, ValueKind};
 
     #[test]
     fn a_schema_lists_its_parameters_and_values() {
@@ -359,21 +160,5 @@ mod tests {
             count.check(&Value::Number(2.0)).unwrap_err().message(),
             "Count doesn't take that value"
         );
-    }
-
-    #[test]
-    fn a_setting_is_a_parameter_of_its_kind() {
-        let d = kinogaki_render_api::SettingDescriptor::new(
-            "samples",
-            "Samples",
-            "main",
-            ValueKind::integer(1, 64),
-            8_i64,
-        )
-        .tooltip("Rays a pixel")
-        .animatable(false);
-        let p = Parameter::setting(&d);
-        assert_eq!((p.kind, p.value), (d.kind, d.default));
-        assert_eq!((p.help.as_str(), p.animatable), ("Rays a pixel", false));
     }
 }

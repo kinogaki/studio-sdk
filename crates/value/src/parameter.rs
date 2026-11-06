@@ -1,0 +1,319 @@
+//! [`Parameter`]: one value a person sets, described as data, and the
+//! [`Section`]s parameters sit in. The same description serves a node's
+//! parameters, a format's options, an engine's settings, the values of a
+//! prim type it declares (a light's size) and a material node's inputs, so
+//! a host draws any of them as rows without knowing whose they are.
+use crate::condition::Condition;
+use crate::data::Data;
+use crate::kind::{Choice, Number, ValueKind};
+use crate::look::NumberLook;
+use crate::value::{Parameters, Value};
+use kinogaki_geometry::Error;
+
+/// One parameter: its name, what it holds, its value (its default, in a
+/// description), how its row shows and when it applies.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Parameter {
+    /// Its stored name (`distance`, `merge_shells`), unique where it is
+    /// declared: the key its value is kept and saved by.
+    pub name: String,
+    /// What its row says.
+    pub label: String,
+    /// What it holds, with its kind's options (a choice's entries, an
+    /// attribute row's names on the input).
+    pub kind: ValueKind,
+    /// Its current value: its default, in a description.
+    pub value: Value,
+    /// How its numbers show and move, for a number, vector or channels
+    /// kind; the host's defaults for its unit unless set.
+    pub look: NumberLook,
+    /// Its tooltip: what it means, where its label alone does not say;
+    /// empty for none.
+    pub help: String,
+    /// More words a search finds it by ("orientation" for an up axis);
+    /// empty for none.
+    pub keywords: String,
+    /// Whether it takes input now; a disabled row shows its value greyed and
+    /// its help says why.
+    pub enabled: bool,
+    /// Whether it can be keyed over time. Its kind gives the default
+    /// ([`ValueKind::animatable`]); turned off for a parameter that shapes
+    /// ports or spares, or whose change should be one deliberate edit (a
+    /// sample cap).
+    pub animatable: bool,
+    /// The [`Section`] it sits in, by name, where parameters are listed
+    /// with their sections apart (an engine's settings, a prim type's
+    /// values, a material node's inputs); empty for none.
+    pub group: String,
+    /// When it applies, and why it doesn't otherwise (a host shows it
+    /// disabled, saying so); none: always.
+    requires: Option<(Condition, String)>,
+    /// When its row is shown; none: always.
+    shown_when: Option<Condition>,
+}
+
+impl Parameter {
+    /// Parameter `name` labelled `label`, of `kind`, at `value`: enabled,
+    /// in no section, always shown and applying, with no help.
+    pub fn new(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        kind: ValueKind,
+        value: impl Into<Value>,
+    ) -> Self {
+        let animatable = kind.animatable();
+        Self {
+            name: name.into(),
+            label: label.into(),
+            kind,
+            value: value.into(),
+            look: NumberLook::default(),
+            help: String::new(),
+            keywords: String::new(),
+            enabled: true,
+            animatable,
+            group: String::new(),
+            requires: None,
+            shown_when: None,
+        }
+    }
+
+    /// A number of `number`'s unit and limits, at `default`.
+    pub fn number(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        number: Number,
+        default: f64,
+    ) -> Self {
+        Self::new(name, label, ValueKind::Number(number), default)
+    }
+
+    /// A slider over `min..=max`, dragged over `soft`, shown with
+    /// `decimals` places, at `default`.
+    pub fn slider(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        (min, max): (f64, f64),
+        soft: (f64, f64),
+        decimals: u8,
+        default: f64,
+    ) -> Self {
+        let number = Number::plain().range(min, max).soft(soft.0, soft.1);
+        Self::number(name, label, number, default)
+            .look(NumberLook::slider().decimals(decimals).speed(0.01))
+    }
+
+    /// A length in scene units over `min..=max`, dragged over `soft` when
+    /// given, shown with `decimals` places, at `default`.
+    pub fn length(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        (min, max): (f64, f64),
+        soft: Option<(f64, f64)>,
+        decimals: u8,
+        default: f64,
+    ) -> Self {
+        let number = Number::length().range(min, max);
+        let number = match soft {
+            Some((a, b)) => number.soft(a, b),
+            None => number,
+        };
+        Self::number(name, label, number, default)
+            .look(NumberLook::default().decimals(decimals).speed(0.01))
+    }
+
+    /// A whole number in `min..=max`, at `default`.
+    pub fn integer(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        min: i64,
+        max: i64,
+        default: i64,
+    ) -> Self {
+        Self::new(name, label, ValueKind::integer(min, max), default)
+    }
+
+    /// Three numbers, each of `number`'s unit and limits, at `default`.
+    pub fn vector(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        number: Number,
+        default: [f64; 3],
+    ) -> Self {
+        let kind = ValueKind::Vector {
+            components: 3,
+            number,
+        };
+        Self::new(name, label, kind, default.to_vec())
+    }
+
+    /// A toggle, at `default`.
+    pub fn toggle(name: impl Into<String>, label: impl Into<String>, default: bool) -> Self {
+        Self::new(name, label, ValueKind::Toggle, default)
+    }
+
+    /// A line of text, at `default`.
+    pub fn text(name: impl Into<String>, label: impl Into<String>, default: &str) -> Self {
+        Self::new(name, label, ValueKind::Text, default)
+    }
+
+    /// One of `choices` (`(key, label)`, in order), at key `default`.
+    pub fn choice(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        choices: &[(&str, &str)],
+        default: &str,
+    ) -> Self {
+        let choices = choices.iter().map(|(key, label)| Choice::new(key, label));
+        let kind = ValueKind::choice(choices.collect());
+        Self::new(name, label, kind, Value::Choice(default.into()))
+    }
+
+    /// Attribute names of the input, one or (`list`) a list, at `default`;
+    /// the node type fills the menu.
+    pub fn attribute(
+        name: impl Into<String>,
+        label: impl Into<String>,
+        list: bool,
+        default: &str,
+    ) -> Self {
+        let kind = ValueKind::Attribute {
+            menu: Vec::new(),
+            list,
+        };
+        Self::new(name, label, kind, default)
+    }
+
+    /// A parameter holding values of `empty`'s data type, starting at
+    /// `empty` (the type's empty value): [`ValueKind::Data`].
+    pub fn data(name: impl Into<String>, label: impl Into<String>, empty: Data) -> Self {
+        Self::new(name, label, ValueKind::Data(empty.ty()), empty)
+    }
+
+    /// In section `group` (see [`group`](Self::group)).
+    pub fn group(mut self, group: impl Into<String>) -> Self {
+        self.group = group.into();
+        self
+    }
+
+    /// Animatable or not (see [`animatable`](Self::animatable)).
+    pub fn animatable(mut self, on: bool) -> Self {
+        self.animatable = on;
+        self
+    }
+
+    /// Its numbers shown and moved as `look` says.
+    pub fn look(mut self, look: NumberLook) -> Self {
+        self.look = look;
+        self
+    }
+
+    /// With `help` as its tooltip.
+    pub fn help(mut self, help: impl Into<String>) -> Self {
+        self.help = help.into();
+        self
+    }
+
+    /// Found by search under `keywords` too.
+    pub fn keywords(mut self, keywords: impl Into<String>) -> Self {
+        self.keywords = keywords.into();
+        self
+    }
+
+    /// Disabled (or enabled again).
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Applying while `when` holds of the values beside it, else disabled,
+    /// saying `reason`.
+    pub fn requires(mut self, when: Condition, reason: &str) -> Self {
+        self.requires = Some((when, reason.to_owned()));
+        self
+    }
+
+    /// Shown while `when` holds of the values beside it.
+    pub fn shown_when(mut self, when: Condition) -> Self {
+        self.shown_when = Some(when);
+        self
+    }
+
+    /// Whether its row shows while the parameters beside it hold `values`.
+    pub fn is_shown(&self, values: &Parameters) -> bool {
+        self.shown_when.as_ref().is_none_or(|c| c.met(values))
+    }
+
+    /// Whether it applies while the parameters beside it hold `values`.
+    pub fn applies(&self, values: &Parameters) -> bool {
+        self.requires.as_ref().is_none_or(|(c, _)| c.met(values))
+    }
+
+    /// It as its row shows while the parameters beside it hold `values`:
+    /// none while hidden; disabled, its help saying why, while it doesn't
+    /// apply; its conditions spent either way.
+    pub fn resolved(mut self, values: &Parameters) -> Option<Self> {
+        if !self.is_shown(values) {
+            return None;
+        }
+        if let Some((when, reason)) = self.requires.take()
+            && !when.met(values)
+        {
+            self.enabled = false;
+            self.help = reason;
+        }
+        self.shown_when = None;
+        Some(self)
+    }
+
+    /// Whether `value` is one it takes: of its kind and within its limits.
+    pub fn accepts(&self, value: &Value) -> bool {
+        self.check(value).is_ok()
+    }
+
+    /// Whether `value` is one it takes, as a host checks every value (when
+    /// a node is made, edited or loaded): its kind's
+    /// [`check`](ValueKind::check). The error says why, naming the
+    /// parameter by its label.
+    pub fn check(&self, value: &Value) -> Result<(), Error> {
+        Ok(self.kind.check(value, &self.label)?)
+    }
+}
+
+/// A collapsible section band parameters sit in.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Section {
+    /// Its name: what [`Parameter::group`] names, and what remembers
+    /// whether the band is open.
+    pub name: String,
+    /// The band's text.
+    pub label: String,
+    /// Whether it starts open.
+    pub open: bool,
+    /// Open whatever `open` says while this holds (a gobo's section while
+    /// its toggle is on).
+    open_when: Option<Condition>,
+}
+
+impl Section {
+    /// Section `name` titled `label`, open when `open`.
+    pub fn new(name: impl Into<String>, label: impl Into<String>, open: bool) -> Self {
+        Self {
+            name: name.into(),
+            label: label.into(),
+            open,
+            open_when: None,
+        }
+    }
+
+    /// Open, whatever [`open`](Self::open) says, while `when` holds.
+    pub fn open_when(mut self, when: Condition) -> Self {
+        self.open_when = Some(when);
+        self
+    }
+
+    /// Whether it starts open, its parameters holding `values`.
+    pub fn is_open(&self, values: &Parameters) -> bool {
+        self.open || self.open_when.as_ref().is_some_and(|c| c.met(values))
+    }
+}

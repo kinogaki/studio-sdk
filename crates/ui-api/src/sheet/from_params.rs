@@ -7,21 +7,24 @@ use kinogaki_studio_api::params::{self, SchemaItem, ValueKind};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
 /// each parameter a field keyed by its name, with its help as the tooltip
-/// and its keywords for search. A data parameter has no field: its node's
-/// schema adds rows of its own.
+/// and its keywords for search, shown and enabled as its conditions say of
+/// the schema's values. A data parameter has no field: its node's schema
+/// adds rows of its own.
 impl From<&params::Schema> for Schema<String> {
     fn from(schema: &params::Schema) -> Self {
-        let data = |p: &params::Parameter| matches!(p.kind, ValueKind::Data(_));
+        let values = schema.values();
         let items = (schema.items.iter())
-            .filter(|item| !matches!(item, SchemaItem::Parameter(p) if data(p)))
-            .map(|item| match item {
-                SchemaItem::Section(s) => Item::Section(Section {
-                    key: s.key.clone().into(),
+            .filter_map(|item| match item {
+                SchemaItem::Section(s) => Some(Item::Section(Section {
+                    key: s.name.clone().into(),
                     label: s.label.clone().into(),
                     open: s.open,
                     sub: false,
-                }),
-                SchemaItem::Parameter(p) => Item::Field(field(p)),
+                })),
+                SchemaItem::Parameter(p) if matches!(p.kind, ValueKind::Data(_)) => None,
+                SchemaItem::Parameter(p) => {
+                    p.clone().resolved(&values).map(|p| Item::Field(field(&p)))
+                }
                 SchemaItem::Button(b) => {
                     let mut field = Field::new(
                         b.name.clone(),
@@ -34,7 +37,7 @@ impl From<&params::Schema> for Schema<String> {
                     );
                     field.enabled = b.enabled;
                     field.tooltip = (!b.help.is_empty()).then(|| b.help.clone().into());
-                    Item::Field(field)
+                    Some(Item::Field(field))
                 }
             })
             .collect();
@@ -325,5 +328,29 @@ mod tests {
         };
         assert!(crate::sheet::segments(choices), "two short ones: segments");
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
+    }
+
+    /// A row shows and applies as its conditions say of the rows' values.
+    #[test]
+    fn conditions_hide_and_disable_rows() {
+        use kinogaki_studio_api::value::Condition;
+        let rows = |flat: bool| {
+            params::Schema::default()
+                .parameter(Parameter::toggle("flat", "Flat", flat))
+                .parameter(
+                    Parameter::toggle("glow", "Glow", false)
+                        .shown_when(Condition::default().except("flat", true)),
+                )
+                .parameter(
+                    Parameter::toggle("tint", "Tint", false)
+                        .requires(Condition::when("flat", false), "Flat shows no tint"),
+                )
+        };
+        let sheet = Schema::<String>::from(&rows(true));
+        assert!(sheet.field(&"glow".to_owned()).is_none());
+        assert!(!sheet.field(&"tint".to_owned()).unwrap().enabled);
+        let sheet = Schema::<String>::from(&rows(false));
+        assert!(sheet.field(&"glow".to_owned()).is_some());
+        assert!(sheet.field(&"tint".to_owned()).unwrap().enabled);
     }
 }

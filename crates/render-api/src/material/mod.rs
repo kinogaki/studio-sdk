@@ -165,7 +165,7 @@ impl NetworkBuilder {
         }
         let mut held = Parameters::new();
         for descriptor in def.inputs.iter().filter_map(Input::value) {
-            let value = values.get(&*descriptor.name).unwrap_or(&descriptor.default);
+            let value = values.get(&descriptor.name).unwrap_or(&descriptor.value);
             descriptor
                 .kind
                 .check(value, &descriptor.label)
@@ -278,11 +278,11 @@ impl NetworkBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SettingDescriptor;
+    use crate::Parameter;
     use kinogaki_value::{NodeTypeId, ValueKind};
 
-    fn color(name: &str) -> SettingDescriptor {
-        SettingDescriptor::new(name, name, "", ValueKind::Color, Value::Color([0.5; 3]))
+    fn color(name: &str) -> Parameter {
+        Parameter::new(name, name, ValueKind::Color, Value::Color([0.5; 3]))
     }
 
     /// A surface output taking a color, a texture reading an attribute, and
@@ -296,7 +296,7 @@ mod tests {
             menu: Vec::new(),
             list: false,
         };
-        let read = SettingDescriptor::new("name", "Name", "", attribute, "Cd");
+        let read = Parameter::new("name", "Name", attribute, "Cd");
         let reader = NodeDef::new(NodeTypeId::declared("toy.m.read"), "Read", "Input")
             .input(Input::Setting(read))
             .input(Input::Driven(color("gain"), Socket::Color))

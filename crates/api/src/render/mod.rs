@@ -9,9 +9,9 @@
 //! (`kinogaki-render-api`), the crate engines build on; they are re-exported
 //! here, so a source a data type makes is what engines' hosts consume.
 //!
-//! An engine's settings and its declared prims' values are parameters of
-//! the one value model ([`Parameter::setting`](crate::params::Parameter::setting)),
-//! keyed over time as node parameters are. A Material's nodes are engine
+//! An engine's settings and its declared prims' values are
+//! [`Parameter`](crate::params::Parameter)s, as node parameters are, and
+//! keyed over time as they are. A Material's nodes are engine
 //! declared ([`ShaderNode`]s over `NodeDef`s).
 mod declared;
 mod light_view;

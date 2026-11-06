@@ -1,5 +1,5 @@
 //! Prim types an engine declares: lights and atmospheres a host places in
-//! its scene, each a parameter schema of [`SettingDescriptor`]s. A host
+//! its scene, each a parameter schema of [`Parameter`]s. A host
 //! keeps such a prim's values by name and draws its rows from the schema,
 //! without knowing the type; only engines that declare a type render it.
 //!
@@ -11,7 +11,8 @@ use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
 use crate::prim::Visibility;
-use crate::settings::{SettingDescriptor, SettingGroup, Textures, defaults};
+use crate::settings::{Textures, defaults};
+use kinogaki_value::{Parameter, Section};
 use kinogaki_value::{Parameters, ParametersExt, PrimTypeId, Value};
 
 /// What a declared type is to a host: where it sits and how a viewport
@@ -35,9 +36,9 @@ pub struct PrimType {
     /// Its role.
     pub role: Role,
     /// Its parameters' groups, in order.
-    pub(crate) groups: Vec<SettingGroup>,
+    pub(crate) groups: Vec<Section>,
     /// Its parameters, in the order a UI lists them.
-    pub params: Vec<SettingDescriptor>,
+    pub params: Vec<Parameter>,
 }
 
 impl PrimType {
@@ -57,7 +58,7 @@ impl PrimType {
 
     /// It with `group` and its parameters `params` after what it has: an
     /// engine's own section on a standard type (a gobo on a spot light).
-    pub fn group(mut self, group: SettingGroup, params: Vec<SettingDescriptor>) -> PrimType {
+    pub fn group(mut self, group: Section, params: Vec<Parameter>) -> PrimType {
         self.groups.push(group);
         self.params.extend(params);
         self

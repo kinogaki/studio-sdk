@@ -14,9 +14,9 @@ use crate::aov::{Aov, AovSpec};
 use crate::declared::PrimType;
 use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef};
 use crate::prim::PrimKind;
-use crate::settings::{SettingDescriptor, SettingGroup};
 use kinogaki_value::NodeTypeId;
 use kinogaki_value::{EngineId, PrimTypeId};
+use kinogaki_value::{Parameter, Section};
 
 /// What an engine's materials are to a host: the rules only its code knows.
 pub trait MaterialRules: Send + Sync {
@@ -96,8 +96,8 @@ pub struct EngineDescription {
     id: EngineId,
     label: Arc<str>,
     capabilities: Capabilities,
-    setting_groups: Vec<SettingGroup>,
-    settings: Vec<SettingDescriptor>,
+    setting_groups: Vec<Section>,
+    settings: Vec<Parameter>,
     node_defs: Vec<Arc<NodeDef>>,
     material_rules: Arc<dyn MaterialRules>,
 }
@@ -128,7 +128,7 @@ impl EngineBuilder {
 
     /// Its settings ([`crate::ViewDesc::values`]), and their
     /// groups in order.
-    pub fn settings(mut self, groups: Vec<SettingGroup>, settings: Vec<SettingDescriptor>) -> Self {
+    pub fn settings(mut self, groups: Vec<Section>, settings: Vec<Parameter>) -> Self {
         self.0.setting_groups = groups;
         self.0.settings = settings;
         self
@@ -189,12 +189,12 @@ impl EngineDescription {
     }
 
     /// Its settings' groups, in order.
-    pub fn setting_groups(&self) -> &[SettingGroup] {
+    pub fn setting_groups(&self) -> &[Section] {
         &self.setting_groups
     }
 
     /// Its settings ([`crate::ViewDesc::values`]).
-    pub fn settings(&self) -> &[SettingDescriptor] {
+    pub fn settings(&self) -> &[Parameter] {
         &self.settings
     }
 
@@ -221,7 +221,7 @@ impl EngineDescription {
 
     /// Type `id`'s groups and parameters as it renders them (none when it
     /// does not declare the type).
-    pub fn schema(&self, id: PrimTypeId) -> Option<(Vec<SettingGroup>, Vec<SettingDescriptor>)> {
+    pub fn schema(&self, id: PrimTypeId) -> Option<(Vec<Section>, Vec<Parameter>)> {
         let ty = self.prim_type(id)?;
         Some((ty.groups.clone(), ty.params.clone()))
     }

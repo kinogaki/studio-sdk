@@ -5,8 +5,8 @@
 //! OpenPBR surface if it wants one), and its description lists them
 //! ([`EngineDescription::node_defs`](crate::EngineDescription::node_defs)). A host makes one node type
 //! of each, in the Shading context of a Material.
-use crate::settings::{SettingDescriptor, SettingGroup};
 use kinogaki_value::{Condition, NodeTypeId, Parameters};
+use kinogaki_value::{Parameter, Section};
 use std::sync::Arc;
 
 /// What a wire between material nodes carries.
@@ -44,9 +44,9 @@ impl Socket {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Input {
     /// A value no wire drives: an operation, a file, an attribute's name.
-    Setting(SettingDescriptor),
+    Setting(Parameter),
     /// A value a wire may drive; unwired, it holds its value.
-    Driven(SettingDescriptor, Socket),
+    Driven(Parameter, Socket),
     /// A wire alone (a surface into an output node).
     Wire {
         /// Its name in files and networks.
@@ -85,7 +85,7 @@ impl Input {
     }
 
     /// The value it holds, unless it is a wire alone.
-    pub fn value(&self) -> Option<&SettingDescriptor> {
+    pub fn value(&self) -> Option<&Parameter> {
         match self {
             Input::Setting(d) | Input::Driven(d, _) => Some(d),
             Input::Wire { .. } => None,
@@ -136,7 +136,7 @@ pub struct NodeDef {
     /// Words search accepts for it.
     pub aliases: Vec<Arc<str>>,
     /// Its values' groups, in order.
-    pub groups: Vec<SettingGroup>,
+    pub groups: Vec<Section>,
     /// Its inputs, in the order a UI lists them.
     pub inputs: Vec<Input>,
     /// Its outputs, in slot order.

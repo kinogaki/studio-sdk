@@ -2,11 +2,11 @@
 //! which is all a Material's network is made of. Its ports and parameters are
 //! the def's; it never cooks: core compiles a Material's inside to a
 //! [`MaterialNetwork`](kinogaki_render_api::MaterialNetwork).
-use crate::cook::{Category, Description, Port, SchemaCx};
+use crate::cook::{Category, Description, Port};
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
 use crate::network::{NewNode, NodeCreation};
-use crate::params::{Parameter, Parameters, Schema, SchemaItem};
+use crate::params::Schema;
 use crate::{CookCx, Error, NodeType, Outputs};
 use kinogaki_render_api::{Input, NodeDef};
 use std::sync::Arc;
@@ -84,28 +84,6 @@ impl NodeType for ShaderNode {
     fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Err(Error::invalid("a shading node compiles with its Material"))
     }
-
-    /// The rows the def's conditions show for `parameters`, greyed where a
-    /// value doesn't apply.
-    fn schema(&self, mut rows: Schema, parameters: &Parameters, _: &SchemaCx<'_>) -> Schema {
-        let value = |name: &str| {
-            (self.def.inputs.iter())
-                .filter_map(Input::value)
-                .find(|d| &*d.name == name)
-        };
-        rows.items.retain(|item| match item {
-            SchemaItem::Parameter(p) => value(&p.name).is_none_or(|d| d.is_shown(parameters)),
-            _ => true,
-        });
-        for item in &mut rows.items {
-            if let SchemaItem::Parameter(p) = item
-                && let Some(d) = value(&p.name)
-            {
-                p.enabled &= d.applies(parameters);
-            }
-        }
-        rows
-    }
 }
 
 /// `def`'s values as rows: its groups' in their order, each as a section, then
@@ -114,12 +92,12 @@ fn parameters(def: &NodeDef) -> Schema {
     let values = || def.inputs.iter().filter_map(Input::value);
     let mut schema = Schema::default();
     for d in values().filter(|d| !def.groups.iter().any(|g| g.name == d.group)) {
-        schema = schema.parameter(Parameter::setting(d));
+        schema = schema.parameter(d.clone());
     }
     for group in &def.groups {
         schema = schema.section(&*group.name, &*group.label, group.open);
         for d in values().filter(|d| d.group == group.name) {
-            schema = schema.parameter(Parameter::setting(d));
+            schema = schema.parameter(d.clone());
         }
     }
     schema
