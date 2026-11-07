@@ -380,6 +380,21 @@ impl PartialEq for Elements {
     }
 }
 
+/// The ids among `ids` below `count`, once each, ascending: sorted when
+/// they are few, else flagged on a table of `count` (what a move of most
+/// points lists, which costs less flagged than sorted).
+pub(crate) fn once_each(count: usize, ids: impl IntoIterator<Item = u32>) -> Vec<u32> {
+    let mut ids: Vec<u32> = ids.into_iter().filter(|&i| (i as usize) < count).collect();
+    if ids.len() < count / 16 {
+        ids.sort_unstable();
+        ids.dedup();
+        return ids;
+    }
+    let mut flags = vec![false; count];
+    ids.iter().for_each(|&i| flags[i as usize] = true);
+    (0..narrow(count)).filter(|&i| flags[i as usize]).collect()
+}
+
 /// A count as stored: the product limits keep every count below
 /// `u32::MAX`.
 fn narrow(count: usize) -> u32 {

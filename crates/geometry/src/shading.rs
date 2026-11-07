@@ -1,7 +1,7 @@
 //! [`ShadingNormals`]: the one rule polygons are shaded by, everywhere.
 use crate::attributes::{Attribute, Domain};
 use crate::column::Column;
-use crate::elements::Elements;
+use crate::elements::{Elements, once_each};
 use crate::geometry::Geometry;
 use crate::kept::Kept;
 use crate::names;
@@ -122,7 +122,8 @@ impl Geometry {
     /// `moved` (which must include every point whose position differs), the
     /// rows that differ between the tables, and the vertices around their
     /// points are made again; the other cells stay shared. Built whole
-    /// otherwise.
+    /// otherwise, and when over an eighth of the points moved (on the
+    /// workers, sooner than gathered).
     pub fn shading_normals_after(
         &self,
         before: &Geometry,
@@ -134,7 +135,8 @@ impl Geometry {
         if let Some(n) = kept.find(|k| k.same(&inputs)) {
             return n;
         }
-        let built = Arc::new(match self.shades_like(before) {
+        let dense = moved.len() > self.primitives().points() / 8;
+        let built = Arc::new(match self.shades_like(before) && !dense {
             true => refreshed(self, before, &inputs, previous, moved),
             false => build(self, &inputs),
         });
@@ -251,25 +253,27 @@ fn refreshed(
     let tail = change.tail as usize;
     let positions = value.positions();
     let index = topology.index();
-    let mut changed: Vec<u32> = moved
-        .iter()
-        .filter(|&&p| (p as usize) < topology.points())
-        .flat_map(|&p| index.point_faces(p as usize).iter().copied())
-        .chain(change.rewired.iter().copied())
-        .filter(|&f| (f as usize) < tail)
-        .collect();
-    changed.sort_unstable();
-    changed.dedup();
+    let through = moved.iter().filter(|&&p| (p as usize) < topology.points());
+    let changed = once_each(
+        tail,
+        (through.flat_map(|&p| index.point_faces(p as usize).iter().copied()))
+            .chain(change.rewired.iter().copied()),
+    );
     let normal = |f: usize| match topology.kind(f).is_polygon() {
         true => face_normal(topology, positions, f),
         false => [0.0; 3],
     };
+    // Made in parallel blocks: a move of most points changes most.
+    let made = parallel::blocks(changed.len(), BLOCK, |r| {
+        (changed[r].iter())
+            .map(|&f| normal(f as usize))
+            .collect::<Vec<_>>()
+    });
     let mut faces = previous.faces.edit();
     let mut flat = previous.primitives.edit();
     faces.truncate(tail);
     flat.truncate(tail);
-    for &f in &changed {
-        let n = normal(f as usize);
+    for (&f, &n) in changed.iter().zip(made.iter().flatten()) {
         faces[f as usize] = n;
         flat[f as usize] = vector::to_f32(n);
     }
@@ -278,31 +282,36 @@ fn refreshed(
         faces.push(n);
         flat.push(vector::to_f32(n));
     }
-    let mut points: Vec<u32> = (changed.iter().copied())
-        .chain(tail as u32..topology.len() as u32)
-        .flat_map(|f| topology.primitive(f as usize).iter().copied())
-        .chain(
-            (change.rewired.iter().copied())
-                .flat_map(|f| was.primitive(f as usize).iter().copied()),
-        )
-        .chain((tail..was.len()).flat_map(|f| was.primitive(f).iter().copied()))
-        .filter(|&p| (p as usize) < topology.points())
-        .collect();
-    points.sort_unstable();
-    points.dedup();
+    let faces = faces.finish();
+    let points = once_each(
+        topology.points(),
+        (changed.iter().copied())
+            .chain(tail as u32..topology.len() as u32)
+            .flat_map(|f| topology.primitive(f as usize).iter().copied())
+            .chain(
+                (change.rewired.iter().copied())
+                    .flat_map(|f| was.primitive(f as usize).iter().copied()),
+            )
+            .chain((tail..was.len()).flat_map(|f| was.primitive(f).iter().copied())),
+    );
     let mut vertices = previous.vertices.edit();
     vertices.truncate(topology.offsets()[tail] as usize);
     (vertices.len()..topology.vertex_count()).for_each(|_| vertices.push([0.0; 3]));
-    let mut fan = Fan::default();
-    for p in points {
-        for &(v, n) in fan.at(value, inputs, p as usize, &faces) {
-            vertices[v as usize] = n;
+    let fans = parallel::blocks(points.len(), BLOCK, |r| {
+        let mut fan = Fan::default();
+        let mut out = Vec::new();
+        for &p in &points[r] {
+            out.extend_from_slice(fan.at(value, inputs, p as usize, &faces));
         }
+        out
+    });
+    for &(v, n) in fans.iter().flatten() {
+        vertices[v as usize] = n;
     }
     ShadingNormals {
         vertices: vertices.finish(),
         primitives: flat.finish(),
-        faces: faces.finish(),
+        faces,
     }
 }
 

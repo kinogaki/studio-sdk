@@ -4,6 +4,7 @@
 mod clip;
 
 use crate::column::Column;
+use crate::elements::once_each;
 use crate::geometry::Geometry;
 use crate::kept::Kept;
 use crate::parallel;
@@ -162,8 +163,10 @@ impl Geometry {
     /// `previous`, `before`'s: only the polygons through the points `moved`
     /// (which must include every point whose position differs) and the rows
     /// that differ between the two tables are clipped again, the other
-    /// triangles stay and their cells stay shared. Built whole when most rows
-    /// differ.
+    /// triangles stay and their cells stay shared (past an eighth of the
+    /// points moved, every polygon is clipped again on the workers, its
+    /// triangles still shared where none changed). Built whole when most
+    /// rows differ.
     pub fn triangulation_after(
         &self,
         before: &Geometry,
@@ -285,28 +288,42 @@ fn rebuilt(
         return build(value);
     }
     let index = topology.index();
-    let mut polygons: Vec<u32> = moved
-        .iter()
-        .filter(|&&p| (p as usize) < topology.points())
-        .flat_map(|&p| index.point_faces(p as usize).iter().copied())
-        .chain(change.rewired)
-        .filter(|&f| (f as usize) < tail && topology.kind(f as usize).is_polygon())
-        .collect();
-    polygons.sort_unstable();
-    polygons.dedup();
+    // Over an eighth of the points moved: every polygon, sooner than
+    // gathered.
+    let mut polygons = match moved.len() > topology.points() / 8 {
+        true => (0..tail as u32).collect(),
+        false => {
+            let through = moved.iter().filter(|&&p| (p as usize) < topology.points());
+            once_each(
+                tail,
+                (through.flat_map(|&p| index.point_faces(p as usize).iter().copied()))
+                    .chain(change.rewired),
+            )
+        }
+    };
+    polygons.retain(|&f| topology.kind(f as usize).is_polygon());
     let layout = Layout::of(topology);
     let first = layout.before(tail);
-    let mut changed: Vec<(usize, Triangle)> = Vec::new();
     let mut fans: Vec<u32> = (previous.fans.iter().copied())
         .filter(|&f| (f as usize) < tail && polygons.binary_search(&f).is_err())
         .collect();
-    for &p in &polygons {
-        let (one, fanned) = triangles_of(value, &layout, p as usize..p as usize + 1);
+    // Clipped in parallel blocks: a move of most points moves most.
+    let blocks = parallel::blocks(polygons.len(), BLOCK, |r| {
+        let (mut changed, mut fans) = (Vec::new(), Vec::new());
+        for &p in &polygons[r] {
+            let (one, fanned) = triangles_of(value, &layout, p as usize..p as usize + 1);
+            fans.extend(fanned);
+            let at = layout.before(p as usize);
+            changed.extend((at..).zip(one).filter(|(i, t)| {
+                previous.triangles[*i] != t.points || previous.corners[*i] != t.vertices
+            }));
+        }
+        (changed, fans)
+    });
+    let mut changed: Vec<(usize, Triangle)> = Vec::new();
+    for (block, fanned) in blocks {
+        changed.extend(block);
         fans.extend(fanned);
-        let at = layout.before(p as usize);
-        changed.extend((at..).zip(one).filter(|(i, t)| {
-            previous.triangles[*i] != t.points || previous.corners[*i] != t.vertices
-        }));
     }
     let (appended, tail_fans) = triangles_of(value, &layout, tail..topology.len());
     fans.extend(tail_fans);
