@@ -24,6 +24,9 @@
 //!   attribute a file carries, and the standard names ([`metadata`]).
 //! - **Sampling.** Where a texture names an image, [`Sampling`] says how it
 //!   is read past its edges and between its texels.
+//! - **Reading at points.** A [`Sampler`] ([`Image::sampler`]) reads a layer
+//!   at coordinates, through a [`SampleFilter`] and a [`Wrap`]: what every
+//!   reader of an image at points shares.
 //!
 //! ```
 //! use kinogaki_geometry::image::{Encoding, Format, Image, Rect, Sample};
@@ -43,6 +46,7 @@ mod held;
 pub mod metadata;
 mod pyramid;
 mod sample;
+mod sampler;
 mod sampling;
 #[cfg(test)]
 mod tests;
@@ -51,6 +55,7 @@ pub use encoding::{ColorTag, Encoding};
 pub use held::HeldPixels;
 pub use pyramid::Pyramid;
 pub use sample::{Sample, f32_to_half, half_to_f32};
+pub use sampler::{SampleFilter, Sampler};
 pub use sampling::{Filter, Sampling, Wrap};
 
 use crate::attributes::Attributes;

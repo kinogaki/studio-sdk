@@ -159,6 +159,7 @@ kinogaki-geometry/doc test crates/geometry/src/frame.rs - frame::Frame
 kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry
 kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry::with_moved
 kinogaki-geometry/doc test crates/geometry/src/image/mod.rs - image
+kinogaki-geometry/doc test crates/geometry/src/image/sampler.rs - image::sampler::Sampler
 kinogaki-geometry/doc test crates/geometry/src/instancing.rs - instancing::placements
 kinogaki-geometry/doc test crates/geometry/src/lib.rs -
 kinogaki-geometry/doc test crates/geometry/src/primitives/components.rs - primitives::components::Components
@@ -214,6 +215,16 @@ kinogaki-geometry/lib test brep::tests::refusals::structure_is_checked
 kinogaki-geometry/lib test curve::tests::a_span_reads_only_its_own_knots
 kinogaki-geometry/lib test diagnostic::tests::messages_say_where
 kinogaki-geometry/lib test error::tests::an_error_is_its_diagnostic_and_its_kind
+kinogaki-geometry/lib test image::sampler::tests::bilinear_and_bicubic_reproduce_a_ramp_between_texels
+kinogaki-geometry/lib test image::sampler::tests::each_wrap_reads_past_the_edges_as_it_says
+kinogaki-geometry/lib test image::sampler::tests::every_filter_and_wrap_reads_a_texel_center_as_stored
+kinogaki-geometry/lib test image::sampler::tests::footprint_reads_the_level_its_spacing_matches
+kinogaki-geometry/lib test image::sampler::tests::levels_reach_one_texel_across_tiles_and_odd_sizes
+kinogaki-geometry/lib test image::sampler::tests::nearest_reads_the_texel_the_point_lies_in
+kinogaki-geometry/lib test image::sampler::tests::nothing_to_read_reads_nothing
+kinogaki-geometry/lib test image::sampler::tests::pixels_outside_the_data_window_read_nothing
+kinogaki-geometry/lib test image::sampler::tests::v_runs_up_from_the_bottom_row
+kinogaki-geometry/lib test image::sampler::tests::values_decode_as_read_pixel_decodes_them
 kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
 kinogaki-geometry/lib test image::tests::a_held_layer_has_no_tiles_and_compares_by_its_key
 kinogaki-geometry/lib test image::tests::a_plane_reads_back_as_it_was_built

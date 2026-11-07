@@ -157,8 +157,12 @@ pub trait Passes: Sync {
 /// says nothing about it itself.
 #[derive(Clone, Debug)]
 pub enum Resolved {
-    /// What the path names: an object's result, or a node's.
-    Object(Data),
+    /// What the path names, an object's result or a node's, and where that
+    /// object (the one holding the node) is placed in the space of the
+    /// object the node cooks in, at the cook's time. A value is unplaced:
+    /// what holds it places it (a camera's lens, another object's geometry
+    /// brought into this one's space).
+    Object(Data, kinogaki_geometry::Xform),
     /// The path itself, as core resolved it from the node (absolute), for
     /// a path the node writes rather than reads (a Material's).
     Path(String),

@@ -6,7 +6,7 @@ use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, ParametersExt, Value};
 use crate::refs::NodeRef;
-use kinogaki_geometry::{Rate, Time};
+use kinogaki_geometry::{Rate, Time, Xform};
 use std::any::Any;
 use std::ops::Range;
 
@@ -102,7 +102,19 @@ impl<'a> CookCx<'a> {
     /// when the node reads objects and core resolved it.
     pub fn object(&self, name: &str) -> Option<&Data> {
         self.resolved.iter().find_map(|(n, r)| match r {
-            Resolved::Object(data) if n == name => Some(data),
+            Resolved::Object(data, _) if n == name => Some(data),
+            _ => None,
+        })
+    }
+
+    /// Where the object path parameter `name` names (or the object holding
+    /// the node it names) is placed in the space of the object the node
+    /// cooks in, at the cook's time, when the node reads objects and core
+    /// resolved it: what places a camera's lens, or brings another object's
+    /// geometry into this one's space ([`Resolved::Object`]).
+    pub fn placement(&self, name: &str) -> Option<Xform> {
+        self.resolved.iter().find_map(|(n, r)| match r {
+            Resolved::Object(_, placement) if n == name => Some(*placement),
             _ => None,
         })
     }
@@ -372,12 +384,16 @@ mod tests {
     use crate::id::DataTypeId;
 
     /// A node sees what core resolved its path parameters to, by name: an
-    /// object's result, or a path.
+    /// object's result and where it is placed, or a path.
     #[test]
     fn resolved_paths_are_read_by_parameter_name() {
         let number = Typed::<f64>::new(DataTypeId::declared("test.cx.number"));
+        let placed = Xform::translation(kinogaki_geometry::Vec3::new(0.0, 0.0, 5.0));
         let resolved = [
-            ("source".to_owned(), Resolved::Object(number.wrap(2.0))),
+            (
+                "source".to_owned(),
+                Resolved::Object(number.wrap(2.0), placed),
+            ),
             (
                 "material".to_owned(),
                 Resolved::Path("/Materials/Red".into()),
@@ -390,8 +406,10 @@ mod tests {
             .with_resolved(&resolved)
             .build();
         assert_eq!(cx.object("source").and_then(|d| number.get(d)), Some(&2.0));
+        assert_eq!(cx.placement("source"), Some(placed));
         assert_eq!(cx.path("material"), Some("/Materials/Red"));
         assert!(cx.object("material").is_none() && cx.path("source").is_none());
+        assert!(cx.placement("material").is_none());
         assert!(cx.project().is_none());
     }
 

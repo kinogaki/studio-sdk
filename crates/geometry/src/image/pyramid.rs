@@ -6,7 +6,7 @@
 //! kept while those four are the same tiles, so after an edit only what lies
 //! over a changed tile is derived again. Only pixels inside the level count:
 //! the padding past a window's edge doesn't darken it.
-use super::{Format, TILE, Tile};
+use super::{Format, TILE, Tile, tiles_of};
 use std::collections::HashMap;
 
 struct Kept {
@@ -43,13 +43,18 @@ impl Pyramid {
         (side.div_ceil(TILE).next_power_of_two().ilog2() + 1) as u8
     }
 
-    /// Tile `at` of `level`, `leaf` giving level 0's; `None` holds nothing.
+    /// Tile `at` of `level`, `leaf` giving level 0's; `None` holds nothing,
+    /// as does a place past the level's tiles.
     pub fn tile(
         &mut self,
         level: u8,
         at: [u32; 2],
         leaf: &mut dyn FnMut([u32; 2]) -> Option<Tile>,
     ) -> Option<Tile> {
+        let across = tiles_of(Self::level_size(self.size, level));
+        if at[0] >= across[0] || at[1] >= across[1] {
+            return None;
+        }
         if level == 0 {
             return leaf(at);
         }

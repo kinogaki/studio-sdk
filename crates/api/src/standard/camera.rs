@@ -2,7 +2,9 @@
 //! (render-api's [`Camera`], unplaced). It looks down its local −Z with
 //! +Y up; its lens and film back are millimetres, its clipping range and
 //! focus distance project units. Where a camera is belongs to what holds
-//! it (an object's placement, a file item's), never to the value.
+//! it (an object's placement, a file item's), never to the value: a node
+//! reading a Camera object by a path row finds it with
+//! [`CookCx::placement`](crate::CookCx::placement).
 //!
 //! ```text
 //! projection, focalLength, horizontalAperture, verticalAperture,
