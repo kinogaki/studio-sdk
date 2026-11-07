@@ -291,7 +291,7 @@ impl Engines {
         let own = network.nodes().iter().any(|n| n.def.mtlx().is_none());
         match own {
             true => self.owner(network)?.material_rules.standard(network),
-            false => crate::material::adopt::standard(network),
+            false => network.translated(crate::material::standard::OPEN_PBR),
         }
     }
 

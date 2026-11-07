@@ -139,6 +139,33 @@ fn standard_surface_translates_by_materialx_own_graph() {
     assert_eq!(surface.values["specular_weight"], Value::Number(1.0));
 }
 
+/// A format writing one model: an OpenPBR Surface as Standard Surface, its
+/// textures as they are and the translation folded to values.
+#[test]
+fn a_network_translates_to_the_model_a_format_writes() {
+    let mut built = MaterialNetwork::builder();
+    let image = built
+        .node(&def("ND_image_color3").unwrap(), &Parameters::new())
+        .unwrap();
+    let values = [("base_metalness".to_owned(), Value::Number(1.0))].into();
+    let s = built
+        .node(&def("ND_open_pbr_surface_surfaceshader").unwrap(), &values)
+        .unwrap();
+    built.link(image, "out", s, "base_color").unwrap();
+    let open = built.build(s).unwrap();
+    let standard = open.translated("standard_surface").unwrap();
+    assert_eq!(nodes(&standard), ["image", "standard_surface"]);
+    let surface = &standard.nodes()[standard.surface().unwrap() as usize];
+    assert_eq!(surface.values["metalness"], Value::Number(1.0));
+    let [link] = standard.links() else {
+        panic!("one wire: {:?}", standard.links());
+    };
+    assert_eq!(&*link.input, "base_color");
+    // A model already shown is the network as it is; none reaches nothing.
+    assert_eq!(open.translated("open_pbr_surface"), Some(open.clone()));
+    assert_eq!(open.translated("nothing_surface"), None);
+}
+
 #[test]
 fn a_conditional_of_values_passes_the_input_it_chooses_on() {
     // Standard Surface's `specular` from an image, on a dielectric: MaterialX's

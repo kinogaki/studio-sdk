@@ -339,6 +339,7 @@ kinogaki-render-api/lib test engine::tests::a_dropped_deliverer_resolves_its_res
 kinogaki-render-api/lib test engine::tests::a_failure_resolves_once_saying_why
 kinogaki-render-api/lib test material::adopt::tests::a_conditional_of_values_passes_the_input_it_chooses_on
 kinogaki-render-api/lib test material::adopt::tests::a_model_expands_for_an_engine_of_every_leaf_and_translates_for_one_of_openpbr
+kinogaki-render-api/lib test material::adopt::tests::a_network_translates_to_the_model_a_format_writes
 kinogaki-render-api/lib test material::adopt::tests::a_node_the_engine_implements_passes_as_it_is
 kinogaki-render-api/lib test material::adopt::tests::a_surface_with_no_way_renders_the_default
 kinogaki-render-api/lib test material::adopt::tests::an_image_wired_into_a_graph_defined_texture_reaches_the_image_inside
@@ -415,6 +416,7 @@ kinogaki-studio-api/doc test crates/api/src/cook/handle.rs - cook::handle::Handl
 kinogaki-studio-api/doc test crates/api/src/cook/placement.rs - cook::placement::Placement
 kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement
 kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::is_name
+kinogaki-studio-api/doc test crates/api/src/format/files.rs - format::files
 kinogaki-studio-api/doc test crates/api/src/format/input.rs - format::input::Input
 kinogaki-studio-api/doc test crates/api/src/format/options.rs - format::options
 kinogaki-studio-api/doc test crates/api/src/icon.rs - icon
@@ -463,6 +465,8 @@ kinogaki-studio-api/lib test element::values::tests::a_damaged_ramp_or_curve_is_
 kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused
 kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back
 kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewports_detail_unless_told
+kinogaki-studio-api/lib test format::files::tests::embedded_files_are_written_once_and_numbered_past_a_clash
+kinogaki-studio-api/lib test format::files::tests::paths_are_relative_to_the_document_where_one_reaches
 kinogaki-studio-api/lib test format::input::tests::a_file_is_read_as_it_is_asked_for_and_a_missing_one_says_so
 kinogaki-studio-api/lib test format::input::tests::a_kept_file_is_lent_and_held_without_a_copy
 kinogaki-studio-api/lib test format::input::tests::bytes_in_memory_are_lent_and_their_head_is_at_most_its_length
@@ -478,6 +482,7 @@ kinogaki-studio-api/lib test image_files::tests::an_image_node_reads_its_file_it
 kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_take
 kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup
 kinogaki-studio-api/lib test network::edit::tests::a_compiled_material_seeds_its_nodes_and_an_image_node_an_image
+kinogaki-studio-api/lib test network::edit::tests::a_seed_makes_the_material_it_starts
 kinogaki-studio-api/lib test params::schema::tests::a_data_parameter_takes_values_of_its_type_alone
 kinogaki-studio-api/lib test params::schema::tests::a_parameter_check_names_it_by_its_label
 kinogaki-studio-api/lib test params::schema::tests::a_schema_lists_its_parameters_and_values

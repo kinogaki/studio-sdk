@@ -178,6 +178,16 @@ impl MaterialNetwork {
         &self.cut
     }
 
+    /// The network with its shown surface as MaterialX shading model `model`
+    /// (a node: `standard_surface`), through the chain of translation graphs
+    /// to it ([`kinogaki_mtlx::Library::translation`]), the translation folded
+    /// and every other node as it is (an engine's own too): what a file
+    /// format writing one model writes of another. None when its surface
+    /// translates to none.
+    pub fn translated(&self, model: &str) -> Option<MaterialNetwork> {
+        adopt::translated(self, model)
+    }
+
     /// Whether `other` has the same nodes' definitions and links, so only
     /// values differ.
     pub fn same_wiring(&self, other: &MaterialNetwork) -> bool {

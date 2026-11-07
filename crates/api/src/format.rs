@@ -41,6 +41,7 @@
 //! [`CHROMATICITIES`](kinogaki_geometry::image::metadata::CHROMATICITIES),
 //! writes each layer as the file can hold it, and says, as a warning, what
 //! it left out.
+pub mod files;
 mod input;
 pub mod options;
 

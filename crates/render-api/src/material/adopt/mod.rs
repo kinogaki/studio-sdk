@@ -97,13 +97,14 @@ pub(crate) fn adopt(network: &MaterialNetwork, engine: &EngineDescription) -> Ma
     rewrite(network, &native, &|def| engine.node_def(def.id).is_some())
 }
 
-/// `network` with its shown surface as an OpenPBR Surface, its translation
-/// folded: the standard form of a MaterialX material. None when its surface
-/// translates to none.
-pub(crate) fn standard(network: &MaterialNetwork) -> Option<MaterialNetwork> {
+/// `network` with its shown surface as shading model `model` (a node:
+/// `standard_surface`), its translation folded and every other node as it
+/// is: the standard form of a MaterialX material for OpenPBR Surface. None
+/// when its surface translates to none.
+pub(crate) fn translated(network: &MaterialNetwork, model: &str) -> Option<MaterialNetwork> {
     let surface = Type::of("surfaceshader");
     let native = |def: &kinogaki_mtlx::NodeDef| {
-        def.node == super::standard::OPEN_PBR || (def.ty() != surface && def.group != "translation")
+        def.node == model || (def.ty() != surface && def.group != "translation")
     };
     let form = rewrite(network, &native, &|_| true);
     form.output().is_some().then_some(form)

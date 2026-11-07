@@ -318,6 +318,51 @@ impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
     }
 }
 
+impl TryFrom<&NetworkSeed> for kinogaki_render_api::MaterialNetwork {
+    type Error = Error;
+
+    /// The material a Material's inside makes, what a file format reads of a
+    /// material it writes: its MaterialX nodes by their signatures with their
+    /// values, wired, each Image node's source read by the inputs it is wired
+    /// into ([`image_source`](crate::image_files::image_source)), the
+    /// displayed node shown. Refused: a node of another type (an engine's
+    /// own), an Image node reading a result, and a seed displaying nothing.
+    fn try_from(seed: &NetworkSeed) -> Result<Self, Error> {
+        use crate::image_files::{IMAGE_NODE, image_source};
+        use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
+        let mut built = kinogaki_render_api::MaterialNetwork::builder();
+        let mut made = Vec::with_capacity(seed.nodes.len());
+        for node in &seed.nodes {
+            if node.node_type == IMAGE_NODE {
+                made.push(None);
+                continue;
+            }
+            let signature = node.parameters.get(SIGNATURE).and_then(Value::choice);
+            let def = signature.and_then(def).ok_or_else(|| {
+                Error::invalid(format_args!("{} isn't a MaterialX node", node.node_type))
+            })?;
+            let mut values = node.parameters.clone();
+            values.remove(SIGNATURE);
+            made.push(Some(built.node(&def, &values)?));
+        }
+        let at = |n: usize| (made.get(n).copied()).ok_or_else(|| Error::invalid("no such node"));
+        for w in &seed.wires {
+            match (at(w.from)?, at(w.to)?) {
+                (Some(from), Some(to)) => built.link(from, &w.output, to, &w.input)?,
+                (None, Some(to)) => {
+                    let source = image_source(&seed.nodes[w.from].parameters)?;
+                    let source =
+                        source.ok_or_else(|| Error::invalid("an Image node reads a result"))?;
+                    built.image(to, &w.input, source)?;
+                }
+                (_, None) => return Err(Error::invalid("a wire into an Image node")),
+            }
+        }
+        let shown = (seed.nodes.iter().position(|n| n.display)).and_then(|n| made[n]);
+        built.build(shown.ok_or_else(|| Error::invalid("it shows no MaterialX node"))?)
+    }
+}
+
 /// Another way Tab and the menus make a node: a node of `node.node_type`
 /// with its parameters set, and its inside started with nodes (a Material
 /// of an engine's preset). A package declares it
@@ -418,5 +463,31 @@ mod tests {
         assert_eq!(signature(&made), signature(&seed.nodes[0]));
         assert_eq!(made.parameters.len(), 1, "its signature alone");
         assert!(NewNode::materialx("ND_nothing").is_none());
+    }
+
+    /// What a material's seed starts reads back as that material; an
+    /// engine's node isn't MaterialX's.
+    #[test]
+    fn a_seed_makes_the_material_it_starts() {
+        let mut built = MaterialNetwork::builder();
+        let none = Parameters::new();
+        let image = built.node(&def("ND_image_color3").unwrap(), &none).unwrap();
+        let red = [("base_weight".to_owned(), crate::Value::Number(0.5))].into();
+        let surface = def("ND_open_pbr_surface_surfaceshader").unwrap();
+        let s = built.node(&surface, &red).unwrap();
+        built.link(image, "out", s, "base_color").unwrap();
+        built
+            .image(image, "file", ImageSource::path("/t/wood.png"))
+            .unwrap();
+        let network = built.build(s).unwrap();
+        let seed = NetworkSeed::from(&network);
+        assert_eq!(MaterialNetwork::try_from(&seed).unwrap(), network);
+        let mut engines = seed.clone();
+        engines.nodes[1] = NewNode::new(NodeTypeId::declared("acme.engine.surface")).displayed();
+        let refused = MaterialNetwork::try_from(&engines).unwrap_err();
+        assert!(
+            refused.to_string().contains("isn't a MaterialX node"),
+            "{refused}"
+        );
     }
 }
