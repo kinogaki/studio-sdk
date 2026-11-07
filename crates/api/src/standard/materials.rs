@@ -36,10 +36,10 @@ pub struct ImportedMaterial {
     /// each texture's file an Image node wired into its `file` input
     /// ([`image_node::reading`](crate::image_files::image_node::reading)).
     pub inside: NetworkSeed,
-    /// Its standard form: an OpenPBR Surface network, what a host takes when
-    /// `inside` needs a package it hasn't installed (an engine's own
-    /// material written beside its MaterialX form). None when `inside` is
-    /// MaterialX's or nothing standard approximates it.
+    /// Its standard form: an OpenPBR Surface network, which a host takes
+    /// when it lacks a node type `inside` holds (an engine's own material,
+    /// as the engine approximates it). None when `inside` is MaterialX's
+    /// nodes alone, or nothing standard approximates it.
     pub standard: Option<NetworkSeed>,
     /// Whether a surface's back shows it too (the Material's Double Sided:
     /// glTF's `doubleSided`, USD's `doubleSided`); off, a realtime engine

@@ -16,10 +16,12 @@ What a Kinogaki Studio plugin compiles against. Studio is an environment: with n
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the API and the UI layer: what each part is for, the rules every package follows, and how the environment uses it.
 
-To write a plugin, follow the two walkthroughs:
+To write a plugin, follow the walkthrough for its kind:
 
 - [Write your first node plugin](docs/FIRST-NODE-PLUGIN.md): a data type, a node type that makes it, the context and object kind that make the node reachable from Tab, tests, and building against the plugin kit.
 - [Write your first context plugin](docs/FIRST-CONTEXT-PLUGIN.md): a context with its own UI (levels, commands, an inspector row) and its tests on the fake host.
+- [Your first render engine](docs/FIRST-RENDER-ENGINE.md): the render contract, from the description to previews.
+- [Your first file format](docs/FIRST-FORMAT.md): reading files into the standard values and writing them back, materials, images and lights included, and untrusted files.
 
 ## Who depends on it
 
@@ -58,11 +60,11 @@ Studio's architecture check enforces the rule: the SDK's crates depend on no Kin
 
 [`examples/flat-engine`](examples/flat-engine) is a render engine: a CPU ray caster on the SDK's render thread, its frames shown through a texture on the host's device; its test runs the SDK's engine conformance. [Your first render engine](docs/FIRST-RENDER-ENGINE.md) is its contract.
 
-[`examples/points-format`](examples/points-format) is a file format: XYZ point lists read into the standard geometry and written from it, with one option; its tests run the conformance suite's fixtures through it as a `Consumer`.
+[`examples/points-format`](examples/points-format) is a file format: XYZ, a text file of points, faces over them and the materials they show, read into the standard Geometry and materials (OpenPBR Surfaces, a picture through an Image node) and written from them, with Scale and Embed Textures options; its tests read and write it both ways and run the conformance suite's fixtures through it as a `Consumer`. [Your first file format](docs/FIRST-FORMAT.md) walks through it.
 
 [`examples/pin-board`](examples/pin-board) is a plugin with UI: a Pin Board object opening into a context of its own (its networks and its UI), with two selection levels, a Pin command and an inspector row, all in the one package it exports. Its tests drive the UI on the fake host, as Studio drives it. [Write your first context plugin](docs/FIRST-CONTEXT-PLUGIN.md) builds it step by step.
 
-Studio's own tests build both against its plugin kit, load them as plugin libraries, run the pin board's commands and cook the Box node in a network.
+Studio's own tests build all four against its plugin kit, load them as plugin libraries, run the pin board's commands and cook the Box node in a network.
 
 ## Building
 
