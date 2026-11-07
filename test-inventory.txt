@@ -78,6 +78,7 @@ kinogaki-edit/lib test editor::gather::tests::groups_and_edge_values_follow_thei
 kinogaki-edit/lib test editor::gather::tests::ids_keep_the_first_and_refresh_the_rest
 kinogaki-edit/lib test editor::gather::tests::one_value_where_it_is_is_that_value
 kinogaki-edit/lib test editor::gather::tests::text_tables_join_and_details_are_the_first_holders
+kinogaki-edit/lib test ids::tests::ids_are_found_whether_they_ascend_or_not
 kinogaki-edit/lib test ids::tests::merge_keeps_the_first_inputs_ids_and_renames_later_collisions
 kinogaki-edit/select test a_boundary_is_a_regions_outline
 kinogaki-edit/select test a_few_elements_convert_as_the_whole_value_says

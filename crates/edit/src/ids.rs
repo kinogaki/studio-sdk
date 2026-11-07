@@ -81,18 +81,61 @@ pub fn elements(value: &Geometry, domain: Domain, ids: &[i64]) -> Vec<u32> {
 }
 
 /// A lookup of `domain`'s elements in `value` by stable id ([`id_of`]'s
-/// inverse), the table made once: the element with an id, `None` for one
-/// gone.
+/// inverse): the element with an id, `None` for one gone. What it searches
+/// by is made once per ids column and shared by every value holding it
+/// ([`Column::derived`]), so a step finding its few elements in a million
+/// costs what it looks up.
 pub fn element_of(value: &Geometry, domain: Domain) -> impl Fn(i64) -> Option<u32> + use<> {
     let count = value.count(domain).unwrap_or(0) as u64;
-    let at: Option<HashMap<i64, u32>> = value.ids(domain).map(|now| {
-        (now.iter().enumerate())
-            .map(|(i, &id)| (id, i as u32))
-            .collect()
-    });
-    move |id| match &at {
-        Some(at) => at.get(&id).copied(),
-        None => u32::try_from(id).ok().filter(|&e| u64::from(e) < count),
+    let ids = value.ids(domain).cloned();
+    let lookup = ids.as_ref().map(|ids| ids.derived(Lookup::of));
+    move |id| match (&ids, &lookup) {
+        (Some(ids), Some(lookup)) => lookup.find(ids, id),
+        _ => u32::try_from(id).ok().filter(|&e| u64::from(e) < count),
+    }
+}
+
+/// How an ids column is searched: by halving while its ids ascend (as
+/// numbering, appending and removing leave them), else through a map.
+enum Lookup {
+    Ascending,
+    Map(HashMap<i64, u32>),
+}
+
+impl Lookup {
+    fn of(ids: &Column<i64>) -> Self {
+        let mut last = None;
+        let ascending = ids
+            .iter()
+            .all(|&id| last.replace(id).is_none_or(|l| l < id));
+        match ascending {
+            true => Lookup::Ascending,
+            false => Lookup::Map(
+                ids.iter()
+                    .enumerate()
+                    .map(|(i, &id)| (id, i as u32))
+                    .collect(),
+            ),
+        }
+    }
+
+    /// The element of `ids` holding `id`.
+    fn find(&self, ids: &Column<i64>, id: i64) -> Option<u32> {
+        match self {
+            Lookup::Map(at) => at.get(&id).copied(),
+            Lookup::Ascending => {
+                let (mut low, mut high) = (0, ids.len());
+                while low < high {
+                    let middle = low + (high - low) / 2;
+                    match ids[middle].cmp(&id) {
+                        std::cmp::Ordering::Less => low = middle + 1,
+                        std::cmp::Ordering::Greater => high = middle,
+                        std::cmp::Ordering::Equal => return Some(middle as u32),
+                    }
+                }
+                None
+            }
+        }
     }
 }
 
@@ -176,6 +219,30 @@ pub(crate) fn merged(inputs: &[Input<'_>]) -> Option<Vec<i64>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kinogaki_geometry::{Attributes, Primitives};
+
+    #[test]
+    fn ids_are_found_whether_they_ascend_or_not() {
+        let with = |ids: Vec<i64>| {
+            let t = Primitives::of_polygons(5, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
+            let ids = Attribute::tuples(ids, Meaning::None).unwrap();
+            let held = Attributes::new()
+                .with(Domain::Point, names::ID, ids)
+                .unwrap();
+            Geometry::new(vec![[0.0; 3]; 5].into(), t, held).unwrap()
+        };
+        // Numbered, then a point gone: ascending with a gap.
+        let ascending = with(vec![0, 1, 3, 4, 9]);
+        assert_eq!(
+            elements(&ascending, Domain::Point, &[9, 2, 0, 3, -1, 10]),
+            [4, 0, 2]
+        );
+        let shuffled = with(vec![7, 3, 9, 0, 4]);
+        assert_eq!(elements(&shuffled, Domain::Point, &[0, 9, 1, 7]), [3, 2, 0]);
+        for (k, &id) in [7, 3, 9, 0, 4].iter().enumerate() {
+            assert_eq!(element_of(&shuffled, Domain::Point)(id), Some(k as u32));
+        }
+    }
 
     #[test]
     fn merge_keeps_the_first_inputs_ids_and_renames_later_collisions() {
