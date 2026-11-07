@@ -63,7 +63,7 @@ pub fn default_item(ty: AttributeType) -> Vec<f64> {
 }
 
 /// A real storage's type.
-trait Real: Copy {
+pub(super) trait Real: Copy {
     fn to_f64(self) -> f64;
     fn from_f64(x: f64) -> Self;
 }
@@ -109,7 +109,7 @@ fn rows<T: Copy>(
 }
 
 /// Blends `sources`' items of `values` into `out` by `rule`.
-fn blend_real<T: Real>(
+pub(super) fn blend_real<T: Real>(
     values: &Column<T>,
     width: usize,
     rule: Rule,
@@ -186,7 +186,7 @@ fn slerp(q: &mut [f64], to: &[f64], t: f64) {
 }
 
 /// The strongest source's item of `values`, or `default` without sources.
-fn strongest_item<T: Copy>(
+pub(super) fn strongest_item<T: Copy>(
     values: &Column<T>,
     width: usize,
     sources: &[Source],

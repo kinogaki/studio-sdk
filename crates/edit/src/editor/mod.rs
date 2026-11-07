@@ -25,6 +25,10 @@
 //!   and a tool knows where its elements ended up.
 //! - **Values gather** ([`gather`]): several values into one, each at a
 //!   placement, by the same attribute rules.
+//! - **Blends can be made again** ([`reblend`]): some elements' values
+//!   from other sources, in place, as an edit makes them: a step replayed
+//!   at other rows whose new corners take what lies where its new points
+//!   moved.
 //!
 //! Numbers stay put during an edit: a base element keeps its number, a new
 //! one takes the next, and a removal takes effect at the finish: the last
@@ -69,6 +73,7 @@ mod follow;
 mod gather;
 mod layout;
 mod place;
+mod reblend;
 mod settle;
 mod split;
 
@@ -77,6 +82,7 @@ pub use change::{Change, Numbers};
 pub use extract::extract;
 pub use finish::place;
 pub use gather::{NOTHING, Placed, gather, gather_table, picked, spread};
+pub use reblend::reblend;
 
 use kinogaki_geometry::{Basis, Error, Geometry, Kind, Vec3, Xform};
 use layout::{Blends, Source, Span};

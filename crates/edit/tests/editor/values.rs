@@ -2,10 +2,11 @@
 //! follow.
 use super::fixture::*;
 use kinogaki_edit::deform::{Deform, Move};
-use kinogaki_edit::editor::{Corner, Editor, Rule, rule};
+use kinogaki_edit::editor::{Corner, Editor, Rule, reblend, rule};
 use kinogaki_edit::select;
 use kinogaki_geometry::{
-    AttributeType, Basis, Domain, Elements, Kind, Meaning, Selection, Storage, Vec3, names,
+    AttributeType, Basis, Domain, Elements, Geometry, Kind, Meaning, Selection, Storage, Vec3,
+    names,
 };
 use std::f32::consts::FRAC_PI_2;
 use std::sync::Arc;
@@ -399,5 +400,53 @@ fn placing_turns_values_by_their_meaning_and_shares_the_rest() {
     assert!(
         out.positions().ptr_eq(value.positions()),
         "positions are the tool's"
+    );
+}
+
+#[test]
+fn blends_made_again_in_place_are_an_edits_own() {
+    // A triangle over a corner of the sheet, its corners blended from the
+    // base's vertices by one set of weights, then made again with another:
+    // what an edit with those weights makes, every bit, its strongest
+    // sources (an integer, a group) moving with them; nothing else written.
+    let value = ruled(2, 2);
+    let made = |w: f64| {
+        let sources = [
+            vec![(0, 1.0 - w), (1, w)],
+            vec![(1, w), (2, 0.25), (5, 1.0 - w)],
+            vec![(3, 0.5), (4, w)],
+        ];
+        let mut edit = Editor::new(&value);
+        let corners: Vec<Corner<'_>> = ([0u32, 1, 4].iter().zip(&sources))
+            .map(|(&point, from)| Corner { point, from })
+            .collect();
+        let f = edit.add_primitive(Kind::POLYGON, &corners, &[(0, 1.0)]);
+        let (made, change) = edit.finish().unwrap();
+        let f = change.primitives.of(f).unwrap() as usize;
+        let first = made.primitives().primitive_vertices(f).start as u32;
+        let listed = (sources.into_iter().enumerate())
+            .map(|(k, s)| (first + k as u32, s))
+            .collect::<Vec<_>>();
+        (made, listed)
+    };
+    let (before, _) = made(0.2);
+    let (after, listed) = made(0.9);
+    let again = reblend(&before, &value, Domain::Vertex, &listed).unwrap();
+    let bits = |v: &Geometry| {
+        column::<[f32; 2]>(v, Domain::Vertex, names::UV)
+            .iter()
+            .map(|uv| uv.map(f32::to_bits))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(bits(&again), bits(&after));
+    assert_ne!(bits(&again), bits(&before));
+    assert_eq!(again.attributes(), after.attributes());
+    assert_ne!(
+        members(&again, Domain::Vertex, "even"),
+        members(&before, Domain::Vertex, "even")
+    );
+    assert_eq!(
+        key(&again, Domain::Point, names::CD),
+        key(&before, Domain::Point, names::CD)
     );
 }

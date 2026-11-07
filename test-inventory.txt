@@ -51,6 +51,7 @@ kinogaki-edit/editor test values::a_deform_places_each_point_by_its_weight_where
 kinogaki-edit/editor test values::a_deform_turns_typed_values_as_the_move_does
 kinogaki-edit/editor test values::a_new_element_without_sources_takes_its_types_default
 kinogaki-edit/editor test values::a_new_point_takes_each_attribute_by_its_rule
+kinogaki-edit/editor test values::blends_made_again_in_place_are_an_edits_own
 kinogaki-edit/editor test values::each_rule_is_declared_by_storage_and_meaning
 kinogaki-edit/editor test values::moving_points_copies_the_positions_alone
 kinogaki-edit/editor test values::nothing_changed_is_the_value_itself
