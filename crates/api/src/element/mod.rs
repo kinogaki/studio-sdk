@@ -207,10 +207,12 @@ pub trait ElementWriter {
     fn child(&mut self, name: &str, kind: &str) -> Result<Box<dyn ElementWriter + '_>, Error>;
 
     /// Writes a value that other places may share as child `name` of
-    /// `kind`. `key` identifies the value for this save (an `Arc`'s
-    /// address, a content hash): the first `share` with a key calls `write`
-    /// with the new child's writer; a later one with the same key writes
-    /// only a reference to that child, and `write` is not called.
+    /// `kind`. `key` identifies the value for this save: a content hash, or
+    /// the address of an `Arc` that lives until the save ends (one the
+    /// value being written holds; a temporary's address can be the next
+    /// value's). The first `share` with a key calls `write` with the new
+    /// child's writer; a later one with the same key writes only a
+    /// reference to that child, and `write` is not called.
     fn share(
         &mut self,
         name: &str,
