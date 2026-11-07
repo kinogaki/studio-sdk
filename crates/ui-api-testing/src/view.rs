@@ -3,7 +3,7 @@
 //! response, what the pointer is over).
 use kinogaki_studio_api::Vec3;
 use studio_ui_api::host::{Ground, PointerOver, View, ViewCamera};
-use studio_ui_api::{Projection, Rect, Response, Slot};
+use studio_ui_api::{Rect, Response, Slot, ViewProjection};
 
 /// The only view, at `rect` (the view pane too): the active one, nothing
 /// modal, the pointer free over it, no clicks or drags this frame, seen
@@ -27,7 +27,7 @@ pub fn view(rect: Rect) -> View {
 /// project points set their own).
 pub fn camera() -> ViewCamera {
     ViewCamera {
-        projection: Projection {
+        projection: ViewProjection {
             clip_from_object: Default::default(),
             object_from_clip: Default::default(),
             backward: Vec3::new(0.0, 0.0, 1.0),

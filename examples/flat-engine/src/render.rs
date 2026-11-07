@@ -5,13 +5,13 @@
 //! wakes the host once, and answers the reads waiting for it.
 use super::paint::Paint;
 use kinogaki_render_api::geometry::{Diagnostic, Error, Vec3, Xform};
-use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Published, Reading, lock};
+use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Published, Reading};
 use kinogaki_render_api::{
     Camera, Frame, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, Topology,
     ViewCamera, ViewDesc, ViewId, ViewMode, Wake, aov, f32_to_half,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 /// Flat as a host holds it.
 pub(crate) type Handle = EngineThread<()>;
@@ -345,4 +345,9 @@ fn nearest(triangles: &[Triangle], from: Vec3, toward: Vec3) -> Option<(f64, usi
         }
     }
     best.map(|(_, shade, at, uv)| (shade, at, uv))
+}
+
+/// `mutex` locked, whatever a panic left in it.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }

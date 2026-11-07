@@ -38,7 +38,7 @@
 //!     <rect x="3" y="3" width="5" height="5"/></svg>"##;
 //! let trees = PackageId::declared("acme.trees");
 //! let package = Package::new(trees, "Trees").with_icon(Icon::new("leaf", LEAF));
-//! assert!(package.icons[0].check().is_ok());
+//! assert!(package.icons()[0].check().is_ok());
 //! assert_eq!(icon::split("acme.trees/leaf"), Some(("acme.trees", "leaf")));
 //! assert_eq!(icon::split("cube"), None);
 //! ```

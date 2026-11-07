@@ -78,8 +78,8 @@ pub use material::preview::{
     PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
 };
 pub use material::{
-    DisplayTexture, Input, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef,
-    NodeIndex, Output, Socket,
+    DisplayTexture, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef,
+    NodeIndex, NodeInput, NodeOutput, Socket,
 };
 pub use prim::{
     Camera, Instancer, InstancerBuilder, Map, Material, MaterialMaps, Prim, PrimKind, Projection,
@@ -89,7 +89,7 @@ pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};
 pub use settings::SceneSettings;
 pub use source::{PlainTriangles, ShapeSource};
-pub use update::{Change, SceneUpdate};
+pub use update::{PrimChange, SceneUpdate};
 
 #[cfg(test)]
 mod tests;

@@ -2,7 +2,7 @@
 //! and nodes, where the user is, one view as a package sees it, what a
 //! node's rows drawn by the host did, and the user's preferences.
 use crate::gizmo::TransformTool;
-use crate::{Pos, Projection, Rect, Response, Slot};
+use crate::{Pos, Rect, Response, Slot, ViewProjection};
 use kinogaki_studio_api::geometry::Ray;
 use kinogaki_studio_api::{ContextId, Units, Vec3};
 pub use kinogaki_studio_api::{NodeRef, ObjectRef};
@@ -66,7 +66,7 @@ pub struct NodeRows {
 pub struct ViewCamera {
     /// Object space to the view's pixels and back, for this view's
     /// rectangle.
-    pub projection: Projection,
+    pub projection: ViewProjection,
     /// Where the camera is, in object space.
     pub eye: Vec3,
     /// What it looks at, in object space.

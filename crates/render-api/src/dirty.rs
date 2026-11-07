@@ -12,7 +12,7 @@ impl Dirty {
     /// Nothing changed.
     pub const NONE: Dirty = Dirty(0);
     /// A shape's point positions (its connectivity stands), at the
-    /// [`Change`](crate::Change)'s ranges.
+    /// [`PrimChange`](crate::PrimChange)'s ranges.
     pub const POINTS: Dirty = Dirty(1 << 0);
     /// A shape's connectivity, and with it every array sized by it.
     pub const TOPOLOGY: Dirty = Dirty(1 << 1);

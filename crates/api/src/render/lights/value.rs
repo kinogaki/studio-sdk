@@ -19,7 +19,7 @@ use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use crate::standard::light;
 use kinogaki_geometry::{Sampled, Xform};
-use kinogaki_render_api::standard::{Emission, Light, Shape};
+use kinogaki_render_api::standard::{Emission, Light, LightShape};
 
 /// The largest size, intensity or temperature a light takes.
 const MAX_VALUE: f32 = 1e12;
@@ -41,14 +41,14 @@ pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
     let positive = |v: f32| within(v) && v > 0.0;
     let at_least_0 = |v: f32| within(v) && v >= 0.0;
     let shape = match &light.shape {
-        Shape::Rect { width, height } => positive(*width) && positive(*height),
-        Shape::Disk { radius } => positive(*radius),
-        Shape::Dome { image, ground } => {
+        LightShape::Rect { width, height } => positive(*width) && positive(*height),
+        LightShape::Disk { radius } => positive(*radius),
+        LightShape::Dome { image, ground } => {
             ground.is_none_or(|g| g.into_iter().all(within))
                 && image.as_ref().is_none_or(|path| !path.trim().is_empty())
         }
-        Shape::Distant { angle } => at_least_0(*angle) && *angle <= 180.0,
-        Shape::Spot {
+        LightShape::Distant { angle } => at_least_0(*angle) && *angle <= 180.0,
+        LightShape::Spot {
             radius,
             cone_angle,
             cone_softness,
@@ -84,16 +84,16 @@ impl LightCodec {
     pub(crate) fn write_light(light: &Light, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let float = |v: f32| Field::Float(f64::from(v));
         let ty = match &light.shape {
-            Shape::Rect { width, height } => {
+            LightShape::Rect { width, height } => {
                 out.set("width", float(*width))?;
                 out.set("height", float(*height))?;
                 "RectLight"
             }
-            Shape::Disk { radius } => {
+            LightShape::Disk { radius } => {
                 out.set("radius", float(*radius))?;
                 "DiskLight"
             }
-            Shape::Dome { image, ground } => {
+            LightShape::Dome { image, ground } => {
                 if let Some(g) = ground {
                     out.set("groundColor", Field::F32s(g.to_vec()))?;
                 }
@@ -102,11 +102,11 @@ impl LightCodec {
                 }
                 "DomeLight"
             }
-            Shape::Distant { angle } => {
+            LightShape::Distant { angle } => {
                 out.set("angle", float(*angle))?;
                 "DistantLight"
             }
-            Shape::Spot {
+            LightShape::Spot {
                 radius,
                 cone_angle,
                 cone_softness,
@@ -144,14 +144,14 @@ impl LightCodec {
             ))),
         };
         let shape = match e.text("type")? {
-            "RectLight" => Shape::Rect {
+            "RectLight" => LightShape::Rect {
                 width: scalar("width")?,
                 height: scalar("height")?,
             },
-            "DiskLight" => Shape::Disk {
+            "DiskLight" => LightShape::Disk {
                 radius: scalar("radius")?,
             },
-            "DomeLight" => Shape::Dome {
+            "DomeLight" => LightShape::Dome {
                 image: match e.field("texture") {
                     Some(_) => Some(e.text("texture")?.into()),
                     None => None,
@@ -161,10 +161,10 @@ impl LightCodec {
                     None => None,
                 },
             },
-            "DistantLight" => Shape::Distant {
+            "DistantLight" => LightShape::Distant {
                 angle: scalar("angle")?,
             },
-            "SphereLight" => Shape::Spot {
+            "SphereLight" => LightShape::Spot {
                 radius: scalar("radius")?,
                 cone_angle: scalar("coneAngle")?,
                 cone_softness: scalar("coneSoftness")?,
@@ -222,21 +222,21 @@ mod tests {
     /// One light of each shape, with values off their defaults.
     fn every_shape() -> Vec<Light> {
         let shapes = [
-            Shape::Rect {
+            LightShape::Rect {
                 width: 2.0,
                 height: 0.5,
             },
-            Shape::Disk { radius: 0.25 },
-            Shape::Dome {
+            LightShape::Disk { radius: 0.25 },
+            LightShape::Dome {
                 image: None,
                 ground: Some([0.2, 0.1, 0.05]),
             },
-            Shape::Dome {
+            LightShape::Dome {
                 image: Some(Arc::from("sky/noon.exr")),
                 ground: None,
             },
-            Shape::Distant { angle: 0.53 },
-            Shape::Spot {
+            LightShape::Distant { angle: 0.53 },
+            LightShape::Spot {
                 radius: 0.1,
                 cone_angle: 30.0,
                 cone_softness: 0.2,
@@ -277,27 +277,27 @@ mod tests {
     #[test]
     fn only_lights_in_range_are_light_values() {
         let bad = [
-            Shape::Rect {
+            LightShape::Rect {
                 width: 0.0,
                 height: 1.0,
             },
-            Shape::Disk { radius: f32::NAN },
-            Shape::Distant { angle: -1.0 },
-            Shape::Spot {
+            LightShape::Disk { radius: f32::NAN },
+            LightShape::Distant { angle: -1.0 },
+            LightShape::Spot {
                 radius: 1.0,
                 cone_angle: 190.0,
                 cone_softness: 0.0,
             },
-            Shape::Spot {
+            LightShape::Spot {
                 radius: 1.0,
                 cone_angle: 45.0,
                 cone_softness: 1.5,
             },
-            Shape::Dome {
+            LightShape::Dome {
                 image: None,
                 ground: Some([f32::NAN, 0.0, 0.0]),
             },
-            Shape::Dome {
+            LightShape::Dome {
                 image: Some(Arc::from(" ")),
                 ground: None,
             },
@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn a_value_is_unplaced_and_keeps_its_image_file() {
-        let sky = Shape::Dome {
+        let sky = LightShape::Dome {
             image: Some(Arc::from("sky/noon.exr")),
             ground: None,
         };

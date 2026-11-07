@@ -1,6 +1,6 @@
 //! MaterialX's nodes as [`NodeDef`]s: one a signature of the
-//! [MaterialX library](kinogaki_mtlx::library), made on first use and shared
-//! ([`def`]). A node's type is `kinogaki.mtlx.<node>` ([`id`]), its label
+//! [MaterialX library](kinogaki_mtlx::library), all made on first use and
+//! shared ([`def`]). A node's type is `kinogaki.mtlx.<node>` ([`id`]), its label
 //! MaterialX's own or its name in words, its family its node group; its
 //! inputs keep MaterialX's names, defaults, enumerations and UI hints:
 //!
@@ -11,12 +11,12 @@
 //! - a `filename` input is an [`Image`](Socket::Image) wire alone: the host's
 //!   Image node reads the file, and holds what MaterialX's `colorspace`
 //!   attribute says.
-use super::def::{Input, NodeDef, Output, Socket};
+use super::def::{NodeDef, NodeInput, NodeOutput, Socket};
 use kinogaki_mtlx::{Port, Type, library};
 use kinogaki_value::NodeTypeId;
 use kinogaki_value::{Choice, Number, NumberLook, Parameter, Section, Value, ValueKind};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, OnceLock};
 
 /// MaterialX's node `node`'s type id (`kinogaki.mtlx.open_pbr_surface`).
 pub fn id(node: &str) -> Option<NodeTypeId> {
@@ -24,18 +24,17 @@ pub fn id(node: &str) -> Option<NodeTypeId> {
 }
 
 /// The node definition of MaterialX signature `signature`
-/// (`ND_image_color3`), made once and shared.
+/// (`ND_image_color3`), shared: the library's definitions are made once,
+/// all together, the first time one is asked for, and read without a lock.
 pub fn def(signature: &str) -> Option<Arc<NodeDef>> {
-    static MADE: Mutex<Option<HashMap<String, Arc<NodeDef>>>> = Mutex::new(None);
-    let mut made = MADE.lock().unwrap_or_else(|e| e.into_inner());
-    let made = made.get_or_insert_with(HashMap::new);
-    if let Some(def) = made.get(signature) {
-        return Some(def.clone());
-    }
-    let source = library().def(signature)?;
-    let def = Arc::new(make(source.clone())?);
-    made.insert(signature.to_owned(), def.clone());
-    Some(def)
+    static MADE: OnceLock<HashMap<String, Arc<NodeDef>>> = OnceLock::new();
+    let made = MADE.get_or_init(|| {
+        let library = library();
+        (library.nodes().flat_map(|node| library.signatures(node)))
+            .filter_map(|source| Some((source.name.clone(), Arc::new(make(source.clone())?))))
+            .collect()
+    });
+    made.get(signature).cloned()
 }
 
 /// The parameter a MaterialX node holds its signature in, a definition's
@@ -59,7 +58,7 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
         def = def.input(input(&source.node, port));
     }
     for port in &source.outputs {
-        def = def.output(Output::new(
+        def = def.output(NodeOutput::new(
             &port.name,
             &words(&port.name),
             Socket::of(&port.ty),
@@ -69,7 +68,7 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
 }
 
 /// `port` of node `node` as an input.
-fn input(node: &str, port: &Port) -> Input {
+fn input(node: &str, port: &Port) -> NodeInput {
     let socket = Socket::of(&port.ty);
     let label = port.label.clone().unwrap_or_else(|| words(&port.name));
     let wire = port.geomprop.is_some()
@@ -79,7 +78,7 @@ fn input(node: &str, port: &Port) -> Input {
         );
     let kind = kind(node, port);
     let (Some(kind), false) = (kind, wire) else {
-        return Input::wire(&port.name, &label, socket);
+        return NodeInput::wire(&port.name, &label, socket);
     };
     let default = (port.value.as_ref())
         .and_then(|v| value(&kind, v))
@@ -93,8 +92,8 @@ fn input(node: &str, port: &Port) -> Input {
         parameter = parameter.look(NumberLook::slider());
     }
     match port.uniform {
-        true => Input::Setting(parameter.animatable(false)),
-        false => Input::Driven(parameter, socket),
+        true => NodeInput::Setting(parameter.animatable(false)),
+        false => NodeInput::Driven(parameter, socket),
     }
 }
 
@@ -401,6 +400,23 @@ mod tests {
     use kinogaki_value::Unit;
 
     #[test]
+    fn every_signature_is_one_shared_definition() {
+        let first = def("ND_image_color3").expect("a definition");
+        assert!(
+            Arc::ptr_eq(&first, &def("ND_image_color3").unwrap()),
+            "shared"
+        );
+        let library = library();
+        let mut count = 0;
+        for source in library.nodes().flat_map(|node| library.signatures(node)) {
+            let made = def(&source.name).expect("every signature is a definition");
+            assert_eq!(made.mtlx().map(|d| &d.name), Some(&source.name));
+            count += 1;
+        }
+        assert!(count > 500, "{count} signatures");
+    }
+
+    #[test]
     fn materialx_nodes_keep_their_names_and_meaning() {
         let image = def("ND_image_color3").unwrap();
         assert_eq!(image.id.as_str(), "kinogaki.mtlx.image");
@@ -412,7 +428,7 @@ mod tests {
         // A file is an image wire alone, with no color space row of its own.
         assert!(matches!(
             image.find_input("file"),
-            Some(Input::Wire {
+            Some(NodeInput::Wire {
                 socket: Socket::Image,
                 ..
             })
@@ -421,14 +437,14 @@ mod tests {
         // An unwired texture coordinate reads the geometry's: a wire alone.
         assert!(matches!(
             image.find_input("texcoord"),
-            Some(Input::Wire {
+            Some(NodeInput::Wire {
                 socket: Socket::Vector2,
                 ..
             })
         ));
         let wrap = image
             .find_input("uaddressmode")
-            .and_then(Input::value)
+            .and_then(NodeInput::value)
             .unwrap();
         assert_eq!(wrap.value, Value::Choice(Arc::from("periodic")));
         // Shared, made once.
@@ -448,7 +464,7 @@ mod tests {
         let alpha = def("ND_gltf_pbr_surfaceshader").unwrap();
         let mode = alpha
             .find_input("alpha_mode")
-            .and_then(Input::value)
+            .and_then(NodeInput::value)
             .unwrap();
         assert!(
             matches!(&mode.kind, ValueKind::Integer { min: 0, max: 2, menu } if menu[1] == "MASK")
@@ -460,7 +476,12 @@ mod tests {
     fn lengths_in_the_scenes_units_are_lengths() {
         let unit = |signature: &str, input: &str| {
             let def = def(signature).unwrap();
-            match &def.find_input(input).and_then(Input::value).unwrap().kind {
+            match &def
+                .find_input(input)
+                .and_then(NodeInput::value)
+                .unwrap()
+                .kind
+            {
                 ValueKind::Number(n) | ValueKind::Vector { number: n, .. } => n.unit.clone(),
                 other => panic!("{input}: {other:?}"),
             }

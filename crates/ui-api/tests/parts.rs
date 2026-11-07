@@ -72,7 +72,7 @@ impl UiPackage for Ui {
 
 fn hosted() -> (FakeHost, Hosting) {
     let package = Package::new(PackageId::declared("acme.clock"), "Clock").with_ui(Ui);
-    let host = FakeHost::new(context(), package.slots.clone());
+    let host = FakeHost::new(context(), package.slots());
     let hosting = Hosting::new(package, &host);
     (host, hosting)
 }

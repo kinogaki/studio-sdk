@@ -4,10 +4,10 @@ use crate::card::{CardResponse, CardSpec, PopoverSpec};
 use crate::color::Color;
 use crate::geom::{Pos, Rect, Vec2};
 use crate::id::Id;
-use crate::input::{Input, KeyFilter};
+use crate::input::{KeyFilter, UserInput};
 use crate::paint::Painter;
 use crate::response::{InnerResponse, Response, Sense};
-use crate::sheet::{self, Edits, FieldKey, Keyed, Schema, SheetStyle};
+use crate::sheet::{self, Edits, FieldKey, Keyed, Sheet, SheetStyle};
 use crate::text::TextStyle;
 use crate::theme::Theme;
 use crate::value_fields::ValueFields;
@@ -40,7 +40,7 @@ pub type RowMenu<'a, K> = &'a mut dyn FnMut(&mut dyn Ui, &K);
 /// `studio_ui_api_testing::RecordingUi`, which records for tests.
 pub trait Ui {
     /// This frame's input.
-    fn input(&self) -> &Input;
+    fn input(&self) -> &UserInput;
 
     /// The host's theme.
     fn theme(&self) -> &Theme;
@@ -172,7 +172,7 @@ pub trait Ui {
     fn sheet(
         &mut self,
         style: &SheetStyle<'_>,
-        schema: &mut Schema<FieldKey>,
+        schema: &mut Sheet<FieldKey>,
         menu: Option<RowMenu<'_, FieldKey>>,
     ) -> Edits<FieldKey>;
 
@@ -234,7 +234,7 @@ pub trait UiExt: Ui {
     fn sheet_keyed<K: Clone + PartialEq + Hash>(
         &mut self,
         style: &SheetStyle<'_>,
-        schema: &mut Schema<K>,
+        schema: &mut Sheet<K>,
         menu: Option<RowMenu<'_, K>>,
     ) -> Edits<K> {
         let (keyed, mut fields) = Keyed::new(std::mem::take(schema));

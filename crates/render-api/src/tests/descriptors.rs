@@ -74,13 +74,13 @@ fn standard_lights_and_fog_round_trip_through_their_prims() {
     let lights = [
         standard::Light::default(),
         standard::Light {
-            shape: standard::Shape::Disk { radius: 0.25 },
+            shape: standard::LightShape::Disk { radius: 0.25 },
             emission: standard::Emission::Temperature,
             color_temperature: 3200.0,
             ..standard::Light::default()
         },
         standard::Light {
-            shape: standard::Shape::Dome {
+            shape: standard::LightShape::Dome {
                 image: None,
                 ground: Some([0.2, 0.1, 0.05]),
             },
@@ -89,19 +89,19 @@ fn standard_lights_and_fog_round_trip_through_their_prims() {
         },
         // A dome's image: its file in a value.
         standard::Light {
-            shape: standard::Shape::Dome {
+            shape: standard::LightShape::Dome {
                 image: Some(Arc::from("sky/noon.exr")),
                 ground: None,
             },
             ..standard::Light::default()
         },
         standard::Light {
-            shape: standard::Shape::Distant { angle: 0.53 },
+            shape: standard::LightShape::Distant { angle: 0.53 },
             intensity: 50_000.0,
             ..standard::Light::default()
         },
         standard::Light {
-            shape: standard::Shape::Spot {
+            shape: standard::LightShape::Spot {
                 radius: 0.1,
                 cone_angle: 30.0,
                 cone_softness: 0.2,
@@ -160,7 +160,7 @@ fn rows_show_and_apply_by_the_values_beside_them() {
     let image = param(&dome, "texture").unwrap();
     assert!(image.is_shown(&sky));
     assert_eq!(sky.get("texture"), Some(&Value::from("")));
-    let imageless = standard::Shape::Dome {
+    let imageless = standard::LightShape::Dome {
         image: None,
         ground: None,
     };

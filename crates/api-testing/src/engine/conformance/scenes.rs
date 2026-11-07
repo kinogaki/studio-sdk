@@ -50,7 +50,7 @@ pub(super) fn check(make: Make<'_>, scene: &Scene) -> Result<(), String> {
 pub(super) fn dome(description: &EngineDescription) -> Option<Prim> {
     description.prim_type(standard::DOME_LIGHT)?;
     let light = standard::Light {
-        shape: standard::Shape::Dome {
+        shape: standard::LightShape::Dome {
             image: None,
             ground: None,
         },

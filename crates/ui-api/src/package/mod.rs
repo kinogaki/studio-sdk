@@ -231,10 +231,9 @@ pub trait WithUi {
 }
 
 impl WithUi for Package {
-    fn with_ui(mut self, ui: impl UiPackage) -> Self {
+    fn with_ui(self, ui: impl UiPackage) -> Self {
         let registered = hosting::Registered::new(ui);
         let contexts = registered.contexts.iter().map(|c| c.id).collect();
-        self.ui = Some(PackageUi::new(contexts, registered));
-        self
+        self.with_package_ui(PackageUi::new(contexts, registered))
     }
 }

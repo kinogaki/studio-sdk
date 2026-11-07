@@ -33,11 +33,11 @@ Your lights, and your fog if you render one, are object kinds of your package: `
 
 `RenderEngine::update(SceneUpdate)` never blocks: an engine queues the batch and applies it at a pass boundary, folding batches it hasn't applied with `SceneUpdate::merge`. A batch holds `added`, `removed`, `changed`, new `settings` (what every view shares: units, frame rate, the Camera whose shutter placements blur across), and `settled` when a drag ended and refitted acceleration structures may be rebuilt. What a prim names comes before it: textures, then materials, then shapes, then Instancers.
 
-A `Change` carries the prim whole; `dirty` says what differs from what you hold:
+A `PrimChange` carries the prim whole; `dirty` says what differs from what you hold:
 
 | Bit | What changed | What to do |
 |---|---|---|
-| `POINTS` | a shape's positions, at `Change::points` | refit, updating those points |
+| `POINTS` | a shape's positions, at `PrimChange::points` | refit, updating those points |
 | `TOPOLOGY` | a shape's connectivity (or an Instancer's prototypes) | rebuild; everything sized by it came with it |
 | `PRIMVARS` | a shape's or Instancer's primvars | compare by name and column (`Column::ptr_eq`): an unchanged primvar is the same column |
 | `MATERIALS` | which materials a shape's primitives render with | re-read `Shape::subsets` |
@@ -90,9 +90,9 @@ Nodes of your own are data too; a host makes one node type of each, listed under
 
 ```rust
 let surface = NodeDef::new(NodeTypeId::declared("acme.ray.surface"), "Surface", "Surface")
-    .input(Input::Driven(color, Socket::Color3))      // a value a wire may drive
-    .input(Input::Setting(reads))                     // ValueKind::Attribute: a primvar it reads
-    .output(Output::new("out", "Out", Socket::surface()));
+    .input(NodeInput::Driven(color, Socket::Color3))  // a value a wire may drive
+    .input(NodeInput::Setting(reads))                 // ValueKind::Attribute: a primvar it reads
+    .output(NodeOutput::new("out", "Out", Socket::surface()));
 ```
 
 A value's kind is the SDK's `ValueKind`, its descriptor the one lights use, so a row needs no UI code. `Socket` is MaterialX's types; a surface's output is `Socket::surface()` (MaterialX's `surfaceshader`), so it feeds a Surface Material, and `Socket::Closure` of another name is yours alone: closures meet only their own name. Numbers drive numbers. An image is an input of `Socket::Image`: the host's Image node is wired into it and reads the file, and the node's `images()` say what each Image input reads. You receive the Texture prim the host read in the node's `textures()`, by the input's name (the host sets them with `MaterialNetwork::set_texture`, which takes Image inputs alone); `Node::reads_data` says whether it holds data (the node gives no color, or its Image node's Color is Data) rather than a color; a node with a `layer` value (MaterialX's `image`) receives that layer of the file as the prim's main layer (`Node::layer`).

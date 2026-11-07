@@ -65,7 +65,7 @@ fn the_node_is_listed_in_its_context() {
 fn the_node_cooks_in_a_network() {
     let package = package();
     let object = ObjectRef(1);
-    let mut host = FakeHost::new(network(), []);
+    let mut host = FakeHost::new(network(), &[]);
     host.networks
         .insert(object, FakeNetwork::new(network(), &[&package]).unwrap());
     let node_type = BoxNode.id();
@@ -101,14 +101,14 @@ fn the_node_cooks_in_a_network() {
 #[test]
 fn the_node_shows_by_the_package_icon() {
     let package = package();
-    let [icon] = &package.icons[..] else {
+    let [icon] = package.icons() else {
         panic!("one icon")
     };
     assert!(icon.check().is_ok());
     // Others name it by its package: `example.boxes/<name>`.
     assert_eq!(
         BoxNode.description().icon,
-        format!("{}/{}", package.id, icon.name)
+        format!("{}/{}", package.id(), icon.name)
     );
 }
 
@@ -266,8 +266,8 @@ fn the_entry_point_makes_the_package() {
     // What Studio's loader calls, through the entry's own type.
     let entry: kinogaki_studio_api::entry::Entry = kinogaki_package;
     let package = entry().expect("no panic");
-    assert_eq!(package.id, PackageId::declared("example.boxes"));
-    assert_eq!(package.node_types.len(), 1);
+    assert_eq!(package.id(), PackageId::declared("example.boxes"));
+    assert_eq!(package.node_types().len(), 1);
 }
 
 #[test]

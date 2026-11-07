@@ -1,7 +1,7 @@
 //! Handle geometry in screen space: the gizmo frame's projection, plane
 //! squares and rotation rings, and drag deltas along axes and planes.
 use crate::geom::{Pos, Rect, Vec2, vec2};
-use crate::projection::Projection;
+use crate::projection::ViewProjection;
 use kinogaki_studio_api::Vec3;
 
 /// A gizmo handle. Axes are 0, 1 and 2 (the frame's X, Y and Z).
@@ -38,7 +38,7 @@ pub struct GizmoFrame {
     /// constant length on screen).
     pub length: f64,
     /// The view's projection, for `rect`'s aspect.
-    pub projection: Projection,
+    pub projection: ViewProjection,
     /// The view's rectangle on screen.
     pub rect: Rect,
 }

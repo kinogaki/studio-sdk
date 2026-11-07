@@ -9,7 +9,7 @@ use studio_ui_api_testing::{Call, FakeHost, Hosting, RecordingUi};
 
 fn host() -> (FakeHost, Hosting) {
     let package = package();
-    let host = FakeHost::new(pinning(), package.slots.clone());
+    let host = FakeHost::new(pinning(), package.slots());
     let hosted = Hosting::new(package, &host);
     (host, hosted)
 }

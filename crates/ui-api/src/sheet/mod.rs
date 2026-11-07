@@ -2,7 +2,7 @@
 //! settings page shows, drawn by the host.
 //!
 //! An owner (a node's parameters, a tool, a settings page) describes its
-//! properties as a [`Schema`]: sections and subsections of typed
+//! properties as a [`Sheet`]: sections and subsections of typed
 //! [`Field`]s, each with its current value, whether it is enabled (and why
 //! not) and its hover text. The host draws it with
 //! [`Ui::sheet`](crate::Ui::sheet), lets the user edit the values in place
@@ -24,14 +24,15 @@
 //! buttons ([`Socket`]).
 mod edits;
 mod from_params;
+mod items;
 mod keyed;
 mod kind;
-mod schema;
 pub use kinogaki_studio_api::params::tone_curve;
 
 pub use kinogaki_studio_api::params::ramp;
 
 pub use edits::{Action, Edits};
+pub use items::{Animation, Band, Field, Item, Sheet};
 pub use keyed::{FieldKey, Keyed};
 pub use kind::{
     Chip, FileDialog, FileFilter, Kind, PathChoice, Socket, SocketKind, Trailing, segments,
@@ -42,7 +43,6 @@ pub use kinogaki_studio_api::params::code::{
 pub use kinogaki_studio_api::params::{
     Choice, CurveChannel, Number, NumberLook, NumberStyle, Unit,
 };
-pub use schema::{Animation, Field, Item, Schema, Section};
 
 use crate::id::Id;
 use std::borrow::Cow;

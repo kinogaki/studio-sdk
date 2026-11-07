@@ -34,70 +34,151 @@ use std::sync::Arc;
 /// ```
 /// use kinogaki_studio_api::{Package, PackageId};
 /// let package = Package::new(PackageId::declared("acme.trees"), "Trees");
-/// assert!(package.data_types.is_empty());
+/// assert!(package.data_types().is_empty());
 /// ```
 #[derive(Clone)]
 pub struct Package {
-    /// Its id (`kinogaki.mesh`).
-    pub id: PackageId,
-    /// What a UI calls it ("Mesh").
-    pub label: String,
-    /// The data types it defines.
-    pub data_types: Vec<Arc<dyn DataType>>,
-    /// How authored deltas apply to its data types.
-    pub held_edits: Vec<Arc<dyn HeldEdit>>,
-    /// How it meshes B-rep bodies for display, rendering and export.
-    pub meshers: Vec<Arc<dyn Mesher>>,
-    /// The functions it offers every other package, as a kernel.
-    pub verbs: Vec<Verb>,
-    /// The script engine it brings ([`script`](crate::script)): core's own
-    /// package does.
+    pub(crate) id: PackageId,
+    pub(crate) label: String,
+    pub(crate) data_types: Vec<Arc<dyn DataType>>,
+    pub(crate) held_edits: Vec<Arc<dyn HeldEdit>>,
+    pub(crate) meshers: Vec<Arc<dyn Mesher>>,
+    pub(crate) verbs: Vec<Verb>,
     pub(crate) script_engine: Option<Arc<dyn crate::script::ScriptEngine>>,
+    pub(crate) node_types: Vec<Arc<dyn NodeType>>,
+    pub(crate) contexts: Vec<NetworkContext>,
+    pub(crate) compilers: Vec<Arc<dyn NetworkCompiler>>,
+    pub(crate) creations: Vec<NodeCreation>,
+    pub(crate) object_kinds: Vec<Arc<dyn ObjectKindSpec>>,
+    pub(crate) formats: Vec<Arc<dyn FileFormat>>,
+    pub(crate) slots: Vec<SessionSlot>,
+    pub(crate) stored: Vec<StoredValue>,
+    pub(crate) icons: Vec<Icon>,
+    pub(crate) engines: Vec<Arc<EngineDescription>>,
+    // A field behind a feature changes the struct's layout. That is
+    // sound because a host and its plugins share one build of this crate
+    // (one feature set, so one layout): a plugin built against another
+    // build is refused before it is loaded.
+    #[cfg(feature = "wgpu")]
+    pub(crate) makers: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
+    #[cfg(feature = "wgpu")]
+    pub(crate) runners: Vec<(ContextId, Arc<dyn crate::network::run::PlanRunner>)>,
+    pub(crate) ui: Option<PackageUi>,
+}
+
+/// What it contributes, as the registry and the host read it. Each list
+/// grows only through its `with_` builder, so what an entry needs comes
+/// with it (an engine's material node types with its description, its
+/// maker with both).
+impl Package {
+    /// Its id (`kinogaki.mesh`).
+    pub fn id(&self) -> PackageId {
+        self.id
+    }
+
+    /// What a UI calls it ("Mesh").
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// The data types it defines.
+    pub fn data_types(&self) -> &[Arc<dyn DataType>] {
+        &self.data_types
+    }
+
+    /// How authored deltas apply to its data types.
+    pub fn held_edits(&self) -> &[Arc<dyn HeldEdit>] {
+        &self.held_edits
+    }
+
+    /// How it meshes B-rep bodies for display, rendering and export.
+    pub fn meshers(&self) -> &[Arc<dyn Mesher>] {
+        &self.meshers
+    }
+
+    /// The functions it offers every other package, as a kernel.
+    pub fn verbs(&self) -> &[Verb] {
+        &self.verbs
+    }
+
     /// What its node types compute.
-    pub node_types: Vec<Arc<dyn NodeType>>,
+    pub fn node_types(&self) -> &[Arc<dyn NodeType>] {
+        &self.node_types
+    }
+
     /// The network contexts it declares, whose networks core keeps in the
     /// objects of kinds naming them.
-    pub contexts: Vec<NetworkContext>,
+    pub fn contexts(&self) -> &[NetworkContext] {
+        &self.contexts
+    }
+
     /// The compilers of its compiled contexts, one each.
-    pub compilers: Vec<Arc<dyn NetworkCompiler>>,
+    pub fn compilers(&self) -> &[Arc<dyn NetworkCompiler>] {
+        &self.compilers
+    }
+
     /// The further ways it makes nodes, of its own types or others'
     /// (an engine's material presets).
-    pub creations: Vec<NodeCreation>,
+    pub fn creations(&self) -> &[NodeCreation] {
+        &self.creations
+    }
+
     /// The object kinds it contributes.
-    pub object_kinds: Vec<Arc<dyn ObjectKindSpec>>,
+    pub fn object_kinds(&self) -> &[Arc<dyn ObjectKindSpec>] {
+        &self.object_kinds
+    }
+
     /// The file formats it reads and writes.
-    pub formats: Vec<Arc<dyn FileFormat>>,
+    pub fn formats(&self) -> &[Arc<dyn FileFormat>] {
+        &self.formats
+    }
+
     /// Its session state.
-    pub slots: Vec<SessionSlot>,
+    pub fn slots(&self) -> &[SessionSlot] {
+        &self.slots
+    }
+
     /// The values it keeps in projects.
-    pub stored: Vec<StoredValue>,
+    pub fn stored(&self) -> &[StoredValue] {
+        &self.stored
+    }
+
     /// The icons it adds to Studio's icon set, named under its id
     /// ([`icon`](crate::icon)).
-    pub icons: Vec<Icon>,
+    pub fn icons(&self) -> &[Icon] {
+        &self.icons
+    }
+
     /// The render engines it brings, by their descriptions (headless):
     /// what declares the values its object kinds hold beyond their
     /// placement (a light's prim values, a Render Output's engine
     /// settings), and what a host lists and renders by.
-    pub engines: Vec<Arc<EngineDescription>>,
+    pub fn engines(&self) -> &[Arc<EngineDescription>] {
+        &self.engines
+    }
+
+    #[cfg(feature = "wgpu")]
     /// How each of its engines is made on a device, by engine id (the
     /// `wgpu` feature, which a host that renders enables): each one's
-    /// description is among [`engines`](Self::engines).
-    ///
-    /// A field behind a feature changes the struct's layout. That is sound
-    /// because a host and its plugins share one build of this crate (one
-    /// feature set, so one layout): a plugin built against another build
-    /// is refused before it is loaded.
+    /// description is among its [`engines`](Self::engines).
+    pub fn makers(&self) -> &[Arc<dyn kinogaki_render_api::display::Engine>] {
+        &self.makers
+    }
+
     #[cfg(feature = "wgpu")]
-    pub makers: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
     /// The runners of its compiled contexts' plans, by context (the `wgpu`
     /// feature): how the host shows what a compiled network makes.
-    #[cfg(feature = "wgpu")]
-    pub runners: Vec<(ContextId, Arc<dyn crate::network::run::PlanRunner>)>,
+    pub fn runners(&self) -> &[(ContextId, Arc<dyn crate::network::run::PlanRunner>)] {
+        &self.runners
+    }
+
     /// Its UI: its contexts' parts and settings pages, made by the
     /// host UI interface (`kinogaki-studio-ui-api`'s `WithUi::with_ui`).
     /// `None`: a headless package (a kernel's data types, a render
     /// engine), shown through Studio's own UI alone.
-    pub ui: Option<PackageUi>,
+    pub fn ui(&self) -> Option<&PackageUi> {
+        self.ui.as_ref()
+    }
 }
 
 /// A package's UI as the headless API carries it: the contexts it gives
@@ -256,6 +337,14 @@ impl Package {
     /// (`icon::qualified`).
     pub fn with_icon(mut self, icon: Icon) -> Self {
         self.icons.push(icon);
+        self
+    }
+
+    /// With UI `ui`, as the host UI interface made it: what
+    /// `kinogaki-studio-ui-api`'s `WithUi::with_ui` calls, which is how a
+    /// package adds its UI.
+    pub fn with_package_ui(mut self, ui: PackageUi) -> Self {
+        self.ui = Some(ui);
         self
     }
 

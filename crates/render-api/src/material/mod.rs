@@ -25,7 +25,7 @@ pub mod mtlx;
 pub mod preview;
 pub mod standard;
 
-pub use def::{Input, NodeDef, Output, Socket};
+pub use def::{NodeDef, NodeInput, NodeOutput, Socket};
 pub use display::{DisplayTexture, MaterialDisplay};
 
 use crate::id::Id;
@@ -96,7 +96,7 @@ impl Node {
 
     /// `Ok` when `input` is one of its Image inputs.
     fn image_input(&self, input: &str) -> Result<(), Error> {
-        match self.def.find_input(input).and_then(Input::socket) == Some(&Socket::Image) {
+        match self.def.find_input(input).and_then(NodeInput::socket) == Some(&Socket::Image) {
             true => Ok(()),
             false => {
                 let label = &self.def.label;
@@ -293,7 +293,7 @@ impl MaterialNetwork {
         let mut primvars = BTreeSet::new();
         for node in &self.nodes {
             let mut values = node.values.clone();
-            for input in node.def.inputs.iter().filter_map(Input::value) {
+            for input in node.def.inputs.iter().filter_map(NodeInput::value) {
                 let Some(value) = values.get_mut(&input.name) else {
                     continue;
                 };
@@ -344,7 +344,7 @@ impl NetworkBuilder {
             return Err(Error::invalid(format_args!("{label} has no value {name}")));
         }
         let mut held = Parameters::new();
-        for descriptor in def.inputs.iter().filter_map(Input::value) {
+        for descriptor in def.inputs.iter().filter_map(NodeInput::value) {
             let value = values.get(&descriptor.name).unwrap_or(&descriptor.value);
             descriptor
                 .kind
@@ -398,7 +398,7 @@ impl NetworkBuilder {
             Error::invalid(format_args!("{label} has no output {output}"))
         })?;
         let takes = (driven.inputs.iter()).find(|i| i.name() == input);
-        let takes = takes.and_then(Input::socket).ok_or_else(|| {
+        let takes = takes.and_then(NodeInput::socket).ok_or_else(|| {
             let label = &driven.label;
             Error::invalid(format_args!(
                 "{label} has no input {input} a wire can drive"
@@ -480,19 +480,19 @@ mod tests {
     fn defs() -> [Arc<NodeDef>; 3] {
         let closure = || Socket::Closure(Arc::from("surface"));
         let surface = NodeDef::new(NodeTypeId::declared("toy.m.surface"), "Surface", "Surface")
-            .input(Input::Driven(color("base"), Socket::Color3))
-            .output(Output::new("out", "Out", closure()));
+            .input(NodeInput::Driven(color("base"), Socket::Color3))
+            .output(NodeOutput::new("out", "Out", closure()));
         let attribute = ValueKind::Attribute {
             menu: Vec::new(),
             list: false,
         };
         let read = Parameter::new("name", "Name", attribute, "Cd");
         let reader = NodeDef::new(NodeTypeId::declared("toy.m.read"), "Read", "Input")
-            .input(Input::Setting(read))
-            .input(Input::Driven(color("gain"), Socket::Color3))
-            .output(Output::new("out", "Out", Socket::Color3));
+            .input(NodeInput::Setting(read))
+            .input(NodeInput::Driven(color("gain"), Socket::Color3))
+            .output(NodeOutput::new("out", "Out", Socket::Color3));
         let output = NodeDef::new(NodeTypeId::declared("toy.m.output"), "Output", "Output")
-            .input(Input::wire("surface", "Surface", closure()));
+            .input(NodeInput::wire("surface", "Surface", closure()));
         [Arc::new(surface), Arc::new(reader), Arc::new(output)]
     }
 

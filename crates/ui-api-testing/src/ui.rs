@@ -12,7 +12,7 @@ use studio_ui_api::Theme;
 #[cfg(doc)]
 use studio_ui_api::Ui;
 use studio_ui_api::sheet::Action;
-use studio_ui_api::{Input, KeyFilter};
+use studio_ui_api::{KeyFilter, UserInput};
 use studio_ui_api::{Pos, Rect, Vec2, vec2};
 use studio_ui_api::{Response, Sense};
 
@@ -114,7 +114,7 @@ impl Shared {
 /// [`open_menus`](RecordingUi::open_menus). Text is measured as the
 /// recording painter measures it.
 pub struct RecordingUi {
-    pub(super) input: Input,
+    pub(super) input: UserInput,
     pub(super) theme: Theme,
     pub(super) id: Id,
     /// The region.
@@ -137,7 +137,7 @@ impl RecordingUi {
         let theme = Theme::default();
         let spacing = Vec2::splat(theme.metrics.gap);
         RecordingUi {
-            input: Input::default(),
+            input: UserInput::default(),
             theme,
             id: Id::new("recording"),
             rect,
@@ -153,7 +153,7 @@ impl RecordingUi {
     }
 
     /// With `input` as this frame's.
-    pub fn with_input(mut self, input: Input) -> Self {
+    pub fn with_input(mut self, input: UserInput) -> Self {
         self.input = input;
         self
     }

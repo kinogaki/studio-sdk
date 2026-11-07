@@ -112,7 +112,7 @@ impl PreviewRequest {
 fn lights(lighting: PreviewLighting) -> [standard::Light; 2] {
     let PreviewLighting::Studio = lighting;
     let dome = standard::Light {
-        shape: standard::Shape::Dome {
+        shape: standard::LightShape::Dome {
             image: None,
             ground: None,
         },
@@ -122,7 +122,7 @@ fn lights(lighting: PreviewLighting) -> [standard::Light; 2] {
         ..standard::Light::default()
     };
     let key = standard::Light {
-        shape: standard::Shape::Rect {
+        shape: standard::LightShape::Rect {
             width: 2.0,
             height: 2.0,
         },

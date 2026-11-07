@@ -40,7 +40,10 @@ impl Slot for Count {
 }
 
 fn host() -> FakeHost {
-    FakeHost::new(context(), [kinogaki_studio_api::SessionSlot::of::<Count>()])
+    FakeHost::new(
+        context(),
+        &[kinogaki_studio_api::SessionSlot::of::<Count>()],
+    )
 }
 
 #[test]

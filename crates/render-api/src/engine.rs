@@ -22,7 +22,9 @@ use kinogaki_value::Parameters;
 /// is a repaint request.
 pub type Wake = Arc<dyn Fn() + Send + Sync>;
 
-/// A view's id, chosen by the host.
+/// A view's id, chosen by the host: any but `u32::MAX`, which is
+/// [`thread::PREVIEW`](crate::thread::PREVIEW), the view an engine's thread
+/// renders previews through.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ViewId(pub u32);
 

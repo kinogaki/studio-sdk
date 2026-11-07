@@ -155,7 +155,7 @@ fn an_object_round_trips_keeping_what_its_type_doesnt_declare() {
 fn a_standard_light_is_a_light_value_and_one_is_adopted() {
     let kind = lights();
     let spot = standard::Light {
-        shape: Shape::Spot {
+        shape: LightShape::Spot {
             radius: 0.2,
             cone_angle: 40.0,
             cone_softness: 0.3,

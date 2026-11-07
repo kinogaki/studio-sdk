@@ -3,7 +3,7 @@
 //! cooked as core cooks them.
 use kinogaki_studio_api::cook::{Handle, HandleKind, NodeType, Port, Vector};
 use kinogaki_studio_api::network::{
-    Flag, Flags, Growth, NetworkContext, NetworkEdit, NetworkRead, NewNode, Place, Wire,
+    Flag, Flags, Growth, Insertion, NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire,
 };
 use kinogaki_studio_api::params::{Number, Parameter, Value, ValueKind};
 use kinogaki_studio_api::{
@@ -152,7 +152,7 @@ fn placing_after_a_node_takes_its_readers_and_deleting_heals() {
     )
     .unwrap();
     net.set_display(Some(b)).unwrap();
-    let after = Place::After {
+    let after = Insertion::After {
         node: source,
         position: [0.0, 1.0],
     };
@@ -169,7 +169,7 @@ fn placing_after_a_node_takes_its_readers_and_deleting_heals() {
         .add_node_in(
             None,
             NewNode::new(NodeTypeId::declared(ADD)),
-            Place::Grow(Growth::Modify),
+            Insertion::Grow(Growth::Modify),
         )
         .unwrap();
     assert_eq!(net.display(), Some(grown));
@@ -195,7 +195,7 @@ fn a_cycle_fails_the_commit_check() {
 #[test]
 fn the_host_edits_networks_as_undo_steps() {
     let object = ObjectRef(7);
-    let mut host = FakeHost::new(context(), []);
+    let mut host = FakeHost::new(context(), &[]);
     host.networks.insert(object, network());
     let mut made = None;
     host.edit_network(object, "Add Source", &mut |net| {

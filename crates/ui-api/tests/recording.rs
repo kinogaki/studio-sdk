@@ -1,7 +1,7 @@
 //! A small plugin panel driven through the headless fakes: layouts that
 //! return values, a sheet keyed by the plugin's own type, menus, overlays
 //! and value fields.
-use studio_ui_api::sheet::{Action, Field, Number, NumberLook, Schema};
+use studio_ui_api::sheet::{Action, Field, Number, NumberLook, Sheet};
 use studio_ui_api::{
     Align2, ButtonSpec, Color, Font, Id, KeyFilter, MenuItem, Pos, Rect, Shape, SheetStyle, Stroke,
     TextStyle, Ui, UiExt, ValueFields, pos, vec2,
@@ -24,8 +24,8 @@ struct Settings {
 }
 
 impl Settings {
-    fn page(&self) -> Schema<Param> {
-        let mut s = Schema::new();
+    fn page(&self) -> Sheet<Param> {
+        let mut s = Sheet::new();
         s.section("shape", "Shape", true);
         s.push(Field::number(
             Param::Width,

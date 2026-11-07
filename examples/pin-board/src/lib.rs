@@ -26,7 +26,7 @@ use studio_ui_api::package::{
     ContextMenuSpec, ContextPart, Inspector, Invoked, LevelSpec, Levels, Library, MenuEntry,
     Places, Shared, TabSpec, UiPackage, ViewMenus, Vocabulary, VocabularyItem, WithUi,
 };
-use studio_ui_api::sheet::{Field as Row, Schema as Rows};
+use studio_ui_api::sheet::{Field as Row, Sheet as Rows};
 use studio_ui_api::{Id, SheetStyle, Ui, UiExt};
 
 /// The package's id.

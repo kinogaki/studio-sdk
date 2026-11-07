@@ -6,18 +6,18 @@ use studio_ui_api::Color;
 use studio_ui_api::Id;
 use studio_ui_api::Painter;
 use studio_ui_api::Theme;
-use studio_ui_api::sheet::{Edits, FieldKey, Number, NumberLook, NumberStyle, Schema, SheetStyle};
+use studio_ui_api::sheet::{Edits, FieldKey, Number, NumberLook, NumberStyle, Sheet, SheetStyle};
 use studio_ui_api::value_fields::ValueFields;
 use studio_ui_api::{Body, RowMenu, Ui};
 use studio_ui_api::{ButtonSpec, ChoiceLook, MenuItem, ScrollSpec, TextEditSpec};
 use studio_ui_api::{CardResponse, CardSpec, PopoverSpec};
 use studio_ui_api::{Font, TextStyle};
-use studio_ui_api::{Input, KeyFilter};
+use studio_ui_api::{KeyFilter, UserInput};
 use studio_ui_api::{Pos, Rect, Vec2, vec2};
 use studio_ui_api::{Response, Sense};
 
 impl Ui for RecordingUi {
-    fn input(&self) -> &Input {
+    fn input(&self) -> &UserInput {
         &self.input
     }
 
@@ -279,7 +279,7 @@ impl Ui for RecordingUi {
     fn sheet(
         &mut self,
         style: &SheetStyle<'_>,
-        schema: &mut Schema<FieldKey>,
+        schema: &mut Sheet<FieldKey>,
         _menu: Option<RowMenu<'_, FieldKey>>,
     ) -> Edits<FieldKey> {
         self.record(Call::Sheet(

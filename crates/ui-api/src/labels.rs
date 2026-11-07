@@ -23,7 +23,7 @@ const PATIENCE: usize = 4096;
 
 /// Labels for `positions` (object space) in a view of `size` pixels, one
 /// per `cell` pixels (a label's footprint). `clip` is the view's clip
-/// space from the object's (a [`Projection`](crate::projection::Projection)'s
+/// space from the object's (a [`ViewProjection`](crate::projection::ViewProjection)'s
 /// `clip_from_object`, built for this view's aspect). `shown` says whether
 /// a point may be labelled (hidden ones are not).
 pub fn point_labels(
@@ -106,10 +106,10 @@ fn gcd(mut a: usize, mut b: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::projection::Projection;
+    use crate::projection::ViewProjection;
     use crate::projection::test_camera::projection;
 
-    fn camera(distance: f64, size: [f64; 2]) -> Projection {
+    fn camera(distance: f64, size: [f64; 2]) -> ViewProjection {
         projection(Vec3::ZERO, distance, false, size[0] / size[1])
     }
 

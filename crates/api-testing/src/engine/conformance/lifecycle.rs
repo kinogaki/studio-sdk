@@ -8,8 +8,8 @@ use super::scenes::{camera, dome, node, quad};
 use super::{Make, SIDE, Session, VIEW, alike, beauty, finite_beauty, id};
 use kinogaki_render_api::geometry::{Column, Error};
 use kinogaki_render_api::{
-    Change, Dirty, EngineDescription, Engines, Id, Material, MaterialNetwork, Prim, SceneUpdate,
-    Shape, Subsets, Topology, ViewCamera,
+    Dirty, EngineDescription, Engines, Id, Material, MaterialNetwork, Prim, PrimChange,
+    SceneUpdate, Shape, Subsets, Topology, ViewCamera,
 };
 use std::sync::Arc;
 
@@ -83,7 +83,7 @@ fn edited(make: Make<'_>, description: &EngineDescription) -> Result<(), String>
         .collect();
     let away = (near.rebuilt().points(Column::from(far)).build()).expect("a quad far away");
     session.engine.update(SceneUpdate {
-        changed: vec![Change::new(id(0), Dirty::POINTS, Prim::Shape(away))],
+        changed: vec![PrimChange::new(id(0), Dirty::POINTS, Prim::Shape(away))],
         ..SceneUpdate::new()
     });
     let after = session

@@ -25,7 +25,7 @@
 //! [`Package::with_stored`]: kinogaki_studio_api::Package::with_stored
 use super::parts::part;
 use crate::host::Cx;
-use crate::sheet::{Edits, Schema};
+use crate::sheet::{Edits, Sheet};
 use kinogaki_studio_api::{Scope, StoredValues};
 use std::fmt;
 
@@ -84,13 +84,13 @@ part! {
     /// (`values`: the user's or the project's, every installed package's).
     pub trait PageRows<S> {
         /// The rows, drawn by the host while the page shows.
-        fn rows(&self, s: &mut S, values: &StoredValues, cx: &mut dyn Cx) -> Schema<u32>;
+        fn rows(&self, s: &mut S, values: &StoredValues, cx: &mut dyn Cx) -> Sheet<u32>;
         /// The edits the host reported on `rows`, written into `values`.
         fn apply(
             &self,
             s: &mut S,
             values: &mut StoredValues,
-            rows: &Schema<u32>,
+            rows: &Sheet<u32>,
             edits: &Edits<u32>,
             cx: &mut dyn Cx,
         );

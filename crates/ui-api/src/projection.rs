@@ -1,5 +1,5 @@
 //! How a view maps the edited object's space to its pixels and back:
-//! [`Projection`] (of [`Projective`] matrices), filled in by the host from its
+//! [`ViewProjection`] (of [`Projective`] matrices), filled in by the host from its
 //! camera, for the pure viewport maths in [`gizmo`](crate::gizmo) and
 //! [`labels`](crate::labels).
 //!
@@ -15,7 +15,7 @@ use kinogaki_studio_api::geometry::{Projective, Ray};
 /// view rectangle's aspect (width over height); one built for another
 /// aspect puts things in the wrong place.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Projection {
+pub struct ViewProjection {
     /// Clip space from the edited object's space (the camera's view and
     /// projection times the object's placement).
     pub clip_from_object: Projective,
@@ -25,7 +25,7 @@ pub struct Projection {
     pub backward: Vec3,
 }
 
-impl Projection {
+impl ViewProjection {
     /// Where `p` shows in a view of `size` pixels (from its top left), or
     /// `None` when it is behind the eye or outside the depth range.
     pub fn project(&self, p: Vec3, size: [f64; 2]) -> Option<[f64; 2]> {
@@ -59,7 +59,7 @@ pub(crate) mod test_camera {
     //! A test orbit camera, as Studio's viewport builds its matrices
     //! (right-handed look-at; perspective or orthographic with depth from 0
     //! to 1), so the viewport maths' tests see real projections.
-    use super::{Projection, Projective};
+    use super::{Projective, ViewProjection};
     use kinogaki_studio_api::Vec3;
 
     /// Orbiting `target` at `distance` from yaw 0.7 and pitch 0.5 (the
@@ -69,7 +69,7 @@ pub(crate) mod test_camera {
         distance: f64,
         orthographic: bool,
         aspect: f64,
-    ) -> Projection {
+    ) -> ViewProjection {
         let (yaw, pitch) = (0.7f64, 0.5f64);
         let backward = Vec3::new(
             yaw.sin() * pitch.cos(),
@@ -102,7 +102,7 @@ pub(crate) mod test_camera {
             perspective_rh(2.0 * 0.41421356237f64.atan(), aspect, near, far)
         };
         let clip = multiply(&projection, &look_at_rh(eye, target, up));
-        Projection {
+        ViewProjection {
             clip_from_object: clip,
             object_from_clip: inverse(&clip),
             backward,

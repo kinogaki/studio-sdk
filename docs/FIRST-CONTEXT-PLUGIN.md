@@ -296,7 +296,7 @@ impl Levels<Pinning> for PinLevels {
 }
 ```
 
-**The inspector** shows rows through Studio's own widgets: the context builds a sheet (`sheet::Schema`) and Studio draws it. Raw widgets on `Ui` are for custom panels only.
+**The inspector** shows rows through Studio's own widgets: the context builds a sheet (`sheet::Sheet`) and Studio draws it. Raw widgets on `Ui` are for custom panels only.
 
 
 ```rust
@@ -350,7 +350,7 @@ use studio_ui_api::{Pos, Rect, Vec2};
 
 fn host() -> (FakeHost, Hosting) {
     let package = package();
-    let host = FakeHost::new(pinning(), package.slots.clone());
+    let host = FakeHost::new(pinning(), package.slots());
     let hosted = Hosting::new(package, &host);
     (host, hosted)
 }
@@ -443,7 +443,7 @@ The pin board changes its own body. A context over geometry (Studio's Mesh plugi
 live.gesture = cx.begin_gesture("Push");
 let mut made = None;
 cx.edit_network(object, "Push", &mut |edit| {
-    made = Some(edit.add_node_in(None, new_node.clone(), Place::Grow(Growth::Modify))?);
+    made = Some(edit.add_node_in(None, new_node.clone(), Insertion::Grow(Growth::Modify))?);
     Ok(())
 })?;
 // Each change of a row while it is live: inside the same gesture.

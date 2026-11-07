@@ -307,7 +307,7 @@ fn an_image_wired_into_a_graph_defined_texture_reaches_the_image_inside() {
 
 #[test]
 fn another_engines_material_goes_as_its_standard_form() {
-    use crate::material::{Input, NodeDef, Output};
+    use crate::material::{NodeDef, NodeInput, NodeOutput};
     use crate::{MaterialRules, Parameter};
     use kinogaki_value::{NodeTypeId, ValueKind};
     /// A toy engine's paint: its standard form an OpenPBR Surface of its color.
@@ -326,13 +326,13 @@ fn another_engines_material_goes_as_its_standard_form() {
         "Paint",
         "Surface",
     )
-    .input(Input::Setting(Parameter::new(
+    .input(NodeInput::Setting(Parameter::new(
         "color",
         "Color",
         ValueKind::Color,
         [0.5; 3],
     )))
-    .output(Output::new("out", "Out", Socket::surface()));
+    .output(NodeOutput::new("out", "Out", Socket::surface()));
     let painter = EngineDescription::builder(EngineId::declared("toy.paint.engine"), "Paint")
         .materials(vec![paint], Arc::new(Paint))
         .build();

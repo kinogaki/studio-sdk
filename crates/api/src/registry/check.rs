@@ -6,8 +6,8 @@ use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
-use crate::params::ValueKind;
-use kinogaki_render_api::{Engines, aov};
+use crate::params::{Parameter, ValueKind};
+use kinogaki_render_api::{Engines, NodeInput, aov};
 use std::collections::BTreeSet;
 
 /// Id `text` `package` declares as an id's text, when well formed (a
@@ -160,6 +160,25 @@ impl Registry {
                     d.name
                 )));
             }
+            let library = kinogaki_render_api::materialx::library();
+            let unknown = |n: &&std::sync::Arc<str>| {
+                library.def(n).is_none() && library.signatures(n).next().is_none()
+            };
+            if let Some(name) = e.capabilities().standard_nodes.iter().find(unknown) {
+                return Err(Error::refused(format_args!(
+                    "{id}: render engine {} implements MaterialX node {name}, which MaterialX's library doesn't define",
+                    e.id()
+                )));
+            }
+            let what = format!("render engine {}", e.id());
+            defaults(id, &what, e.settings())?;
+            for ty in (e.capabilities().types.iter()).filter(|t| !standard_type(t.id)) {
+                defaults(id, &format!("prim type {}", ty.id), &ty.params)?;
+            }
+            for def in e.node_defs() {
+                let inputs = def.inputs.iter().filter_map(NodeInput::value);
+                defaults(id, &format!("material node {}", def.id), inputs)?;
+            }
         }
         for f in &package.formats {
             declare("format", f.id().as_str(), owner(self.formats.get(&f.id())))?;
@@ -199,6 +218,11 @@ impl Registry {
                     parameter = p.name.clone()
                 )));
             }
+            defaults(
+                id,
+                &format!("node type {}", n.id()),
+                description.parameters.parameters(),
+            )?;
             let object = |p: &&crate::params::Parameter| matches!(p.kind, ValueKind::Object(_));
             if let Some(p) = description.parameters.parameters().find(object) {
                 return Err(Error::refused(format!(
@@ -208,29 +232,10 @@ impl Registry {
                 )));
             }
         }
-        #[cfg(feature = "wgpu")]
-        self.check_makers(package)?;
         self.check_names(package)?;
         self.check_compilers(package)?;
         self.check_insides(package)?;
         self.check_references(package)
-    }
-
-    /// Each render engine maker `package` brings makes an engine it
-    /// describes.
-    #[cfg(feature = "wgpu")]
-    fn check_makers(&self, package: &Package) -> Result<(), Error> {
-        for maker in &package.makers {
-            let engine = maker.description().id();
-            if !package.engines.iter().any(|e| e.id() == engine) {
-                return Err(Error::refused(format!(
-                    "{package} makes render engine {engine}, which it doesn't describe",
-                    package = package.id,
-                    engine = engine
-                )));
-            }
-        }
-        Ok(())
     }
 
     /// Every context `package` names is declared, by it or before it
@@ -510,4 +515,24 @@ fn route(
         }
     }
     None
+}
+
+/// `Ok` when every one of `parameters`, `what`'s of package `id`, holds a
+/// default its own kind takes; a default refused there would fail every
+/// node, material or render made of it, far from the package at fault.
+fn defaults<'p>(
+    id: PackageId,
+    what: &str,
+    parameters: impl IntoIterator<Item = &'p Parameter>,
+) -> Result<(), Error> {
+    for p in parameters {
+        if let Err(why) = p.check(&p.value) {
+            return Err(Error::refused(format_args!(
+                "{id}: {what}'s parameter {} defaults to a value it refuses: {}",
+                p.name,
+                why.message()
+            )));
+        }
+    }
+    Ok(())
 }

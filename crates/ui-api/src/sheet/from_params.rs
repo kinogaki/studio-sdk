@@ -2,7 +2,7 @@
 //! parameter name: what the host shows for a node's parameters. A field
 //! holds its parameter's value as it is, so an edit is the parameter's new
 //! value.
-use super::{Field, FileDialog, Item, Kind, Number, NumberLook, Schema, Section};
+use super::{Band, Field, FileDialog, Item, Kind, Number, NumberLook, Sheet};
 use kinogaki_studio_api::params::{self, SchemaItem, ValueKind};
 
 /// The sheet of a parameter schema: its sections as top-level sections,
@@ -10,12 +10,12 @@ use kinogaki_studio_api::params::{self, SchemaItem, ValueKind};
 /// and its keywords for search, shown and enabled as its conditions say of
 /// the schema's values. A data parameter has no field: its node's schema
 /// adds rows of its own.
-impl From<&params::Schema> for Schema<String> {
+impl From<&params::Schema> for Sheet<String> {
     fn from(schema: &params::Schema) -> Self {
         let values = schema.values();
         let items = (schema.items.iter())
             .filter_map(|item| match item {
-                SchemaItem::Section(s) => Some(Item::Section(Section {
+                SchemaItem::Section(s) => Some(Item::Band(Band {
                     key: s.name.clone().into(),
                     label: s.label.clone().into(),
                     open: s.open,
@@ -41,7 +41,7 @@ impl From<&params::Schema> for Schema<String> {
                 }
             })
             .collect();
-        Schema { items }
+        Sheet { items }
     }
 }
 
@@ -195,12 +195,10 @@ mod tests {
                 ))
                 .wrap(0.0),
             ));
-        let sheet = Schema::<String>::from(&schema);
+        let sheet = Sheet::<String>::from(&schema);
         // A data parameter has no row.
         assert!(sheet.field(&"sketch".to_owned()).is_none());
-        assert!(
-            matches!(&sheet.items[0], Item::Section(s) if s.key == "shape" && s.open && !s.sub)
-        );
+        assert!(matches!(&sheet.items[0], Item::Band(s) if s.key == "shape" && s.open && !s.sub));
         let distance = sheet.field(&"distance".to_owned()).unwrap();
         assert_eq!(distance.value, Some(Value::Number(1.5)));
         assert_eq!(distance.tooltip.as_deref(), Some("How far"));
@@ -269,7 +267,7 @@ mod tests {
             };
             assert!(p.kind.accepts(&p.value), "{}", p.name);
         }
-        let sheet = Schema::<String>::from(&schema);
+        let sheet = Sheet::<String>::from(&schema);
         let field = |name: &str| sheet.field(&name.to_owned()).unwrap();
         let curves_field = field("curves");
         assert_eq!(curves_field.value, Some(Value::ToneCurves(curves)));
@@ -317,7 +315,7 @@ mod tests {
             ))
             .parameter(Parameter::new("group", "Group", ValueKind::Group, "0-"))
             .button(params::Button::new("fit", "Fit").enabled(false));
-        let sheet = Schema::<String>::from(&schema);
+        let sheet = Sheet::<String>::from(&schema);
         let field = |name: &str| sheet.field(&name.to_owned()).unwrap();
         assert!(
             matches!(&field("attr").kind, Kind::Name { names, list: true, .. } if names.len() == 2)
@@ -347,10 +345,10 @@ mod tests {
                         .requires(Condition::when("flat", false), "Flat shows no tint"),
                 )
         };
-        let sheet = Schema::<String>::from(&rows(true));
+        let sheet = Sheet::<String>::from(&rows(true));
         assert!(sheet.field(&"glow".to_owned()).is_none());
         assert!(!sheet.field(&"tint".to_owned()).unwrap().enabled);
-        let sheet = Schema::<String>::from(&rows(false));
+        let sheet = Sheet::<String>::from(&rows(false));
         assert!(sheet.field(&"glow".to_owned()).is_some());
         assert!(sheet.field(&"tint".to_owned()).unwrap().enabled);
     }

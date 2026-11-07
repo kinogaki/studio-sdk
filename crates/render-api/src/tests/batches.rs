@@ -10,7 +10,7 @@ fn an_add_then_a_remove_cancel() {
     let mut second = SceneUpdate::new();
     second
         .changed
-        .push(Change::new(id(0), Dirty::TRANSFORM, mesh(3)));
+        .push(PrimChange::new(id(0), Dirty::TRANSFORM, mesh(3)));
     second.removed.push(id(0));
     first.merge(second);
     assert_eq!(first.added.len(), 1);
@@ -28,10 +28,12 @@ fn many_prims_fold_by_id_in_order() {
     for i in 0..count {
         first
             .changed
-            .push(Change::new(id(i), Dirty::TRANSFORM, mesh(3)));
-        second
-            .changed
-            .push(Change::new(id(count - 1 - i), Dirty::VISIBILITY, mesh(4)));
+            .push(PrimChange::new(id(i), Dirty::TRANSFORM, mesh(3)));
+        second.changed.push(PrimChange::new(
+            id(count - 1 - i),
+            Dirty::VISIBILITY,
+            mesh(4),
+        ));
     }
     second.added.push((id(count), mesh(3)));
     second.removed.extend([id(7), id(count)]);
@@ -57,7 +59,7 @@ fn a_change_to_an_added_prim_replaces_its_payload() {
     let mut second = SceneUpdate::new();
     second
         .changed
-        .push(Change::new(id(0), Dirty::POINTS, mesh(5)));
+        .push(PrimChange::new(id(0), Dirty::POINTS, mesh(5)));
     first.merge(second);
     assert_eq!(first.added, vec![(id(0), mesh(5))]);
     assert!(first.changed.is_empty());
@@ -68,11 +70,11 @@ fn dirty_bits_or_and_the_later_payload_wins() {
     let mut first = SceneUpdate::new();
     first
         .changed
-        .push(Change::new(id(2), Dirty::TRANSFORM, mesh(3)));
+        .push(PrimChange::new(id(2), Dirty::TRANSFORM, mesh(3)));
     let mut second = SceneUpdate::new();
     second
         .changed
-        .push(Change::new(id(2), Dirty::VISIBILITY, mesh(4)));
+        .push(PrimChange::new(id(2), Dirty::VISIBILITY, mesh(4)));
     first.merge(second);
     assert_eq!(first.changed.len(), 1);
     assert_eq!(first.changed[0].dirty, Dirty::TRANSFORM | Dirty::VISIBILITY);
@@ -90,15 +92,17 @@ fn point_ranges_merge_and_fall_back_to_whole_past_the_cap() {
     let mut first = SceneUpdate::new();
     first
         .changed
-        .push(Change::points(id(0), mesh(100_000), Ranges::of(0..10)));
+        .push(PrimChange::points(id(0), mesh(100_000), Ranges::of(0..10)));
     let mut second = SceneUpdate::new();
     second
         .changed
-        .push(Change::points(id(0), mesh(100_000), Ranges::of(20..30)));
+        .push(PrimChange::points(id(0), mesh(100_000), Ranges::of(20..30)));
     let mut third = SceneUpdate::new();
-    third
-        .changed
-        .push(Change::points(id(0), mesh(100_000), Ranges::of(500..510)));
+    third.changed.push(PrimChange::points(
+        id(0),
+        mesh(100_000),
+        Ranges::of(500..510),
+    ));
     first.merge(second);
     first.merge(third);
     let points = &first.changed[0].points;
@@ -115,21 +119,21 @@ fn point_ranges_merge_and_fall_back_to_whole_past_the_cap() {
     let mut whole = SceneUpdate::new();
     whole
         .changed
-        .push(Change::new(id(0), Dirty::POINTS, mesh(10)));
+        .push(PrimChange::new(id(0), Dirty::POINTS, mesh(10)));
     let mut patch = SceneUpdate::new();
     patch
         .changed
-        .push(Change::points(id(0), mesh(10), Ranges::of(1..2)));
+        .push(PrimChange::points(id(0), mesh(10), Ranges::of(1..2)));
     whole.merge(patch);
     assert!(whole.changed[0].points.is_whole());
     let mut moved = SceneUpdate::new();
     moved
         .changed
-        .push(Change::new(id(0), Dirty::TRANSFORM, mesh(10)));
+        .push(PrimChange::new(id(0), Dirty::TRANSFORM, mesh(10)));
     let mut patch = SceneUpdate::new();
     patch
         .changed
-        .push(Change::points(id(0), mesh(10), Ranges::of(1..2)));
+        .push(PrimChange::points(id(0), mesh(10), Ranges::of(1..2)));
     moved.merge(patch);
     assert_eq!(moved.changed[0].points.spans().to_vec(), vec![1..2]);
     assert_eq!(moved.changed[0].dirty, Dirty::TRANSFORM | Dirty::POINTS);
@@ -140,7 +144,7 @@ fn settling_survives_later_non_drag_batches() {
     let mut first = SceneUpdate::new();
     first.settled = true;
     let mut camera = SceneUpdate::new();
-    camera.changed.push(Change::new(
+    camera.changed.push(PrimChange::new(
         id(9),
         Dirty::TRANSFORM,
         Prim::Camera(Camera::default()),
@@ -149,7 +153,7 @@ fn settling_survives_later_non_drag_batches() {
     assert!(first.settled);
     let mut drag = SceneUpdate::new();
     drag.changed
-        .push(Change::points(id(0), mesh(10), Ranges::of(0..1)));
+        .push(PrimChange::points(id(0), mesh(10), Ranges::of(0..1)));
     first.merge(drag);
     assert!(!first.settled);
 }
@@ -195,11 +199,11 @@ fn the_recording_engine_counts_what_it_was_sent() {
     let mut moved = SceneUpdate::new();
     moved
         .changed
-        .push(Change::new(id(0), Dirty::TRANSFORM, mesh(3)));
+        .push(PrimChange::new(id(0), Dirty::TRANSFORM, mesh(3)));
     engine.update(moved);
     let mut drag = SceneUpdate::new();
     drag.changed
-        .push(Change::points(id(0), mesh(3), Ranges::of(1..2)));
+        .push(PrimChange::points(id(0), mesh(3), Ranges::of(1..2)));
     engine.update(drag);
     let counts = &engine.counts;
     assert_eq!((counts.updates, counts.added, counts.changed), (3, 1, 2));

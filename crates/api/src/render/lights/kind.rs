@@ -25,7 +25,7 @@ use crate::{
     ObjectBody, ObjectCodec, ObjectKindId, ObjectKindSpec, Parameters, ReadCx, RenderedKind, Value,
     Valued, standard as data,
 };
-use kinogaki_render_api::standard::{self, Shape};
+use kinogaki_render_api::standard::{self, LightShape};
 use kinogaki_render_api::{Declared, PrimType, Role};
 use std::sync::Arc;
 
@@ -75,12 +75,12 @@ fn finite(values: &Parameters) -> bool {
 fn aliases(ty: &PrimType) -> &'static [&'static str] {
     let prim = Declared::new(ty.id, ty.defaults());
     match standard::Light::decode(&prim).map(|light| light.shape) {
-        Some(Shape::Rect { .. } | Shape::Disk { .. }) => {
+        Some(LightShape::Rect { .. } | LightShape::Disk { .. }) => {
             &["usdlux", "lamp", "rect", "disk", "rectlight", "disklight"]
         }
-        Some(Shape::Dome { .. }) => &["usdlux", "environment", "sky", "domelight", "hdri"],
-        Some(Shape::Distant { .. }) => &["usdlux", "sun", "directional", "distantlight"],
-        Some(Shape::Spot { .. }) => &["usdlux", "spotlight", "sphere", "spherelight", "cone"],
+        Some(LightShape::Dome { .. }) => &["usdlux", "environment", "sky", "domelight", "hdri"],
+        Some(LightShape::Distant { .. }) => &["usdlux", "sun", "directional", "distantlight"],
+        Some(LightShape::Spot { .. }) => &["usdlux", "spotlight", "sphere", "spherelight", "cone"],
         None if ty.role == Role::Atmosphere => &["mist", "haze", "atmosphere", "height fog"],
         None => &[],
     }

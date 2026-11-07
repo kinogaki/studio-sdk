@@ -8,7 +8,7 @@ use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
 use crate::network::{NewNode, NodeCreation};
 use crate::params::Schema;
 use crate::{CookCx, Error, NodeType, Outputs};
-use kinogaki_render_api::{Input, NodeDef, Socket};
+use kinogaki_render_api::{NodeDef, NodeInput, Socket};
 use std::sync::Arc;
 
 /// Inside a Material node: its shading network.
@@ -100,7 +100,7 @@ impl NodeType for ShaderNode {
 /// `def`'s values as rows: its groups' in their order, each as a section, then
 /// the rest.
 fn parameters(def: &NodeDef) -> Schema {
-    let values = || def.inputs.iter().filter_map(Input::value);
+    let values = || def.inputs.iter().filter_map(NodeInput::value);
     let mut schema = Schema::default();
     for d in values().filter(|d| !def.groups.iter().any(|g| g.name == d.group)) {
         schema = schema.parameter(d.clone());

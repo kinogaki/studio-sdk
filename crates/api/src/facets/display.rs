@@ -19,7 +19,7 @@ pub enum DrawPurpose {
     #[default]
     Shown,
     /// As a templated node's result beside what the open object shows.
-    /// The host draws its pieces as [`Role::Template`]; a type may draw
+    /// The host draws its pieces as [`PieceRole::Template`]; a type may draw
     /// templates differently (a mesh of points alone keeps a piece for its
     /// points, another type might draw wires).
     Template,
@@ -83,7 +83,7 @@ impl fmt::Debug for DisplayRequest {
 
 /// What a piece is to its object, which says how it looks.
 #[derive(Clone)]
-pub enum Role {
+pub enum PieceRole {
     /// Its own surface, styled as the object is (shaded, a ghost, a
     /// template's tint) and outlined when the object is selected or
     /// hovered.
@@ -107,7 +107,7 @@ pub enum Role {
     },
 }
 
-impl fmt::Debug for Role {
+impl fmt::Debug for PieceRole {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Own {
@@ -148,7 +148,7 @@ pub struct Piece {
     /// the placements writes none of them again.
     pub tints: Option<Arc<[u32]>>,
     /// What it is to its object.
-    pub role: Role,
+    pub role: PieceRole,
 }
 
 impl Piece {
@@ -160,7 +160,7 @@ impl Piece {
             placements: None,
             instances: None,
             tints: None,
-            role: Role::Own {
+            role: PieceRole::Own {
                 edges: true,
                 wires: false,
                 marks: true,
@@ -204,10 +204,10 @@ impl Drawn {
         Self::new(vec![Piece::own(packet)])
     }
 
-    /// The first piece that is the value's own surface ([`Role::Own`]):
+    /// The first piece that is the value's own surface ([`PieceRole::Own`]):
     /// the one its components are picked on.
     pub fn own(&self) -> Option<&Piece> {
-        (self.pieces.iter()).find(|p| matches!(p.role, Role::Own { .. }))
+        (self.pieces.iter()).find(|p| matches!(p.role, PieceRole::Own { .. }))
     }
 
     /// With `detail` beside the pieces, for the type's own later calls.

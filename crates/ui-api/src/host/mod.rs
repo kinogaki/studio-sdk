@@ -195,7 +195,7 @@ pub trait ViewCx: Cx {
     /// button of a press camera navigation has), the modifiers, the keys
     /// and typing the tools didn't take
     /// ([`LiveTools::key`](crate::package::LiveTools::key)), the wheel.
-    fn input(&self) -> &crate::Input;
+    fn input(&self) -> &crate::UserInput;
     /// The best of `targets` within `radius` pixels of screen point `at`
     /// in this view, as the host's gizmo snaps: the value `on` names
     /// asked through its type's `Snappable`, nothing of it moving, hidden

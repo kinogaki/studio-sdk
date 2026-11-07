@@ -30,10 +30,10 @@ pub use canvas::{
     Canvas, CanvasPiece, Live, LiveResult, Picture, PieceSource, Probe, ProbedColor, TextAlign,
     TextFace,
 };
-pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally};
+pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, PieceRole, Tally};
 pub use glyph::{GlyphScale, Glyphs};
 pub use held::Held;
-pub use object::{Look, Marquee, Materials, ObjectPicking};
+pub use object::{Look, Marquee, MaterialDisplays, ObjectPicking};
 pub use pick::{Combine, Pickable};
 pub use render::{RenderCx, Renderable, Rendered};
 pub use snap::{SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable};

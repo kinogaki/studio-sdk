@@ -1,11 +1,11 @@
-//! [`Input`]: this frame's pointer, keys and typing, as plain data the
+//! [`UserInput`]: this frame's pointer, keys and typing, as plain data the
 //! host fills in before it calls a plugin.
 use crate::geom::{Pos, Vec2};
 
 /// What the user did since the last frame, and the state of the pointer
 /// and keys now. Read it through [`Ui::input`](crate::Ui::input).
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Input {
+pub struct UserInput {
     /// The pointer.
     pub pointer: Pointer,
     /// The modifier keys held now.
@@ -24,7 +24,7 @@ pub struct Input {
     pub popup_open: bool,
 }
 
-impl Input {
+impl UserInput {
     /// Whether `key` went down this frame (repeats included), with any
     /// modifiers.
     pub fn key_pressed(&self, key: Key) -> bool {
@@ -258,7 +258,7 @@ pub enum ScrollUnit {
     Page,
 }
 
-/// One thing that happened, in [`Input::events`].
+/// One thing that happened, in [`UserInput::events`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     /// A key went down or came up.
@@ -295,7 +295,7 @@ pub enum Event {
     },
     /// The pointer left the window.
     PointerGone,
-    /// The wheel or trackpad scrolled (unsmoothed; [`Input::scroll`] is
+    /// The wheel or trackpad scrolled (unsmoothed; [`UserInput::scroll`] is
     /// the smoothed total).
     Scroll {
         /// How far.
@@ -496,14 +496,14 @@ mod tests {
 
     #[test]
     fn keys_and_text_read_from_the_events() {
-        let input = Input {
+        let input = UserInput {
             events: vec![
                 key(Key::Z, true, Modifiers::COMMAND),
                 Event::Text("ab".into()),
                 key(Key::Tab, false, Modifiers::NONE),
                 Event::Text("c".into()),
             ],
-            ..Input::default()
+            ..UserInput::default()
         };
         assert!(input.key_pressed(Key::Z));
         assert!(input.key_pressed_with(Key::Z, Modifiers::COMMAND));

@@ -1,7 +1,7 @@
 //! [`ObjectPicking`] and [`Look`]: what the viewport asks of an object's
 //! result at the object levels beyond its pieces. The first covers where a
 //! ray meets it, whether a [`Marquee`] takes it and its world box. The second
-//! covers how it looks against the scene's [`Materials`].
+//! covers how it looks against the scene's [`MaterialDisplays`].
 use crate::data::Data;
 use crate::facets::Drawn;
 use kinogaki_geometry::image::ImageSource;
@@ -63,7 +63,7 @@ pub trait ObjectPicking: Send + Sync {
 
 /// What the scene's materials say, as an object's look reads them. It is
 /// core's service, the same for every type.
-pub trait Materials {
+pub trait MaterialDisplays {
     /// What material `path` shows while shaded: its engine's approximation
     /// of it. `None` when the path names no material, or one no installed
     /// engine owns.
@@ -106,7 +106,7 @@ pub trait Look: Send + Sync {
         data: &Data,
         drawn: &Drawn,
         piece: usize,
-        materials: &dyn Materials,
+        materials: &dyn MaterialDisplays,
     ) -> Option<Arc<[u32]>>;
 
     /// The images piece `piece` of `drawn` shows over its colors. `None`: its
@@ -117,7 +117,7 @@ pub trait Look: Send + Sync {
         data: &Data,
         drawn: &Drawn,
         piece: usize,
-        materials: &dyn Materials,
+        materials: &dyn MaterialDisplays,
     ) -> Option<SurfaceTextures> {
         let _ = (data, drawn, piece, materials);
         None
@@ -125,5 +125,5 @@ pub trait Look: Send + Sync {
 
     /// Whether it renders as a volume (its surface only the volume's
     /// bounds, drawn as a ghost).
-    fn volume(&self, data: &Data, materials: &dyn Materials) -> bool;
+    fn volume(&self, data: &Data, materials: &dyn MaterialDisplays) -> bool;
 }

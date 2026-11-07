@@ -424,6 +424,62 @@ fn an_engine_setting_is_never_named_as_a_render_outputs_own() {
     );
 }
 
+#[test]
+fn an_engines_standard_nodes_and_every_default_are_checked_at_admission() {
+    use kinogaki_render_api::{NodeDef, NodeInput, Parameter, PrimType, Role};
+    use kinogaki_studio_api::NodeTypeId;
+    use kinogaki_studio_api::params::{Number, ValueKind};
+    let package =
+        |d| Package::new(PackageId::declared("acme.lights"), "Lights").with_engine_description(d);
+    let base = || engine("acme.lights.engine");
+    let mut capabilities = base().capabilities().clone();
+    capabilities.standard_nodes = ["open_pbr_surface", "ND_image_color3"]
+        .map(Into::into)
+        .into();
+    let fine = base().rebuilt().capabilities(capabilities.clone()).build();
+    assert!(Registry::new().register(package(fine)).is_ok());
+    // A typo would send every material through translation.
+    capabilities.standard_nodes.push("open_pbr_surfce".into());
+    let typo = base().rebuilt().capabilities(capabilities).build();
+    assert_refused(
+        Registry::new().register(package(typo)),
+        &["MaterialX node open_pbr_surfce", "doesn't define"],
+    );
+    // A default its own kind refuses: a setting, a prim type's value, a
+    // material node's input.
+    let unit = ValueKind::Number(Number::plain().range(0.0, 1.0));
+    let wrong = || Parameter::new("gain", "Gain", unit.clone(), 2.0).group("main");
+    let setting = base().rebuilt().settings(Vec::new(), vec![wrong()]).build();
+    assert_refused(
+        Registry::new().register(package(setting)),
+        &["render engine acme.lights.engine's parameter gain defaults to a value it refuses"],
+    );
+    let mut capabilities = base().capabilities().clone();
+    let mut glow = PrimType::new(
+        kinogaki_render_api::PrimTypeId::declared("acme.lights.glow"),
+        "Glow",
+        Role::Light,
+    );
+    glow.params.push(wrong());
+    capabilities.types.push(glow);
+    let prim = base().rebuilt().capabilities(capabilities).build();
+    assert_refused(
+        Registry::new().register(package(prim)),
+        &["prim type acme.lights.glow's parameter gain"],
+    );
+    let node = NodeDef::new(NodeTypeId::declared("acme.lights.tint"), "Tint", "Color")
+        .input(NodeInput::Setting(wrong()));
+    struct Plain;
+    impl kinogaki_render_api::MaterialRules for Plain {}
+    let material = (base().rebuilt())
+        .materials(vec![node], Arc::new(Plain))
+        .build();
+    assert_refused(
+        Registry::new().register(package(material)),
+        &["material node acme.lights.tint's parameter gain"],
+    );
+}
+
 /// An engine with its own prim type `ty` beside the standard ones, and
 /// output `aov` among its outputs.
 fn engine_with(
@@ -529,14 +585,9 @@ impl kinogaki_render_api::display::Engine for Glow {
 
 #[cfg(feature = "wgpu")]
 #[test]
-fn a_package_makes_the_engines_it_describes() {
+fn a_packages_engine_comes_with_its_description_and_maker() {
     let glow = Package::new(PackageId::declared("acme.glow"), "Glow").with_engine(Glow);
-    assert_eq!(glow.engines.len(), 1);
-    assert!(Registry::new().register(glow.clone()).is_ok());
-    let mut stray = glow;
-    stray.engines.clear();
-    assert_refused(
-        Registry::new().register(stray),
-        &["render engine acme.glow.engine, which it doesn't describe"],
-    );
+    assert_eq!((glow.engines().len(), glow.makers().len()), (1, 1));
+    assert_eq!(glow.makers()[0].description().id(), glow.engines()[0].id());
+    assert!(Registry::new().register(glow).is_ok());
 }

@@ -39,7 +39,7 @@ fn a_later_declared_prim_replaces_the_one_a_batch_sends() {
     }
     .declared();
     let mut later = SceneUpdate::new();
-    later.changed.push(Change::new(
+    later.changed.push(PrimChange::new(
         id,
         Dirty::PARAMS,
         Prim::Declared(thick.clone()),
@@ -83,7 +83,7 @@ fn def(engine: &str) -> NodeDef {
     } else {
         "toy.there.paint"
     });
-    NodeDef::new(id, "Paint", "Surface").output(Output::new("out", "Out", Socket::surface()))
+    NodeDef::new(id, "Paint", "Surface").output(NodeOutput::new("out", "Out", Socket::surface()))
 }
 
 /// The network of `def` alone.

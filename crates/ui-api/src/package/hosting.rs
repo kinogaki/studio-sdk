@@ -111,7 +111,7 @@ impl Registered {
 
     /// `package`'s UI; `None`: a headless package.
     pub fn of(package: &Package) -> Option<&Registered> {
-        package.ui.as_ref()?.parts().downcast_ref()
+        package.ui().as_ref()?.parts().downcast_ref()
     }
 
     /// A new host's state of the package.

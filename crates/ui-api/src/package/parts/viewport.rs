@@ -11,7 +11,7 @@ use crate::host::{Cx, NodeRef, ViewCx};
 use crate::package::data::{Ended, GizmoUse, LiveHandles, Panel, Takes};
 use crate::package::edited::Edited;
 use crate::package::view::{Holds, KeyPress};
-use crate::sheet::{Edits, Schema};
+use crate::sheet::{Edits, Sheet};
 use crate::{Painter, Ui};
 use kinogaki_studio_api::Parameters;
 
@@ -131,13 +131,13 @@ part! {
         /// selection, symmetry), under core's space row; the Gear shows
         /// while it has rows. A live tool's settings are its card. Asked
         /// once a frame, so it is built from the state as it is.
-        fn gear(&self, s: &S, cx: &dyn Cx) -> Schema<u32> {
+        fn gear(&self, s: &S, cx: &dyn Cx) -> Sheet<u32> {
             let _ = (s, cx);
-            Schema::new()
+            Sheet::new()
         }
         /// The edits of [`gear`](Self::gear)'s rows, `rows` holding the
         /// edited values.
-        fn apply_gear(&self, s: &mut S, cx: &mut dyn Cx, rows: &Schema<u32>, edits: &Edits<u32>) {
+        fn apply_gear(&self, s: &mut S, cx: &mut dyn Cx, rows: &Sheet<u32>, edits: &Edits<u32>) {
             let _ = (s, cx, rows, edits);
         }
     }

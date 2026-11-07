@@ -21,7 +21,7 @@ use studio_ui_api::package::{
     MenuDefaults, PageRows, Panel, PanelScope, Panels, Places, SettingsPage, Shared, Situation,
     Takes, UiPackage, VocabularyItem, When, WithUi,
 };
-use studio_ui_api::sheet::{Edits, Field as Row, Number, Schema};
+use studio_ui_api::sheet::{Edits, Field as Row, Number, Sheet};
 use studio_ui_api::{ButtonSpec, Color, Modifiers, Painter, Pos, Rect, Stroke, Ui, Vec2};
 use studio_ui_api_testing::{Call, FakeHost, HostCall, Hosting, RecordingUi};
 
@@ -301,10 +301,10 @@ impl Stored for Density {
 struct DensityPage;
 
 impl PageRows<Forest> for DensityPage {
-    fn rows(&self, s: &mut Forest, user: &StoredValues, _cx: &mut dyn Cx) -> Schema<u32> {
+    fn rows(&self, s: &mut Forest, user: &StoredValues, _cx: &mut dyn Cx) -> Sheet<u32> {
         s.pages += 1;
         let density = user.get::<Density>().map_or(0.0, |d| d.0);
-        let mut rows = Schema::new();
+        let mut rows = Sheet::new();
         rows.push(Row::number(0, "Density", density, Number::length()));
         rows
     }
@@ -312,7 +312,7 @@ impl PageRows<Forest> for DensityPage {
         &self,
         _s: &mut Forest,
         user: &mut StoredValues,
-        rows: &Schema<u32>,
+        rows: &Sheet<u32>,
         edits: &Edits<u32>,
         cx: &mut dyn Cx,
     ) {
@@ -351,10 +351,10 @@ impl kinogaki_studio_api::Stored for Spacing {
 struct SpacingPage;
 
 impl PageRows<Forest> for SpacingPage {
-    fn rows(&self, s: &mut Forest, project: &StoredValues, _cx: &mut dyn Cx) -> Schema<u32> {
+    fn rows(&self, s: &mut Forest, project: &StoredValues, _cx: &mut dyn Cx) -> Sheet<u32> {
         s.pages += 1;
         let spacing = project.get::<Spacing>().map_or(0.0, |s| s.0);
-        let mut rows = Schema::new();
+        let mut rows = Sheet::new();
         rows.push(Row::number(0, "Spacing", spacing, Number::length()));
         rows
     }
@@ -362,7 +362,7 @@ impl PageRows<Forest> for SpacingPage {
         &self,
         _s: &mut Forest,
         project: &mut StoredValues,
-        rows: &Schema<u32>,
+        rows: &Sheet<u32>,
         edits: &Edits<u32>,
         _cx: &mut dyn Cx,
     ) {
@@ -385,7 +385,7 @@ fn inside(object: ObjectRef, subnet: Option<NodeRef>) -> Place {
 }
 
 fn host() -> FakeHost {
-    let mut host = FakeHost::new(scene(), package().slots);
+    let mut host = FakeHost::new(scene(), package().slots());
     host.place = inside(ObjectRef(7), None);
     host
 }
@@ -416,9 +416,9 @@ fn view() -> View {
 fn registering_reads_the_contexts_once_and_erases_the_state() {
     let whole = package();
     // One id, label and set of slots: the package's.
-    assert_eq!(whole.id, PackageId::declared("toy.trees"));
-    assert_eq!(whole.label, "Trees");
-    assert_eq!(whole.slots[0].id(), Picked::id());
+    assert_eq!(whole.id(), PackageId::declared("toy.trees"));
+    assert_eq!(whole.label(), "Trees");
+    assert_eq!(whole.slots()[0].id(), Picked::id());
     let package = Registered::of(&whole).unwrap();
     assert!(Registered::of(&Package::new(PackageId::declared("toy.bare"), "Bare")).is_none());
     let context = package.context(forest()).unwrap();
@@ -582,7 +582,7 @@ fn settings_pages_edit_the_stored_values_they_are_lent() {
         ..Edits::default()
     };
     let edited = |value| {
-        let mut rows = Schema::new();
+        let mut rows = Sheet::new();
         rows.push(Row::number(0, "", value, Number::length()));
         rows
     };

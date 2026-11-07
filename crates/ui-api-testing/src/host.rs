@@ -109,7 +109,7 @@ pub struct FakeHost {
     /// The view a view call is about.
     pub view: Option<View>,
     /// This frame's input, as view calls see it ([`ViewCx::input`]).
-    pub input: studio_ui_api::Input,
+    pub input: studio_ui_api::UserInput,
     /// What the inspector shows.
     pub inspected: Inspected,
     /// The user's preferences.
@@ -164,12 +164,13 @@ pub struct FakeHost {
 }
 
 impl FakeHost {
-    /// A host at the object levels of context `scene`, holding `slots` at
-    /// their initial values.
-    pub fn new(scene: ContextId, slots: impl IntoIterator<Item = SessionSlot>) -> Self {
+    /// A host at the object levels of context `scene`, holding `slots` (a
+    /// package's, [`Package::slots`](kinogaki_studio_api::Package::slots))
+    /// at their initial values.
+    pub fn new(scene: ContextId, slots: &[SessionSlot]) -> Self {
         FakeHost {
             calls: Vec::new(),
-            slots: SessionSlots::new(slots),
+            slots: SessionSlots::new(slots.iter().cloned()),
             objects: Vec::new(),
             components: None,
             nodes: Vec::new(),
@@ -682,7 +683,7 @@ impl ViewCx for FakeHost {
             .expect("a view call on a FakeHost with its `view` set")
     }
     /// Its `input` field.
-    fn input(&self) -> &studio_ui_api::Input {
+    fn input(&self) -> &studio_ui_api::UserInput {
         &self.input
     }
     /// Its `snap` field.

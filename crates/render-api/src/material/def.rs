@@ -99,7 +99,7 @@ impl Socket {
 
 /// One input of a node.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Input {
+pub enum NodeInput {
     /// A value no wire drives: an operation, an attribute's name (MaterialX's
     /// uniform inputs).
     Setting(Parameter),
@@ -118,10 +118,10 @@ pub enum Input {
     },
 }
 
-impl Input {
+impl NodeInput {
     /// Wire input `name`, labelled `label`, taking `socket`.
-    pub fn wire(name: &str, label: &str, socket: Socket) -> Input {
-        Input::Wire {
+    pub fn wire(name: &str, label: &str, socket: Socket) -> NodeInput {
+        NodeInput::Wire {
             name: Arc::from(name),
             label: Arc::from(label),
             socket,
@@ -131,39 +131,39 @@ impl Input {
     /// Its name in files and networks.
     pub fn name(&self) -> &str {
         match self {
-            Input::Setting(d) | Input::Driven(d, _) => &d.name,
-            Input::Wire { name, .. } => name,
+            NodeInput::Setting(d) | NodeInput::Driven(d, _) => &d.name,
+            NodeInput::Wire { name, .. } => name,
         }
     }
 
     /// What a UI labels it.
     pub fn label(&self) -> &str {
         match self {
-            Input::Setting(d) | Input::Driven(d, _) => &d.label,
-            Input::Wire { label, .. } => label,
+            NodeInput::Setting(d) | NodeInput::Driven(d, _) => &d.label,
+            NodeInput::Wire { label, .. } => label,
         }
     }
 
     /// The value it holds, unless it is a wire alone.
     pub fn value(&self) -> Option<&Parameter> {
         match self {
-            Input::Setting(d) | Input::Driven(d, _) => Some(d),
-            Input::Wire { .. } => None,
+            NodeInput::Setting(d) | NodeInput::Driven(d, _) => Some(d),
+            NodeInput::Wire { .. } => None,
         }
     }
 
     /// What a wire into it carries, when one may be.
     pub fn socket(&self) -> Option<&Socket> {
         match self {
-            Input::Setting(_) => None,
-            Input::Driven(_, socket) | Input::Wire { socket, .. } => Some(socket),
+            NodeInput::Setting(_) => None,
+            NodeInput::Driven(_, socket) | NodeInput::Wire { socket, .. } => Some(socket),
         }
     }
 }
 
 /// One output of a node.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Output {
+pub struct NodeOutput {
     /// Its name in files and networks.
     pub name: Arc<str>,
     /// What a UI labels it.
@@ -172,10 +172,10 @@ pub struct Output {
     pub socket: Socket,
 }
 
-impl Output {
+impl NodeOutput {
     /// Output `name`, labelled `label`, carrying `socket`.
-    pub fn new(name: &str, label: &str, socket: Socket) -> Output {
-        Output {
+    pub fn new(name: &str, label: &str, socket: Socket) -> NodeOutput {
+        NodeOutput {
             name: Arc::from(name),
             label: Arc::from(label),
             socket,
@@ -200,9 +200,9 @@ pub struct NodeDef {
     /// Its values' groups, in order.
     pub groups: Vec<Section>,
     /// Its inputs, in the order a UI lists them.
-    pub inputs: Vec<Input>,
+    pub inputs: Vec<NodeInput>,
     /// Its outputs, in slot order.
-    pub outputs: Vec<Output>,
+    pub outputs: Vec<NodeOutput>,
     /// The MaterialX definition it is of, for a MaterialX node.
     mtlx: Option<Arc<kinogaki_mtlx::NodeDef>>,
 }
@@ -223,13 +223,13 @@ impl NodeDef {
     }
 
     /// With `input` next.
-    pub fn input(mut self, input: Input) -> NodeDef {
+    pub fn input(mut self, input: NodeInput) -> NodeDef {
         self.inputs.push(input);
         self
     }
 
     /// With `output` next.
-    pub fn output(mut self, output: Output) -> NodeDef {
+    pub fn output(mut self, output: NodeOutput) -> NodeDef {
         self.outputs.push(output);
         self
     }
@@ -247,7 +247,7 @@ impl NodeDef {
     }
 
     /// Its input `name`.
-    pub fn find_input(&self, name: &str) -> Option<&Input> {
+    pub fn find_input(&self, name: &str) -> Option<&NodeInput> {
         self.inputs.iter().find(|i| i.name() == name)
     }
 

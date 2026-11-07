@@ -9,7 +9,7 @@ use crate::cook::{Handle, HandleKind, Scalar, Vector};
 use crate::facets::{GlyphScale, Glyphs};
 use crate::{ObjectBody, Vec3};
 use kinogaki_render_api::Declared;
-use kinogaki_render_api::standard::{self, Shape};
+use kinogaki_render_api::standard::{self, LightShape};
 
 /// Segments around a circle.
 const CIRCLE: usize = 32;
@@ -51,25 +51,25 @@ impl Glyphs for LightGlyphs {
         let size = scale.size;
         let mut out = Vec::new();
         match standard::Light::decode(&light.prim).map(|l| l.shape) {
-            Some(Shape::Rect { width, height }) => {
+            Some(LightShape::Rect { width, height }) => {
                 let (w, h) = (f64::from(width) * 0.5, f64::from(height) * 0.5);
                 let corners =
                     [[-w, -h], [w, -h], [w, h], [-w, h]].map(|[x, y]| Vec3::new(x, y, 0.0));
                 out.extend((0..4).map(|i| [corners[i], corners[(i + 1) % 4]]));
                 arrow(&mut out, Vec3::ZERO, DOWN, X, size);
             }
-            Some(Shape::Disk { radius }) => {
+            Some(LightShape::Disk { radius }) => {
                 circle(&mut out, Vec3::ZERO, X, Y, f64::from(radius));
                 arrow(&mut out, Vec3::ZERO, DOWN, X, size);
             }
-            Some(Shape::Dome { .. }) => {
+            Some(LightShape::Dome { .. }) => {
                 circle(&mut out, Vec3::ZERO, X, Z, size);
                 circle(&mut out, Vec3::ZERO, X, Y, size);
                 circle(&mut out, Vec3::ZERO, Y, Z, size);
                 // Its top (+Y, where a sky image's top goes).
                 arrow(&mut out, Y * size, Y, X, size * 0.4);
             }
-            Some(Shape::Distant { .. }) => {
+            Some(LightShape::Distant { .. }) => {
                 // A disk with parallel rays down −Z: the sun's direction.
                 let r = size * 0.25;
                 circle(&mut out, Vec3::ZERO, X, Y, r);
@@ -77,7 +77,7 @@ impl Glyphs for LightGlyphs {
                     arrow(&mut out, side, DOWN, X, size);
                 }
             }
-            Some(Shape::Spot {
+            Some(LightShape::Spot {
                 radius, cone_angle, ..
             }) => {
                 // Its sphere's outline, and the cone `size` deep (capped short
@@ -119,7 +119,7 @@ pub(super) fn handles(prim: &Declared) -> Vec<Handle> {
         )
     };
     match standard::Light::decode(prim).map(|l| l.shape) {
-        Some(Shape::Rect { .. }) => {
+        Some(LightShape::Rect { .. }) => {
             let size = Vector::components("width", "height", 0.0);
             let size = HandleKind::Box {
                 center: origin(),
@@ -127,19 +127,19 @@ pub(super) fn handles(prim: &Declared) -> Vec<Handle> {
             };
             vec![Handle::new("Size", size).plane(2).range(1e-6, 1e12)]
         }
-        Some(Shape::Disk { .. }) => {
+        Some(LightShape::Disk { .. }) => {
             let radius = HandleKind::Radius {
                 radius: "radius".into(),
                 center: origin(),
             };
             vec![Handle::new("Radius", radius).plane(2).range(1e-6, 1e12)]
         }
-        Some(Shape::Spot { .. }) => vec![
+        Some(LightShape::Spot { .. }) => vec![
             angle("Cone angle", "coneAngle", None).range(0.0, 90.0),
             angle("Cone softness", "coneSoftness", Some("coneAngle")).range(0.0, 1.0),
         ],
-        Some(Shape::Distant { .. }) => vec![angle("Angle", "angle", None).range(0.0, 180.0)],
-        Some(Shape::Dome { .. }) | None => Vec::new(),
+        Some(LightShape::Distant { .. }) => vec![angle("Angle", "angle", None).range(0.0, 180.0)],
+        Some(LightShape::Dome { .. }) | None => Vec::new(),
     }
 }
 

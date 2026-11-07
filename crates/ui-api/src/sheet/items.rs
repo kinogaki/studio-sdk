@@ -1,4 +1,4 @@
-//! [`Schema`]: sections, headings and fields, top to bottom.
+//! [`Sheet`]: bands, headings and fields, top to bottom.
 use super::tone_curve::ToneCurve;
 use super::{CurveChannel, FileDialog, Kind, Number, NumberLook, Socket, Text, Trailing};
 use kinogaki_studio_api::params::{Choice, Value};
@@ -6,14 +6,14 @@ use kinogaki_studio_api::params::{Choice, Value};
 /// What a property sheet shows, top to bottom. `K` is the owner's key for
 /// a field (an enum naming its slots, a parameter's name).
 #[derive(Clone, Debug, PartialEq)]
-pub struct Schema<K> {
+pub struct Sheet<K> {
     /// Sections, headings and fields, in order.
     pub items: Vec<Item<K>>,
 }
 
-impl<K> Default for Schema<K> {
+impl<K> Default for Sheet<K> {
     fn default() -> Self {
-        Schema { items: Vec::new() }
+        Sheet { items: Vec::new() }
     }
 }
 
@@ -23,7 +23,7 @@ impl<K> Default for Schema<K> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Item<K> {
     /// A collapsible section band; its fields follow until the next band.
-    Section(Section),
+    Band(Band),
     /// A band that does not collapse (a settings page's group).
     Heading(Text),
     /// A labelled property.
@@ -32,7 +32,7 @@ pub enum Item<K> {
 
 /// A section or subsection band.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Section {
+pub struct Band {
     /// Remembers whether the band is open, for every schema with a section
     /// of this key.
     pub key: Text,
@@ -348,7 +348,7 @@ impl<K> Field<K> {
     }
 }
 
-impl<K> Schema<K> {
+impl<K> Sheet<K> {
     /// An empty schema.
     pub fn new() -> Self {
         Self::default()
@@ -356,7 +356,7 @@ impl<K> Schema<K> {
 
     /// Starts a collapsible section; `key` remembers whether it is open.
     pub fn section(&mut self, key: impl Into<Text>, label: impl Into<Text>, open: bool) {
-        self.items.push(Item::Section(Section {
+        self.items.push(Item::Band(Band {
             key: key.into(),
             label: label.into(),
             open,
@@ -366,7 +366,7 @@ impl<K> Schema<K> {
 
     /// Starts a collapsible subsection inside the current section.
     pub fn subsection(&mut self, key: impl Into<Text>, label: impl Into<Text>, open: bool) {
-        self.items.push(Item::Section(Section {
+        self.items.push(Item::Band(Band {
             key: key.into(),
             label: label.into(),
             open,
@@ -401,23 +401,23 @@ impl<K> Schema<K> {
     }
 
     /// Appends `other`'s items with keys mapped by `f`.
-    pub fn extend<J>(&mut self, other: Schema<J>, f: impl Fn(J) -> K) {
+    pub fn extend<J>(&mut self, other: Sheet<J>, f: impl Fn(J) -> K) {
         self.items
             .extend(other.items.into_iter().map(|item| match item {
-                Item::Section(s) => Item::Section(s),
+                Item::Band(s) => Item::Band(s),
                 Item::Heading(h) => Item::Heading(h),
                 Item::Field(field) => Item::Field(field.map(&f)),
             }));
     }
 
     /// The schema with every field's key mapped by `f`, in order.
-    pub fn map<J>(self, mut f: impl FnMut(K) -> J) -> Schema<J> {
-        Schema {
+    pub fn map<J>(self, mut f: impl FnMut(K) -> J) -> Sheet<J> {
+        Sheet {
             items: self
                 .items
                 .into_iter()
                 .map(|item| match item {
-                    Item::Section(s) => Item::Section(s),
+                    Item::Band(s) => Item::Band(s),
                     Item::Heading(h) => Item::Heading(h),
                     Item::Field(field) => Item::Field(field.map(&mut f)),
                 })
@@ -426,16 +426,16 @@ impl<K> Schema<K> {
     }
 }
 
-impl<K: Clone> Schema<K> {
+impl<K: Clone> Sheet<K> {
     /// The fields whose keys `f` maps (and every band), with mapped keys:
     /// the part of a combined schema one owner applies.
-    pub fn filter_map<J>(&self, f: impl Fn(&K) -> Option<J>) -> Schema<J> {
-        Schema {
+    pub fn filter_map<J>(&self, f: impl Fn(&K) -> Option<J>) -> Sheet<J> {
+        Sheet {
             items: self
                 .items
                 .iter()
                 .filter_map(|item| match item {
-                    Item::Section(s) => Some(Item::Section(s.clone())),
+                    Item::Band(s) => Some(Item::Band(s.clone())),
                     Item::Heading(h) => Some(Item::Heading(h.clone())),
                     Item::Field(field) => {
                         let key = f(&field.key)?;
@@ -447,7 +447,7 @@ impl<K: Clone> Schema<K> {
     }
 }
 
-impl<K: PartialEq> Schema<K> {
+impl<K: PartialEq> Sheet<K> {
     /// The field at `key`.
     pub fn field(&self, key: &K) -> Option<&Field<K>> {
         self.fields().find(|f| f.key == *key)
@@ -508,8 +508,8 @@ mod tests {
         Go,
     }
 
-    fn schema() -> Schema<Key> {
-        let mut s = Schema::new();
+    fn schema() -> Sheet<Key> {
+        let mut s = Sheet::new();
         s.section("shape", "Shape", true);
         s.push(Field::number(Key::Width, "Width", 2.0, Number::length()));
         s.push(Field::toggle(Key::Cap, "Cap", true).enabled(false, Some("Closed shapes only")));
@@ -543,7 +543,7 @@ mod tests {
         let only_width = s.filter_map(|k| (*k == Key::Width).then_some("w"));
         assert_eq!(only_width.fields().count(), 1);
         assert_eq!(only_width.items.len(), 3, "bands stay");
-        let mut combined: Schema<String> = Schema::new();
+        let mut combined: Sheet<String> = Sheet::new();
         combined.extend(s.clone(), |k| format!("{k:?}"));
         assert_eq!(combined.number(&"Width".to_owned()), Some(2.0));
         let indexed = s.map(|k| k as u8);

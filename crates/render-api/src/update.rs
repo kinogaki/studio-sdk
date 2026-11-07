@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 /// A changed prim: what changed, its new payload, and for a POINTS change
 /// the points that moved.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Change {
+pub struct PrimChange {
     /// The prim.
     pub id: PrimId,
     /// What changed.
@@ -31,15 +31,15 @@ pub struct Change {
     pub points: Ranges,
 }
 
-impl Change {
+impl PrimChange {
     /// A change of `dirty` to `prim`; POINTS changes cover every point.
-    pub fn new(id: PrimId, dirty: Dirty, prim: Prim) -> Change {
+    pub fn new(id: PrimId, dirty: Dirty, prim: Prim) -> PrimChange {
         let points = if dirty.contains(Dirty::POINTS) {
             Ranges::whole()
         } else {
             Ranges::new()
         };
-        Change {
+        PrimChange {
             id,
             dirty,
             prim,
@@ -48,8 +48,8 @@ impl Change {
     }
 
     /// A drag's change: POINTS of `prim` at `points` only.
-    pub fn points(id: PrimId, prim: Prim, points: Ranges) -> Change {
-        Change {
+    pub fn points(id: PrimId, prim: Prim, points: Ranges) -> PrimChange {
+        PrimChange {
             id,
             dirty: Dirty::POINTS,
             prim,
@@ -58,7 +58,7 @@ impl Change {
     }
 
     /// `later` folded into this change of the same prim.
-    fn absorb(&mut self, later: Change) {
+    fn absorb(&mut self, later: PrimChange) {
         let points = self.dirty.contains(Dirty::POINTS);
         let later_points = later.dirty.contains(Dirty::POINTS);
         match (points, later_points) {
@@ -79,7 +79,7 @@ pub struct SceneUpdate {
     /// Prims gone.
     pub removed: Vec<PrimId>,
     /// Prims changed.
-    pub changed: Vec<Change>,
+    pub changed: Vec<PrimChange>,
     /// New scene settings, if they changed.
     pub settings: Option<SceneSettings>,
     /// A drag ended: meshes refitted during it may now be rebuilt.

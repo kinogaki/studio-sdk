@@ -27,13 +27,13 @@ pub trait NetworkEdit: NetworkRead {
         &mut self,
         subnet: Option<NodeRef>,
         node: NewNode,
-        place: Place,
+        at: Insertion,
     ) -> Result<NodeRef, Error>;
 
     /// Adds `node` on the top level at `position`, wired to nothing
-    /// ([`add_node_in`](Self::add_node_in) with [`Place::At`]).
+    /// ([`add_node_in`](Self::add_node_in) with [`Insertion::At`]).
     fn add_node(&mut self, node: NewNode, position: [f32; 2]) -> Result<NodeRef, Error> {
-        self.add_node_in(None, node, Place::At(position))
+        self.add_node_in(None, node, Insertion::At(position))
     }
 
     /// Renames `node` to `name`, numbered when its level has a node so
@@ -130,9 +130,10 @@ pub trait NetworkEdit: NetworkRead {
     fn freeze(&mut self, node: NodeRef, outputs: Outputs) -> Result<(), Error>;
 }
 
-/// Where [`NetworkEdit::add_node_in`] puts a new node, and what it wires.
+/// Where [`NetworkEdit::add_node_in`] inserts a new node, and what it
+/// wires.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Place {
+pub enum Insertion {
     /// At `position`, wired to nothing.
     At([f32; 2]),
     /// At `position`, after `node`: the new node reads `node`'s first
@@ -149,7 +150,7 @@ pub enum Place {
     Grow(Growth),
 }
 
-/// How a node added by [`Place::Grow`] joins what its level displays.
+/// How a node added by [`Insertion::Grow`] joins what its level displays.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Growth {
     /// It reads the displayed result: inserted after the displayed node,

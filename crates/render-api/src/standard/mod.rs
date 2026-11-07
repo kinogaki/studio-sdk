@@ -317,7 +317,7 @@ impl Fog {
 
 /// A standard light's shape.
 #[derive(Clone, Debug, PartialEq)]
-pub enum Shape {
+pub enum LightShape {
     /// A RectLight: `width` × `height` in its XY plane, emitting down -Z.
     Rect {
         /// Along X.
@@ -362,7 +362,7 @@ pub enum Shape {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Light {
     /// Its shape.
-    pub shape: Shape,
+    pub shape: LightShape,
     /// Where the spectrum comes from.
     pub emission: Emission,
     /// Its color, linear (ACEScg in a prim an engine receives,
@@ -387,7 +387,7 @@ impl Default for Light {
     /// A 1 × 1 rectangle of intensity 1 (UsdLux's fallbacks).
     fn default() -> Light {
         Light {
-            shape: Shape::Rect {
+            shape: LightShape::Rect {
                 width: 1.0,
                 height: 1.0,
             },
@@ -407,23 +407,23 @@ impl Light {
     /// `prim` as a standard light (none when it is of another type).
     pub fn decode(prim: &Declared) -> Option<Light> {
         let shape = match prim.type_id {
-            AREA_LIGHT if prim.choice("shape") == "disk" => Shape::Disk {
+            AREA_LIGHT if prim.choice("shape") == "disk" => LightShape::Disk {
                 radius: prim.float("radius"),
             },
-            AREA_LIGHT => Shape::Rect {
+            AREA_LIGHT => LightShape::Rect {
                 width: prim.float("width"),
                 height: prim.float("height"),
             },
-            DOME_LIGHT => Shape::Dome {
+            DOME_LIGHT => LightShape::Dome {
                 image: (prim.value("texture").and_then(Value::text))
                     .filter(|path| !path.trim().is_empty())
                     .map(Arc::from),
                 ground: prim.bool("ground").then(|| prim.color("groundColor")),
             },
-            DISTANT_LIGHT => Shape::Distant {
+            DISTANT_LIGHT => LightShape::Distant {
                 angle: prim.float("angle"),
             },
-            SPOT_LIGHT => Shape::Spot {
+            SPOT_LIGHT => LightShape::Spot {
                 radius: prim.float("radius"),
                 cone_angle: prim.float("coneAngle"),
                 cone_softness: prim.float("coneSoftness"),
@@ -457,10 +457,10 @@ impl Light {
     /// Its type: the standard type its shape is.
     pub fn prim_type(&self) -> PrimType {
         match self.shape {
-            Shape::Rect { .. } | Shape::Disk { .. } => area_light(),
-            Shape::Dome { .. } => dome_light(),
-            Shape::Distant { .. } => distant_light(),
-            Shape::Spot { .. } => spot_light(),
+            LightShape::Rect { .. } | LightShape::Disk { .. } => area_light(),
+            LightShape::Dome { .. } => dome_light(),
+            LightShape::Distant { .. } => distant_light(),
+            LightShape::Spot { .. } => spot_light(),
         }
     }
 
@@ -472,24 +472,24 @@ impl Light {
         let float = |v: f32| Value::Number(f64::from(v));
         let color = |c: [f32; 3]| Value::Color(c.map(f64::from));
         match &self.shape {
-            Shape::Rect { width, height } => {
+            LightShape::Rect { width, height } => {
                 set("shape", choice("rectangle"));
                 set("width", float(*width));
                 set("height", float(*height));
             }
-            Shape::Disk { radius } => {
+            LightShape::Disk { radius } => {
                 set("shape", choice("disk"));
                 set("radius", float(*radius));
             }
-            Shape::Dome { image, ground } => {
+            LightShape::Dome { image, ground } => {
                 set("texture", Value::from(image.as_deref().unwrap_or("")));
                 set("ground", Value::Bool(ground.is_some()));
                 if let Some(g) = ground {
                     set("groundColor", color(*g));
                 }
             }
-            Shape::Distant { angle } => set("angle", float(*angle)),
-            Shape::Spot {
+            LightShape::Distant { angle } => set("angle", float(*angle)),
+            LightShape::Spot {
                 radius,
                 cone_angle,
                 cone_softness,

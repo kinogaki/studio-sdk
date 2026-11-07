@@ -3,8 +3,8 @@
 //! edits and its node types in a network without Studio.
 use kinogaki_studio_api::cook::{Arity, Description, NewCx, NodeRole, Ports, PortsCx};
 use kinogaki_studio_api::network::{
-    Flag, Flags, Growth, NetworkContext, NetworkEdit, NetworkKind, NetworkRead, NewNode, NodeInfo,
-    Place, Wire,
+    Flag, Flags, Growth, Insertion, NetworkContext, NetworkEdit, NetworkKind, NetworkRead, NewNode,
+    NodeInfo, Wire,
 };
 use kinogaki_studio_api::params::Value;
 use kinogaki_studio_api::{
@@ -62,7 +62,7 @@ struct Node {
 /// cache, no incremental plans, no time or selection reads), a held node
 /// applies its delta to its input as it is now (core captures the base
 /// once) until [`NetworkEdit::rebase_held`] gives it a base, a node's
-/// [`NodeInfo::result`] is cooked as it is read, and [`Place::Grow`] puts a node after the displayed one
+/// [`NodeInfo::result`] is cooked as it is read, and [`Insertion::Grow`] puts a node after the displayed one
 /// ([`Growth::Modify`]) or unwired ([`Growth::Create`], with no Merge),
 /// displayed either way.
 ///
@@ -115,19 +115,19 @@ impl FakeNetwork {
     pub fn new(context: ContextId, packages: &[&Package]) -> Result<Self, Error> {
         let declared = packages
             .iter()
-            .flat_map(|p| &p.contexts)
+            .flat_map(|p| p.contexts())
             .find(|c| c.id == context)
             .cloned()
             .ok_or_else(|| Error::invalid(format_args!("no package declares context {context}")))?;
         let mut types = Types::default();
         for package in packages {
-            for t in &package.node_types {
+            for t in package.node_types() {
                 types.nodes.insert(t.id(), (t.clone(), t.description()));
             }
-            for h in &package.held_edits {
+            for h in package.held_edits() {
                 types.held.insert(h.delta(), h.clone());
             }
-            for c in &package.contexts {
+            for c in package.contexts() {
                 types.contexts.insert(c.id, c.clone());
             }
         }
@@ -392,7 +392,7 @@ impl NetworkEdit for FakeNetwork {
         &mut self,
         subnet: Option<NodeRef>,
         node: NewNode,
-        place: Place,
+        place: Insertion,
     ) -> Result<NodeRef, Error> {
         if let Some(subnet) = subnet {
             self.known(subnet)?;
@@ -412,12 +412,12 @@ impl NetworkEdit for FakeNetwork {
         }
         parameters.extend(node.parameters);
         let (position, after, display) = match place {
-            Place::At(position) => (position, None, node.display),
-            Place::After {
+            Insertion::At(position) => (position, None, node.display),
+            Insertion::After {
                 node: after,
                 position,
             } => (position, Some(after), node.display),
-            Place::Grow(growth) => {
+            Insertion::Grow(growth) => {
                 let shown = self.displays.get(&subnet).copied();
                 let after = shown.filter(|_| growth == Growth::Modify);
                 let below = shown.map_or([0.0, 0.0], |s| {

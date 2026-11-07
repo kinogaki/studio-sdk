@@ -1,6 +1,6 @@
 //! [`FieldKey`]: the one key type the host's sheet takes, and [`Keyed`],
 //! which turns any owner's keys into it and back.
-use super::{Edits, Schema};
+use super::{Edits, Sheet};
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// A field's key as the host's sheet sees it: a hash of the owner's key.
@@ -22,7 +22,7 @@ pub struct Keyed<K> {
 
 impl<K: Clone + PartialEq + Hash> Keyed<K> {
     /// `schema` keyed by [`FieldKey`], and the map back.
-    pub fn new(schema: Schema<K>) -> (Self, Schema<FieldKey>) {
+    pub fn new(schema: Sheet<K>) -> (Self, Sheet<FieldKey>) {
         let mut keys: Vec<(FieldKey, K)> = Vec::new();
         let keyed = schema.map(|key| {
             let mut salt = 0u32;
@@ -44,7 +44,7 @@ impl<K: Clone + PartialEq + Hash> Keyed<K> {
 
     /// The schema back with the owner's keys. The host changes a sheet's
     /// values only, never its fields' keys.
-    pub fn restore(&self, schema: Schema<FieldKey>) -> Schema<K> {
+    pub fn restore(&self, schema: Sheet<FieldKey>) -> Sheet<K> {
         schema.map(|field| {
             self.key(field)
                 .cloned()
@@ -74,8 +74,8 @@ mod tests {
     use super::super::{Action, Field, Number};
     use super::*;
 
-    fn schema(names: &[&'static str]) -> Schema<&'static str> {
-        let mut s = Schema::new();
+    fn schema(names: &[&'static str]) -> Sheet<&'static str> {
+        let mut s = Sheet::new();
         s.section("main", "Main", true);
         for &name in names {
             s.push(Field::number(name, name, 1.0, Number::plain()));
@@ -87,7 +87,7 @@ mod tests {
     fn field_keys_follow_the_key_not_the_row() {
         let (_, a) = Keyed::new(schema(&["width", "height"]));
         let (_, b) = Keyed::new(schema(&["depth", "width", "height"]));
-        let keys = |s: &Schema<FieldKey>| s.fields().map(|f| f.key).collect::<Vec<_>>();
+        let keys = |s: &Sheet<FieldKey>| s.fields().map(|f| f.key).collect::<Vec<_>>();
         assert_eq!(keys(&a), keys(&b)[1..]);
     }
 

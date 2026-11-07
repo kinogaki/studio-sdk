@@ -55,9 +55,9 @@ impl Stored for Forest {
 #[test]
 fn a_package_registers_its_stored_values() {
     let package = Package::new(PackageId::declared("acme.trees"), "Trees").with_stored::<Density>();
-    assert_eq!(package.stored.len(), 1);
-    assert_eq!(package.stored[0].id().as_str(), "acme.trees.forest");
-    assert_eq!(package.stored[0].scope(), Scope::Project);
+    assert_eq!(package.stored().len(), 1);
+    assert_eq!(package.stored()[0].id().as_str(), "acme.trees.forest");
+    assert_eq!(package.stored()[0].scope(), Scope::Project);
     assert!(Registry::new().register(package).is_ok());
 }
 
