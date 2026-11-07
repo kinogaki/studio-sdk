@@ -75,7 +75,7 @@ Sample times are frames from the frame rendered. `Camera::shutter` says when it 
 
 ## Materials
 
-A material is a MaterialX 1.39 network ([`kinogaki-mtlx`](../crates/mtlx): MaterialX 1.39.5's libraries and Kinogaki's, `render_api::material::mtlx` their nodes as `NodeDef`s, one a signature), with nodes of engines' own beside MaterialX's. List the MaterialX nodes you implement as they are, by node or, where you implement some of a node's signatures, by signature; everything else reaches you adopted:
+A material is a MaterialX 1.39 network ([`kinogaki-mtlx`](../crates/mtlx), `render_api::materialx`: MaterialX 1.39.5's libraries and Kinogaki's; `render_api::material::mtlx` their nodes as `NodeDef`s, one a signature), with nodes of engines' own beside MaterialX's. List the MaterialX nodes you implement as they are, by node or, where you implement some of a node's signatures, by signature (`materialx::library()` lists them all); everything else reaches you adopted:
 
 ```rust
 Capabilities {
@@ -84,7 +84,7 @@ Capabilities {
 }
 ```
 
-A host sends you a material as you adopt it (`Engines::adopt`): each node you list as it is; another expanded into the graph MaterialX defines it by, where you render what that graph is made of; a shading model translated into one you render (Standard Surface, glTF PBR, USD Preview Surface and Surface Unlit into OpenPBR Surface; approximations, as MaterialX's own are); else cut, what it fed holding its own value, its node named in `MaterialNetwork::cut` for you to report once. A node of values alone reaches you as its value, folded by MaterialX's formulas. An engine implementing MaterialX's leaves (the nodes it defines without a graph) renders every model; one implementing OpenPBR Surface and the Surface Material renders every model's constant material through translation.
+A host sends you a material as you adopt it (`Engines::adopt`): each node you list as it is; another expanded into the graph MaterialX defines it by, where you render what that graph is made of; a shading model translated into one you render (Standard Surface, glTF PBR, USD Preview Surface and Surface Unlit into OpenPBR Surface; approximations, as MaterialX's own are); else cut, what it fed holding its own value, its node named in `MaterialNetwork::cut` for you to report once. A node of values alone reaches you as its value, folded by MaterialX's formulas, and a node passing one of its inputs on as its values say (a `dot`, a conditional or `switch` of values, arithmetic by its identity) as that input. An engine implementing MaterialX's leaves (the nodes it defines without a graph) renders every model; one implementing OpenPBR Surface and the Surface Material renders every model's constant material through translation.
 
 Nodes of your own are data too; a host makes one node type of each, listed under your label in a Material's network, beside MaterialX's:
 

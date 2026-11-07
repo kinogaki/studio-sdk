@@ -140,6 +140,38 @@ fn standard_surface_translates_by_materialx_own_graph() {
 }
 
 #[test]
+fn a_conditional_of_values_passes_the_input_it_chooses_on() {
+    // Standard Surface's `specular` from an image, on a dielectric: MaterialX's
+    // translation chooses it by `metalness` (`ifgreater`), which the engine
+    // doesn't implement; the choice is made here and the image drives
+    // OpenPBR's specular weight.
+    let mut built = MaterialNetwork::builder();
+    let image = built
+        .node(&def("ND_image_float").unwrap(), &Parameters::new())
+        .unwrap();
+    let metalness = [("metalness".to_owned(), Value::Number(0.0))].into();
+    let s = built
+        .node(
+            &def("ND_standard_surface_surfaceshader").unwrap(),
+            &metalness,
+        )
+        .unwrap();
+    built.link(image, "out", s, "specular").unwrap();
+    let network = built.build(s).unwrap();
+    let open = engine(
+        "toy.open.engine",
+        &["open_pbr_surface", "surfacematerial", "ND_image_float"],
+    );
+    let adopted = Engines::new(vec![open.clone()]).adopt(&network, open.id());
+    assert!(adopted.cut().is_empty(), "{:?}", adopted.cut());
+    assert_eq!(nodes(&adopted), ["image", "open_pbr_surface"]);
+    let [link] = adopted.links() else {
+        panic!("one wire: {:?}", adopted.links());
+    };
+    assert_eq!((&*link.output, &*link.input), ("out", "specular_weight"));
+}
+
+#[test]
 fn what_no_way_reaches_is_cut_and_named_once() {
     let open = engine("toy.open.engine", &["open_pbr_surface", "surfacematerial"]);
     let engines = Engines::new(vec![open.clone()]);

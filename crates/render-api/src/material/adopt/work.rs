@@ -89,6 +89,31 @@ impl Work {
             .collect()
     }
 
+    /// The nodes `output` reads, itself included.
+    fn read(&self, output: NodeIndex) -> BTreeSet<NodeIndex> {
+        let mut read = BTreeSet::from([output]);
+        let mut open = vec![output];
+        while let Some(at) = open.pop() {
+            for l in self.links.iter().filter(|l| l.to == at) {
+                if self.node(l.from).is_some() && read.insert(l.from) {
+                    open.push(l.from);
+                }
+            }
+        }
+        read
+    }
+
+    /// Removes every node the shown one doesn't read.
+    pub fn prune(&mut self) {
+        let Some(output) = self.output.filter(|&o| self.node(o).is_some()) else {
+            return;
+        };
+        let read = self.read(output);
+        for at in self.live().into_iter().filter(|at| !read.contains(at)) {
+            self.take(at);
+        }
+    }
+
     /// Removes `at` and every link to or from it; its node.
     pub fn take(&mut self, at: NodeIndex) -> Option<Node> {
         self.links.retain(|l| l.from != at && l.to != at);
@@ -298,15 +323,7 @@ impl Work {
                 ..MaterialNetwork::default()
             };
         };
-        let mut read = BTreeSet::from([output]);
-        let mut open = vec![output];
-        while let Some(at) = open.pop() {
-            for l in self.links.iter().filter(|l| l.to == at) {
-                if self.node(l.from).is_some() && read.insert(l.from) {
-                    open.push(l.from);
-                }
-            }
-        }
+        let read = self.read(output);
         let index: Vec<Option<NodeIndex>> = {
             let mut next = 0;
             (0..self.nodes.len() as NodeIndex)

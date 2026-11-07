@@ -10,11 +10,13 @@
 //! 4. **Cut**: the node removed, what it fed holding its own value, its name
 //!    kept for the engine to report ([`MaterialNetwork::cut`]).
 //!
-//! Then what an engine would only compute again is folded away: a pass-through
-//! (`dot`) is bypassed, a node of values alone becomes the value it yields
-//! ([`NodeDef::evaluate`](kinogaki_mtlx::NodeDef::evaluate)), and a node
-//! reading the geometric property its readers read anyway (a texture
-//! coordinate into a `texcoord` input, the shading normal into a normal) goes.
+//! Then what an engine would only compute again is folded away: a node passing
+//! one of its inputs on as its values say (a `dot`, a conditional of values,
+//! arithmetic by its identity) is bypassed; a node of values alone becomes the
+//! value it yields ([`NodeDef::evaluate`](kinogaki_mtlx::NodeDef::evaluate));
+//! a node reading the geometric property its readers read anyway (a texture
+//! coordinate into a `texcoord` input, the shading normal into a normal)
+//! goes; and so does what the shown node no longer reads.
 mod work;
 
 use super::{MaterialNetwork, NodeDef, NodeIndex, mtlx};
@@ -206,7 +208,7 @@ fn model(model: &str) -> Option<Arc<NodeDef>> {
 }
 
 /// Bypasses, folds and leaves out what the readers would compute again,
-/// until nothing more goes.
+/// until nothing more goes; then what the shown node no longer reads.
 fn simplify(work: &mut Work) {
     loop {
         let mut changed = false;
@@ -214,27 +216,125 @@ fn simplify(work: &mut Work) {
             changed |= bypass(work, at) || fold(work, at) || implied(work, at);
         }
         if !changed {
+            work.prune();
             return;
         }
     }
 }
 
-/// A `dot` reading a link: its readers read what it reads.
+/// A node whose output is one of its inputs, as its values say: a `dot`, a
+/// conditional or `switch` of values, arithmetic by its identity (`+ 0`,
+/// `- 0`, `× 1`, `÷ 1`, `^ 1`, a turn of 0), a `mix` of 0 or 1.
+/// Its readers read what that input reads, or hold its value, and it goes.
 fn bypass(work: &mut Work, at: NodeIndex) -> bool {
-    let Some(node) = work.node(at) else {
+    let Some(input) = through(work, at) else {
         return false;
     };
-    if node.def.mtlx().is_none_or(|d| d.node != "dot") || work.output == Some(at) {
-        return false;
-    }
-    let Some(link) = work.driver(at, "in").cloned() else {
-        return false;
-    };
-    for (_, reader, input) in work.out_of(at) {
-        work.link(link.from, &link.output, reader, &input);
+    let readers = work.out_of(at);
+    match work.driver(at, &input).cloned() {
+        Some(link) => {
+            // What its readers read stays of its type: a wire of another
+            // width keeps the node that converts it.
+            let carries = |at: NodeIndex, output: &str| {
+                let node = work.node(at)?;
+                let out = node.def.outputs.iter().find(|o| &*o.name == output)?;
+                Some(out.socket.clone())
+            };
+            let taken = work
+                .node(at)
+                .and_then(|n| n.def.find_input(&input)?.socket().cloned());
+            if carries(link.from, &link.output).is_none_or(|s| Some(s) != taken) {
+                return false;
+            }
+            for (_, reader, into) in readers {
+                work.link(link.from, &link.output, reader, &into);
+            }
+        }
+        None => {
+            let node = work.node(at).expect("a live node");
+            let held = node.values.get(&input).cloned();
+            let Some(value) =
+                held.or_else(|| Some(node.def.find_input(&input)?.value()?.value.clone()))
+            else {
+                return false;
+            };
+            let takes = (readers.iter()).all(|(_, reader, into)| {
+                let port = work
+                    .node(*reader)
+                    .and_then(|n| n.def.find_input(into)?.value());
+                port.is_some_and(|p| p.kind.accepts(&value))
+            });
+            if !takes {
+                return false;
+            }
+            for (_, reader, into) in readers {
+                work.set(reader, &into, value.clone());
+            }
+        }
     }
     work.take(at);
     true
+}
+
+/// The input node `at` passes on as it is, its values say ([`bypass`]).
+fn through(work: &Work, at: NodeIndex) -> Option<String> {
+    let node = work.node(at)?;
+    let def = node.def.mtlx()?;
+    if work.output == Some(at) || def.outputs.len() != 1 {
+        return None;
+    }
+    let held = mtlx_values(&node.values);
+    let wired = |name: &str| work.driver(at, name).is_some();
+    // An unwired input's numbers: its value, or its default.
+    let numbers = |name: &str| -> Option<Vec<f64>> {
+        if wired(name) {
+            return None;
+        }
+        Some(
+            match held(name).or_else(|| def.input(name)?.value.clone())? {
+                Value::Numbers(n) => n,
+                Value::Integer(n) => vec![n as f64],
+                Value::Boolean(b) => vec![f64::from(u8::from(b))],
+                Value::Text(_) => return None,
+            },
+        )
+    };
+    let is = |name: &str, of: f64| numbers(name).is_some_and(|n| n.iter().all(|v| *v == of));
+    let first = |name: &str| numbers(name)?.first().copied();
+    let input = match def.node.as_str() {
+        "dot" => "in".to_owned(),
+        "ifgreater" | "ifgreatereq" | "ifequal" => {
+            let (a, b) = (first("value1")?, first("value2")?);
+            let holds = match def.node.as_str() {
+                "ifgreater" => a > b,
+                "ifgreatereq" => a >= b,
+                _ => a == b,
+            };
+            if holds { "in1" } else { "in2" }.to_owned()
+        }
+        // `in1` below 1, `in2` below 2, and so on to the last.
+        "switch" => {
+            let last = def
+                .inputs
+                .iter()
+                .filter(|p| p.name.starts_with("in"))
+                .count();
+            let k = first("which")?.floor().max(0.0) as usize;
+            format!("in{}", k.min(last.saturating_sub(1)) + 1)
+        }
+        "add" if wired("in1") && is("in2", 0.0) => "in1".to_owned(),
+        "add" if wired("in2") && is("in1", 0.0) => "in2".to_owned(),
+        "subtract" if wired("in1") && is("in2", 0.0) => "in1".to_owned(),
+        "multiply" if wired("in1") && is("in2", 1.0) => "in1".to_owned(),
+        "multiply" if wired("in2") && is("in1", 1.0) => "in2".to_owned(),
+        "divide" | "power" if wired("in1") && is("in2", 1.0) => "in1".to_owned(),
+        "rotate2d" | "rotate3d" if is("amount", 0.0) => "in".to_owned(),
+        "mix" if is("mix", 1.0) => "fg".to_owned(),
+        "mix" if is("mix", 0.0) => "bg".to_owned(),
+        _ => return None,
+    };
+    // Of the output's type (an `FA` operation's float passes nothing on).
+    (def.input(&input)?.ty == def.ty()).then_some(input)
 }
 
 /// A node of values alone, every reader taking a value where it reads it: the

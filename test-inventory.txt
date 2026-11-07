@@ -323,6 +323,7 @@ kinogaki-render-api/lib test aov::tests::the_specifications_hashes_and_keys
 kinogaki-render-api/lib test aov::tests::values_not_of_the_frame_are_refused
 kinogaki-render-api/lib test engine::tests::a_dropped_deliverer_resolves_its_result_and_wakes_once
 kinogaki-render-api/lib test engine::tests::a_failure_resolves_once_saying_why
+kinogaki-render-api/lib test material::adopt::tests::a_conditional_of_values_passes_the_input_it_chooses_on
 kinogaki-render-api/lib test material::adopt::tests::a_model_expands_for_an_engine_of_every_leaf_and_translates_for_one_of_openpbr
 kinogaki-render-api/lib test material::adopt::tests::a_node_the_engine_implements_passes_as_it_is
 kinogaki-render-api/lib test material::adopt::tests::a_surface_with_no_way_renders_the_default
