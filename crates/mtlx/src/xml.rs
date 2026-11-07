@@ -12,7 +12,14 @@
 //!
 //! Text read from a `'static` source (the embedded libraries) is borrowed, not
 //! copied: the library reads in a few milliseconds.
+//!
+//! Elements nest at most [`DEPTH`] deep, so reading, writing and dropping a
+//! document recurse within the 2 MiB stack a file is read on.
 use std::borrow::Cow;
+
+/// How deep elements nest: MaterialX's own documents nest a handful of
+/// levels.
+pub(crate) const DEPTH: usize = 256;
 
 /// An element's text: borrowed from a `'static` source, else its own.
 pub(crate) type Text = Cow<'static, str>;
@@ -84,7 +91,7 @@ fn read<'a>(text: &'a str, keep: fn(&'a str) -> Text) -> Result<Element, String>
         keep,
     };
     reader.prolog()?;
-    let root = reader.element()?;
+    let root = reader.element(1)?;
     reader.prolog()?;
     match reader.at < reader.text.len() {
         true => Err(reader.error("content after the root element")),
@@ -241,10 +248,13 @@ impl<'a> Reader<'a> {
         }
     }
 
-    /// An element, its `<` next.
-    fn element(&mut self) -> Result<Element, String> {
+    /// An element `depth` levels deep, its `<` next.
+    fn element(&mut self, depth: usize) -> Result<Element, String> {
         if !self.starts("<") {
             return Err(self.error("an element expected"));
+        }
+        if depth > DEPTH {
+            return Err(self.error(&format!("elements nested deeper than {DEPTH}")));
         }
         self.at += 1;
         let mut element = Element {
@@ -280,12 +290,12 @@ impl<'a> Reader<'a> {
             };
             element.attributes.push(((self.keep)(key), value));
         }
-        self.children(&mut element)?;
+        self.children(&mut element, depth)?;
         Ok(element)
     }
 
-    /// `element`'s children and its end tag.
-    fn children(&mut self, element: &mut Element) -> Result<(), String> {
+    /// `element`'s children (`depth` its own) and its end tag.
+    fn children(&mut self, element: &mut Element, depth: usize) -> Result<(), String> {
         loop {
             let start = self.at;
             self.skip_space();
@@ -314,7 +324,7 @@ impl<'a> Reader<'a> {
             } else if self.starts("<?") {
                 self.until("?>")?;
             } else if self.starts("<") {
-                let child = self.element()?;
+                let child = self.element(depth + 1)?;
                 element.children.push(Child::Element(child));
             } else {
                 return Err(self.error("text inside an element"));
@@ -394,6 +404,28 @@ mod tests {
         let mut out = String::new();
         escape("a\u{1}b", &mut out);
         assert_eq!(out, "a&#01;b");
+    }
+
+    #[test]
+    fn nesting_past_its_depth_is_refused_on_a_small_stack() {
+        let nested = |depth: usize| "<m>".repeat(depth) + &"</m>".repeat(depth);
+        let read = std::thread::Builder::new()
+            .stack_size(2 << 20)
+            .spawn(move || {
+                let deepest = parse(&nested(DEPTH)).map(|root| write(&root).len());
+                (deepest, parse(&nested(DEPTH + 1)), parse(&nested(100_000)))
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+        assert!(read.0.is_ok_and(|len| len > 0));
+        for refused in [read.1, read.2] {
+            assert!(
+                refused
+                    .unwrap_err()
+                    .ends_with("elements nested deeper than 256")
+            );
+        }
     }
 
     #[test]

@@ -37,7 +37,7 @@ mod types;
 mod upgrade;
 mod xml;
 
-pub use document::Document;
+pub use document::{Document, Included};
 pub use graph::{Binding, Graph, GraphNode};
 pub use library::{GeomProp, Library, NodeDef, Port, library};
 pub use material::{Bound, Material, MaterialNode};

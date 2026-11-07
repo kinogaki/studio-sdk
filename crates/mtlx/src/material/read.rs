@@ -4,7 +4,7 @@ use crate::document::Document;
 use crate::graph::node_def;
 use crate::library::{NodeDef, Port, library};
 use crate::types::{Type, Value};
-use crate::xml::Element;
+use crate::xml::{DEPTH as CHAIN, Element};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -134,6 +134,10 @@ struct Flat<'a, 'd> {
     /// Each node with where it stands in the document.
     nodes: Vec<(Vec<usize>, MaterialNode)>,
     made: HashMap<(usize, &'d str), Made>,
+    /// The nodes being made, each reading the next: a node reading one of
+    /// them reads itself, and the chain is at most [`CHAIN`] long, so
+    /// making a node recurses within a small stack.
+    making: Vec<(usize, &'d str)>,
     /// The top-level node graphs read, by name: their scopes.
     graphs: HashMap<&'d str, usize>,
     taken: HashSet<String>,
@@ -153,6 +157,7 @@ impl<'a, 'd> Flat<'a, 'd> {
             scopes: vec![top],
             nodes: Vec::new(),
             made: HashMap::new(),
+            making: Vec::new(),
             graphs: HashMap::new(),
             taken: HashSet::new(),
             left: Vec::new(),
@@ -223,12 +228,30 @@ impl<'a, 'd> Flat<'a, 'd> {
         }
     }
 
-    /// Node `name` of `scope`, made once.
+    /// Node `name` of `scope`, made once; refused when it reads itself, or
+    /// ends a chain of nodes reading one another deeper than [`CHAIN`].
     fn node(&mut self, scope: usize, name: &str) -> Result<Made, String> {
         let e = (self.element(scope, name)).ok_or_else(|| format!("no node {name}"))?;
-        if let Some(made) = self.made.get(&(scope, e.get("name"))) {
+        let key = (scope, e.get("name"));
+        if let Some(made) = self.made.get(&key) {
             return Ok(*made);
         }
+        if self.making.contains(&key) {
+            return Err(format!("{name} reads itself"));
+        }
+        if self.making.len() >= CHAIN {
+            return Err(format!("{name} ends a chain of nodes deeper than {CHAIN}"));
+        }
+        self.making.push(key);
+        let made = self.make(scope, name, e);
+        self.making.pop();
+        let made = made?;
+        self.made.insert(key, made);
+        Ok(made)
+    }
+
+    /// Node element `e` of `scope`, named `name`, made.
+    fn make(&mut self, scope: usize, name: &str, e: &'d Element) -> Result<Made, String> {
         let position = self.position(scope, e);
         let made = match self.doc.own(e) {
             Some((def, graph)) => {
@@ -281,7 +304,6 @@ impl<'a, 'd> Flat<'a, 'd> {
                 Made::Node(self.nodes.len() - 1)
             }
         };
-        self.made.insert((scope, e.get("name")), made);
         Ok(made)
     }
 

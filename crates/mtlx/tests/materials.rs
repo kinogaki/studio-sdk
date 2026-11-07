@@ -1,7 +1,7 @@
 //! A document's materials as flat networks (MaterialX's own test documents,
 //! `tests/documents/read`), a document written of materials reading back as
 //! them, and includes read.
-use kinogaki_mtlx::{Bound, Document, Material, Value};
+use kinogaki_mtlx::{Bound, Document, Included, Material, Value};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -222,32 +222,160 @@ fn includes_read_the_documents_they_name_relative_to_the_one_naming_them() {
     let files: HashMap<&str, &str> = HashMap::from([
         (
             "lib/defs.mtlx",
-            "<materialx version=\"1.39\" fileprefix=\"maps/\">\n  <xi:include href=\"more.mtlx\" />\n  <constant name=\"half\" type=\"float\">\n    <input name=\"value\" type=\"float\" value=\"0.5\" />\n  </constant>\n</materialx>\n",
+            "<materialx version=\"1.39\" fileprefix=\"maps/\">\n  <xi:include href=\"more.mtlx\" />\n  <xi:include href=\"./more.mtlx\" />\n  <constant name=\"half\" type=\"float\">\n    <input name=\"value\" type=\"float\" value=\"0.5\" />\n  </constant>\n</materialx>\n",
         ),
         (
             "lib/more.mtlx",
-            "<materialx version=\"1.39\">\n  <xi:include href=\"more.mtlx\" />\n</materialx>\n",
+            "<materialx version=\"1.39\">\n  <xi:include href=\"../lib/./defs.mtlx\" />\n  <constant name=\"more\" type=\"float\" />\n</materialx>\n",
         ),
     ]);
-    let text = "<materialx version=\"1.39\">\n  <xi:include href=\"lib/defs.mtlx\" />\n  <xi:include href=\"gone.mtlx\" />\n</materialx>\n";
+    // Each name resolved against the folder of the document naming it, the
+    // file's identity its path without `.` and `..`, as a resolver gives it.
+    let identity = |href: &str, within: Option<&str>| {
+        let mut parts: Vec<&str> = within
+            .map_or(vec![], |w| w.split('/').collect::<Vec<_>>())
+            .into_iter()
+            .rev()
+            .skip(1)
+            .rev()
+            .collect();
+        for part in href.split('/') {
+            match part {
+                "." => {}
+                ".." => _ = parts.pop(),
+                part => parts.push(part),
+            }
+        }
+        parts.join("/")
+    };
+    let text = "<materialx version=\"1.39\">\n  <xi:include href=\"lib/defs.mtlx\" />\n  <xi:include href=\"gone.mtlx\" />\n  <xi:include href=\"lib/more.mtlx\" />\n</materialx>\n";
     let mut document: Document = text.parse().unwrap();
     let mut asked = Vec::new();
-    let said = document.include(&mut |path| {
-        asked.push(path.to_owned());
-        files
-            .get(path)
-            .map(|t| t.to_string())
-            .ok_or_else(|| "no such file".to_owned())
+    let said = document.include(None, &mut |href, within| {
+        let path = identity(href, within);
+        asked.push(path.clone());
+        let text = files.get(&*path)?.to_string();
+        Some(Included {
+            identity: path,
+            text,
+        })
     });
     assert_eq!(
         asked,
-        ["lib/defs.mtlx", "lib/more.mtlx", "gone.mtlx"].map(String::from)
+        [
+            "lib/defs.mtlx",
+            "lib/more.mtlx",
+            "lib/defs.mtlx",
+            "lib/more.mtlx",
+            "gone.mtlx",
+            "lib/more.mtlx"
+        ]
+        .map(String::from)
     );
-    assert_eq!(said.len(), 2, "a cycle and a missing file: {said:?}");
+    let [cycle] = &said[..] else {
+        panic!("a cycle, said; a missing file, its loader's to say: {said:?}")
+    };
+    assert!(
+        cycle.starts_with("../lib/./defs.mtlx includes itself"),
+        "{said:?}"
+    );
     let written = document.to_string();
     assert!(
         written.contains("<constant name=\"half\" type=\"float\" fileprefix=\"maps/\">")
             && !written.contains("xi:include"),
         "{written}"
+    );
+    assert_eq!(
+        written.matches("name=\"more\"").count(),
+        1,
+        "included once: {written}"
+    );
+}
+
+#[test]
+fn includes_naming_one_document_many_times_read_it_once() {
+    // Each level includes the next twice: read whole, 2^30 copies.
+    let level = |k: usize| {
+        let next = format!("<xi:include href=\"{}.mtlx\" />", k + 1);
+        format!(
+            "<materialx version=\"1.39\">{next}{next}<constant name=\"c{k}\" type=\"float\" /></materialx>"
+        )
+    };
+    let mut document: Document = level(0).parse().unwrap();
+    let mut loads = 0;
+    let said = document.include(Some("0.mtlx"), &mut |href, _| {
+        loads += 1;
+        let k: usize = href.trim_end_matches(".mtlx").parse().unwrap();
+        let text = match k < 30 {
+            true => level(k),
+            false => "<materialx version=\"1.39\" />".to_owned(),
+        };
+        Some(Included {
+            identity: href.to_owned(),
+            text,
+        })
+    });
+    assert_eq!(
+        loads, 60,
+        "each level's second include is asked, then left out"
+    );
+    assert!(said.is_empty(), "{said:?}");
+    assert_eq!(document.to_string().matches("<constant").count(), 30);
+}
+
+/// `document` flattened on a thread of the 2 MiB stack a file is read on.
+fn flattened_on_a_small_stack(document: Document) -> (Vec<Material>, Vec<String>) {
+    std::thread::Builder::new()
+        .stack_size(2 << 20)
+        .spawn(move || document.materials())
+        .unwrap()
+        .join()
+        .unwrap()
+}
+
+/// A material whose surface's `base` reads node `read` of `nodes`.
+fn reading(nodes: &str, read: &str) -> Document {
+    format!(
+        "<materialx version=\"1.39\">{nodes}<standard_surface name=\"s\" type=\"surfaceshader\"><input name=\"base\" type=\"float\" nodename=\"{read}\" /></standard_surface><surfacematerial name=\"m\" type=\"material\"><input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"s\" /></surfacematerial></materialx>"
+    )
+    .parse()
+    .unwrap()
+}
+
+#[test]
+fn nodes_reading_themselves_are_left_unbound_and_said() {
+    let add = |name: &str, reads: &str| {
+        format!(
+            "<add name=\"{name}\" type=\"float\"><input name=\"in1\" type=\"float\" nodename=\"{reads}\" /></add>"
+        )
+    };
+    for (nodes, said) in [
+        (add("a", "a"), "a reads itself"),
+        (add("a", "b") + &add("b", "a"), "a reads itself"),
+    ] {
+        let (materials, left) = flattened_on_a_small_stack(reading(&nodes, "a"));
+        assert_eq!(materials.len(), 1);
+        assert!(left.iter().any(|l| l.contains(said)), "{left:?}");
+    }
+}
+
+#[test]
+fn a_chain_of_nodes_deeper_than_its_limit_is_cut_and_said() {
+    // 2,000 nodes, each reading the next: written deepest last, so the
+    // material reads the whole chain from its top.
+    let add = |k: usize| {
+        format!(
+            "<add name=\"n{k}\" type=\"float\"><input name=\"in1\" type=\"float\" nodename=\"n{}\" /></add>",
+            k + 1
+        )
+    };
+    let nodes: String =
+        (0..2000).map(add).collect::<String>() + "<constant name=\"n2000\" type=\"float\" />";
+    let (materials, left) = flattened_on_a_small_stack(reading(&nodes, "n0"));
+    assert_eq!(materials.len(), 1);
+    assert!(
+        left.iter()
+            .any(|l| l.contains("ends a chain of nodes deeper than 256")),
+        "{left:?}"
     );
 }
