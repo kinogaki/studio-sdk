@@ -567,23 +567,25 @@ impl ImageBuilder {
         }
         let across = tiles_of(self.data.size()).map(|n| n as usize);
         let side = TILE as usize;
-        let mut tiles = Vec::with_capacity(across[0] * across[1]);
-        for ty in 0..across[1] {
-            for tx in 0..across[0] {
-                let mut tile = vec![0; format.tile_bytes()];
-                let mut any = false;
-                for row in 0..side.min(height.saturating_sub(ty * side)) {
-                    let y = ty * side + row;
-                    let run = side.min(width - tx * side) * bytes;
-                    let from = (y * width + tx * side) * bytes;
-                    let to = &mut tile[row * side * bytes..][..run];
-                    to.copy_from_slice(&pixels[from..from + run]);
-                    any |= to.iter().any(|&b| b != 0);
-                }
-                tiles.push(any.then(|| Tile::new(tile)));
+        let tile = |at: usize| {
+            let (tx, ty) = (at % across[0], at / across[0]);
+            let mut tile = vec![0; format.tile_bytes()];
+            let mut any = false;
+            for row in 0..side.min(height.saturating_sub(ty * side)) {
+                let y = ty * side + row;
+                let run = side.min(width - tx * side) * bytes;
+                let from = (y * width + tx * side) * bytes;
+                let to = &mut tile[row * side * bytes..][..run];
+                to.copy_from_slice(&pixels[from..from + run]);
+                any |= to.iter().any(|&b| b != 0);
             }
-        }
-        self.tiles(format, tiles)
+            any.then(|| Tile::new(tile))
+        };
+        // A row of tiles a block, on the process's workers.
+        let rows = crate::parallel::map(across[0] * across[1], across[0], |range| {
+            range.map(tile).collect::<Vec<_>>()
+        });
+        self.tiles(format, rows.into_iter().flatten().collect())
     }
 
     /// The image.

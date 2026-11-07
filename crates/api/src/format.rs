@@ -35,7 +35,9 @@
 //!
 //! The host resolves the tag to a space of its configuration and converts
 //! (a format holds no color maths). A writer of pictures takes one item
-//! holding an Image the host tagged for the file, copies the tag and
+//! holding an Image the host made for the file (as a display shows it when
+//! the writer is [`display_referred`](FormatWriter::display_referred), else
+//! linear light) and tagged for it, copies the tag and
 //! [`CHROMATICITIES`](kinogaki_geometry::image::metadata::CHROMATICITIES),
 //! writes each layer as the file can hold it, and says, as a warning, what
 //! it left out.
@@ -287,6 +289,14 @@ pub trait FormatWriter: Send + Sync {
     /// that doesn't is handed one time's items and no frames. No by
     /// default.
     fn frames(&self) -> bool {
+        false
+    }
+
+    /// Whether its files hold display-referred code values (a PNG's, a
+    /// JPEG's) rather than scene-linear light (an OpenEXR's): a host hands
+    /// such a writer an image as a display shows it, through the view a
+    /// render is seen in, tagged with that display. No by default.
+    fn display_referred(&self) -> bool {
         false
     }
 

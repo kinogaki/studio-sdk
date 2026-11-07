@@ -28,6 +28,13 @@
 use crate::{Diagnostic, Error};
 use std::fmt::Debug;
 
+/// The sRGB display's space by its interop name, which configurations
+/// alias (the Color Interop Forum's `srgb_rec709_display`): what a file's
+/// own sRGB tag says (a PNG's `sRGB` chunk), so a format tags such a file
+/// with it, and what the host tags an image with for a file of sRGB code
+/// values, so its writer writes that tag.
+pub const SRGB_DISPLAY: &str = "srgb_rec709_display";
+
 /// The host's color management.
 pub trait ColorService: Send + Sync + Debug {
     /// The project's working space, by its name in the configuration.

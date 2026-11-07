@@ -188,10 +188,10 @@ impl FileDialog {
 
     /// Offering files named `name` ("Images (PNG, JPEG)") with these
     /// `extensions` (without the dot).
-    pub fn filter(mut self, name: impl Into<Text>, extensions: &[&'static str]) -> Self {
+    pub fn filter(mut self, name: impl Into<Text>, extensions: &[&str]) -> Self {
         self.filters.push(FileFilter {
             name: name.into(),
-            extensions: extensions.iter().map(|&e| e.into()).collect(),
+            extensions: extensions.iter().map(|&e| Text::Owned(e.into())).collect(),
         });
         self
     }
