@@ -112,9 +112,8 @@ impl<'a> Input<'a> {
     /// device is never read, [`regular`]), or lent from memory.
     ///
     /// # Errors
-    /// The file can't be read: [`Missing`](crate::ErrorKind::Missing) when
-    /// there is no such file, else [`Invalid`](crate::ErrorKind::Invalid)
-    /// (one not a regular file among them); the message names it.
+    /// The file can't be read (it isn't there, or isn't a regular file):
+    /// [`Invalid`](crate::ErrorKind::Invalid), the message naming it.
     pub fn bytes(&self) -> Result<Cow<'a, [u8]>, Error> {
         match self.source {
             Source::Memory(bytes) => Ok(Cow::Borrowed(bytes)),
@@ -175,7 +174,7 @@ mod tests {
         let missing = Input::file(&gone);
         assert!(missing.head().is_empty());
         let why = missing.bytes().unwrap_err();
-        assert_eq!(why.kind, crate::ErrorKind::Missing);
+        assert_eq!(why.kind, crate::ErrorKind::Invalid, "nothing uninstalled");
         assert!(why.message().starts_with(&gone.display().to_string()));
         std::fs::remove_dir_all(&dir).unwrap();
     }

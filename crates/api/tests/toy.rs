@@ -4,16 +4,14 @@ use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::*;
 use kinogaki_studio_api_testing::Unconverted;
 use kinogaki_studio_api_testing::assert_refused;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
 /// The toy kernel's value.
 #[derive(Debug, PartialEq)]
 struct Cloud(Vec<[f64; 3]>);
 
-static CLOUD: LazyLock<Typed<Cloud>> =
-    LazyLock::new(|| Typed::new(DataTypeId::declared("toy.points.cloud")));
-static COUNT: LazyLock<Typed<usize>> =
-    LazyLock::new(|| Typed::new(DataTypeId::declared("toy.points.count")));
+const CLOUD: Typed<Cloud> = Typed::new(DataTypeId::declared("toy.points.cloud"));
+const COUNT: Typed<usize> = Typed::new(DataTypeId::declared("toy.points.count"));
 
 struct CloudCodec;
 impl DataCodec for CloudCodec {
@@ -209,8 +207,8 @@ impl FileFormat for XyzFormat {
         &["xyz"]
     }
     fn produces(&self) -> &[DataTypeId] {
-        static PRODUCES: LazyLock<[DataTypeId; 1]> = LazyLock::new(|| [CLOUD.id()]);
-        &*PRODUCES
+        const PRODUCES: &[DataTypeId] = &[CLOUD.id()];
+        PRODUCES
     }
     fn read(
         &self,

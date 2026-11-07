@@ -74,8 +74,7 @@ use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::id::{DataTypeId, FormatId};
 use crate::params::{Parameters, Schema, Value};
 use crate::{Diagnostic, Error};
-use kinogaki_geometry::{Rate, Units, Xform};
-use std::any::Any;
+use kinogaki_geometry::{Units, Xform};
 use std::path::Path;
 
 /// A format's options by name (`"scale"`, `"merge_shells"`). A format's
@@ -147,9 +146,6 @@ pub struct Reading<'a> {
     /// The host's color management: colors in the file are converted
     /// from the file's space into the project's working space.
     pub colors: &'a dyn ColorService,
-    /// Values of the project the host lends formats, found by their Rust
-    /// type (`Reading::setting`): a CAD kernel's tolerances.
-    pub settings: &'a [&'a (dyn Any + Send + Sync)],
     /// What the read may spend, and its cancellation: what the file claims
     /// is checked against it, and long reads poll it ([`Reading::check`])
     /// and stop with [`Error::cancelled()`].
@@ -161,14 +157,13 @@ pub struct Reading<'a> {
 }
 
 impl<'a> Reading<'a> {
-    /// A read for `purpose` into `units` and `colors`' working space, lent
-    /// nothing, of the default budget and never cancelled.
+    /// A read for `purpose` into `units` and `colors`' working space, of
+    /// the default budget and never cancelled, wanting any type.
     pub fn new(purpose: Purpose, units: Units, colors: &'a dyn ColorService) -> Self {
         Self {
             purpose,
             units,
             colors,
-            settings: &[],
             budget: ReadBudget::default(),
             wants: None,
         }
@@ -307,13 +302,6 @@ pub trait FormatWriter: Send + Sync {
         Schema::default()
     }
 
-    /// Whether it writes a range of frames ([`Writing::frames`]); a writer
-    /// that doesn't is handed one time's items and no frames. No by
-    /// default.
-    fn frames(&self) -> bool {
-        false
-    }
-
     /// Whether its files hold display-referred code values (a PNG's, a
     /// JPEG's) rather than scene-linear light (an OpenEXR's): a host hands
     /// such a writer an image as a display shows it, through the view a
@@ -351,41 +339,23 @@ pub struct Writing<'a> {
     /// (a B-rep through the installed mesher); `None` when nothing meshes
     /// it.
     pub meshed: &'a (dyn Fn(&Data) -> Option<kinogaki_geometry::Geometry> + Sync),
-    /// The range being written, for a writer that writes
-    /// [`frames`](FormatWriter::frames); `None` writes `items` alone.
-    pub frames: Option<&'a dyn Frames>,
 }
 
 impl<'a> Writing<'a> {
     /// A write in `units` and `colors`' working space, never cancelled,
-    /// meshing nothing, of one time.
+    /// meshing nothing.
     pub fn new(units: Units, colors: &'a dyn ColorService) -> Self {
         Self {
             units,
             colors,
             cancel: CancelToken::default(),
             meshed: &|_| None,
-            frames: None,
         }
     }
 
     /// `Err(Error::cancelled())` once the write is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
         self.cancel.check()
-    }
-}
-
-/// A range of frames a writer writes ([`Writing::frames`]): the items at
-/// each, keeping their structure (the same items, parents and names) from
-/// frame to frame.
-pub trait Frames: Sync {
-    /// Frames a second.
-    fn rate(&self) -> Rate;
-    /// How many frames.
-    fn len(&self) -> usize;
-    /// Whether it holds no frame.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }
 
@@ -492,14 +462,11 @@ mod tests {
     }
 
     #[test]
-    fn readings_lend_settings_by_type_and_poll_cancellation() {
-        let tolerance = 0.01_f64;
-        let lent: [&(dyn Any + Send + Sync); 1] = [&tolerance];
+    fn readings_poll_cancellation() {
         let stop = CancelToken::default();
         stop.cancel();
         let units = Units::new(0.001, UpAxis::Z).unwrap();
         let reading = Reading {
-            settings: &lent,
             budget: ReadBudget::default().cancelled_by(stop),
             ..Reading::new(Purpose::Value, units, &Unconverted)
         };

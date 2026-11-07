@@ -267,7 +267,7 @@ fn carried_values(
             Values::Text(t.with_indices(indices)?)
         }
         other => {
-            return Err(Error::refused(format!(
+            return Err(Error::invalid(format!(
                 "no rule carries {} values",
                 other.storage().name()
             )));
@@ -318,7 +318,7 @@ pub(super) fn carried_attribute(
                 let text = Text::new(v.into(), t.table().clone())?;
                 Attribute::arrays(ty, o.into(), Values::Text(text))
             }
-            other => Err(Error::refused(format!(
+            other => Err(Error::invalid(format!(
                 "no rule carries {} values",
                 other.storage().name()
             ))),
@@ -337,7 +337,7 @@ fn fresh_ids(
     layout: &Layout,
 ) -> Result<Attribute, Error> {
     let mut next = ids::fresh(old, layout.added())
-        .ok_or_else(|| Error::refused("the new ids pass the largest id"))?;
+        .ok_or_else(|| Error::invalid("the new ids pass the largest id"))?;
     let mut out = ColumnWriter::new();
     for run in layout.runs() {
         match run {

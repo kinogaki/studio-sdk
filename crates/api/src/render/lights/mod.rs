@@ -5,7 +5,7 @@
 //!
 //! | Part | What |
 //! |---|---|
-//! | `value` | a light as a data type: [`light_value`] makes one, [`LightCodec`] saves it (an import's lights, a reference's) |
+//! | `value` | a light as a data type, checked as [`standard::light`](crate::standard::light) wraps it; [`LightCodec`] saves it (an import's lights, a reference's) |
 //! | `kind` | [`DeclaredKind`]: an engine's object kind of lights (and of its atmosphere), its objects prims of the types it declares |
 //! | `view` | how a kind's lights show in the viewport: their glyphs and handles |
 mod kind;
@@ -13,4 +13,5 @@ mod value;
 mod view;
 
 pub use kind::DeclaredKind;
-pub use value::{LightCodec, light_value};
+pub use value::LightCodec;
+pub(crate) use value::light_value;

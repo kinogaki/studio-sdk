@@ -4,7 +4,7 @@
 //! | Module | What |
 //! |---|---|
 //! | [`id`] | declared ids (`<vendor>.<package>.<name>`), one type per kind of thing |
-//! | [`data`] | [`Data`]: a type-erased value of a registered data type, and a kernel's [`Typed`] handle |
+//! | [`data`] | [`Data`]: a type-erased value of a registered data type, and a kernel's [`Typed`] handle ([`Checked`] for values checked as they are wrapped) |
 //! | [`value`] | [`Value`]: what a parameter, a render setting, a declared prim's value or a material port holds; [`Parameters`], values by name |
 //! | [`reads`] | [`ParametersExt`]: a value of [`Parameters`] read by name as its variant, or an error naming it |
 //! | [`kind`] | [`ValueKind`]: what a value holds, its limits and the options its kind takes ([`Number`], [`Unit`], [`Choice`]) |
@@ -33,7 +33,7 @@ pub mod tone_curve;
 pub mod value;
 
 pub use condition::Condition;
-pub use data::{Data, Typed};
+pub use data::{Checked, Data, Typed};
 pub use id::{
     ContextId, CreationId, DataTypeId, EngineId, FormatId, MesherId, NodeTypeId, ObjectKindId,
     PackageId, PrimTypeId, SlotId, StoredId,

@@ -26,11 +26,12 @@ const MAX_VALUE: f32 = 1e12;
 /// and near distance, a far distance beyond the near one, a focus distance
 /// and f-number of at least 0, a shutter closing no earlier than it opens,
 /// every value finite and within range. Its placement is dropped (the
-/// identity, still): what a camera value holds.
+/// identity, still): what a camera value holds. The check of
+/// [`camera`](fn@camera), which wraps every camera value.
 ///
 /// # Errors
 /// A value out of range.
-pub fn lens(camera: Camera) -> Result<Camera, Error> {
+pub(crate) fn lens(camera: Camera) -> Result<Camera, Error> {
     let [near, far] = camera.clipping_range;
     let positive = [
         camera.focal_length,
@@ -104,7 +105,8 @@ impl CameraCodec {
     }
 
     /// Reads the lens [`write_lens`](Self::write_lens) wrote, strictly:
-    /// every field, a known projection, and a valid lens ([`lens`]).
+    /// every field, a known projection, and a valid lens (as
+    /// [`camera`](fn@camera) checks one).
     ///
     /// # Errors
     /// A field missing or of another kind, or an invalid lens.
@@ -161,7 +163,7 @@ impl DataCodec for CameraCodec {
     }
 
     fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
-        Ok(camera().wrap(Self::read_lens(element)?))
+        camera().wrap(Self::read_lens(element)?)
     }
 }
 
@@ -172,18 +174,19 @@ mod tests {
 
     #[test]
     fn a_lens_saves_and_reads_back() {
-        let lens = lens(Camera {
-            projection: Projection::Orthographic,
-            focal_length: 35.0,
-            horizontal_aperture_offset: 1.5,
-            clipping_range: [0.5, 900.0],
-            f_stop: 2.8,
-            shutter: [-0.25, 0.25],
-            ..Camera::default()
-        })
-        .unwrap();
+        let lens = camera()
+            .check(Camera {
+                projection: Projection::Orthographic,
+                focal_length: 35.0,
+                horizontal_aperture_offset: 1.5,
+                clipping_range: [0.5, 900.0],
+                f_stop: 2.8,
+                shutter: [-0.25, 0.25],
+                ..Camera::default()
+            })
+            .unwrap();
         let mut e = MemoryElement::new("camera");
-        e.write(|w| CameraCodec.write(&camera().wrap(lens.clone()), None, w))
+        e.write(|w| CameraCodec.write(&camera().wrap(lens.clone()).unwrap(), None, w))
             .unwrap();
         let back = e.read(|r| CameraCodec.read(r, None)).unwrap();
         assert_eq!(camera().get(&back), Some(&lens));
@@ -208,7 +211,7 @@ mod tests {
             ..Camera::default()
         };
         for bad in [reversed, blind, infinite, backwards] {
-            assert!(lens(bad).is_err());
+            assert!(camera().wrap(bad).is_err(), "refused as it is wrapped");
         }
         let placed = Camera {
             xform: Sampled::new(
@@ -221,6 +224,7 @@ mod tests {
             .unwrap(),
             ..Camera::default()
         };
-        assert_eq!(lens(placed).unwrap(), Camera::default(), "unplaced");
+        let value = camera().wrap(placed).unwrap();
+        assert_eq!(camera().get(&value), Some(&Camera::default()), "unplaced");
     }
 }

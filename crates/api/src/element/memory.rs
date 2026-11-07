@@ -465,10 +465,10 @@ mod tests {
 
     #[test]
     fn values_are_the_same_as_the_caller_says() {
-        let ty = crate::DataTypeId::declared("example.counts.count");
+        let ty = crate::Typed::<i64>::new(crate::DataTypeId::declared("example.counts.count"));
         let holding = |n: i64| {
             let mut e = MemoryElement::new("holder");
-            e.write(|w| w.data("value", &Data::new(ty, n))).unwrap();
+            e.write(|w| w.data("value", &ty.wrap(n))).unwrap();
             e
         };
         let (a, b, c) = (holding(4), holding(4), holding(5));

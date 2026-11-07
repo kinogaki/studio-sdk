@@ -192,7 +192,7 @@ impl RenderEngine for RecordingEngine {
                 )
             })
             .collect();
-        let image = size.ok_or_else(|| kinogaki_geometry::Error::missing("no such view"));
+        let image = size.ok_or_else(|| kinogaki_geometry::Error::invalid("no such view"));
         match image.and_then(|size| crate::aov::image(size, &planes, &[])) {
             Ok(image) => deliver.deliver(image),
             Err(why) => deliver.fail(why),

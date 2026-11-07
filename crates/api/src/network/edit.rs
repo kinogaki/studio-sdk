@@ -386,13 +386,13 @@ impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
         let shown = network.output_index();
         let mut seed = NetworkSeed::default();
         for (at, node) in network.nodes().iter().enumerate() {
-            let mut parameters = node.values.clone();
-            if let Some(def) = node.def.mtlx() {
+            let mut parameters = node.values().clone();
+            if let Some(def) = node.def().mtlx() {
                 let signature = crate::Value::Choice(std::sync::Arc::from(def.name.as_str()));
                 parameters.insert(SIGNATURE.to_owned(), signature);
             }
             seed.node(NewNode {
-                node_type: node.def.id,
+                node_type: node.def().id,
                 name: None,
                 parameters,
                 display: shown == Some(at as u32),
@@ -403,7 +403,7 @@ impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
         }
         let mut images: Vec<(&kinogaki_geometry::image::ImageSource, usize)> = Vec::new();
         for (at, node) in network.nodes().iter().enumerate() {
-            for (input, source) in &node.images {
+            for (input, source) in node.images() {
                 let image = match images.iter().find(|(s, _)| *s == source) {
                     Some((_, image)) => *image,
                     None => {

@@ -36,7 +36,7 @@ impl Paint {
         };
         let surface = &network.nodes()[at as usize];
         if surface
-            .def
+            .def()
             .mtlx()
             .is_none_or(|d| d.node != standard::OPEN_PBR)
         {
@@ -44,13 +44,13 @@ impl Paint {
         }
         let wired = (network.links().iter()).find(|l| l.to == at && &*l.input == "base_color");
         let image = wired.and_then(|l| {
-            let texture = network.nodes()[l.from as usize].textures.get("file")?;
+            let texture = network.nodes()[l.from as usize].textures().get("file")?;
             match prims.get(&texture.prim()) {
                 Some(Prim::Texture(image)) => Some(image.clone()),
                 _ => None,
             }
         });
-        let held = surface.values.get("base_color").and_then(Value::color);
+        let held = surface.values().get("base_color").and_then(Value::color);
         Paint {
             color: match (&image, wired) {
                 (Some(_), _) => [1.0; 3],

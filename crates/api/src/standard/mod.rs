@@ -45,7 +45,7 @@ mod selection;
 mod tolerances;
 
 pub use brep::BrepCodec;
-pub use camera::{CameraCodec, lens};
+pub use camera::CameraCodec;
 pub use color::ColorConfiguration;
 pub use embedded::EmbeddedFileCodec;
 pub use geometry::GeometryCodec;
@@ -58,7 +58,7 @@ pub use output::{BackgroundSpace, DisplayOutput};
 
 use crate::Error;
 use crate::components::Components;
-use crate::data::Typed;
+use crate::data::{Checked, Typed};
 use crate::facets::Combine;
 use crate::id::DataTypeId;
 use crate::viewport::ElementKind;
@@ -67,9 +67,6 @@ use kinogaki_geometry::{Domain, Elements, Geometry, Selection};
 
 /// The id of [`Geometry`] values: polygons, polylines and curves.
 pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
-
-/// The id of [`Brep`] values.
-pub const BREP: DataTypeId = DataTypeId::declared("kinogaki.core.brep");
 
 /// The id of a file's materials and images as a format reads them beside
 /// its geometry ([`materials`](fn@materials)).
@@ -114,37 +111,40 @@ pub const fn selection() -> Typed<Selection> {
     Typed::new(DataTypeId::declared(SELECTION))
 }
 
-/// The id of camera values: an unplaced lens ([`lens`], [`CameraCodec`]).
-pub const CAMERA: DataTypeId = DataTypeId::declared("kinogaki.core.camera");
-
-/// The id of the camera object kind, whose objects hold a [`CAMERA`]
-/// value: what a camera row picks.
+/// The id of the camera object kind, whose objects hold a
+/// [`camera`](fn@camera) value: what a camera row picks.
 pub const CAMERA_KIND: crate::ObjectKindId = crate::ObjectKindId::declared("kinogaki.core.camera");
 
-/// The handle on camera values ([`CAMERA`]): render-api's
-/// [`Camera`](kinogaki_render_api::Camera), unplaced, in UsdGeomCamera's
-/// units; make one with [`lens`].
-pub const fn camera() -> Typed<kinogaki_render_api::Camera> {
-    Typed::new(CAMERA)
+/// The handle on camera values (`kinogaki.core.camera`, saved by
+/// [`CameraCodec`]): render-api's [`Camera`](kinogaki_render_api::Camera),
+/// unplaced, in UsdGeomCamera's units. Wrapping checks the lens (positive
+/// focal length, film back and near distance, a far distance beyond the
+/// near one, a focus distance and f-number of at least 0, a shutter
+/// closing no earlier than it opens, every value finite) and drops its
+/// placement.
+pub const fn camera() -> Checked<kinogaki_render_api::Camera> {
+    Checked::new(DataTypeId::declared("kinogaki.core.camera"), camera::lens)
 }
 
-/// The id of light values: an unplaced light ([`light_value`],
-/// [`LightCodec`]).
-///
-/// [`light_value`]: crate::render::lights::light_value
-/// [`LightCodec`]: crate::render::lights::LightCodec
+/// The id of light values (`light`).
 pub(crate) const LIGHT: &str = "kinogaki.core.light";
 
-/// The handle on light values (`LIGHT`): render-api's standard
-/// [`Light`](kinogaki_render_api::standard::Light), unplaced, in UsdLux's
-/// terms; make one with [`light_value`](crate::render::lights::light_value).
-pub const fn light() -> Typed<kinogaki_render_api::standard::Light> {
-    Typed::new(DataTypeId::declared(LIGHT))
+/// The handle on light values (`kinogaki.core.light`, saved by
+/// [`LightCodec`](crate::render::lights::LightCodec)): render-api's
+/// standard [`Light`](kinogaki_render_api::standard::Light), unplaced, in
+/// UsdLux's terms. Wrapping checks it (every number finite and within
+/// range, sizes positive, angles and softness in range, a dome's image a
+/// path that isn't blank) and drops its placement.
+pub const fn light() -> Checked<kinogaki_render_api::standard::Light> {
+    Checked::new(
+        DataTypeId::declared(LIGHT),
+        crate::render::lights::light_value,
+    )
 }
 
-/// The handle on [`Brep`] values ([`BREP`]).
+/// The handle on [`Brep`] values (`kinogaki.core.brep`).
 pub const fn brep() -> Typed<Brep> {
-    Typed::new(BREP)
+    Typed::new(DataTypeId::declared("kinogaki.core.brep"))
 }
 
 /// The handle on a file's materials and the images its lights name, as a

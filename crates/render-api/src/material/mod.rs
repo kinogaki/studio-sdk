@@ -28,10 +28,11 @@ pub mod standard;
 pub use def::{Input, NodeDef, Output, Socket};
 pub use display::{DisplayTexture, MaterialDisplay};
 
+use crate::id::Id;
 use crate::settings::Textures;
 use kinogaki_geometry::Error;
-use kinogaki_geometry::image::{ImageColor, ImageSource};
-use kinogaki_value::{Parameters, Value, ValueKind};
+use kinogaki_geometry::image::{Image, ImageColor, ImageSource};
+use kinogaki_value::{Parameter, Parameters, Value, ValueKind};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
@@ -42,21 +43,40 @@ pub type NodeIndex = u32;
 /// A node: its definition, every input's value (its default when never
 /// set), the images its [`Image`](Socket::Image) inputs read, and, as an
 /// engine receives it, the Texture prims the host read those to, by input
-/// name.
+/// name. Read-only: a network's nodes change only through the network,
+/// which checks what they hold ([`MaterialNetwork::set_texture`],
+/// [`MaterialNetwork::map_values`]).
 #[derive(Clone)]
 pub struct Node {
-    /// Its definition: its type and, for a MaterialX node, its signature.
-    pub def: Arc<NodeDef>,
-    /// Every input's value that isn't a wire alone, by name.
-    pub values: Parameters,
-    /// What its Image inputs read, by input name: the host's Image nodes
-    /// wired into them, as the host compiles a material.
-    pub images: BTreeMap<String, ImageSource>,
-    /// Its images' Texture prims, filled by the host as it sends the network.
-    pub textures: Textures,
+    def: Arc<NodeDef>,
+    values: Parameters,
+    images: BTreeMap<String, ImageSource>,
+    textures: Textures,
 }
 
 impl Node {
+    /// Its definition: its type and, for a MaterialX node, its signature.
+    pub fn def(&self) -> &Arc<NodeDef> {
+        &self.def
+    }
+
+    /// Every input's value that isn't a wire alone, by name.
+    pub fn values(&self) -> &Parameters {
+        &self.values
+    }
+
+    /// What its Image inputs read, by input name: the host's Image nodes
+    /// wired into them, as the host compiles a material.
+    pub fn images(&self) -> &BTreeMap<String, ImageSource> {
+        &self.images
+    }
+
+    /// Its Image inputs' Texture prims, by input name: what the host read
+    /// their images to as it sent the network.
+    pub fn textures(&self) -> &BTreeMap<String, Id<Image>> {
+        &self.textures
+    }
+
     /// The layer of its file its Image inputs read: its `layer` value
     /// (MaterialX's `image` names one); none, or blank, reads the main layer.
     pub fn layer(&self) -> Option<&str> {
@@ -72,6 +92,19 @@ impl Node {
         let color =
             (self.def.outputs.iter()).any(|o| matches!(o.socket, Socket::Color3 | Socket::Color4));
         !color || (self.images.get(input)).is_some_and(|i| *i.color() == ImageColor::Data)
+    }
+
+    /// `Ok` when `input` is one of its Image inputs.
+    fn image_input(&self, input: &str) -> Result<(), Error> {
+        match self.def.find_input(input).and_then(Input::socket) == Some(&Socket::Image) {
+            true => Ok(()),
+            false => {
+                let label = &self.def.label;
+                Err(Error::invalid(format_args!(
+                    "{label} has no image input {input}"
+                )))
+            }
+        }
     }
 }
 
@@ -130,11 +163,6 @@ impl MaterialNetwork {
     /// Its nodes; links name them by index.
     pub fn nodes(&self) -> &[Node] {
         &self.nodes
-    }
-
-    /// Its nodes, for a host resolving their files.
-    pub fn nodes_mut(&mut self) -> &mut [Node] {
-        &mut self.nodes
     }
 
     /// Its links, in the order they were made (an engine may emit in it).
@@ -234,6 +262,65 @@ impl MaterialNetwork {
             cut: self.cut.clone(),
         }
     }
+
+    /// Image input `input` of node `at` reading Texture prim `texture`: what
+    /// a host does as it sends the network, having read the input's image.
+    ///
+    /// # Errors
+    /// No such node, or no Image input so named.
+    pub fn set_texture(
+        &mut self,
+        at: NodeIndex,
+        input: &str,
+        texture: Id<Image>,
+    ) -> Result<(), Error> {
+        let node = (self.nodes.get_mut(at as usize))
+            .ok_or_else(|| Error::invalid(format_args!("no node {at} to read a texture")))?;
+        node.image_input(input)?;
+        node.textures.insert(input.to_owned(), texture);
+        Ok(())
+    }
+
+    /// Every node's values through `map`, given each value's input: what a
+    /// host does to a network's colors as it sends them to an engine's
+    /// space. Each value `map` changes is checked again against its input,
+    /// so the network stays whole.
+    ///
+    /// # Errors
+    /// A value its input's kind refuses; the network is then unchanged.
+    pub fn map_values(&mut self, mut map: impl FnMut(&Parameter, &mut Value)) -> Result<(), Error> {
+        let mut mapped = Vec::with_capacity(self.nodes.len());
+        let mut primvars = BTreeSet::new();
+        for node in &self.nodes {
+            let mut values = node.values.clone();
+            for input in node.def.inputs.iter().filter_map(Input::value) {
+                let Some(value) = values.get_mut(&input.name) else {
+                    continue;
+                };
+                map(input, value);
+                (input.kind.check(value, &input.label))
+                    .map_err(|why| Error::invalid(why.message))?;
+                primvars.extend(attributes(input, value));
+            }
+            mapped.push(values);
+        }
+        for (node, values) in self.nodes.iter_mut().zip(mapped) {
+            node.values = values;
+        }
+        self.primvars = primvars.into_iter().collect();
+        Ok(())
+    }
+}
+
+/// The primvars value `value` of input `input` names: an attribute
+/// input's names, none for any other.
+fn attributes(input: &Parameter, value: &Value) -> Vec<Arc<str>> {
+    match (&input.kind, value) {
+        (ValueKind::Attribute { .. }, Value::Text(names)) => {
+            names.split_whitespace().map(Arc::from).collect()
+        }
+        _ => Vec::new(),
+    }
 }
 
 /// Makes a [`MaterialNetwork`], checking it whole.
@@ -263,10 +350,7 @@ impl NetworkBuilder {
                 .kind
                 .check(value, &descriptor.label)
                 .map_err(|why| Error::invalid(why.message))?;
-            if let (ValueKind::Attribute { .. }, Value::Text(names)) = (&descriptor.kind, value) {
-                self.primvars
-                    .extend(names.split_whitespace().map(Arc::from));
-            }
+            self.primvars.extend(attributes(descriptor, value));
             held.insert(descriptor.name.to_string(), value.clone());
         }
         self.network.nodes.push(Node {
@@ -285,13 +369,7 @@ impl NetworkBuilder {
     pub fn image(&mut self, at: NodeIndex, input: &str, image: ImageSource) -> Result<(), Error> {
         let node = (self.network.nodes.get_mut(at as usize))
             .ok_or_else(|| Error::invalid(format_args!("no node {at} to read an image")))?;
-        let takes = node.def.find_input(input).and_then(Input::socket) == Some(&Socket::Image);
-        if !takes {
-            let label = &node.def.label;
-            return Err(Error::invalid(format_args!(
-                "{label} has no image input {input}"
-            )));
-        }
+        node.image_input(input)?;
         node.images.insert(input.to_owned(), image);
         Ok(())
     }
@@ -431,7 +509,7 @@ mod tests {
         b.link(r, "out", s, "base").unwrap();
         b.link(s, "out", o, "surface").unwrap();
         let network = b.build(o).unwrap();
-        assert_eq!(network.output().map(|n| n.def.id), Some(output.id));
+        assert_eq!(network.output().map(|n| n.def().id), Some(output.id));
         assert_eq!(network.primvars()[..], [Arc::from("Cd")]);
         // Every value is there, a default never asked for.
         assert_eq!(network.nodes()[1].values["base"], Value::Color([0.5; 3]));
@@ -520,6 +598,57 @@ mod tests {
         let as_data = ImageSource::new(file, ImageColor::Data);
         data.images.insert("file".into(), as_data);
         assert!(data.reads_data("file"), "its image says data");
+    }
+
+    #[test]
+    fn a_networks_nodes_change_only_as_it_checks_them() {
+        let [surface, read, output] = defs();
+        let none = Parameters::new();
+        let mut b = MaterialNetwork::builder();
+        let r = b.node(&read, &none).unwrap();
+        let s = b.node(&surface, &none).unwrap();
+        let o = b.node(&output, &none).unwrap();
+        b.link(r, "out", s, "base").unwrap();
+        b.link(s, "out", o, "surface").unwrap();
+        let mut network = b.build(o).unwrap();
+        let halved = |_: &Parameter, v: &mut Value| {
+            if let Value::Color(c) = v {
+                *c = c.map(|x| x * 0.5);
+            }
+        };
+        network.map_values(halved).unwrap();
+        assert_eq!(network.nodes()[1].values()["base"], Value::Color([0.25; 3]));
+        assert_eq!(network.nodes()[0].values()["gain"], Value::Color([0.25; 3]));
+        // An attribute renamed: the primvars follow.
+        let uv = |p: &Parameter, v: &mut Value| {
+            if p.name == "name" {
+                *v = Value::Text("uv st".into());
+            }
+        };
+        network.map_values(uv).unwrap();
+        assert_eq!(network.primvars()[..], [Arc::from("st"), Arc::from("uv")]);
+        // A value its input refuses: refused whole, nothing changed.
+        let before = network.clone();
+        let wrong = |_: &Parameter, v: &mut Value| {
+            if matches!(v, Value::Color(_)) {
+                *v = Value::Bool(true);
+            }
+        };
+        assert!(network.map_values(wrong).is_err());
+        assert_eq!(network, before);
+        // A texture only where an Image input is.
+        let image = mtlx::def("ND_image_color3").unwrap();
+        let mut b = MaterialNetwork::builder();
+        let i = b.node(&image, &none).unwrap();
+        let mut network = b.build(i).unwrap();
+        let texture = Id::of(crate::PrimId {
+            slot: 3,
+            generation: 0,
+        });
+        network.set_texture(i, "file", texture).unwrap();
+        assert_eq!(network.nodes()[0].textures()["file"], texture);
+        assert!(network.set_texture(i, "default", texture).is_err());
+        assert!(network.set_texture(9, "file", texture).is_err());
     }
 
     #[test]

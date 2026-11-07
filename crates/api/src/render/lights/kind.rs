@@ -205,20 +205,17 @@ impl ObjectKindSpec for DeclaredKind {
     }
     /// A light of a standard type as a light value, saying what it leaves
     /// out: the values no standard light type has (the engine's own). None
-    /// for a light no light value is ([`light_value`](super::light_value)).
+    /// for a light no light value is (one [`data::light`] refuses).
     fn value(&self, body: &dyn ObjectBody, _path: &str) -> Option<Valued> {
         let prim = self.prim(body).filter(|_| self.of_lights())?;
-        let light = super::light_value(standard::Light::decode(prim)?).ok()?;
+        let value = data::light().wrap(standard::Light::decode(prim)?).ok()?;
         let types = standard::lights();
         let own =
             |name: &String| (types.iter()).all(|t| t.params.iter().all(|d| *d.name != **name));
         let warnings = (prim.values.keys().filter(|name| own(name)))
             .map(|name| Diagnostic::warning(format!("{name} isn't a standard light's; left out")))
             .collect();
-        Some(Valued {
-            value: data::light().wrap(light),
-            warnings,
-        })
+        Some(Valued { value, warnings })
     }
     fn at_root(&self) -> bool {
         !self.of_lights()

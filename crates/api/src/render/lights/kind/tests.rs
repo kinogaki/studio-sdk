@@ -166,7 +166,7 @@ fn a_standard_light_is_a_light_value_and_one_is_adopted() {
     let engines = Engines::new(Vec::new());
     assert_eq!(kind.adopted(), [data::light().id()]);
     let body = kind
-        .adopts(&data::light().wrap(spot.clone()), &cx(&engines))
+        .adopts(&data::light().wrap(spot.clone()).unwrap(), &cx(&engines))
         .unwrap()
         .body;
     let valued = kind.value(&*body, "/Spot").unwrap();

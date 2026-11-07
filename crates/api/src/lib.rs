@@ -122,7 +122,7 @@ pub use cook::{
     NodeType, Outputs, Pass, Passes, Port, Ports, PortsCx, Project, Reads, Resolved, RowsFor,
     SchemaCx,
 };
-pub use data::{Data, Typed};
+pub use data::{Checked, Data, Typed};
 pub use data_type::{DataType, InfoRow, Stamp, WireColor, stamp_of};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use facets::{
@@ -132,8 +132,7 @@ pub use facets::{
     Tabular, Tally,
 };
 pub use format::{
-    FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Input, Purpose, Reading,
-    Writing,
+    FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Input, Purpose, Reading, Writing,
 };
 pub use held::HeldEdit;
 pub use icon::Icon;

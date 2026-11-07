@@ -103,11 +103,11 @@ fn material(
     let network = built.build(shown).expect("a whole material");
     let mut network = Engines::new(vec![description.clone()]).adopt(&network, description.id());
     if let Some(texture) = texture {
-        for node in network.nodes_mut() {
-            let read: Vec<String> = node.images.keys().cloned().collect();
-            for input in read {
-                node.textures.insert(input, Id::of(id(texture)));
-            }
+        let reading: Vec<(u32, String)> = (network.nodes().iter().zip(0..))
+            .flat_map(|(node, at)| node.images().keys().map(move |input| (at, input.clone())))
+            .collect();
+        for (at, input) in reading {
+            (network.set_texture(at, &input, Id::of(id(texture)))).expect("an image input");
         }
     }
     Prim::Material(Material {

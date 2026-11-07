@@ -88,8 +88,7 @@ const FACES: [[u32; 4]; 6] = [
 const TOPOLOGY: u64 = 1;
 
 /// Wraps boxes as `Data` and reads them back.
-pub static BOX: LazyLock<Typed<BoxShape>> =
-    LazyLock::new(|| Typed::new(DataTypeId::declared("acme.boxes.box")));
+pub const BOX: Typed<BoxShape> = Typed::new(DataTypeId::declared("acme.boxes.box"));
 
 fn box_of(data: &Data) -> Result<&BoxShape, Error> {
     BOX.get(data).ok_or_else(|| Error::invalid("not a box"))

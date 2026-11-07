@@ -14,7 +14,6 @@ use kinogaki_studio_api::{
 };
 use std::fmt::Write as _;
 use std::path::Path;
-use std::sync::LazyLock;
 
 /// The scale option's name.
 const SCALE: &str = "scale";
@@ -23,7 +22,7 @@ const SCALE: &str = "scale";
 const METRE: f64 = 1000.0;
 
 /// What it reads and writes: the standard geometry.
-static GEOMETRY: LazyLock<DataTypeId> = LazyLock::new(|| standard::geometry().id());
+const GEOMETRY: &[DataTypeId] = &[standard::geometry().id()];
 
 /// The format.
 pub struct Points;
@@ -44,7 +43,7 @@ impl FileFormat for Points {
         &["xyz"]
     }
     fn produces(&self) -> &[DataTypeId] {
-        std::slice::from_ref(&*GEOMETRY)
+        GEOMETRY
     }
     fn options(&self) -> FormatOptions {
         FormatOptions::from([(SCALE.to_owned(), Value::Number(1.0))])
@@ -137,7 +136,7 @@ impl FormatWriter for Points {
             }
         }
         std::fs::write(path, text)
-            .map_err(|e| Error::refused(format_args!("{}: {e}", path.display())))?;
+            .map_err(|e| Error::invalid(format_args!("{}: {e}", path.display())))?;
         let note =
             || Diagnostic::warning("Only the points are written; their primitives are left out");
         Ok(left_out.then(note).into_iter().collect())

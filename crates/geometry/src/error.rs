@@ -23,9 +23,11 @@ pub struct Error {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ErrorKind {
-    /// The input can't be used: a value breaking a rule, a malformed file,
-    /// a stored value of the wrong shape, data of another type, a file the
-    /// system couldn't read.
+    /// The input can't be used: a value breaking a rule or passing a limit
+    /// (ids past the largest), a malformed file, a stored value of the
+    /// wrong shape, data of another type, a request naming what isn't there
+    /// (a view an engine doesn't have), a file that isn't there or that the
+    /// system couldn't read or write.
     Invalid,
     /// What the work needs isn't installed (a light of a type no installed
     /// engine declares). Reading a project, the host keeps the object as it

@@ -35,7 +35,7 @@ fn documents_write_back_as_materialx_writes_them() {
 
 #[test]
 fn what_isnt_materialx_is_refused() {
-    let refused = |text: &str| text.parse::<Document>().unwrap_err();
+    let refused = |text: &str| text.parse::<Document>().unwrap_err().message().to_owned();
     assert!(refused("<usd />").contains("isn't a MaterialX document"));
     assert!(refused("<materialx version=\"1.35\" />").contains("1.35 isn't read"));
     assert!(refused("<materialx version=\"1.39\">").contains("isn't closed"));

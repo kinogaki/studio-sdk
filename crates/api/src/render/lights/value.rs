@@ -30,12 +30,13 @@ const MAX_VALUE: f32 = 1e12;
 /// and a softness of 0 to 1, colors finite (a component below 0 is a
 /// color outside the space's gamut, as a file in a narrower space than
 /// the scene's holds), and a dome's image a file whose path isn't blank.
-/// Its transform is dropped: where a light is isn't the value's. Make
-/// every light value with it: [`LightCodec`] reads only what it accepts.
+/// Its transform is dropped: where a light is isn't the value's. The
+/// check of [`standard::light`](crate::standard::light), which wraps every
+/// light value, and of what [`LightCodec`] reads.
 ///
 /// # Errors
 /// A value out of range.
-pub fn light_value(light: Light) -> Result<Light, Error> {
+pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
     let within = |v: f32| v.is_finite() && v.abs() <= MAX_VALUE;
     let positive = |v: f32| within(v) && v > 0.0;
     let at_least_0 = |v: f32| within(v) && v >= 0.0;
@@ -208,7 +209,7 @@ impl DataCodec for LightCodec {
     }
 
     fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
-        Ok(light().wrap(Self::read_light(element)?))
+        light().wrap(Self::read_light(element)?)
     }
 }
 
@@ -264,9 +265,9 @@ mod tests {
     #[test]
     fn every_shape_saves_and_reads_back() {
         for l in every_shape() {
-            let l = light_value(l).unwrap();
+            let l = light().check(l).unwrap();
             let mut e = MemoryElement::new("light");
-            e.write(|w| LightCodec.write(&light().wrap(l.clone()), None, w))
+            e.write(|w| LightCodec.write(&light().wrap(l.clone()).unwrap(), None, w))
                 .unwrap();
             let back = e.read(|r| LightCodec.read(r, None)).unwrap();
             assert_eq!(light().get(&back), Some(&l));
@@ -303,11 +304,12 @@ mod tests {
         ];
         for shape in bad {
             assert!(
-                light_value(Light {
-                    shape,
-                    ..Light::default()
-                })
-                .is_err()
+                light()
+                    .wrap(Light {
+                        shape,
+                        ..Light::default()
+                    })
+                    .is_err()
             );
         }
         let cold = Light {
@@ -318,13 +320,13 @@ mod tests {
             exposure: f32::INFINITY,
             ..Light::default()
         };
-        assert!(light_value(cold).is_err() && light_value(wild).is_err());
+        assert!(light().wrap(cold).is_err() && light().wrap(wild).is_err());
         // Outside a space's gamut is a color still.
         let wide = Light {
             color: [-0.62, 1.14, -0.13],
             ..Light::default()
         };
-        assert!(light_value(wide).is_ok());
+        assert!(light().wrap(wide).is_ok());
     }
 
     #[test]
@@ -340,7 +342,7 @@ mod tests {
             ))),
             ..Light::default()
         };
-        let value = light_value(placed).unwrap();
+        let value = light().check(placed).unwrap();
         assert_eq!(
             (&value.xform, &value.shape),
             (&Sampled::still(Xform::IDENTITY), &sky)

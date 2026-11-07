@@ -5,6 +5,7 @@
 //! and `xi:include` elements are written back as they were.
 use crate::upgrade;
 use crate::xml::{self, Child, Element};
+use kinogaki_geometry::Error;
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
@@ -19,17 +20,21 @@ pub struct Document {
 }
 
 impl FromStr for Document {
-    type Err = String;
+    type Err = Error;
 
     /// `text` read; a document of MaterialX 1.36 to 1.38 is upgraded to
-    /// 1.39 on the way. Refused: XML that doesn't read, a root other than
-    /// `<materialx>`, or another version.
-    fn from_str(text: &str) -> Result<Document, String> {
-        let mut root = xml::parse(text)?;
+    /// 1.39 on the way. Refused ([`Invalid`](kinogaki_geometry::ErrorKind::Invalid)):
+    /// XML that doesn't read, a root other than `<materialx>`, or another
+    /// version.
+    fn from_str(text: &str) -> Result<Document, Error> {
+        let mut root = xml::parse(text).map_err(Error::invalid)?;
         if root.category != "materialx" {
-            return Err(format!("<{}> isn't a MaterialX document", root.category));
+            let category = &root.category;
+            return Err(Error::invalid(format_args!(
+                "<{category}> isn't a MaterialX document"
+            )));
         }
-        upgrade::upgrade(&mut root)?;
+        upgrade::upgrade(&mut root).map_err(Error::invalid)?;
         Ok(Document { root })
     }
 }

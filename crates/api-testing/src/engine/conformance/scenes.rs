@@ -250,14 +250,15 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
             .build()
             .expect("a texture");
         prims.push(Prim::Texture(image));
-        for node in network.nodes_mut() {
-            let read: Vec<String> = (node.images.iter())
-                .filter(|(_, image)| image.name() == file)
-                .map(|(input, _)| input.clone())
-                .collect();
-            for input in read {
-                node.textures.insert(input, texture);
-            }
+        let reading: Vec<(u32, String)> = (network.nodes().iter().zip(0..))
+            .flat_map(|(node, at)| {
+                (node.images().iter())
+                    .filter(|(_, image)| image.name() == file)
+                    .map(move |(input, _)| (at, input.clone()))
+            })
+            .collect();
+        for (at, input) in reading {
+            (network.set_texture(at, &input, texture)).expect("an image input");
         }
     }
     let material = Id::of(id(first + prims.len()));

@@ -381,7 +381,7 @@ fn merged_ids(sources: &[Source<'_>], domain: Domain) -> Result<Attribute, Error
         })
         .collect();
     let merged =
-        ids::merged(&each).ok_or_else(|| Error::refused("the merged ids pass the largest id"))?;
+        ids::merged(&each).ok_or_else(|| Error::invalid("the merged ids pass the largest id"))?;
     Attribute::tuples(merged, Meaning::None)
 }
 

@@ -275,7 +275,7 @@ mod tests {
     fn a_failure_resolves_once_saying_why() {
         let (wake, wakes) = counted();
         let (deliver, result) = pending::<u32>(wake);
-        let failed = Error::missing("the device was lost");
+        let failed = Error::invalid("the film is wider than the device allows");
         deliver.fail(failed.clone());
         assert_eq!(
             wakes.load(Ordering::SeqCst),

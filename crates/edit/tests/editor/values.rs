@@ -195,6 +195,28 @@ fn a_new_point_takes_each_attribute_by_its_rule() {
 }
 
 #[test]
+fn ids_past_the_largest_id_are_an_invalid_edit() {
+    let value = ruled(1, 1);
+    let count = value.positions().len() as i64;
+    let highest: Vec<i64> = (0..count).map(|i| i64::MAX - i).collect();
+    let ids = kinogaki_geometry::Attribute::tuples(highest, Meaning::None).unwrap();
+    let table = value
+        .attributes()
+        .with(Domain::Point, names::ID, ids)
+        .unwrap();
+    let value = value.with_attributes(table).unwrap();
+    let mut edit = Editor::new(&value);
+    edit.add_point([0.0; 3], &[]);
+    let refused = edit.finish().unwrap_err();
+    assert_eq!(
+        refused.kind,
+        kinogaki_geometry::ErrorKind::Invalid,
+        "{refused}"
+    );
+    assert_eq!(refused.message(), "the new ids pass the largest id");
+}
+
+#[test]
 fn a_new_element_without_sources_takes_its_types_default() {
     let value = ruled(1, 1);
     let mut edit = Editor::new(&value);

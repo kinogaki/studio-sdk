@@ -280,7 +280,7 @@ impl Engines {
     /// it shows (none for a MaterialX one).
     pub fn owner(&self, network: &MaterialNetwork) -> Option<&Arc<EngineDescription>> {
         let shown = &network.nodes()[network.surface()? as usize];
-        self.iter().find(|e| e.node_def(shown.def.id).is_some())
+        self.iter().find(|e| e.node_def(shown.def().id).is_some())
     }
 
     /// `network` in the standard form, an OpenPBR Surface ([`standard`]): a
@@ -288,7 +288,7 @@ impl Engines {
     /// its rules say. None: its surface translates to none, its owner isn't
     /// installed, or its owner says nothing standard approximates it.
     pub fn standard(&self, network: &MaterialNetwork) -> Option<MaterialNetwork> {
-        let own = network.nodes().iter().any(|n| n.def.mtlx().is_none());
+        let own = network.nodes().iter().any(|n| n.def().mtlx().is_none());
         match own {
             true => self.owner(network)?.material_rules.standard(network),
             false => network.translated(crate::material::standard::OPEN_PBR),
@@ -307,7 +307,7 @@ impl Engines {
             return MaterialNetwork::default();
         };
         let foreign = (network.nodes().iter())
-            .any(|n| n.def.mtlx().is_none() && engine.node_def(n.def.id).is_none());
+            .any(|n| n.def().mtlx().is_none() && engine.node_def(n.def().id).is_none());
         let standard = match foreign {
             true => self.standard(network),
             false => None,

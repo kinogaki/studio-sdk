@@ -94,16 +94,10 @@ pub fn replace<E: From<std::io::Error>>(
 /// read, a project): one could block, or never end.
 ///
 /// # Errors
-/// It isn't there ([`Missing`](crate::ErrorKind::Missing)), isn't a regular
-/// file, or can't be opened; the message names it.
+/// It isn't there, isn't a regular file, or can't be opened
+/// ([`Invalid`](crate::ErrorKind::Invalid)); the message names it.
 pub fn regular(path: &Path) -> Result<(std::fs::File, u64), Error> {
-    let failed = |e: std::io::Error| {
-        let why = format_args!("{}: {e}", path.display());
-        match e.kind() {
-            std::io::ErrorKind::NotFound => Error::missing(why),
-            _ => Error::invalid(why),
-        }
-    };
+    let failed = |e: std::io::Error| Error::invalid(format_args!("{}: {e}", path.display()));
     let regular = |meta: std::fs::Metadata| match meta.is_file() {
         true => Ok(meta.len()),
         false => Err(Error::invalid(format_args!(

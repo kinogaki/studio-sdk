@@ -1,6 +1,7 @@
 //! Values on wires and in object results: [`Data`], a type-erased shared
 //! value tagged with its data type, and [`Typed`], a kernel's typed handle
-//! for wrapping and reading its own values.
+//! for wrapping and reading its own values ([`Checked`] for a type whose
+//! values are checked as they are wrapped).
 //!
 //! The environment never looks inside a [`Data`]: it reaches it only
 //! through the `DataType` registered for its id. A
@@ -9,6 +10,7 @@
 //! the whole program holds one copy of each kernel crate, so a kernel
 //! type has one `TypeId` everywhere.
 use crate::id::DataTypeId;
+use kinogaki_geometry::Error;
 use std::any::Any;
 use std::fmt;
 use std::marker::PhantomData;
@@ -27,13 +29,9 @@ pub struct Data {
 }
 
 impl Data {
-    /// `value` as data of type `ty`. Prefer the kernel's
-    /// [`Typed::wrap`], which can't pair a value with the wrong id.
-    pub fn new<T: Any + Send + Sync>(ty: DataTypeId, value: T) -> Self {
-        Self::from_arc(ty, Arc::new(value))
-    }
-
-    /// A shared `value` as data of type `ty`, without copying it.
+    /// A shared `value` as data of type `ty`, without copying it: made
+    /// through a [`Typed`] handle alone, which can't pair a value with the
+    /// wrong id.
     pub(crate) fn from_arc<T: Any + Send + Sync>(ty: DataTypeId, value: Arc<T>) -> Self {
         Self { ty, value }
     }
@@ -126,13 +124,13 @@ impl<T: Any + Send + Sync> Typed<T> {
     }
 
     /// The data type's id.
-    pub fn id(self) -> DataTypeId {
+    pub const fn id(self) -> DataTypeId {
         self.id
     }
 
     /// `value` as [`Data`] of this type.
     pub fn wrap(self, value: T) -> Data {
-        Data::new(self.id, value)
+        Data::from_arc(self.id, Arc::new(value))
     }
 
     /// Whether `data` is of this type.
@@ -152,6 +150,99 @@ impl<T: Any + Send + Sync> Typed<T> {
         (data.ty() == self.id)
             .then(|| data.downcast_arc())
             .flatten()
+    }
+}
+
+/// A handle on a data type whose values are checked as they are wrapped:
+/// the type's check runs on every value made into [`Data`], so no `Data`
+/// of the type holds a value its rules refuse. Reading is as through
+/// [`Typed`].
+///
+/// ```
+/// use kinogaki_geometry::Error;
+/// use kinogaki_value::{Checked, DataTypeId};
+///
+/// fn positive(v: f64) -> Result<f64, Error> {
+///     match v > 0.0 {
+///         true => Ok(v),
+///         false => Err(Error::invalid("a radius is above 0")),
+///     }
+/// }
+/// let radius = Checked::new(DataTypeId::declared("acme.disc.radius"), positive);
+/// assert!(radius.wrap(-1.0).is_err());
+/// let data = radius.wrap(2.0).unwrap();
+/// assert_eq!(radius.get(&data), Some(&2.0));
+/// ```
+pub struct Checked<T> {
+    typed: Typed<T>,
+    check: fn(T) -> Result<T, Error>,
+}
+
+impl<T> Clone for Checked<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for Checked<T> {}
+
+impl<T> fmt::Debug for Checked<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Checked<{}>({})",
+            std::any::type_name::<T>(),
+            self.typed.id
+        )
+    }
+}
+
+impl<T: Any + Send + Sync> Checked<T> {
+    /// The handle for data type `id`, whose values are `T`s that `check`
+    /// takes: it returns the value as the type holds it (normalized, where
+    /// its rules say so), or why it is refused.
+    pub const fn new(id: DataTypeId, check: fn(T) -> Result<T, Error>) -> Self {
+        Self {
+            typed: Typed::new(id),
+            check,
+        }
+    }
+
+    /// The data type's id.
+    pub const fn id(self) -> DataTypeId {
+        self.typed.id
+    }
+
+    /// `value` as the type holds it, checked: what [`wrap`](Self::wrap)
+    /// wraps, for a holder keeping the value itself.
+    ///
+    /// # Errors
+    /// A value the type's rules refuse.
+    pub fn check(self, value: T) -> Result<T, Error> {
+        (self.check)(value)
+    }
+
+    /// `value`, checked, as [`Data`] of this type.
+    ///
+    /// # Errors
+    /// A value the type's rules refuse.
+    pub fn wrap(self, value: T) -> Result<Data, Error> {
+        Ok(self.typed.wrap(self.check(value)?))
+    }
+
+    /// Whether `data` is of this type.
+    pub fn is(self, data: &Data) -> bool {
+        self.typed.is(data)
+    }
+
+    /// `data`'s value, when it is of this type.
+    pub fn get(self, data: &Data) -> Option<&T> {
+        self.typed.get(data)
+    }
+
+    /// `data`'s shared value, when it is of this type.
+    pub fn get_arc(self, data: &Data) -> Option<Arc<T>> {
+        self.typed.get_arc(data)
     }
 }
 
@@ -186,6 +277,31 @@ mod tests {
         let wrong = Typed::<String>::new(cloud().id());
         assert!(wrong.get(&data).is_none() && wrong.get_arc(&data).is_none());
         assert!(data.downcast_ref::<String>().is_none());
+    }
+
+    #[test]
+    fn a_checked_type_wraps_only_what_its_check_takes() {
+        fn sorted(mut v: Vec<i32>) -> Result<Vec<i32>, Error> {
+            match v.is_empty() {
+                true => Err(Error::invalid("empty")),
+                false => {
+                    v.sort();
+                    Ok(v)
+                }
+            }
+        }
+        let list = Checked::new(DataTypeId::declared("acme.list.sorted"), sorted);
+        assert!(list.wrap(Vec::new()).is_err());
+        let data = list.wrap(vec![3, 1, 2]).unwrap();
+        assert_eq!(
+            list.get(&data),
+            Some(&vec![1, 2, 3]),
+            "as the type holds it"
+        );
+        assert!(list.is(&data) && list.get_arc(&data).is_some());
+        assert_eq!(list.check(vec![2, 1]).unwrap(), [1, 2]);
+        const ID: DataTypeId = Checked::new(DataTypeId::declared("acme.list.sorted"), sorted).id();
+        assert_eq!(data.ty(), ID);
     }
 
     #[test]
