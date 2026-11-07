@@ -1,8 +1,8 @@
 //! What file formats share about their options: reading one typed value
 //! out of a format's [`FormatOptions`] (a choice by its key, so a saved
 //! setting survives a reordered list), the rows most import dialogs show
-//! (a scale, toggles), and the rows a node holds a format's options in
-//! ([`row`], [`from_rows`]).
+//! (a scale, toggles, [`embed`]), and the rows a node holds a format's
+//! options in ([`row`], [`from_rows`]).
 //!
 //! ```
 //! use kinogaki_studio_api::format::options;
@@ -70,6 +70,24 @@ pub fn scale(schema: Schema, scale: f64) -> Schema {
     )
 }
 
+/// The option saying whether textures a file names on disk are embedded
+/// ([`embed`]).
+pub const EMBED: &str = "embed";
+
+/// The Embed Textures row ([`EMBED`], off by default): on, the textures a
+/// file names on disk are read into the project, its Image nodes holding
+/// them embedded; off, they stay paths. Textures packed in the file (a
+/// usdz's, a GLB's) are embedded whatever it says.
+pub fn embed(schema: Schema, embed: bool) -> Schema {
+    toggle(
+        schema,
+        EMBED,
+        "Embed Textures",
+        "images pictures pack inline keep",
+        embed,
+    )
+}
+
 /// A toggle row.
 pub fn toggle(schema: Schema, name: &str, label: &str, keywords: &str, value: bool) -> Schema {
     schema.parameter(Parameter::new(name, label, ValueKind::Toggle, value).keywords(keywords))
@@ -85,8 +103,9 @@ mod tests {
             toggle(Schema::default(), "weld", "Weld", "merge", true),
             2.0,
         );
+        let schema = embed(schema, false);
         let names: Vec<_> = schema.parameters().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, ["weld", "scale"]);
+        assert_eq!(names, ["weld", "scale", EMBED]);
         assert_eq!(schema.parameters().next().unwrap().value, Value::Bool(true));
     }
 

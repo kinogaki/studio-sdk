@@ -212,9 +212,11 @@ impl Valued {
 /// What an object made from an imported value starts as
 /// ([`ObjectKindSpec::adopts`]): its body; its network's content when the
 /// kind builds it from the value (otherwise the network shows the value
-/// from a Stash); and the references the file's other items make that now
+/// from a Stash); the references the file's other items make that now
 /// resolve inside it: `key` to `<the object's path>/<below>` (a file's
-/// material key to a Material's name).
+/// material key to a Material's name, an image key its lights name by
+/// `op:` to an Image node's); and what it approximates or leaves out, for
+/// the user.
 #[derive(Clone)]
 pub struct Adoption {
     /// The body.
@@ -223,6 +225,9 @@ pub struct Adoption {
     pub network: Option<crate::network::NetworkSeed>,
     /// References to `.0` resolve to the object's path and `.1` below it.
     pub renamed: Vec<(String, String)>,
+    /// What it approximates or leaves out of the value ("Red takes its
+    /// standard form: acme.engine isn't installed"): warnings.
+    pub warnings: Vec<Diagnostic>,
 }
 
 impl Adoption {
@@ -232,6 +237,7 @@ impl Adoption {
             body,
             network: None,
             renamed: Vec::new(),
+            warnings: Vec::new(),
         }
     }
 
@@ -244,6 +250,12 @@ impl Adoption {
     /// References to `key` resolving to `below` the object.
     pub fn renamed(mut self, key: impl Into<String>, below: impl Into<String>) -> Self {
         self.renamed.push((key.into(), below.into()));
+        self
+    }
+
+    /// Saying `message`, a warning.
+    pub fn warning(mut self, message: impl Into<String>) -> Self {
+        self.warnings.push(Diagnostic::warning(message));
         self
     }
 }

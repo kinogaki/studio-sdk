@@ -160,6 +160,7 @@ kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry
 kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry::with_moved
 kinogaki-geometry/doc test crates/geometry/src/image/mod.rs - image
 kinogaki-geometry/doc test crates/geometry/src/image/sampler.rs - image::sampler::Sampler
+kinogaki-geometry/doc test crates/geometry/src/image/source.rs - image::source::EmbeddedFile
 kinogaki-geometry/doc test crates/geometry/src/instancing.rs - instancing::placements
 kinogaki-geometry/doc test crates/geometry/src/lib.rs -
 kinogaki-geometry/doc test crates/geometry/src/primitives/components.rs - primitives::components::Components
@@ -225,6 +226,7 @@ kinogaki-geometry/lib test image::sampler::tests::nothing_to_read_reads_nothing
 kinogaki-geometry/lib test image::sampler::tests::pixels_outside_the_data_window_read_nothing
 kinogaki-geometry/lib test image::sampler::tests::v_runs_up_from_the_bottom_row
 kinogaki-geometry/lib test image::sampler::tests::values_decode_as_read_pixel_decodes_them
+kinogaki-geometry/lib test image::source::tests::a_hash_made_a_piece_at_a_time_is_blake3s
 kinogaki-geometry/lib test image::source::tests::embedded_files_are_equal_by_name_and_bytes
 kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
 kinogaki-geometry/lib test image::tests::a_held_layer_has_no_tiles_and_compares_by_its_key
@@ -461,6 +463,7 @@ kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out
 kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back
 kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewports_detail_unless_told
 kinogaki-studio-api/lib test format::input::tests::a_file_is_read_as_it_is_asked_for_and_a_missing_one_says_so
+kinogaki-studio-api/lib test format::input::tests::a_kept_file_is_lent_and_held_without_a_copy
 kinogaki-studio-api/lib test format::input::tests::bytes_in_memory_are_lent_and_their_head_is_at_most_its_length
 kinogaki-studio-api/lib test format::options::tests::a_node_holds_a_formats_options_in_rows_of_its_id
 kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values
@@ -473,6 +476,7 @@ kinogaki-studio-api/lib test icon::tests::names_are_lowercase_words_joined_by_da
 kinogaki-studio-api/lib test image_files::tests::an_image_node_reads_its_file_its_embedded_bytes_or_a_result
 kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_take
 kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup
+kinogaki-studio-api/lib test network::edit::tests::a_compiled_material_seeds_its_nodes_and_an_image_node_an_image
 kinogaki-studio-api/lib test params::schema::tests::a_data_parameter_takes_values_of_its_type_alone
 kinogaki-studio-api/lib test params::schema::tests::a_parameter_check_names_it_by_its_label
 kinogaki-studio-api/lib test params::schema::tests::a_schema_lists_its_parameters_and_values
@@ -490,7 +494,7 @@ kinogaki-studio-api/lib test render::lights::view::tests::glyphs_follow_the_ligh
 kinogaki-studio-api/lib test render::lights::view::tests::handles_bind_to_the_light_shape
 kinogaki-studio-api/lib test standard::camera::tests::a_lens_saves_and_reads_back
 kinogaki-studio-api/lib test standard::camera::tests::only_lenses_are_cameras
-kinogaki-studio-api/lib test standard::materials::tests::every_value_and_wire_round_trips
+kinogaki-studio-api/lib test standard::materials::tests::every_value_wire_inside_standard_form_and_image_round_trips
 kinogaki-studio-api/lib test viewport::tests::a_drag_patches_only_the_moved_points_even_over_skipped_frames
 kinogaki-studio-api/lib test viewport::tests::a_faces_triangles_are_its_own_contiguous_run
 kinogaki-studio-api/lib test viewport::tests::a_surface_is_a_packet_over_its_own_arrays

@@ -12,7 +12,20 @@
 //! reading a picture, in every context that carries images. Its source is a
 //! file, the file embedded in the project, or another result; where networks
 //! cook it gives the Image, and where they compile a compiler reads what it
-//! names ([`image_source`]) and asks the host's files as it runs.
+//! names ([`image_source`]) and asks the host's files as it runs. A network
+//! a package starts (a file's material, [`NetworkSeed`]) holds Image nodes
+//! made by [`image_node::reading`].
+//!
+//! **Images named where no wire reaches.** A row of an object's kind that
+//! reads an image (a dome's) holds a file's path, or [`OP`] and the
+//! absolute path of an Image node (`op:/Library/Sky`): the host reads what
+//! that node reads, follows it through renames and moves, and refuses one
+//! reading a render, which renders the light reading it. A format's light
+//! names an image of its file's materials item by `op:` and the image's key
+//! ([`Materials::images`]), which Import points at the Image node it makes.
+//!
+//! [`NetworkSeed`]: crate::network::NetworkSeed
+//! [`Materials::images`]: crate::standard::Materials::images
 use crate::standard::embedded_file;
 use kinogaki_geometry::Error;
 use kinogaki_geometry::image::{Image, ImageColor, ImageFile, ImageSource};
@@ -73,8 +86,20 @@ impl ImageFiles for NoFiles {
 /// Core's Image node: its source, then its rows ([`image_node`]).
 pub const IMAGE_NODE: NodeTypeId = NodeTypeId::declared("kinogaki.core.image");
 
-/// The rows of core's Image node ([`IMAGE_NODE`]), by name.
+/// What an image row holding an Image node's path starts with (`op:`,
+/// Houdini's spelling): see the module docs.
+pub const OP: &str = "op:";
+
+/// The rows of core's Image node ([`IMAGE_NODE`]), by name, its output, and
+/// a node reading a source ([`reading`](image_node::reading)).
 pub mod image_node {
+    use crate::network::NewNode;
+    use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
+    use kinogaki_value::Value;
+    use std::sync::Arc;
+
+    /// Its one output: the Image.
+    pub const IMAGE: &str = "image";
     /// What it reads (a choice): [`FILE`], [`EMBEDDED`] or [`RESULT`].
     pub const SOURCE: &str = "source";
     /// The file's path, as typed; what a File source reads.
@@ -99,6 +124,31 @@ pub mod image_node {
     /// Its button writing the file it holds out (the host writes it), every
     /// Image node holding the same bytes then reading it.
     pub const EXTRACT: &str = "extract";
+
+    /// An Image node reading `source`, to start a network with (a file's
+    /// material's texture): its Source File with the path, or Embedded with
+    /// the file, and its Color; the rest at its defaults.
+    pub fn reading(source: &ImageSource) -> NewNode {
+        let choice = |key: &str| Value::Choice(Arc::from(key));
+        let node = match source.file() {
+            ImageFile::Path(path) => NewNode::new(super::IMAGE_NODE)
+                .with(SOURCE, choice(FILE))
+                .with(FILE, path.to_string()),
+            ImageFile::Embedded(file) => NewNode::new(super::IMAGE_NODE)
+                .with(SOURCE, choice(EMBEDDED))
+                .with(
+                    EMBEDDED,
+                    Value::Data(super::embedded_file().wrap(file.clone())),
+                ),
+        };
+        match source.color() {
+            ImageColor::Auto => node.with(COLOR, choice(AUTO)),
+            ImageColor::Data => node.with(COLOR, choice(DATA)),
+            ImageColor::Space(space) => node
+                .with(COLOR, choice(SPACE))
+                .with(SPACE, space.to_string()),
+        }
+    }
 }
 
 /// What an Image node holding `parameters` reads: its file or its embedded
@@ -172,6 +222,16 @@ mod tests {
         assert_eq!(read.color(), &ImageColor::Data);
         let result = rows(&[(SOURCE, choice(RESULT))]);
         assert!(image_source(&result).unwrap().is_none());
+        // A node reading a source reads it back.
+        let space = ImageColor::Space(Arc::from("ACEScg"));
+        for source in [
+            read,
+            ImageSource::new(ImageFile::Path(Arc::from("/a.exr")), space),
+        ] {
+            let made = reading(&source);
+            assert_eq!(made.node_type, IMAGE_NODE);
+            assert_eq!(image_source(&made.parameters).unwrap(), Some(source));
+        }
         let blank = rows(&[(SOURCE, choice(FILE)), (FILE, Value::Text(" ".into()))]);
         assert!(image_source(&blank).is_err());
         assert!(image_source(&rows(&[(SOURCE, choice(EMBEDDED))])).is_err());

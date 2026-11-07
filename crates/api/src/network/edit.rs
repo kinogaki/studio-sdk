@@ -187,6 +187,16 @@ impl NewNode {
         }
     }
 
+    /// A node of MaterialX's definition `signature` (`ND_image_color3`):
+    /// its node's type (`kinogaki.mtlx.image`) holding the signature in its
+    /// Signature row; `None` for a signature MaterialX's library lacks.
+    pub fn materialx(signature: &str) -> Option<Self> {
+        use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
+        let def = def(signature)?;
+        let signature = crate::Value::Choice(std::sync::Arc::from(signature));
+        Some(Self::new(def.id).with(SIGNATURE, signature))
+    }
+
     /// With parameter `name` set to `value`.
     pub fn with(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         self.parameters.insert(name.into(), value.into());
@@ -266,38 +276,45 @@ impl NetworkSeed {
 impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
     /// A Material's inside making `network`: its nodes as it holds them (a
     /// MaterialX node's signature among its parameters), the one it shows
-    /// displayed.
+    /// displayed, and an Image node for each distinct image its nodes read
+    /// ([`image_node::reading`](crate::image_files::image_node::reading)),
+    /// wired into every input reading it.
     fn from(network: &kinogaki_render_api::MaterialNetwork) -> Self {
+        use crate::image_files::image_node;
         use kinogaki_render_api::material::mtlx::SIGNATURE;
         let shown = network.output_index();
-        let nodes = (network.nodes().iter().enumerate())
-            .map(|(at, node)| {
-                let mut parameters = node.values.clone();
-                if let Some(def) = node.def.mtlx() {
-                    let signature = crate::Value::Choice(std::sync::Arc::from(def.name.as_str()));
-                    parameters.insert(SIGNATURE.to_owned(), signature);
-                }
-                NewNode {
-                    node_type: node.def.id,
-                    name: None,
-                    parameters,
-                    display: shown == Some(at as u32),
-                }
-            })
-            .collect();
-        let wires = (network.links().iter())
-            .map(|l| SeedWire {
-                from: l.from as usize,
-                output: l.output.to_string(),
-                to: l.to as usize,
-                input: l.input.to_string(),
-            })
-            .collect();
-        Self {
-            nodes,
-            wires,
-            insides: Vec::new(),
+        let mut seed = NetworkSeed::default();
+        for (at, node) in network.nodes().iter().enumerate() {
+            let mut parameters = node.values.clone();
+            if let Some(def) = node.def.mtlx() {
+                let signature = crate::Value::Choice(std::sync::Arc::from(def.name.as_str()));
+                parameters.insert(SIGNATURE.to_owned(), signature);
+            }
+            seed.node(NewNode {
+                node_type: node.def.id,
+                name: None,
+                parameters,
+                display: shown == Some(at as u32),
+            });
         }
+        for l in network.links() {
+            seed.wire(l.from as usize, &l.output, l.to as usize, &l.input);
+        }
+        let mut images: Vec<(&kinogaki_geometry::image::ImageSource, usize)> = Vec::new();
+        for (at, node) in network.nodes().iter().enumerate() {
+            for (input, source) in &node.images {
+                let image = match images.iter().find(|(s, _)| *s == source) {
+                    Some((_, image)) => *image,
+                    None => {
+                        let image = seed.node(image_node::reading(source));
+                        images.push((source, image));
+                        image
+                    }
+                };
+                seed.wire(image, image_node::IMAGE, at, input);
+            }
+        }
+        seed
     }
 }
 
@@ -356,5 +373,50 @@ impl NodeCreation {
     pub fn inside(mut self, node: NewNode) -> Self {
         self.inside.node(node);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Parameters;
+    use crate::image_files::{IMAGE_NODE, image_node, image_source};
+    use kinogaki_geometry::image::ImageSource;
+    use kinogaki_render_api::MaterialNetwork;
+    use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
+
+    /// Two textures reading one file seed one Image node wired into both.
+    #[test]
+    fn a_compiled_material_seeds_its_nodes_and_an_image_node_an_image() {
+        let image = def("ND_image_color3").unwrap();
+        let surface = def("ND_open_pbr_surface_surfaceshader").unwrap();
+        let none = Parameters::new();
+        let mut built = MaterialNetwork::builder();
+        let a = built.node(&image, &none).unwrap();
+        let b = built.node(&image, &none).unwrap();
+        let s = built.node(&surface, &none).unwrap();
+        built.link(a, "out", s, "base_color").unwrap();
+        built.link(b, "out", s, "specular_color").unwrap();
+        let wood = ImageSource::path("/t/wood.png");
+        built.image(a, "file", wood.clone()).unwrap();
+        built.image(b, "file", wood.clone()).unwrap();
+        let seed = NetworkSeed::from(&built.build(s).unwrap());
+        assert_eq!(seed.nodes.len(), 4);
+        assert!(seed.nodes[2].display);
+        let [file] = [&seed.nodes[3]];
+        assert_eq!(file.node_type, IMAGE_NODE);
+        assert_eq!(image_source(&file.parameters).unwrap(), Some(wood));
+        let into: Vec<(usize, &str, usize, &str)> = (seed.wires.iter())
+            .filter(|w| w.from == 3)
+            .map(|w| (w.from, w.output.as_str(), w.to, w.input.as_str()))
+            .collect();
+        let image = image_node::IMAGE;
+        assert_eq!(into, [(3, image, 0, "file"), (3, image, 1, "file")]);
+        // A MaterialX node by its signature is the node the seed holds.
+        let made = NewNode::materialx("ND_image_color3").unwrap();
+        let signature = |n: &NewNode| (n.node_type, n.parameters.get(SIGNATURE).cloned());
+        assert_eq!(signature(&made), signature(&seed.nodes[0]));
+        assert_eq!(made.parameters.len(), 1, "its signature alone");
+        assert!(NewNode::materialx("ND_nothing").is_none());
     }
 }

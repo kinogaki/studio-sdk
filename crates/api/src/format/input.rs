@@ -1,5 +1,6 @@
 //! [`Input`]: the file a format reads, on disk or held in memory.
 use crate::Error;
+use kinogaki_geometry::image::EmbeddedFile;
 use std::borrow::Cow;
 use std::fmt;
 use std::io::Read as _;
@@ -15,7 +16,9 @@ const HEAD: usize = 64;
 /// project's file rules are read from), its [`head`](Input::head) (what
 /// [`FileFormat::detects`](super::FileFormat::detects) sees), its
 /// [`bytes`](Input::bytes), and its [`path`](Input::path) when it has one,
-/// beside which a format finds the files it names (an OBJ's MTL).
+/// beside which a format finds the files it names (an OBJ's MTL). A format
+/// keeping files packed in it (a usdz's textures, a GLB's images) takes its
+/// bytes [`held`](Input::held), whose ranges it embeds without a copy.
 ///
 /// ```
 /// use kinogaki_studio_api::format::Input;
@@ -37,6 +40,7 @@ pub struct Input<'a> {
 enum Source<'a> {
     File(&'a Path),
     Memory(&'a [u8]),
+    Embedded(&'a EmbeddedFile),
 }
 
 impl<'a> Input<'a> {
@@ -62,6 +66,16 @@ impl<'a> Input<'a> {
         }
     }
 
+    /// `file`, a file kept in the project (or packed in another), its bytes
+    /// shared.
+    pub fn embedded(file: &'a EmbeddedFile) -> Self {
+        Self {
+            name: Cow::Borrowed(file.name()),
+            source: Source::Embedded(file),
+            head: OnceLock::new(),
+        }
+    }
+
     /// Its file name, extension included; empty for a path that ends in
     /// none.
     pub fn name(&self) -> &str {
@@ -73,7 +87,7 @@ impl<'a> Input<'a> {
     pub fn path(&self) -> Option<&'a Path> {
         match self.source {
             Source::File(path) => Some(path),
-            Source::Memory(_) => None,
+            Source::Memory(_) | Source::Embedded(_) => None,
         }
     }
 
@@ -82,6 +96,7 @@ impl<'a> Input<'a> {
     pub fn head(&self) -> &[u8] {
         self.head.get_or_init(|| match self.source {
             Source::Memory(bytes) => bytes[..bytes.len().min(HEAD)].to_vec(),
+            Source::Embedded(file) => file.bytes()[..file.bytes().len().min(HEAD)].to_vec(),
             Source::File(path) => {
                 let mut head = Vec::with_capacity(HEAD);
                 let read = std::fs::File::open(path)
@@ -101,15 +116,36 @@ impl<'a> Input<'a> {
     pub fn bytes(&self) -> Result<Cow<'a, [u8]>, Error> {
         match self.source {
             Source::Memory(bytes) => Ok(Cow::Borrowed(bytes)),
-            Source::File(path) => std::fs::read(path).map(Cow::Owned).map_err(|e| {
-                let why = format_args!("{}: {e}", path.display());
-                match e.kind() {
-                    std::io::ErrorKind::NotFound => Error::missing(why),
-                    _ => Error::invalid(why),
-                }
-            }),
+            Source::Embedded(file) => Ok(Cow::Borrowed(file.bytes())),
+            Source::File(path) => read(path).map(Cow::Owned),
         }
     }
+
+    /// All of its bytes as one shared file named as it is, whose ranges a
+    /// format keeps as the files packed in it
+    /// ([`EmbeddedFile::slice`]): a file kept in the project shared as it
+    /// is, one on disk read once, bytes lent from memory copied.
+    ///
+    /// # Errors
+    /// As [`bytes`](Self::bytes).
+    pub fn held(&self) -> Result<EmbeddedFile, Error> {
+        match self.source {
+            Source::Embedded(file) => Ok(file.clone()),
+            Source::Memory(bytes) => Ok(EmbeddedFile::new(&self.name, bytes.to_vec())),
+            Source::File(path) => Ok(EmbeddedFile::new(&self.name, read(path)?)),
+        }
+    }
+}
+
+/// The file at `path`, read whole.
+fn read(path: &Path) -> Result<Vec<u8>, Error> {
+    std::fs::read(path).map_err(|e| {
+        let why = format_args!("{}: {e}", path.display());
+        match e.kind() {
+            std::io::ErrorKind::NotFound => Error::missing(why),
+            _ => Error::invalid(why),
+        }
+    })
 }
 
 /// What a message names it by: its path, else its name.
@@ -117,7 +153,7 @@ impl fmt::Display for Input<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.source {
             Source::File(path) => path.display().fmt(f),
-            Source::Memory(_) => f.write_str(&self.name),
+            Source::Memory(_) | Source::Embedded(_) => f.write_str(&self.name),
         }
     }
 }
@@ -155,5 +191,22 @@ mod tests {
         let input = Input::memory("b.bin", &long);
         assert_eq!(input.head().len(), HEAD);
         assert!(matches!(input.bytes().unwrap(), Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn a_kept_file_is_lent_and_held_without_a_copy() {
+        let package = EmbeddedFile::new("chair.usdz", (0..100u8).collect());
+        let input = Input::embedded(&package);
+        assert_eq!((input.name(), input.path()), ("chair.usdz", None));
+        assert_eq!(
+            (input.head().len(), input.to_string()),
+            (HEAD, "chair.usdz".into())
+        );
+        let held = input.held().unwrap();
+        assert!(std::ptr::eq(held.bytes(), package.bytes()));
+        let entry = held.slice("wood.png", 10..20).unwrap();
+        assert!(std::ptr::eq(entry.bytes(), &package.bytes()[10..20]));
+        let lent = Input::memory("b.bin", b"abc").held().unwrap();
+        assert_eq!((lent.name(), lent.bytes()), ("b.bin", &b"abc"[..]));
     }
 }
