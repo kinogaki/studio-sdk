@@ -8,7 +8,7 @@ use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
 use crate::network::{NewNode, NodeCreation};
 use crate::params::Schema;
 use crate::{CookCx, Error, NodeType, Outputs};
-use kinogaki_render_api::{Input, NodeDef};
+use kinogaki_render_api::{Input, NodeDef, Socket};
 use std::sync::Arc;
 
 /// Inside a Material node: its shading network.
@@ -37,6 +37,16 @@ pub fn material_creation(
 /// meet is checked as a Material compiles.
 pub const SHADER: DataTypeId = DataTypeId::declared("kinogaki.core.shader");
 
+/// What the wire at a material node's port of `socket` carries: an image
+/// ([`standard::image`](crate::standard::image)) at an Image input, where the
+/// host's Image node is wired, a shading wire ([`SHADER`]) at every other.
+pub fn wire_type(socket: &Socket) -> DataTypeId {
+    match socket {
+        Socket::Image => crate::standard::image().id(),
+        _ => SHADER,
+    }
+}
+
 /// The node type of material node `def`, listed under its engine's label.
 pub struct ShaderNode {
     def: Arc<NodeDef>,
@@ -62,7 +72,6 @@ impl NodeType for ShaderNode {
 
     fn description(&self) -> Description {
         let def = &self.def;
-        let wire = SHADER;
         let aliases: Vec<&str> = def.aliases.iter().map(|a| &**a).collect();
         let mut description = Description::new(&*def.label).context(SHADING).listed(
             &*self.engine,
@@ -70,13 +79,15 @@ impl NodeType for ShaderNode {
             &*def.family,
             &aliases,
         );
-        let driven = (def.inputs.iter()).filter(|i| i.socket().is_some());
-        for input in driven {
-            description =
-                description.input(Port::new(input.name(), input.label(), wire).optional());
+        for input in &def.inputs {
+            if let Some(socket) = input.socket() {
+                let port = Port::new(input.name(), input.label(), wire_type(socket));
+                description = description.input(port.optional());
+            }
         }
         for output in &def.outputs {
-            description = description.output(Port::new(&*output.name, &*output.label, wire));
+            let port = Port::new(&*output.name, &*output.label, wire_type(&output.socket));
+            description = description.output(port);
         }
         description.parameters(parameters(def))
     }

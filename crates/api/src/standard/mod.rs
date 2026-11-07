@@ -16,8 +16,9 @@
 //! ```
 //!
 //! **Saving.** The project encoding of each type is the SDK's: the codecs
-//! here ([`GeometryCodec`], [`ImageCodec`], [`InstancesCodec`], [`BrepCodec`], [`CameraCodec`],
-//! [`MaterialsCodec`], and the lights' [`LightCodec`](crate::render::lights::LightCodec))
+//! here ([`GeometryCodec`], [`ImageCodec`], [`EmbeddedFileCodec`], [`InstancesCodec`],
+//! [`BrepCodec`], [`CameraCodec`], [`MaterialsCodec`], and the lights'
+//! [`LightCodec`](crate::render::lights::LightCodec))
 //! are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
 //! Project files save only frozen and held results, never cooked ones.
@@ -33,6 +34,7 @@ mod attributes;
 mod brep;
 mod camera;
 mod color;
+mod embedded;
 mod geometry;
 mod image;
 mod instances;
@@ -45,6 +47,7 @@ mod tolerances;
 pub use brep::BrepCodec;
 pub use camera::{CameraCodec, lens};
 pub use color::ColorConfiguration;
+pub use embedded::EmbeddedFileCodec;
 pub use geometry::GeometryCodec;
 pub use image::ImageCodec;
 pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
@@ -82,6 +85,14 @@ pub(crate) const IMAGE: &str = "kinogaki.core.image";
 /// The handle on [`Image`](kinogaki_geometry::image::Image) values (`IMAGE`).
 pub const fn image() -> Typed<kinogaki_geometry::image::Image> {
     Typed::new(DataTypeId::declared(IMAGE))
+}
+
+/// The handle on an image file's original bytes kept in a project
+/// ([`EmbeddedFile`](kinogaki_geometry::image::EmbeddedFile),
+/// `kinogaki.core.embedded_file`): what an Image node holds when its file is
+/// embedded ([`EmbeddedFileCodec`]).
+pub const fn embedded_file() -> Typed<kinogaki_geometry::image::EmbeddedFile> {
+    Typed::new(DataTypeId::declared("kinogaki.core.embedded_file"))
 }
 
 /// The id of [`Instances`] values: placements of prototypes of any type.

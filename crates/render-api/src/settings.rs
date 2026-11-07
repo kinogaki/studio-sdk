@@ -9,9 +9,11 @@
 //! [`Section`]: kinogaki_value::Section
 //!
 //! Values are authored [`Value`](kinogaki_value::Value)s by name ([`Parameters`]). An image value
-//! of a declared prim or a material node ([`ValueKind::File`](kinogaki_value::ValueKind::File)) is authored
-//! as its file's path; an engine receives the Texture prim the host decoded
-//! it to, in the prim's or node's `textures`, by the value's name.
+//! of a declared prim ([`ValueKind::File`](kinogaki_value::ValueKind::File)) is authored as its
+//! file's path, and a material node's image is the host's Image node wired
+//! into it ([`Socket::Image`](crate::Socket::Image)); an engine receives the
+//! Texture prim the host read either to, in the prim's or node's `textures`,
+//! by the value's or input's name.
 
 use kinogaki_geometry::{Error, Rate, Units};
 use kinogaki_value::{Parameter, Parameters};
@@ -21,9 +23,9 @@ use crate::geometry::image::Image;
 use crate::id::Id;
 use crate::prim::Camera;
 
-/// The Texture prims the host decoded image values to, by the value's
-/// name: what an engine reads for each [`ValueKind::File`](kinogaki_value::ValueKind::File) value (one
-/// missing: no image, or one not read yet).
+/// The Texture prims the host read images to, by the value's or input's
+/// name: what an engine reads for each image (one missing: no image, or one
+/// not read yet).
 pub(crate) type Textures = BTreeMap<String, Id<Image>>;
 
 /// What every view of an engine shares. What differs between views travels

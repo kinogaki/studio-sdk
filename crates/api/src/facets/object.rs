@@ -4,6 +4,7 @@
 //! covers how it looks against the scene's [`Materials`].
 use crate::data::Data;
 use crate::facets::Drawn;
+use kinogaki_geometry::image::ImageSource;
 use kinogaki_geometry::{Bounds, Projective, Ray, Xform};
 use kinogaki_render_api::MaterialDisplay;
 use kinogaki_viewport_api::{SurfaceImage, SurfaceTextures};
@@ -68,14 +69,14 @@ pub trait Materials {
     /// engine owns.
     fn display(&self, path: &str) -> Option<MaterialDisplay>;
 
-    /// Image file `file` (a material's [`DisplayTexture::file`]) as the
-    /// shaded views show it. `None` while it is read, or when it can't be.
-    /// Asking starts reading it, once; when it is read the host wakes once
-    /// and the [`revision`](Self::revision) moves.
+    /// Image `image` (a material's [`DisplayTexture::image`]) as the shaded
+    /// views show it. `None` while it is read, or when it can't be. Asking
+    /// starts reading it, once; when it is read the host wakes once and the
+    /// [`revision`](Self::revision) moves.
     ///
-    /// [`DisplayTexture::file`]: kinogaki_render_api::DisplayTexture::file
-    fn image(&self, file: &str) -> Option<Arc<SurfaceImage>> {
-        let _ = file;
+    /// [`DisplayTexture::image`]: kinogaki_render_api::DisplayTexture::image
+    fn image(&self, image: &ImageSource) -> Option<Arc<SurfaceImage>> {
+        let _ = image;
         None
     }
 

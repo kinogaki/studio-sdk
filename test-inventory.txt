@@ -225,6 +225,7 @@ kinogaki-geometry/lib test image::sampler::tests::nothing_to_read_reads_nothing
 kinogaki-geometry/lib test image::sampler::tests::pixels_outside_the_data_window_read_nothing
 kinogaki-geometry/lib test image::sampler::tests::v_runs_up_from_the_bottom_row
 kinogaki-geometry/lib test image::sampler::tests::values_decode_as_read_pixel_decodes_them
+kinogaki-geometry/lib test image::source::tests::embedded_files_are_equal_by_name_and_bytes
 kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
 kinogaki-geometry/lib test image::tests::a_held_layer_has_no_tiles_and_compares_by_its_key
 kinogaki-geometry/lib test image::tests::a_plane_reads_back_as_it_was_built
@@ -352,6 +353,7 @@ kinogaki-render-api/lib test material::standard::tests::each_model_shows_its_con
 kinogaki-render-api/lib test material::standard::tests::open_pbr_makes_a_shown_surface
 kinogaki-render-api/lib test material::tests::a_builder_refuses_what_isnt_whole
 kinogaki-render-api/lib test material::tests::a_network_is_whole_once_built
+kinogaki-render-api/lib test material::tests::an_image_input_reads_a_source_as_color_or_data
 kinogaki-render-api/lib test material::tests::sockets_meet_by_kind
 kinogaki-render-api/lib test source::tests::plain_triangles_are_flat_and_default_material
 kinogaki-render-api/lib test standard::emission::tests::blackbodies_warm_below_white_and_cool_above
@@ -417,6 +419,7 @@ kinogaki-studio-api/doc test crates/api/src/network/context.rs - network::contex
 kinogaki-studio-api/doc test crates/api/src/package.rs - package::Package
 kinogaki-studio-api/doc test crates/api/src/standard/brep/mod.rs - standard::brep::BrepCodec
 kinogaki-studio-api/doc test crates/api/src/standard/color.rs - standard::color::ColorConfiguration
+kinogaki-studio-api/doc test crates/api/src/standard/embedded.rs - standard::embedded::EmbeddedFileCodec
 kinogaki-studio-api/doc test crates/api/src/standard/geometry.rs - standard::geometry::GeometryCodec
 kinogaki-studio-api/doc test crates/api/src/standard/image.rs - standard::image::ImageCodec
 kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances
@@ -466,6 +469,7 @@ kinogaki-studio-api/lib test format::tests::readings_lend_settings_by_type_and_p
 kinogaki-studio-api/lib test icon::tests::a_well_formed_icon_checks_as_its_text
 kinogaki-studio-api/lib test icon::tests::documents_are_bounded_utf8_text
 kinogaki-studio-api/lib test icon::tests::names_are_lowercase_words_joined_by_dashes
+kinogaki-studio-api/lib test image_files::tests::an_image_node_reads_its_file_its_embedded_bytes_or_a_result
 kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_take
 kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup
 kinogaki-studio-api/lib test params::schema::tests::a_data_parameter_takes_values_of_its_type_alone

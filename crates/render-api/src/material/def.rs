@@ -6,7 +6,7 @@
 //! ([`EngineDescription::node_defs`](crate::EngineDescription::node_defs)).
 //! A host makes node types of them in the Shading context of a Material.
 use kinogaki_mtlx::Type;
-use kinogaki_value::{Condition, NodeTypeId, Parameters};
+use kinogaki_value::NodeTypeId;
 use kinogaki_value::{Parameter, Section};
 use std::sync::Arc;
 
@@ -36,8 +36,10 @@ pub enum Socket {
     Matrix44,
     /// `string`.
     String,
-    /// `filename`: an image file.
-    Filename,
+    /// `filename`: an image, wired from the host's Image node. A network an
+    /// engine receives holds no wire into it: the image's Texture prim, in
+    /// its node's `textures` (see [`Node`](super::Node)).
+    Image,
     /// A closure or shader, by its name: MaterialX's (`BSDF`, `EDF`, `VDF`,
     /// `surfaceshader`, `displacementshader`, `volumeshader`, `material`) or
     /// one an engine's own nodes alone agree on.
@@ -59,7 +61,7 @@ impl Socket {
             Type::Matrix33 => Socket::Matrix33,
             Type::Matrix44 => Socket::Matrix44,
             Type::String => Socket::String,
-            Type::Filename => Socket::Filename,
+            Type::Filename => Socket::Image,
             Type::Named(name) => Socket::Closure(name.clone()),
         }
     }
@@ -83,12 +85,12 @@ impl Socket {
 
     /// Whether an output of this socket may drive an input of `input`:
     /// numbers drive numbers (an engine converts between widths, as
-    /// MaterialX's `convert` would), text drives text, a matrix one of its
-    /// size, and a closure its own kind alone.
+    /// MaterialX's `convert` would), text drives text, an image an image, a
+    /// matrix one of its size, and a closure its own kind alone.
     pub fn drives(&self, input: &Socket) -> bool {
         match (self, input) {
             (Socket::Closure(a), Socket::Closure(b)) => a == b,
-            (Socket::String | Socket::Filename, Socket::String | Socket::Filename) => true,
+            (Socket::String, Socket::String) | (Socket::Image, Socket::Image) => true,
             (Socket::Matrix33, Socket::Matrix33) | (Socket::Matrix44, Socket::Matrix44) => true,
             _ => self.width() > 0 && input.width() > 0,
         }
@@ -98,14 +100,14 @@ impl Socket {
 /// One input of a node.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Input {
-    /// A value no wire drives: an operation, a file, an attribute's name
-    /// (MaterialX's uniform inputs).
+    /// A value no wire drives: an operation, an attribute's name (MaterialX's
+    /// uniform inputs).
     Setting(Parameter),
     /// A value a wire may drive; unwired, it holds its value.
     Driven(Parameter, Socket),
-    /// A wire alone: a closure, or what reads a geometric property while
-    /// unwired (MaterialX's `defaultgeomprop`: the shading normal, a texture
-    /// coordinate).
+    /// A wire alone: a closure, an image, or what reads a geometric property
+    /// while unwired (MaterialX's `defaultgeomprop`: the shading normal, a
+    /// texture coordinate).
     Wire {
         /// Its name in files and networks.
         name: Arc<str>,
@@ -203,9 +205,6 @@ pub struct NodeDef {
     pub outputs: Vec<Output>,
     /// The MaterialX definition it is of, for a MaterialX node.
     mtlx: Option<Arc<kinogaki_mtlx::NodeDef>>,
-    /// The image files read as data (roughness, normals: the stored values as
-    /// they are) while their conditions hold; every other file is a color.
-    data_files: Vec<(Arc<str>, Condition)>,
 }
 
 impl NodeDef {
@@ -220,7 +219,6 @@ impl NodeDef {
             inputs: Vec::new(),
             outputs: Vec::new(),
             mtlx: None,
-            data_files: Vec::new(),
         }
     }
 
@@ -236,21 +234,10 @@ impl NodeDef {
         self
     }
 
-    /// With file `name` read as data while `when` holds.
-    pub fn data_file(mut self, name: &str, when: Condition) -> NodeDef {
-        self.data_files.push((Arc::from(name), when));
-        self
-    }
-
     /// As the node type of MaterialX definition `def`.
     pub(crate) fn of_mtlx(mut self, def: Arc<kinogaki_mtlx::NodeDef>) -> NodeDef {
         self.mtlx = Some(def);
         self
-    }
-
-    /// Whether file input `name` reads as data, the node holding `values`.
-    pub fn reads_data(&self, name: &str, values: &Parameters) -> bool {
-        (self.data_files.iter()).any(|(file, when)| &**file == name && when.met(values))
     }
 
     /// The MaterialX definition it is of, for a MaterialX node: its node

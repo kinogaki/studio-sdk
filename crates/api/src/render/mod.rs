@@ -16,7 +16,7 @@
 pub mod lights;
 mod shader;
 
-pub use shader::{MATERIAL, SHADER, SHADING, ShaderNode, material_creation};
+pub use shader::{MATERIAL, SHADER, SHADING, ShaderNode, material_creation, wire_type};
 
 use kinogaki_geometry::{Attributes, Column, Xform};
 use std::fmt;

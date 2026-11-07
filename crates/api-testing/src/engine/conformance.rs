@@ -17,13 +17,13 @@ use super::Waiter;
 use crate::{Outcome, Report};
 use kinogaki_render_api::aov::standard as aovs;
 use kinogaki_render_api::display::Made;
-use kinogaki_render_api::geometry::image::{Encoding, Format, Image, Rect, Sample};
+use kinogaki_render_api::geometry::image::{Encoding, Format, Image, ImageSource, Rect, Sample};
 use kinogaki_render_api::geometry::{
     Attribute, Domain, Error, Kind, Meaning, Primitives, Sampled, Vec3, Xform, names,
 };
 use kinogaki_render_api::material::mtlx;
 use kinogaki_render_api::settings::defaults;
-use kinogaki_render_api::value::{Parameters, Value, ValueKind};
+use kinogaki_render_api::value::{Parameters, Value};
 use kinogaki_render_api::{
     AovDesc, AovFormat, Camera, Declared, EngineDescription, Engines, Id, Instancer, Material,
     MaterialNetwork, Prim, PrimId, PrimKind, Projection, SceneSettings, SceneUpdate, Shape,
@@ -304,14 +304,10 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
                     ("alpha_mode", Value::Integer(1)),
                 ],
             );
-            let orm = node(
-                &mut built,
-                "ND_gltf_image_vector3_vector3_1_0",
-                &[
-                    ("file", Value::Text("orm.png".into())),
-                    ("filecolorspace", Value::Choice(Arc::from("raw"))),
-                ],
-            );
+            let orm = node(&mut built, "ND_gltf_image_vector3_vector3_1_0", &[]);
+            built
+                .image(orm, "file", ImageSource::path("orm.png"))
+                .expect("an image input");
             for (index, input) in [(2, "metallic"), (1, "roughness")] {
                 let extract = node(
                     &mut built,
@@ -346,15 +342,12 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
             .expect("a texture");
         prims.push(Prim::Texture(image));
         for node in network.nodes_mut() {
-            let files = node.def.inputs.iter().filter_map(|i| i.value());
-            let read = files
-                .filter(|p| p.kind == ValueKind::File)
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>();
-            for name in read {
-                if node.values.get(&name).and_then(Value::text) == Some("orm.png") {
-                    node.textures.insert(name, texture);
-                }
+            let read: Vec<String> = (node.images.iter())
+                .filter(|(_, image)| image.name() == "orm.png")
+                .map(|(input, _)| input.clone())
+                .collect();
+            for input in read {
+                node.textures.insert(input, texture);
             }
         }
     }

@@ -1,14 +1,15 @@
 use super::*;
 use crate::Engines;
 use crate::material::mtlx::def;
-use kinogaki_geometry::image::{Filter, Wrap};
+use kinogaki_geometry::image::{Filter, ImageSource, Wrap};
 
 /// A node feeding a surface: its signature, its output, its values and the
 /// surface's input it feeds.
 type Wired<'a> = (&'a str, &'a str, &'a [(&'a str, Value)], &'a str);
 
 /// A material of `surface` (a signature) holding `values`, its `input` wired
-/// from `upstream` (a signature, holding `held`) when given.
+/// from `upstream` (a signature, holding `held`, its image `wood.png` when it
+/// reads one) when given.
 fn material(surface: &str, values: &[(&str, Value)], wired: Option<Wired<'_>>) -> MaterialNetwork {
     let params = |v: &[(&str, Value)]| -> Parameters {
         v.iter()
@@ -18,7 +19,13 @@ fn material(surface: &str, values: &[(&str, Value)], wired: Option<Wired<'_>>) -
     let mut built = MaterialNetwork::builder();
     let s = built.node(&def(surface).unwrap(), &params(values)).unwrap();
     if let Some((upstream, output, held, input)) = wired {
-        let u = built.node(&def(upstream).unwrap(), &params(held)).unwrap();
+        let upstream = def(upstream).unwrap();
+        let u = built.node(&upstream, &params(held)).unwrap();
+        if upstream.find_input("file").is_some() {
+            built
+                .image(u, "file", ImageSource::path("wood.png"))
+                .unwrap();
+        }
         built.link(u, output, s, input).unwrap();
     }
     let m = built
@@ -79,7 +86,6 @@ fn each_model_shows_its_constant_base_color() {
 
 #[test]
 fn an_image_shows_through_any_model_with_its_placement() {
-    let file = ("file", Value::Text("wood.png".into()));
     let cases = [
         (
             "ND_open_pbr_surface_surfaceshader",
@@ -107,18 +113,14 @@ fn an_image_shows_through_any_model_with_its_placement() {
         ),
     ];
     for (surface, texture, output, input) in cases {
-        let network = material(
-            surface,
-            &[],
-            Some((texture, output, std::slice::from_ref(&file), input)),
-        );
+        let network = material(surface, &[], Some((texture, output, &[], input)));
         let display = shown(&network);
         let texture = display
             .texture
             .clone()
             .unwrap_or_else(|| panic!("{surface}: {display:?}"));
         assert_eq!(
-            (&*texture.file, &*texture.uv),
+            (texture.image.name(), &*texture.uv),
             ("wood.png", "uv"),
             "{surface}"
         );
@@ -126,7 +128,6 @@ fn an_image_shows_through_any_model_with_its_placement() {
     // glTF's placement: its transform scales about its pivot, its wrap and
     // filter as its sampler says.
     let held = [
-        file.clone(),
         ("scale", Value::Numbers(vec![2.0, 4.0])),
         ("uaddressmode", Value::Choice(Arc::from("clamp"))),
         ("vaddressmode", Value::Choice(Arc::from("mirror"))),

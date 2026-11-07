@@ -79,10 +79,14 @@ pub enum Reach {
     /// Every network, offered and kept: a node that holds any value (a
     /// stash of what an import made).
     Everywhere,
-    /// Offered where an installed format reads into what the network
-    /// carries, kept in every network (it stays when its formats go): a
-    /// node reading files.
-    Files,
+    /// Offered wherever what it gives is carried: in every network whose
+    /// context's node types have a port of a type its output gives (a node
+    /// declaring no output, its ports following the installed formats, gives
+    /// what they read less what another such node gives), and in library
+    /// levels it lists among its contexts; kept in every network (it stays
+    /// when what carried it goes). Core's value nodes, the Image node and the
+    /// File node ([`wherever_carried`](Description::wherever_carried)).
+    Carried,
     /// Kept in every network but the one it holds
     /// ([`inside`](Description::inside)), offered in its contexts: a
     /// holder carried with what it is used in (a Material).
@@ -113,6 +117,13 @@ impl Description {
     pub fn reach(mut self, reach: Reach) -> Self {
         self.reach = reach;
         self
+    }
+
+    /// Offered wherever what it gives is carried ([`Reach::Carried`]): a
+    /// node brought into a context by any node type there that takes or
+    /// makes its output's type.
+    pub fn wherever_carried(self) -> Self {
+        self.reach(Reach::Carried)
     }
 
     /// With icon `name`.

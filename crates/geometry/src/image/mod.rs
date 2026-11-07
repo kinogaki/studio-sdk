@@ -27,6 +27,8 @@
 //! - **Reading at points.** A [`Sampler`] ([`Image::sampler`]) reads a layer
 //!   at coordinates, through a [`SampleFilter`] and a [`Wrap`]: what every
 //!   reader of an image at points shares.
+//! - **Sources.** Where an image a node names comes from ([`ImageSource`]): a
+//!   file on disk, or the file's bytes kept in the project ([`EmbeddedFile`]).
 //!
 //! ```
 //! use kinogaki_geometry::image::{Encoding, Format, Image, Rect, Sample};
@@ -48,6 +50,7 @@ mod pyramid;
 mod sample;
 mod sampler;
 mod sampling;
+mod source;
 #[cfg(test)]
 mod tests;
 
@@ -57,6 +60,7 @@ pub use pyramid::Pyramid;
 pub use sample::{Sample, f32_to_half, half_to_f32};
 pub use sampler::{SampleFilter, Sampler};
 pub use sampling::{Filter, Sampling, Wrap};
+pub use source::{EmbeddedFile, ImageColor, ImageFile, ImageSource};
 
 use crate::attributes::Attributes;
 use crate::column::Column;

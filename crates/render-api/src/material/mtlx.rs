@@ -8,14 +8,13 @@
 //!   drive;
 //! - an input reading a geometric property while unwired (a texture
 //!   coordinate, the shading normal), a matrix and a closure are wires alone;
-//! - a `filename` input is a file setting with a color space row beside it,
-//!   `<input>colorspace` (as Houdini names MaterialX's `colorspace`
-//!   attribute): empty reads the file's colors by the host's file rules, `raw`
-//!   reads its values as stored.
+//! - a `filename` input is an [`Image`](Socket::Image) wire alone: the host's
+//!   Image node reads the file, and holds what MaterialX's `colorspace`
+//!   attribute says.
 use super::def::{Input, NodeDef, Output, Socket};
 use kinogaki_mtlx::{Port, Type, library};
 use kinogaki_value::NodeTypeId;
-use kinogaki_value::{Choice, Condition, Number, NumberLook, Parameter, Section, Value, ValueKind};
+use kinogaki_value::{Choice, Number, NumberLook, Parameter, Section, Value, ValueKind};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -43,9 +42,6 @@ pub fn def(signature: &str) -> Option<Arc<NodeDef>> {
 /// name (`ND_image_color3`).
 pub const SIGNATURE: &str = "signature";
 
-/// The suffix of a file input's color space row.
-pub(crate) const COLORSPACE: &str = "colorspace";
-
 /// `source` as a node definition.
 fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
     let mut def = NodeDef::new(
@@ -61,23 +57,6 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
             def.groups.push(Section::new(folder, folder, first));
         }
         def = def.input(input(port));
-        if port.ty == Type::Filename {
-            let row = format!("{}{COLORSPACE}", port.name);
-            let data = !source.ty().is_color();
-            let space = Parameter::new(
-                &row,
-                "Color Space",
-                ValueKind::choice(vec![Choice::new("", "Auto"), Choice::new("raw", "Raw")]),
-                Value::Choice(Arc::from(if data { "raw" } else { "" })),
-            )
-            .group(folder)
-            .animatable(false);
-            def = def.input(Input::Setting(space));
-            def = def.data_file(
-                &port.name,
-                Condition::when(row, Value::Choice(Arc::from("raw"))),
-            );
-        }
     }
     for port in &source.outputs {
         def = def.output(Output::new(
@@ -94,7 +73,10 @@ fn input(port: &Port) -> Input {
     let socket = Socket::of(&port.ty);
     let label = port.label.clone().unwrap_or_else(|| words(&port.name));
     let wire = port.geomprop.is_some()
-        || matches!(port.ty, Type::Matrix33 | Type::Matrix44 | Type::Named(_));
+        || matches!(
+            port.ty,
+            Type::Matrix33 | Type::Matrix44 | Type::Filename | Type::Named(_)
+        );
     let kind = kind(port);
     let (Some(kind), false) = (kind, wire) else {
         return Input::wire(&port.name, &label, socket);
@@ -110,7 +92,7 @@ fn input(port: &Port) -> Input {
     {
         parameter = parameter.look(NumberLook::slider());
     }
-    match port.uniform || port.ty == Type::Filename {
+    match port.uniform {
         true => Input::Setting(parameter.animatable(false)),
         false => Input::Driven(parameter, socket),
     }
@@ -175,7 +157,6 @@ fn kind(port: &Port) -> Option<ValueKind> {
         },
         Type::String if !port.enumeration.is_empty() => ValueKind::choice(choices()),
         Type::String => ValueKind::Text,
-        Type::Filename => ValueKind::File,
         _ => return None,
     })
 }
@@ -192,7 +173,7 @@ pub(crate) fn value(kind: &ValueKind, v: &kinogaki_mtlx::Value) -> Option<Value>
             Value::Numbers(n.clone())
         }
         (ValueKind::Choice { .. }, M::Text(t)) => Value::Choice(Arc::from(t.as_str())),
-        (ValueKind::Text | ValueKind::File, M::Text(t)) => Value::Text(t.clone()),
+        (ValueKind::Text, M::Text(t)) => Value::Text(t.clone()),
         _ => return None,
     })
 }
@@ -225,7 +206,7 @@ fn zero(kind: &ValueKind) -> Value {
                 .first()
                 .map_or_else(|| Arc::from(""), |c| c.key.clone()),
         ),
-        ValueKind::Text | ValueKind::File => Value::Text(String::new()),
+        ValueKind::Text => Value::Text(String::new()),
         _ => Value::Number(0.0),
     }
 }
@@ -385,28 +366,15 @@ mod tests {
         assert_eq!(image.id.as_str(), "kinogaki.mtlx.image");
         assert_eq!((&*image.label, &*image.family), ("Image", "Texture 2D"));
         assert_eq!(image.mtlx().unwrap().name, "ND_image_color3");
-        // A file and its color space are settings; a color one reads colors.
-        assert!(
-            matches!(image.find_input("file"), Some(Input::Setting(p)) if p.kind == ValueKind::File)
-        );
-        let colorspace = image
-            .find_input("filecolorspace")
-            .and_then(Input::value)
-            .unwrap();
-        assert_eq!(colorspace.value, Value::Choice(Arc::from("")));
-        assert!(!image.reads_data(
-            "file",
-            &[("filecolorspace".to_owned(), colorspace.value.clone())].into()
+        // A file is an image wire alone, with no color space row of its own.
+        assert!(matches!(
+            image.find_input("file"),
+            Some(Input::Wire {
+                socket: Socket::Image,
+                ..
+            })
         ));
-        let float = def("ND_image_float").unwrap();
-        let data = float
-            .find_input("filecolorspace")
-            .and_then(Input::value)
-            .unwrap();
-        assert!(float.reads_data(
-            "file",
-            &[("filecolorspace".to_owned(), data.value.clone())].into()
-        ));
+        assert!(image.find_input("filecolorspace").is_none());
         // An unwired texture coordinate reads the geometry's: a wire alone.
         assert!(matches!(
             image.find_input("texcoord"),

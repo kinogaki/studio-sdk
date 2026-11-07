@@ -104,7 +104,7 @@ fn traced(network: &MaterialNetwork, at: NodeIndex, depth: usize) -> Option<Mate
     }
     match def.node.as_str() {
         "image" => {
-            let file = node.values.get("file")?.text()?;
+            let image = node.images.get("file")?;
             let (transform, uv) = match into("texcoord") {
                 Some(l) => affine(network, l.from)?,
                 None => (IDENTITY, Arc::from(kinogaki_geometry::names::UV)),
@@ -120,7 +120,7 @@ fn traced(network: &MaterialNetwork, at: NodeIndex, depth: usize) -> Option<Mate
                 Some("closest") => Filter::Nearest,
                 _ => Filter::Smooth,
             };
-            let mut texture = DisplayTexture::new(file);
+            let mut texture = DisplayTexture::new(image.clone());
             texture.uv = uv;
             texture.transform = transform.map(|row| row.map(|v| v as f32));
             texture.sampling = Sampling {

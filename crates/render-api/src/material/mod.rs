@@ -30,8 +30,9 @@ pub use display::{DisplayTexture, MaterialDisplay};
 
 use crate::settings::Textures;
 use kinogaki_geometry::Error;
+use kinogaki_geometry::image::{ImageColor, ImageSource};
 use kinogaki_value::{Parameters, Value, ValueKind};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -39,22 +40,40 @@ use std::sync::Arc;
 pub type NodeIndex = u32;
 
 /// A node: its definition, every input's value (its default when never
-/// set), and, as an engine receives it, the Texture prims its image files
-/// were decoded to, by input name.
+/// set), the images its [`Image`](Socket::Image) inputs read, and, as an
+/// engine receives it, the Texture prims the host read those to, by input
+/// name.
 #[derive(Clone)]
 pub struct Node {
     /// Its definition: its type and, for a MaterialX node, its signature.
     pub def: Arc<NodeDef>,
     /// Every input's value that isn't a wire alone, by name.
     pub values: Parameters,
-    /// Its files' Texture prims, filled by the host as it sends the network.
+    /// What its Image inputs read, by input name: the host's Image nodes
+    /// wired into them, as the host compiles a material.
+    pub images: BTreeMap<String, ImageSource>,
+    /// Its images' Texture prims, filled by the host as it sends the network.
     pub textures: Textures,
 }
 
+impl Node {
+    /// Whether Image input `input` reads its file's values as stored: its
+    /// image says data, or the node gives no color (MaterialX converts color
+    /// spaces for colors alone).
+    pub fn reads_data(&self, input: &str) -> bool {
+        let color = (self.def.outputs.first())
+            .is_some_and(|o| matches!(o.socket, Socket::Color3 | Socket::Color4));
+        !color || (self.images.get(input)).is_some_and(|i| *i.color() == ImageColor::Data)
+    }
+}
+
 impl PartialEq for Node {
-    /// Equal definitions ([`NodeDef::same`]), values and textures.
+    /// Equal definitions ([`NodeDef::same`]), values, images and textures.
     fn eq(&self, other: &Node) -> bool {
-        self.def.same(&other.def) && self.values == other.values && self.textures == other.textures
+        self.def.same(&other.def)
+            && self.values == other.values
+            && self.images == other.images
+            && self.textures == other.textures
     }
 }
 
@@ -65,6 +84,7 @@ impl fmt::Debug for Node {
             .field("def", &self.def.id)
             .field("signature", &signature)
             .field("values", &self.values)
+            .field("images", &self.images)
             .field("textures", &self.textures)
             .finish()
     }
@@ -234,9 +254,28 @@ impl NetworkBuilder {
         self.network.nodes.push(Node {
             def: def.clone(),
             values: held,
+            images: BTreeMap::new(),
             textures: Textures::new(),
         });
         Ok((self.network.nodes.len() - 1) as NodeIndex)
+    }
+
+    /// Image input `input` of node `at` reading `image`.
+    ///
+    /// # Errors
+    /// No such node, or no Image input so named.
+    pub fn image(&mut self, at: NodeIndex, input: &str, image: ImageSource) -> Result<(), Error> {
+        let node = (self.network.nodes.get_mut(at as usize))
+            .ok_or_else(|| Error::invalid(format_args!("no node {at} to read an image")))?;
+        let takes = node.def.find_input(input).and_then(Input::socket) == Some(&Socket::Image);
+        if !takes {
+            let label = &node.def.label;
+            return Err(Error::invalid(format_args!(
+                "{label} has no image input {input}"
+            )));
+        }
+        node.images.insert(input.to_owned(), image);
+        Ok(())
     }
 
     /// Output `output` of node `from` driving input `input` of node `to`.
@@ -434,11 +473,39 @@ mod tests {
     }
 
     #[test]
+    fn an_image_input_reads_a_source_as_color_or_data() {
+        let color = mtlx::def("ND_image_color3").unwrap();
+        let float = mtlx::def("ND_image_float").unwrap();
+        let mut b = MaterialNetwork::builder();
+        let none = Parameters::new();
+        let (c, f) = (
+            b.node(&color, &none).unwrap(),
+            b.node(&float, &none).unwrap(),
+        );
+        let wood = ImageSource::path("wood.png");
+        b.image(c, "file", wood.clone()).unwrap();
+        b.image(f, "file", wood.clone()).unwrap();
+        assert!(b.image(c, "default", wood.clone()).is_err(), "not an image");
+        assert!(b.image(9, "file", wood.clone()).is_err(), "no such node");
+        let network = b.build(c).unwrap();
+        let [c, f] = [&network.nodes()[0], &network.nodes()[1]];
+        assert_eq!(c.images["file"], wood);
+        assert!(!c.reads_data("file"), "a color reads its colors");
+        assert!(f.reads_data("file"), "a float reads its values");
+        let mut data = c.clone();
+        let file = kinogaki_geometry::image::ImageFile::Path(Arc::from("wood.png"));
+        let as_data = ImageSource::new(file, ImageColor::Data);
+        data.images.insert("file".into(), as_data);
+        assert!(data.reads_data("file"), "its image says data");
+    }
+
+    #[test]
     fn sockets_meet_by_kind() {
         let closure = |n: &str| Socket::Closure(Arc::from(n));
         assert!(Socket::Float.drives(&Socket::Color3));
         assert!(Socket::Color4.drives(&Socket::Vector2));
-        assert!(Socket::Filename.drives(&Socket::String));
+        assert!(Socket::Image.drives(&Socket::Image));
+        assert!(!Socket::Image.drives(&Socket::String));
         assert!(!Socket::Matrix33.drives(&Socket::Matrix44));
         assert!(!Socket::Float.drives(&Socket::String));
         assert!(closure("a").drives(&closure("a")));

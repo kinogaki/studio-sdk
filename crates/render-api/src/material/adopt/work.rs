@@ -4,10 +4,12 @@
 //! keeping only what the shown node reads.
 use super::super::mtlx::{self, value};
 use super::super::{Link, MaterialNetwork, Node, NodeDef, NodeIndex};
+use crate::Id;
+use crate::geometry::image::{Image, ImageSource};
 use crate::settings::Textures;
 use kinogaki_mtlx::{Binding, GeomProp, Graph, library};
 use kinogaki_value::{Parameters, Value, ValueKind};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 /// A network being rewritten (see the module docs).
@@ -19,10 +21,12 @@ pub(super) struct Work {
 }
 
 /// Where an input's value comes from, as an outer node held it: a link, a
-/// value, or nothing (a wire alone, unwired).
+/// value, an image (with its Texture prim once the host read it), or nothing
+/// (a wire alone, unwired).
 enum Source {
     Link(NodeIndex, Arc<str>),
-    Value(Value, Option<Value>, Textures),
+    Value(Value),
+    Image(ImageSource, Option<Id<Image>>),
     Nothing,
 }
 
@@ -56,6 +60,7 @@ impl Work {
         self.nodes.push(Some(Node {
             def,
             values,
+            images: BTreeMap::new(),
             textures: Textures::new(),
         }));
         (self.nodes.len() - 1) as NodeIndex
@@ -150,18 +155,11 @@ impl Work {
         if let Some(l) = self.driver(at, input) {
             return Source::Link(l.from, l.output.clone());
         }
+        if let Some(image) = node.images.get(input) {
+            return Source::Image(image.clone(), node.textures.get(input).copied());
+        }
         match node.values.get(input) {
-            Some(v) => {
-                let space = node
-                    .values
-                    .get(&format!("{input}{}", mtlx::COLORSPACE))
-                    .cloned();
-                let textures = (node.textures.iter())
-                    .filter(|(k, _)| k.as_str() == input)
-                    .map(|(k, t)| (k.clone(), *t))
-                    .collect();
-                Source::Value(v.clone(), space, textures)
-            }
+            Some(v) => Source::Value(v.clone()),
             None => Source::Nothing,
         }
     }
@@ -172,13 +170,11 @@ impl Work {
     fn bind(&mut self, source: &Source, geomprop: Option<&str>, to: NodeIndex, input: &str) {
         match source {
             Source::Link(from, output) => self.link(*from, output, to, input),
-            Source::Value(v, space, textures) => {
-                self.set(to, input, v.clone());
-                if let Some(space) = space {
-                    self.set(to, &format!("{input}{}", mtlx::COLORSPACE), space.clone());
-                }
+            Source::Value(v) => _ = self.set(to, input, v.clone()),
+            Source::Image(image, texture) => {
                 if let Some(node) = self.nodes.get_mut(to as usize).and_then(Option::as_mut) {
-                    for texture in textures.values() {
+                    node.images.insert(input.to_owned(), image.clone());
+                    if let Some(texture) = texture {
                         node.textures.insert(input.to_owned(), *texture);
                     }
                 }

@@ -4,18 +4,17 @@
 //! primvar and an image, read through its texture's transform and sampling.
 //! Render views show the real look.
 
-use kinogaki_geometry::image::Sampling;
+use kinogaki_geometry::image::{ImageSource, Sampling};
 use kinogaki_geometry::names;
 use std::sync::Arc;
 
-/// The image a material's color shows: its file, as a node of the material
-/// holds it, the coordinates it is read through and how.
+/// The image a material's color shows: what a node of the material reads,
+/// the coordinates it is read through and how.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisplayTexture {
-    /// The file, as typed: relative paths read from the project's folder. The
-    /// host reads it as a color (the color service's file rules) and shows it
-    /// once read.
-    pub file: Arc<str>,
+    /// The image, as the node's Image input reads it. The host reads it as a
+    /// color and shows it once read.
+    pub image: ImageSource,
     /// The primvar holding its coordinates.
     pub uv: Arc<str>,
     /// Where a point of coordinates `(u, v)` reads the image: `transform` ·
@@ -26,10 +25,10 @@ pub struct DisplayTexture {
 }
 
 impl DisplayTexture {
-    /// `file`, read through the standard `uv` as it is.
-    pub fn new(file: &str) -> DisplayTexture {
+    /// `image`, read through the standard `uv` as it is.
+    pub fn new(image: ImageSource) -> DisplayTexture {
         DisplayTexture {
-            file: Arc::from(file),
+            image,
             uv: Arc::from(names::UV),
             transform: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
             sampling: Sampling::default(),
@@ -52,7 +51,7 @@ pub struct MaterialDisplay {
     /// The primvar its color is multiplied by, where a shape has it (`Cd`).
     pub primvar: Option<Arc<str>>,
     /// The image its color multiplies by, where a shape has the coordinates
-    /// and once the file is read; before that, its color alone.
+    /// and once it is read; before that, its color alone.
     pub texture: Option<DisplayTexture>,
     /// Whether it fills its shape as a volume (a participating medium) rather
     /// than shading its surface: the viewport shows such a shape as a
