@@ -5,7 +5,7 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::object::ObjectBody;
 use crate::refs::NodeRef;
-use crate::viewport::{ElementKind, ElementSet, SurfaceSource};
+use crate::viewport::{ElementKind, ElementSet, Streams, SurfaceSource};
 use kinogaki_geometry::{Bounds, Column, Units, Xform};
 use kinogaki_geometry::{DisplayQuality, Tolerances};
 use std::any::Any;
@@ -26,14 +26,14 @@ pub enum DrawPurpose {
 }
 
 /// What [`Displayable::prepare`] is asked for: the object's display
-/// quality, whether a gesture is under way, whether a view shades by
-/// curvature, what the value is drawn for, the object's body when the value is an object's
+/// quality, whether a gesture is under way, the streams the views draw,
+/// what the value is drawn for, the object's body when the value is an object's
 /// result (its display settings: a mesh's subdivision display), the
 /// project's tolerances, which an approximate display (a B-rep's mesh, a
 /// sampled surface) is made to, the project's units, which a display
 /// of physical sizes (a grid in millimetres) draws in, and what the host
 /// made of values other values hold ([`Held`](super::Held)).
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct DisplayRequest {
     /// How finely the object shows: types whose display is tessellated (a
     /// B-rep's mesh, a sampled surface) make it at
@@ -44,13 +44,17 @@ pub struct DisplayRequest {
     /// The user is dragging or playing: prepare fast, leaving finer work
     /// to [`Displayable::refine`] once the scene rests.
     pub interactive: bool,
-    /// A view that shows shades by curvature: make the curvature the
-    /// packet carries (its vertices' `curvature`,
-    /// [`SurfaceSource::curvature_range`]), where the value rests when
-    /// `interactive`. Otherwise it may be left at zero: it is looked at,
-    /// so nothing pays for it unseen. The host asks again when a view
-    /// turns to it.
-    pub curvature: bool,
+    /// The packet streams the views draw of the pieces ([`Streams`]): a
+    /// type builds these and may leave the others out, so nothing pays
+    /// for what no view draws. The host asks again with more when a view
+    /// starts drawing one (wires shown, an edge level, a curvature
+    /// shading); the type adds only those to the pieces it drew before.
+    /// Curvature, which is looked at, not dragged through, may wait for
+    /// where the value rests when `interactive`. A piece that draws as
+    /// wires whatever the views show (a cage, a template) holds its wires.
+    /// Every stream but curvature by default: what a view of the default
+    /// display draws.
+    pub streams: Streams,
     /// What it is drawn for.
     pub purpose: DrawPurpose,
     /// The object's body, when the value is an object's result.
@@ -66,12 +70,27 @@ pub struct DisplayRequest {
     pub held: Option<Arc<dyn super::Held>>,
 }
 
+impl Default for DisplayRequest {
+    fn default() -> Self {
+        Self {
+            quality: DisplayQuality::default(),
+            interactive: false,
+            streams: Streams::ALL.without(Streams::CURVATURE),
+            purpose: DrawPurpose::default(),
+            body: None,
+            tolerances: Tolerances::default(),
+            units: Units::default(),
+            held: None,
+        }
+    }
+}
+
 impl fmt::Debug for DisplayRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DisplayRequest")
             .field("quality", &self.quality)
             .field("interactive", &self.interactive)
-            .field("curvature", &self.curvature)
+            .field("streams", &self.streams)
             .field("purpose", &self.purpose)
             .field("body", &self.body.is_some())
             .field("tolerances", &self.tolerances)

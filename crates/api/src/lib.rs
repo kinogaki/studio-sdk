@@ -152,4 +152,4 @@ pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, ShapeSource};
 pub use session::{GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
-pub use viewport::{ElementKind, ElementSet, Hit, Surface, SurfaceSource};
+pub use viewport::{ElementKind, ElementSet, Hit, Streams, Surface, SurfaceSource};

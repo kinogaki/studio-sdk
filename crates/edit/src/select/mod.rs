@@ -43,6 +43,7 @@ pub use ways::{Ways, along_edges};
 
 use kinogaki_geometry::{Column, Domain, Elements, Error, Geometry, Incidence, Selection, Vec3};
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 /// How [`convert_by`] relates a target element to the selected elements
 /// it touches.
@@ -100,7 +101,10 @@ pub fn convert_by(
 }
 
 /// The elements [`convert_by`] selects, without the selection made of them
-/// (its stable ids): what a count or a pass over them needs.
+/// (its stable ids): what a count or a pass over them needs. What it finds
+/// is kept with the selection for the table it was found on
+/// ([`Selection::derived`]), so those asking the same of one selection (a
+/// host's counts and a context's pivot, after a box) convert it once.
 ///
 /// # Errors
 /// As [`convert`].
@@ -114,6 +118,52 @@ pub fn members_by(
     if to == s.domain() {
         return Ok(s.members().clone());
     }
+    let key = (on.fingerprint(), to, coverage);
+    let kept = s.derived(Converted::default);
+    if let Some(found) = kept.find(&key) {
+        return Ok(found);
+    }
+    let found = converted(s, on, to, coverage)?;
+    kept.keep(key, found.clone());
+    Ok(found)
+}
+
+/// What one selection came to, by the table, the domain and the coverage
+/// of the conversion (the last few asked).
+#[derive(Default)]
+struct Converted(Mutex<Vec<(ConversionKey, Elements)>>);
+
+/// A conversion: the table's fingerprint, the domain and how.
+type ConversionKey = ([u8; 32], Domain, Coverage);
+
+impl Converted {
+    /// Conversions kept at most: the levels a host and a context ask for.
+    const KEPT: usize = 4;
+
+    fn find(&self, key: &ConversionKey) -> Option<Elements> {
+        let kept = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        kept.iter().find(|(k, _)| k == key).map(|(_, e)| e.clone())
+    }
+
+    fn keep(&self, key: ConversionKey, found: Elements) {
+        let mut kept = self.0.lock().unwrap_or_else(|e| e.into_inner());
+        if kept.iter().any(|(k, _)| *k == key) {
+            return;
+        }
+        if kept.len() == Self::KEPT {
+            kept.remove(0);
+        }
+        kept.push((key, found));
+    }
+}
+
+/// [`members_by`] worked out.
+fn converted(
+    s: &Selection,
+    on: &dyn Incidence,
+    to: Domain,
+    coverage: Coverage,
+) -> Result<Elements, Error> {
     let targets = target(on, to)?;
     let sources = on.count(s.domain()).unwrap_or(0);
     // A few elements cost what they touch, not what the value holds.

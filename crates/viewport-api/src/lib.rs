@@ -10,7 +10,8 @@
 //!   see-through ([`FaceLook`]). A kernel reads its own packets back with
 //!   [`packet_as`]; what a host makes from a packet (its picking
 //!   structure) is kept with it ([`SurfaceSource::derived`], an
-//!   [`Identity`]'s caches).
+//!   [`Identity`]'s caches). Its [`Streams`] are what only some views
+//!   draw (wires, curvature): a maker builds them when a host asks.
 //! - [`pack_linear`]: a linear color as the RGB9E5 word surface colors
 //!   are carried in ([`ColorLayout`]).
 //! - [`SurfaceTextures`]: the images ([`SurfaceImage`]) a surface's polygons
@@ -36,6 +37,7 @@ mod overlay;
 mod packet;
 mod selection;
 mod shading;
+mod streams;
 mod textures;
 mod updates;
 pub use color::pack_linear;
@@ -53,5 +55,6 @@ pub use selection::ElementSelection;
 pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,
 };
+pub use streams::Streams;
 pub use textures::{SurfaceImage, SurfaceTextures, TextureCorner};
 pub use updates::{BufferRanges, DrawUpdate, UpdateRanges};

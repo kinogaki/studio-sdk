@@ -86,6 +86,7 @@ kinogaki-edit/lib test ids::tests::ids_are_found_whether_they_ascend_or_not
 kinogaki-edit/lib test ids::tests::merge_keeps_the_first_inputs_ids_and_renames_later_collisions
 kinogaki-edit/lib test select::tests::target_by_target_conversions_are_one_pass_conversions
 kinogaki-edit/select test a_boundary_is_a_regions_outline
+kinogaki-edit/select test a_conversion_is_kept_with_its_selection_for_its_table
 kinogaki-edit/select test a_few_elements_convert_as_the_whole_value_says
 kinogaki-edit/select test a_selection_is_valid_on_its_own_topology_and_within_its_elements
 kinogaki-edit/select test a_selection_with_ids_is_found_again_after_an_insert_upstream
@@ -732,6 +733,7 @@ kinogaki-value/lib test value::tests::integers_are_exact
 kinogaki-value/lib test value::tests::values_read_back_only_as_their_variant
 kinogaki-viewport-api/doc test crates/viewport-api/src/packet.rs - packet::ElementSet
 kinogaki-viewport-api/doc test crates/viewport-api/src/packet.rs - packet::ElementSet #2
+kinogaki-viewport-api/doc test crates/viewport-api/src/streams.rs - streams::Streams
 kinogaki-viewport-api/lib test color::tests::packed_colors_round_trip_within_a_mantissa_step_and_are_never_zero
 kinogaki-viewport-api/lib test lines::tests::classes_map_ids_both_ways_and_refuse_overlaps_and_bad_styles
 kinogaki-viewport-api/lib test looks::tests::runs_are_whole_ordered_triangles_inside_the_indices

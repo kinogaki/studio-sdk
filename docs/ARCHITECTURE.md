@@ -351,6 +351,8 @@ Studio's core draws and picks. What it draws is a packet behind `kinogaki-viewpo
 
 The simpler path is a `viewport::Surface`, a `SurfaceSource` itself: points, polygon corners (point, face, normal), triangles over the corners, and line segments with edge ids. During a drag a type returns a surface `derived` from the last one, with the points that moved, and the host patches only those. Picks come back as `Hit`s and box selections as `ElementSet`s, in the ids the packet gave.
 
+Some of a packet only some views draw: its wires (the wire classes' segments: a surface's edges) and its curvature. These are its `Streams`: the host asks for those its views draw (`DisplayRequest::streams`: wires where a view shows them or an edge level picks them, curvature where a view shades by it) and asks again with more when a view starts drawing one; a type builds only those, adds the missing ones to what it drew before (the packet's update rewriting them alone), and keeps a piece's wires where it draws as wires whatever the views show (a cage, a template). Everything else every view draws and picks by is always there, the point markers among it: point picks and snapping find points through them at any level and on any object.
+
 `Displayable::prepare` returns a `Drawn`: the value's pieces in drawing order. A piece is a packet, where it sits in its object (none, or several placements sharing one upload), its role (the object's own surface, or a templated node's faint result the open context marks). Core draws every piece while its object is open too. `prepare` receives what the type made for the value shown before, so a type whose values change a little at a time builds on it, and `refine` offers a finer display once the value rests.
 
 ## Self-contained

@@ -495,3 +495,36 @@ fn a_few_elements_convert_as_the_whole_value_says() {
         }
     }
 }
+
+/// What a selection converts to is kept with it for the table it was found
+/// on: asked again, of it or of a clone (a host's counts after a
+/// context's pivot), it is the same set; of another table of as many
+/// elements, that table's.
+#[test]
+fn a_conversion_is_kept_with_its_selection_for_its_table() {
+    let p = sheet(4, 4);
+    let faces = on(&p, Domain::Primitive, &[0, 5, 6]);
+    let first = select::members_by(&faces, &p, Domain::Point, Coverage::Any).unwrap();
+    let again = select::members_by(&faces.clone(), &p, Domain::Point, Coverage::Any).unwrap();
+    assert_eq!(first, again);
+    // One storage: the kept set's, in whichever form it holds.
+    let shared = first.indices().ptr_eq(&again.indices()) || first.words().ptr_eq(&again.words());
+    assert!(shared, "kept, not found again");
+    // Another conversion of it is its own.
+    let edges = select::members_by(&faces, &p, Domain::Edge, Coverage::Any).unwrap();
+    assert_ne!(edges.count(), first.count());
+    // A selection made on no value in particular, over another table of
+    // as many faces: that table's points.
+    let free = Selection::new(Domain::Primitive, faces.members().clone(), None).unwrap();
+    let rows: Vec<u32> = (0..16).flat_map(|f| [f, f + 1, f + 2, f + 3]).collect();
+    let offsets: Vec<u32> = (0..=16).map(|f| 4 * f).collect();
+    let fan = Primitives::of_polygons(25, offsets.into(), rows.into()).unwrap();
+    let fan = Geometry::new(vec![[0.0; 3]; 25].into(), fan, Attributes::new()).unwrap();
+    let here = select::members_by(&free, &p, Domain::Point, Coverage::Any).unwrap();
+    let there = select::members_by(&free, &fan, Domain::Point, Coverage::Any).unwrap();
+    assert_eq!(here, first);
+    assert_eq!(
+        there.iter().collect::<Vec<_>>(),
+        [0, 1, 2, 3, 5, 6, 7, 8, 9]
+    );
+}

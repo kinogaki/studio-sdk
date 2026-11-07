@@ -3,13 +3,16 @@
 use crate::Error;
 use crate::attributes::Domain;
 use crate::column::Column;
+use crate::derived::Derived;
 use crate::elements::Elements;
 use crate::incidence::Incidence;
+use std::sync::Arc;
 
 /// Selected elements of one domain ([`Elements`]); the active one (the
 /// last picked, which tools that need one element start from); the
 /// fingerprint of the value it was made on; and, when that value carries
-/// stable ids, the members' ids.
+/// stable ids, the members' ids. What is made of it (its conversions to
+/// other domains) is kept with it and its clones ([`derived`](Self::derived)).
 ///
 /// **Rules** (each constructor checks them): the active element is a
 /// member; ids, when held, are one per member, in member order.
@@ -30,13 +33,25 @@ use crate::incidence::Incidence;
 /// let other = Elements::from_indices(10, [1]).unwrap();
 /// assert!(Selection::new(Domain::Point, other, Some(2)).is_err());
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Selection {
     domain: Domain,
     members: Elements,
     active: Option<u32>,
     on: Option<[u8; 32]>,
     ids: Option<Column<i64>>,
+    derived: Arc<Derived>,
+}
+
+/// Equal when they select the same, whatever each keeps made of it.
+impl PartialEq for Selection {
+    fn eq(&self, other: &Self) -> bool {
+        self.domain == other.domain
+            && self.members == other.members
+            && self.active == other.active
+            && self.on == other.on
+            && self.ids == other.ids
+    }
 }
 
 impl Selection {
@@ -61,6 +76,7 @@ impl Selection {
             active,
             on: None,
             ids: None,
+            derived: Arc::default(),
         })
     }
 
@@ -136,6 +152,13 @@ impl Selection {
     /// in particular).
     pub fn made_on(&self) -> Option<[u8; 32]> {
         self.on
+    }
+
+    /// The `D` made of this selection and kept with it and its clones,
+    /// built by `build` the first time any of them asks; only the crate
+    /// that defines `D` asks for it (the crate's cache rule).
+    pub fn derived<D: Send + Sync + 'static>(&self, build: impl FnOnce() -> D) -> Arc<D> {
+        self.derived.get_or_build(build)
     }
 
     /// The members' stable ids, in member order, when the value it was
