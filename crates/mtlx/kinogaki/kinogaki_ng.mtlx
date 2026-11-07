@@ -216,11 +216,25 @@
   </nodegraph>
 
   <!--
-    USD Preview Surface into OpenPBR Surface: the specular workflow as a
-    dielectric of the specular color, the metallic one as OpenPBR's metalness;
-    emission at a luminance of one, its color the emissive color; the normal
-    from tangent space as USD's own graph reads it; opacity cut at its
-    threshold as USD cuts it.
+    USD Preview Surface (2.6) into OpenPBR Surface, input by input:
+    - diffuseColor is the base color; metallic the base metalness, which the
+      specular workflow ignores, as USD does. A metal's reflectance at
+      normal incidence is its color (USD's F0); toward grazing OpenPBR's metal
+      whitens where USD's keeps its color (F90).
+    - The specular workflow's specularColor is USD's F0: the dielectric's
+      weight scales its index's reflectance up to the color's largest
+      channel, and its color is the specular color over that channel. Normal
+      incidence is exact; its edges go to that color, not USD's white, by
+      OpenPBR's Fresnel rather than Schlick's.
+    - roughness, ior, clearcoat and clearcoatRoughness are OpenPBR's specular
+      roughness and index, coat weight and roughness; the coat takes the
+      same index (USD 2.4) and no darkening, which USD's has none of.
+    - opacity: at a threshold above zero a cutout at it, whatever the mode;
+      else in the transparent mode a transmission of 1 - opacity, emission
+      and specular kept whole, and in the presence mode OpenPBR's opacity,
+      which fades all of it.
+    - emissiveColor is the emission's color at a luminance of one.
+    - normal is tangent space, read as USD's own graph reads it.
   -->
   <nodegraph name="NG_UsdPreviewSurface_to_open_pbr_surface" nodedef="ND_UsdPreviewSurface_to_open_pbr_surface">
     <dot name="base_color" type="color3">
@@ -232,10 +246,68 @@
       <input name="in1" type="float" value="0" />
       <input name="in2" type="float" interfacename="metallic" />
     </ifequal>
+    <subtract name="ior_minus_one" type="float">
+      <input name="in1" type="float" interfacename="ior" />
+      <input name="in2" type="float" value="1" />
+    </subtract>
+    <add name="ior_plus_one" type="float">
+      <input name="in1" type="float" interfacename="ior" />
+      <input name="in2" type="float" value="1" />
+    </add>
+    <divide name="reflection_ratio" type="float">
+      <input name="in1" type="float" nodename="ior_minus_one" />
+      <input name="in2" type="float" nodename="ior_plus_one" />
+    </divide>
+    <multiply name="ior_f0" type="float">
+      <input name="in1" type="float" nodename="reflection_ratio" />
+      <input name="in2" type="float" nodename="reflection_ratio" />
+    </multiply>
+    <extract name="specular_red" type="float">
+      <input name="in" type="color3" interfacename="specularColor" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <extract name="specular_green" type="float">
+      <input name="in" type="color3" interfacename="specularColor" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <extract name="specular_blue" type="float">
+      <input name="in" type="color3" interfacename="specularColor" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <max name="specular_red_green" type="float">
+      <input name="in1" type="float" nodename="specular_red" />
+      <input name="in2" type="float" nodename="specular_green" />
+    </max>
+    <max name="specular_peak" type="float">
+      <input name="in1" type="float" nodename="specular_red_green" />
+      <input name="in2" type="float" nodename="specular_blue" />
+    </max>
+    <max name="ior_f0_held" type="float">
+      <input name="in1" type="float" nodename="ior_f0" />
+      <input name="in2" type="float" value="0.000001" />
+    </max>
+    <divide name="specular_scale" type="float">
+      <input name="in1" type="float" nodename="specular_peak" />
+      <input name="in2" type="float" nodename="ior_f0_held" />
+    </divide>
+    <ifequal name="specular_weight" type="float">
+      <input name="value1" type="integer" interfacename="useSpecularWorkflow" />
+      <input name="value2" type="integer" value="1" />
+      <input name="in1" type="float" nodename="specular_scale" />
+      <input name="in2" type="float" value="1" />
+    </ifequal>
+    <max name="specular_peak_held" type="float">
+      <input name="in1" type="float" nodename="specular_peak" />
+      <input name="in2" type="float" value="0.000001" />
+    </max>
+    <divide name="specular_tint" type="color3">
+      <input name="in1" type="color3" interfacename="specularColor" />
+      <input name="in2" type="float" nodename="specular_peak_held" />
+    </divide>
     <ifequal name="specular_color" type="color3">
       <input name="value1" type="integer" interfacename="useSpecularWorkflow" />
       <input name="value2" type="integer" value="1" />
-      <input name="in1" type="color3" interfacename="specularColor" />
+      <input name="in1" type="color3" nodename="specular_tint" />
       <input name="in2" type="color3" value="1, 1, 1" />
     </ifequal>
     <dot name="specular_roughness" type="float">
@@ -244,29 +316,57 @@
     <dot name="specular_ior" type="float">
       <input name="in" type="float" interfacename="ior" />
     </dot>
+    <subtract name="clearness" type="float">
+      <input name="in1" type="float" value="1" />
+      <input name="in2" type="float" interfacename="opacity" />
+    </subtract>
+    <ifequal name="transparent" type="float">
+      <input name="value1" type="integer" interfacename="opacityMode" />
+      <input name="value2" type="integer" value="0" />
+      <input name="in1" type="float" nodename="clearness" />
+      <input name="in2" type="float" value="0" />
+    </ifequal>
+    <ifgreater name="transmission_weight" type="float">
+      <input name="value1" type="float" interfacename="opacityThreshold" />
+      <input name="value2" type="float" value="0" />
+      <input name="in1" type="float" value="0" />
+      <input name="in2" type="float" nodename="transparent" />
+    </ifgreater>
     <dot name="coat_weight" type="float">
       <input name="in" type="float" interfacename="clearcoat" />
     </dot>
     <dot name="coat_roughness" type="float">
       <input name="in" type="float" interfacename="clearcoatRoughness" />
     </dot>
+    <dot name="coat_ior" type="float">
+      <input name="in" type="float" interfacename="ior" />
+    </dot>
+    <constant name="coat_darkening" type="float">
+      <input name="value" type="float" value="0" />
+    </constant>
     <constant name="emission_luminance" type="float">
       <input name="value" type="float" value="1" />
     </constant>
     <dot name="emission_color" type="color3">
       <input name="in" type="color3" interfacename="emissiveColor" />
     </dot>
-    <ifgreatereq name="cutout_opacity" type="float">
+    <ifgreatereq name="cutout" type="float">
       <input name="value1" type="float" interfacename="opacity" />
       <input name="value2" type="float" interfacename="opacityThreshold" />
       <input name="in1" type="float" value="1" />
       <input name="in2" type="float" value="0" />
     </ifgreatereq>
+    <ifequal name="presence" type="float">
+      <input name="value1" type="integer" interfacename="opacityMode" />
+      <input name="value2" type="integer" value="1" />
+      <input name="in1" type="float" interfacename="opacity" />
+      <input name="in2" type="float" value="1" />
+    </ifequal>
     <ifgreater name="opacity" type="float">
       <input name="value1" type="float" interfacename="opacityThreshold" />
       <input name="value2" type="float" value="0" />
-      <input name="in1" type="float" nodename="cutout_opacity" />
-      <input name="in2" type="float" interfacename="opacity" />
+      <input name="in1" type="float" nodename="cutout" />
+      <input name="in2" type="float" nodename="presence" />
     </ifgreater>
     <multiply name="scale_normal" type="vector3">
       <input name="in1" type="vector3" interfacename="normal" />
@@ -281,11 +381,15 @@
     </normalmap>
     <output name="base_color_out" type="color3" nodename="base_color" />
     <output name="base_metalness_out" type="float" nodename="base_metalness" />
+    <output name="specular_weight_out" type="float" nodename="specular_weight" />
     <output name="specular_color_out" type="color3" nodename="specular_color" />
     <output name="specular_roughness_out" type="float" nodename="specular_roughness" />
     <output name="specular_ior_out" type="float" nodename="specular_ior" />
+    <output name="transmission_weight_out" type="float" nodename="transmission_weight" />
     <output name="coat_weight_out" type="float" nodename="coat_weight" />
     <output name="coat_roughness_out" type="float" nodename="coat_roughness" />
+    <output name="coat_ior_out" type="float" nodename="coat_ior" />
+    <output name="coat_darkening_out" type="float" nodename="coat_darkening" />
     <output name="emission_luminance_out" type="float" nodename="emission_luminance" />
     <output name="emission_color_out" type="color3" nodename="emission_color" />
     <output name="geometry_opacity_out" type="float" nodename="opacity" />

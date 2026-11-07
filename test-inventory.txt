@@ -350,6 +350,7 @@ kinogaki-render-api/lib test material::mtlx::tests::materialx_nodes_keep_their_n
 kinogaki-render-api/lib test material::mtlx::tests::names_read_as_words
 kinogaki-render-api/lib test material::preview::tests::a_request_is_a_scene_of_its_own
 kinogaki-render-api/lib test material::preview::tests::the_sphere_is_closed_unit_and_faces_out
+kinogaki-render-api/lib test material::standard::tests::a_preview_surface_translates_input_by_input
 kinogaki-render-api/lib test material::standard::tests::a_vertex_color_shows_as_its_primvar
 kinogaki-render-api/lib test material::standard::tests::an_image_shows_through_any_model_with_its_placement
 kinogaki-render-api/lib test material::standard::tests::each_model_shows_its_constant_base_color

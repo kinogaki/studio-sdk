@@ -192,3 +192,90 @@ fn open_pbr_makes_a_shown_surface() {
     );
     assert!(open_pbr(&[("nope".to_owned(), Value::Number(1.0))].into()).is_err());
 }
+
+/// The OpenPBR Surface values of `values`' USD Preview Surface's standard
+/// form, its constants folded.
+fn preview_form(values: &[(&str, Value)]) -> Parameters {
+    let network = material("ND_UsdPreviewSurface_surfaceshader", values, None);
+    let form = Engines::default().standard(&network).unwrap();
+    let surface = form.surface().unwrap();
+    assert_eq!(
+        form.nodes().len(),
+        2,
+        "folded to a surface and its material"
+    );
+    form.nodes()[surface as usize].values.clone()
+}
+
+#[test]
+fn a_preview_surface_translates_input_by_input() {
+    let number = |v: &Parameters, name: &str| v[name].number().unwrap();
+    let color = |v: &Parameters, name: &str| v[name].color().unwrap();
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    // The metallic workflow: its colors, metal, roughness, index and coat.
+    let metal = preview_form(&[
+        ("diffuseColor", Value::Color(ORANGE)),
+        ("emissiveColor", Value::Color([0.1, 0.2, 0.3])),
+        ("metallic", Value::Number(0.25)),
+        ("roughness", Value::Number(0.4)),
+        ("ior", Value::Number(1.8)),
+        ("clearcoat", Value::Number(0.6)),
+        ("clearcoatRoughness", Value::Number(0.2)),
+    ]);
+    assert_eq!(color(&metal, "base_color"), ORANGE);
+    assert_eq!(color(&metal, "emission_color"), [0.1, 0.2, 0.3]);
+    assert_eq!(color(&metal, "specular_color"), [1.0; 3]);
+    let numbers = [
+        ("base_metalness", 0.25),
+        ("specular_weight", 1.0),
+        ("specular_roughness", 0.4),
+        ("specular_ior", 1.8),
+        ("coat_weight", 0.6),
+        ("coat_roughness", 0.2),
+        ("coat_ior", 1.8),
+        ("coat_darkening", 0.0),
+        ("emission_luminance", 1.0),
+        ("transmission_weight", 0.0),
+        ("geometry_opacity", 1.0),
+    ];
+    for (name, expected) in numbers {
+        assert!(near(number(&metal, name), expected), "{name}: {metal:?}");
+    }
+    // The specular workflow: its color is the reflectance at normal
+    // incidence (an index of 1.5 reflects 0.04), metallic ignored.
+    let specular = preview_form(&[
+        ("useSpecularWorkflow", Value::Integer(1)),
+        ("specularColor", Value::Color([0.4, 0.2, 0.1])),
+        ("metallic", Value::Number(1.0)),
+    ]);
+    assert!(near(number(&specular, "base_metalness"), 0.0));
+    assert!(near(number(&specular, "specular_weight"), 0.4 / 0.04));
+    let tint = color(&specular, "specular_color");
+    assert!(
+        (tint.iter().zip([1.0, 0.5, 0.25])).all(|(a, b)| near(*a, b)),
+        "{tint:?}"
+    );
+    // Opacity: transparent transmits, presence fades, a threshold cuts.
+    let cases = [
+        (0, 0.0, 0.3, 0.7, 1.0),
+        (1, 0.0, 0.3, 0.0, 0.3),
+        (0, 0.5, 0.3, 0.0, 0.0),
+        (1, 0.5, 0.6, 0.0, 1.0),
+        (0, 0.5, 0.5, 0.0, 1.0),
+    ];
+    for (mode, threshold, opacity, transmission, shown) in cases {
+        let form = preview_form(&[
+            ("opacityMode", Value::Integer(mode)),
+            ("opacityThreshold", Value::Number(threshold)),
+            ("opacity", Value::Number(opacity)),
+        ]);
+        let got = (
+            number(&form, "transmission_weight"),
+            number(&form, "geometry_opacity"),
+        );
+        assert!(
+            near(got.0, transmission) && near(got.1, shown),
+            "mode {mode}, threshold {threshold}, opacity {opacity}: {got:?}"
+        );
+    }
+}

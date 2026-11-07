@@ -59,10 +59,11 @@ pub struct Node {
 impl Node {
     /// Whether Image input `input` reads its file's values as stored: its
     /// image says data, or the node gives no color (MaterialX converts color
-    /// spaces for colors alone).
+    /// spaces for colors alone; a USD UV Texture's `rgb` is one, beside its
+    /// channels).
     pub fn reads_data(&self, input: &str) -> bool {
-        let color = (self.def.outputs.first())
-            .is_some_and(|o| matches!(o.socket, Socket::Color3 | Socket::Color4));
+        let color =
+            (self.def.outputs.iter()).any(|o| matches!(o.socket, Socket::Color3 | Socket::Color4));
         !color || (self.images.get(input)).is_some_and(|i| *i.color() == ImageColor::Data)
     }
 }
@@ -476,15 +477,18 @@ mod tests {
     fn an_image_input_reads_a_source_as_color_or_data() {
         let color = mtlx::def("ND_image_color3").unwrap();
         let float = mtlx::def("ND_image_float").unwrap();
+        let usd = mtlx::def("ND_UsdUVTexture_23").unwrap();
         let mut b = MaterialNetwork::builder();
         let none = Parameters::new();
-        let (c, f) = (
+        let (c, f, u) = (
             b.node(&color, &none).unwrap(),
             b.node(&float, &none).unwrap(),
+            b.node(&usd, &none).unwrap(),
         );
         let wood = ImageSource::path("wood.png");
         b.image(c, "file", wood.clone()).unwrap();
         b.image(f, "file", wood.clone()).unwrap();
+        b.image(u, "file", wood.clone()).unwrap();
         assert!(b.image(c, "default", wood.clone()).is_err(), "not an image");
         assert!(b.image(9, "file", wood.clone()).is_err(), "no such node");
         let network = b.build(c).unwrap();
@@ -492,6 +496,8 @@ mod tests {
         assert_eq!(c.images["file"], wood);
         assert!(!c.reads_data("file"), "a color reads its colors");
         assert!(f.reads_data("file"), "a float reads its values");
+        let u = &network.nodes()[2];
+        assert!(!u.reads_data("file"), "a USD UV Texture's rgb is a color");
         let mut data = c.clone();
         let file = kinogaki_geometry::image::ImageFile::Path(Arc::from("wood.png"));
         let as_data = ImageSource::new(file, ImageColor::Data);

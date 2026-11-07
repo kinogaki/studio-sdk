@@ -92,7 +92,10 @@
     Translations into OpenPBR Surface, the standard form every engine meets
     in: approximate where the models differ, as MaterialX's own are. glTF's
     occlusion, thickness and dispersion, and USD's displacement and occlusion
-    have no OpenPBR input and aren't translated.
+    have no OpenPBR input and aren't translated. USD Preview Surface reflects
+    by Schlick's curve between two colors, which neither OpenPBR's
+    dielectric nor its metal holds: its translation keeps each reflectance
+    at normal incidence and approximates toward the edges (kinogaki_ng.mtlx).
   -->
   <nodedef name="ND_gltf_pbr_to_open_pbr_surface" node="gltf_pbr_to_open_pbr_surface" nodegroup="translation">
     <input name="base_color" type="color3" value="1, 1, 1" />
@@ -160,11 +163,15 @@
     <input name="normal" type="vector3" value="0, 0, 1" />
     <output name="base_color_out" type="color3" />
     <output name="base_metalness_out" type="float" />
+    <output name="specular_weight_out" type="float" />
     <output name="specular_color_out" type="color3" />
     <output name="specular_roughness_out" type="float" />
     <output name="specular_ior_out" type="float" />
+    <output name="transmission_weight_out" type="float" />
     <output name="coat_weight_out" type="float" />
     <output name="coat_roughness_out" type="float" />
+    <output name="coat_ior_out" type="float" />
+    <output name="coat_darkening_out" type="float" />
     <output name="emission_luminance_out" type="float" />
     <output name="emission_color_out" type="color3" />
     <output name="geometry_opacity_out" type="float" />

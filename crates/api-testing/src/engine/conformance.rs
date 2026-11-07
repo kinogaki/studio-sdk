@@ -11,8 +11,9 @@
 //! corner; a light is placed above the quad, emitting down -Z. An engine
 //! taking materials also renders MaterialX materials as a host sends them,
 //! adopted ([`Engines::adopt`]): an OpenPBR Surface; a glTF PBR of an
-//! occlusion-roughness-metallic texture, cut out by its alpha; a Surface
-//! Unlit.
+//! occlusion-roughness-metallic texture, cut out by its alpha; a USD Preview
+//! Surface whose color and opacity a texture gives, cut out at a threshold;
+//! a Surface Unlit.
 use super::Waiter;
 use crate::{Outcome, Report};
 use kinogaki_render_api::aov::standard as aovs;
@@ -229,6 +230,10 @@ fn scenes(description: &EngineDescription) -> Vec<Scene> {
         for (name, which) in [
             ("an OpenPBR Surface", Model::OpenPbr),
             ("a glTF PBR of an ORM texture, cut out", Model::Gltf),
+            (
+                "a USD Preview Surface of a texture, cut out",
+                Model::Preview,
+            ),
             ("a Surface Unlit", Model::Unlit),
         ] {
             add(name, lit(materialx(description, first, which)));
@@ -258,6 +263,7 @@ fn scenes(description: &EngineDescription) -> Vec<Scene> {
 enum Model {
     OpenPbr,
     Gltf,
+    Preview,
     Unlit,
 }
 
@@ -277,9 +283,10 @@ fn node(
 
 /// A MaterialX material on the dressed quad, the subject's prims from prim
 /// `first` on: an orange OpenPBR Surface; an orange glTF PBR whose metallic
-/// and roughness come from a 2 × 2 texture, its alpha 0.8 cut out at 0.5; an
-/// orange Surface Unlit. Adopted for the engine as a host adopts it, its
-/// file read as the texture.
+/// and roughness come from a 2 × 2 texture, its alpha 0.8 cut out at 0.5; a
+/// USD Preview Surface whose diffuse color and opacity are a 2 × 2
+/// texture's, half of it cut out at 0.5; an orange Surface Unlit. Adopted
+/// for the engine as a host adopts it, its file read as the texture.
 fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec<Prim> {
     let orange = Value::Color([0.9, 0.4, 0.1]);
     let mut built = MaterialNetwork::builder();
@@ -319,6 +326,22 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
             }
             gltf
         }
+        Model::Preview => {
+            let preview = node(
+                &mut built,
+                "ND_UsdPreviewSurface_surfaceshader",
+                &[("opacityThreshold", Value::Number(0.5))],
+            );
+            let leaf = node(&mut built, "ND_UsdUVTexture_23", &[]);
+            built
+                .image(leaf, "file", ImageSource::path("leaf.png"))
+                .expect("an image input");
+            let wires = [("rgb", "diffuseColor"), ("a", "opacity")];
+            for (output, input) in wires {
+                built.link(leaf, output, preview, input).expect("a wire");
+            }
+            preview
+        }
     };
     let material = node(&mut built, "ND_surfacematerial", &[]);
     built
@@ -327,12 +350,21 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
     let network = built.build(material).expect("a whole material");
     let mut network = Engines::new(vec![description.clone()]).adopt(&network, description.id());
     let mut prims = Vec::new();
-    if matches!(model, Model::Gltf) {
+    let file = match model {
+        Model::Gltf => Some("orm.png"),
+        Model::Preview => Some("leaf.png"),
+        _ => None,
+    };
+    if let Some(file) = file {
         let texture: Id<Image> = Id::of(id(first));
         let window = Rect::new([0, 0], [2, 2]).expect("a window");
         let format = Format::rgba(Sample::F32, Encoding::Raw);
-        // Occlusion 1; rough, then smooth; metal, then not.
-        let (a, b) = ([1.0f32, 0.9, 1.0, 1.0], [1.0f32, 0.1, 0.0, 1.0]);
+        // glTF: occlusion 1; rough, then smooth; metal, then not. USD: an
+        // orange leaf, then a cut-out one.
+        let (a, b) = match model {
+            Model::Gltf => ([1.0f32, 0.9, 1.0, 1.0], [1.0f32, 0.1, 0.0, 1.0]),
+            _ => ([0.9f32, 0.4, 0.1, 1.0], [0.9f32, 0.4, 0.1, 0.2]),
+        };
         let texels: Vec<u8> = ([a, b, b, a].iter().flatten())
             .flat_map(|v| v.to_ne_bytes())
             .collect();
@@ -343,7 +375,7 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
         prims.push(Prim::Texture(image));
         for node in network.nodes_mut() {
             let read: Vec<String> = (node.images.iter())
-                .filter(|(_, image)| image.name() == "orm.png")
+                .filter(|(_, image)| image.name() == file)
                 .map(|(input, _)| input.clone())
                 .collect();
             for input in read {

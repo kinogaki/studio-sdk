@@ -22,13 +22,13 @@ use std::sync::Arc;
 pub const OPEN_PBR: &str = "open_pbr_surface";
 
 /// The shading models a host offers a new material as, by signature, in
-/// order: OpenPBR Surface first, then Autodesk's Standard Surface, glTF PBR,
-/// USD Preview Surface and Surface Unlit.
+/// order: OpenPBR Surface first, then USD Preview Surface, Autodesk's
+/// Standard Surface, glTF PBR and Surface Unlit.
 pub const MODELS: [&str; 5] = [
     "ND_open_pbr_surface_surfaceshader",
+    "ND_UsdPreviewSurface_surfaceshader",
     "ND_standard_surface_surfaceshader",
     "ND_gltf_pbr_surfaceshader",
-    "ND_UsdPreviewSurface_surfaceshader",
     "ND_surface_unlit",
 ];
 
