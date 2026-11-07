@@ -26,6 +26,18 @@ impl Encoding {
         }
     }
 
+    /// Whether its values are colors premultiplied by their alpha (data and
+    /// straight colors are not).
+    pub fn premultiplied(&self) -> bool {
+        matches!(
+            self,
+            Self::Color {
+                premultiplied: true,
+                ..
+            }
+        )
+    }
+
     /// The configuration's space its colors are in, when its tag names one.
     pub fn space(&self) -> Option<&str> {
         match self {

@@ -19,8 +19,8 @@ use super::Waiter;
 use crate::{Outcome, Report};
 use kinogaki_render_api::aov::standard as aovs;
 use kinogaki_render_api::display::{Display, Made};
-use kinogaki_render_api::geometry::Error;
 use kinogaki_render_api::geometry::image::Image;
+use kinogaki_render_api::geometry::{Diagnostic, Error};
 use kinogaki_render_api::settings::defaults;
 use kinogaki_render_api::{
     AovDesc, AovFormat, EngineDescription, Prim, PrimId, RenderEngine, SceneSettings, SceneUpdate,
@@ -143,6 +143,11 @@ fn id(i: usize) -> PrimId {
 /// The beauty of `prims` through the conformance camera on an engine made
 /// for them: an error when the engine fails or it isn't finite.
 fn beauty(make: Make<'_>, prims: Vec<Prim>) -> Result<Arc<[f32]>, String> {
+    rendered(make, prims).map(|(beauty, _)| beauty)
+}
+
+/// [`beauty`], and what the engine said of the scene.
+fn rendered(make: Make<'_>, prims: Vec<Prim>) -> Result<(Arc<[f32]>, Vec<Diagnostic>), String> {
     let mut session = Session::new(make)?;
     session.send(prims);
     let camera = ViewCamera::Free(scenes::camera());
@@ -152,7 +157,8 @@ fn beauty(make: Make<'_>, prims: Vec<Prim>) -> Result<Arc<[f32]>, String> {
     if let Some(why) = session.engine.problem(VIEW) {
         return Err(why.message);
     }
-    finite_beauty(&outputs, [SIDE; 2])
+    let beauty = finite_beauty(&outputs, [SIDE; 2])?;
+    Ok((beauty, session.engine.said()))
 }
 
 /// Whether beauty `a` agrees with `b`: at most one pixel in a hundred
