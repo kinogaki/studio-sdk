@@ -62,14 +62,14 @@ pub(super) fn repeated(ids: &[i64]) -> Option<i64> {
     }
     let bucket = |id: i64| (id as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) as usize >> 58;
     // Each block's ids by bucket, then each bucket's ids from every block.
-    let blocks: Vec<Vec<Vec<i64>>> = parallel::map(ids.len(), BLOCK, |range| {
+    let blocks: Vec<Vec<Vec<i64>>> = parallel::blocks(ids.len(), BLOCK, |range| {
         let mut out = vec![Vec::new(); BUCKETS];
         for &id in &ids[range] {
             out[bucket(id)].push(id);
         }
         out
     });
-    let found = parallel::map(BUCKETS, 1, |range| {
+    let found = parallel::blocks(BUCKETS, 1, |range| {
         range.into_iter().find_map(|b| {
             let mut all: Vec<i64> = blocks.iter().flat_map(|block| &block[b]).copied().collect();
             all.sort_unstable();

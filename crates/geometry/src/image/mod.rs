@@ -591,7 +591,7 @@ impl ImageBuilder {
             any.then(|| Tile::new(tile))
         };
         // A row of tiles a block, on the process's workers.
-        let rows = crate::parallel::map(across[0] * across[1], across[0], |range| {
+        let rows = crate::parallel::blocks(across[0] * across[1], across[0], |range| {
             range.map(tile).collect::<Vec<_>>()
         });
         self.tiles(format, rows.into_iter().flatten().collect())

@@ -306,7 +306,7 @@ pub(super) fn build(t: &Primitives) -> Index {
         let at = cursor[t.vertices[c] as usize].fetch_add(1, Relaxed);
         slots[at as usize].store(c as u32, Relaxed);
     });
-    let blocks = parallel::map(t.points.div_ceil(POINTS), 1, |range| {
+    let blocks = parallel::blocks(t.points.div_ceil(POINTS), 1, |range| {
         let mut corners = Corners::default();
         range
             .map(|b| {

@@ -1,9 +1,11 @@
-//! The files a file names: those a file being read names, found and read
-//! by one rule ([`Named`]), and the image files a written document names
-//! ([`Beside`]): what a format writing materials (an MTL library, a
-//! MaterialX document) writes for the Image nodes feeding its textures. A
-//! file on disk is named by its path relative to the document; an embedded
-//! file is written beside the document, once for equal bytes, and named so.
+//! The files a format reads and writes: those a file being read names,
+//! found and read by one rule ([`Named`]); the image files a written
+//! document names ([`Beside`]), what a format writing materials (an MTL
+//! library, a MaterialX document) writes for the Image nodes feeding its
+//! textures; and every file a writer writes, replaced whole or not at all
+//! ([`replace`]). A file on disk is named by its path relative to the
+//! document; an embedded file is written beside the document, once for
+//! equal bytes, and named so.
 //!
 //! ```
 //! use kinogaki_studio_api::format::files::Beside;
@@ -27,8 +29,64 @@ pub use named::Named;
 use crate::Error;
 use kinogaki_geometry::image::{EmbeddedFile, ImageFile};
 use std::collections::HashMap;
+use std::fs::File;
 use std::io::Read as _;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+/// Writes the file at `path` whole or not at all: `write` fills a new file
+/// beside it, which is flushed to the disk and renamed over `path`, so a
+/// reader never meets half a file and a write that fails or is cancelled
+/// leaves what was there. Every file a format writes goes through it (the
+/// files [`Beside`] writes too), and its error type is the writer's own.
+///
+/// ```
+/// use kinogaki_studio_api::format::files::replace;
+/// use std::io::Write as _;
+///
+/// let path = std::env::temp_dir().join(format!("replace-doc-{}.txt", std::process::id()));
+/// replace(&path, |file| file.write_all(b"whole")).unwrap();
+/// let failed: std::io::Result<()> = replace(&path, |file| {
+///     file.write_all(b"half")?;
+///     Err(std::io::Error::other("stopped"))
+/// });
+/// assert!(failed.is_err());
+/// assert_eq!(std::fs::read(&path).unwrap(), b"whole");
+/// # std::fs::remove_file(&path).unwrap();
+/// ```
+///
+/// # Errors
+/// What `write` gave, or why the file couldn't be made, written or renamed;
+/// the new file is then removed.
+pub fn replace<E: From<std::io::Error>>(
+    path: &Path,
+    write: impl FnOnce(&mut File) -> Result<(), E>,
+) -> Result<(), E> {
+    /// Each replacement's own name for its new file, within the process.
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    let n = NEXT.fetch_add(1, Ordering::Relaxed);
+    name.push(format!(".{}-{n}.part", std::process::id()));
+    let part = path.with_file_name(name);
+    let result = (|| {
+        let mut file = File::create(&part)?;
+        write(&mut file)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&part, path)?;
+        // The rename itself reaches the disk (a folder opens as a file on
+        // Unix alone).
+        #[cfg(unix)]
+        if let Some(folder) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            File::open(folder)?.sync_all()?;
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&part);
+    }
+    result
+}
 
 /// The regular file at `path`, open, and its size then: looked at before
 /// it is opened (opening a pipe waits for a writer) and again once open. A
@@ -200,7 +258,8 @@ fn write(file: &EmbeddedFile, folder: &Path) -> Result<PathBuf, Error> {
             Ok(_) => continue,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 std::fs::create_dir_all(folder).map_err(|e| failed(folder, e))?;
-                std::fs::write(&path, file.bytes()).map_err(|e| failed(&path, e))?;
+                let bytes = |f: &mut File| std::io::Write::write_all(f, file.bytes());
+                replace(&path, bytes).map_err(|e| failed(&path, e))?;
                 return Ok(path);
             }
             Err(e) => return Err(failed(&path, e)),
@@ -264,6 +323,29 @@ mod tests {
                 "{path}"
             );
         }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_replacement_leaves_the_file_and_nothing_beside_it() {
+        let dir = std::env::temp_dir().join(format!("kinogaki-replace-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("scene.obj");
+        replace(&path, |f| std::io::Write::write_all(f, b"first")).unwrap();
+        replace(&path, |f| std::io::Write::write_all(f, b"second")).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"second");
+        let failed = replace(&path, |f| {
+            std::io::Write::write_all(f, b"half")?;
+            Err(Error::cancelled())
+        });
+        assert_eq!(failed, Err(Error::cancelled()));
+        assert_eq!(std::fs::read(&path).unwrap(), b"second");
+        let left: Vec<_> = std::fs::read_dir(&dir).unwrap().collect();
+        assert_eq!(left.len(), 1, "no part file is left");
+        // A file in a folder that isn't there: an error, nothing made.
+        let nowhere = dir.join("gone/scene.obj");
+        assert!(replace(&nowhere, |_| Ok::<_, std::io::Error>(())).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

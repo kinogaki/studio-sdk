@@ -1,7 +1,7 @@
 //! [`Named`]: the files a file being read names, found and read by one
 //! rule.
 use crate::format::budget::ReadBudget;
-use crate::format::options::{EMBED, OUTSIDE};
+use crate::format::options::EMBED;
 use crate::format::{FormatOptions, Input, Reading};
 use crate::{Diagnostic, Error};
 use kinogaki_geometry::image::{EmbeddedFile, ImageFile};
@@ -17,16 +17,12 @@ const LISTED: usize = 8;
 /// document's includes and images. Every format finds and reads them here,
 /// by one rule:
 ///
-/// - **Where.** In the folder of the file being read, or a folder under it,
-///   decided once `.`, `..` and symbolic links are followed, so no name
-///   climbs out. A name reaching anywhere else (an absolute path, a parent
-///   folder, a network or device path) is left unresolved, never looked at,
-///   and listed in one warning, unless the user turned on Read Files
-///   Outside the Folder ([`options::outside`](super::super::options::outside)).
-///   A file held in memory has no folder: what it names on disk is left
-///   unresolved.
+/// - **Where.** Relative to the folder of the file being read (`.` and `..`
+///   taken as written), or wherever an absolute name says: a file may name
+///   files anywhere. A file held in memory has no folder: the files it
+///   names are left unresolved, its pictures' names kept as written.
 /// - **What.** Regular files alone: a device, a pipe or a folder is never
-///   read, whatever the option says.
+///   read, whoever names it.
 /// - **How much.** A file is read whole, charged to the read's budget
 ///   ([`ReadBudget::take`]).
 ///
@@ -52,8 +48,8 @@ const LISTED: usize = 8;
 /// let named = Named::new(&Input::file(&scene), &FormatOptions::new(), &reading);
 /// let wood = named.file("maps/wood.png", None).unwrap();
 /// assert_eq!(named.read(&wood).unwrap(), b"png");
-/// assert!(named.file("../../etc/hosts", None).is_none(), "outside the folder");
-/// assert!(named.file("/dev/zero", None).is_none());
+/// assert!(named.file("/dev/zero", None).is_none(), "a device");
+/// assert!(named.file("/dev/null", None).is_none());
 /// assert_eq!(named.warnings().len(), 1, "one warning lists both");
 /// # std::fs::remove_dir_all(&folder).unwrap();
 /// ```
@@ -63,10 +59,6 @@ pub struct Named {
     file: String,
     /// Its folder, absolute and without `.` or `..`; `None` held in memory.
     folder: Option<PathBuf>,
-    /// That folder with its links followed, which found files must be in.
-    root: Option<PathBuf>,
-    /// Read Files Outside the Folder.
-    outside: bool,
     /// Embed Textures.
     embed: bool,
     budget: ReadBudget,
@@ -76,7 +68,6 @@ pub struct Named {
 
 #[derive(Debug, Default)]
 struct Left {
-    outside: BTreeSet<String>,
     special: BTreeSet<String>,
     held: BTreeSet<String>,
     missing: BTreeSet<String>,
@@ -84,9 +75,9 @@ struct Left {
 }
 
 impl Named {
-    /// The files `input` names, reached as `chosen` says (its
-    /// [`OUTSIDE`] and [`EMBED`] options, off where it has none), read
-    /// within `reading`'s budget.
+    /// The files `input` names, its pictures embedded as `chosen` says (its
+    /// [`EMBED`] option, off where it has none), read within `reading`'s
+    /// budget.
     pub fn new(input: &Input<'_>, chosen: &FormatOptions, reading: &Reading<'_>) -> Named {
         let on = |name| matches!(chosen.get(name), Some(crate::Value::Bool(true)));
         let folder = (input.path())
@@ -94,11 +85,7 @@ impl Named {
             .and_then(|p| p.parent().map(normal));
         Named {
             file: input.to_string(),
-            root: folder
-                .as_ref()
-                .map(|f| f.canonicalize().unwrap_or(f.clone())),
             folder,
-            outside: on(OUTSIDE),
             embed: on(EMBED),
             budget: reading.budget.clone(),
             left: Mutex::default(),
@@ -157,25 +144,17 @@ impl Named {
 
     /// The picture `name` names relative to `from` (as
     /// [`file`](Self::file)), as an Image node reads it: its path, or its
-    /// bytes when Embed Textures is on. A picture in reach that isn't there
-    /// stays a path, which its Image node says is missing; a name in a file
-    /// held in memory stays as written while it is relative and climbs
-    /// nowhere (the project's folder finds it). `None` out of reach or not
-    /// a regular file, listed.
+    /// bytes when Embed Textures is on. A picture that isn't there stays a
+    /// path, which its Image node says is missing; a name in a file held in
+    /// memory stays as written (a relative one is the project folder's to
+    /// find). `None` for what isn't a regular file, listed.
     pub fn image(&self, name: &str, from: Option<&Path>) -> Option<ImageFile> {
         if name.is_empty() {
             return None;
         }
         if from.is_none() && self.folder.is_none() {
-            let written = normal(Path::new(name));
-            let stays = written.is_relative() && !written.starts_with("..");
-            return match stays {
-                true => Some(ImageFile::Path(Arc::from(written.display().to_string()))),
-                false => {
-                    self.note(Why::Held, name);
-                    None
-                }
-            };
+            let written = normal(Path::new(name)).display().to_string();
+            return Some(ImageFile::Path(Arc::from(written)));
         }
         let path = match self.locate(name, from) {
             Located::Found(found) if self.embed => match self.read(&found) {
@@ -209,9 +188,11 @@ impl Named {
         let left = self.left.lock().unwrap_or_else(|e| e.into_inner());
         let file = &self.file;
         [
-            (&left.outside, format!("files outside the folder of {file} are left unresolved (Read Files Outside the Folder reads them)")),
             (&left.special, "not regular files, never read".to_owned()),
-            (&left.held, format!("{file} is held in memory, so the files it names are left unresolved")),
+            (
+                &left.held,
+                format!("{file} is held in memory, so the files it names are left unresolved"),
+            ),
             (&left.missing, "no such files".to_owned()),
             (&left.failed, "files that couldn't be read".to_owned()),
         ]
@@ -222,40 +203,26 @@ impl Named {
     }
 
     /// Where `name`, relative to `from` (else the read file's folder),
-    /// leads. A name out of reach as written is never looked at on disk.
+    /// leads.
     fn locate(&self, name: &str, from: Option<&Path>) -> Located {
         let Some(base) = from.or(self.folder.as_deref()) else {
             return Located::Left(Why::Held);
         };
         let path = normal(&base.join(name));
-        if !self.outside && !self.within(&path) {
-            return Located::Left(Why::Outside);
-        }
         match std::fs::metadata(&path) {
             Ok(meta) if !meta.is_file() => Located::Left(Why::Special),
             Ok(_) => match path.canonicalize() {
-                Ok(real) if self.outside || self.within(&real) => Located::Found(real),
-                Ok(_) => Located::Left(Why::Outside),
+                Ok(real) => Located::Found(real),
                 Err(_) => Located::Absent(path),
             },
             Err(_) => Located::Absent(path),
         }
     }
 
-    /// Whether `path` is in the read file's folder or under it, as given or
-    /// with its links followed.
-    fn within(&self, path: &Path) -> bool {
-        [&self.folder, &self.root]
-            .into_iter()
-            .flatten()
-            .any(|folder| path.starts_with(folder))
-    }
-
     /// Lists `name` as left unresolved for `why`.
     fn note(&self, why: Why, name: &str) {
         let mut left = self.left.lock().unwrap_or_else(|e| e.into_inner());
         let list = match why {
-            Why::Outside => &mut left.outside,
             Why::Special => &mut left.special,
             Why::Held => &mut left.held,
             Why::Missing => &mut left.missing,
@@ -267,18 +234,17 @@ impl Named {
 
 /// Where a name leads ([`Named::locate`]).
 enum Located {
-    /// A regular file in reach, by its canonical path.
+    /// A regular file, by its canonical path.
     Found(PathBuf),
-    /// A path in reach where nothing is.
+    /// A path where nothing is.
     Absent(PathBuf),
-    /// Nowhere it may be read, for this reason.
+    /// Nothing it may be read as, for this reason.
     Left(Why),
 }
 
 /// Why a name was left unresolved, or a file unread.
 #[derive(Clone, Copy)]
 enum Why {
-    Outside,
     Special,
     Held,
     Missing,
@@ -363,7 +329,7 @@ mod tests {
     }
 
     #[test]
-    fn names_reach_the_folder_and_below_and_nothing_else() {
+    fn names_reach_files_anywhere_and_regular_ones_alone() {
         let dir = scratch("reach");
         let scene = dir.join("scene/scene.obj");
         let named = named(&scene, &[], ReadLimits::default());
@@ -379,42 +345,28 @@ mod tests {
             real,
             "from a found file's folder"
         );
-        assert_eq!(
-            named.file(&wood.display().to_string(), None),
-            real,
-            "absolute, inside"
-        );
-        for out in [
-            "../secret",
-            "maps/../../secret",
-            "/etc/hosts",
-            "//server/share/a.png",
-        ] {
-            assert_eq!(named.file(out, None), None, "{out}");
-        }
-        assert_eq!(
-            named.file("../../secret", Some(&maps)),
-            None,
-            "a side file's name climbing out"
-        );
+        assert_eq!(named.file(&wood.display().to_string(), None), real);
+        // Outside the folder: read, as a parent folder or an absolute path.
+        let secret = dir.join("secret").canonicalize().ok();
+        assert_eq!(named.file("../secret", None), secret);
+        assert_eq!(named.file("maps/../../secret", None), secret);
+        assert_eq!(named.file("../../secret", Some(&maps)), secret);
+        let absolute = dir.join("secret").display().to_string();
+        assert_eq!(named.file(&absolute, None), secret);
+        assert_eq!(named.read(secret.as_ref().unwrap()).unwrap(), b"key");
+        // Never a device, a folder or what isn't there.
+        assert_eq!(named.file("/dev/zero", None), None);
+        assert_eq!(named.file("maps", None), None);
         assert_eq!(named.file("nothing.mtl", None), None);
-        let warnings = named.warnings();
-        assert_eq!(warnings.len(), 2, "{warnings:?}");
-        assert!(
-            warnings[0]
-                .message
-                .contains("../secret, //server/share/a.png, /etc/hosts"),
-            "{warnings:?}"
-        );
-        assert!(warnings[1].message.ends_with("no such files: nothing.mtl"));
-        // Turned on, a name reaches anywhere; still only regular files.
-        let anywhere = self::named(&scene, &[(OUTSIDE, true)], ReadLimits::default());
+        assert_eq!(named.file("//server/share/a.png", None), None);
+        let warnings: Vec<String> = named.warnings().into_iter().map(|w| w.message).collect();
         assert_eq!(
-            anywhere.file("../secret", None),
-            dir.join("secret").canonicalize().ok()
+            warnings,
+            [
+                "not regular files, never read: /dev/zero, maps",
+                "no such files: //server/share/a.png, nothing.mtl"
+            ]
         );
-        assert_eq!(anywhere.file("/dev/zero", None), None);
-        assert!(anywhere.warnings()[0].message.contains("not regular files"));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -434,26 +386,26 @@ mod tests {
     }
 
     #[test]
-    fn a_link_out_of_the_folder_is_out_of_reach() {
+    fn a_link_is_followed_to_a_regular_file_alone() {
         let dir = scratch("link");
         let scene = dir.join("scene/scene.obj");
         let link = dir.join("scene/maps/key.png");
         std::os::unix::fs::symlink(dir.join("secret"), &link).unwrap();
         std::os::unix::fs::symlink("/dev/zero", dir.join("scene/zero.png")).unwrap();
         let named = named(&scene, &[(EMBED, true)], ReadLimits::default());
-        assert_eq!(named.file("maps/key.png", None), None);
-        assert_eq!(named.image("maps/key.png", None), None);
+        let secret = dir.join("secret").canonicalize().ok();
+        assert_eq!(named.file("maps/key.png", None), secret, "by its identity");
+        let Some(ImageFile::Embedded(key)) = named.image("maps/key.png", None) else {
+            panic!("embedded");
+        };
+        assert_eq!((key.name(), key.bytes()), ("secret", &b"key"[..]));
         assert_eq!(
             named.image("zero.png", None),
             None,
             "a device behind a link"
         );
         let messages: Vec<String> = named.warnings().into_iter().map(|w| w.message).collect();
-        assert!(messages[0].ends_with("maps/key.png"), "{messages:?}");
-        assert!(
-            messages[1].ends_with("never read: zero.png"),
-            "{messages:?}"
-        );
+        assert_eq!(messages, ["not regular files, never read: zero.png"]);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -501,16 +453,21 @@ mod tests {
         );
         assert_eq!(named.folder(), None);
         assert_eq!(named.file("a.bin", None), None);
-        let kept = named.image("maps/./wood.png", None);
-        assert!(matches!(kept, Some(ImageFile::Path(p)) if &*p == "maps/wood.png"));
-        assert_eq!(named.image("../wood.png", None), None);
-        assert_eq!(named.image("/etc/hosts", None), None);
+        // Its pictures' names are kept as written, for the project to find.
+        for (name, kept) in [
+            ("maps/./wood.png", "maps/wood.png"),
+            ("../wood.png", "../wood.png"),
+            ("/maps/wood.png", "/maps/wood.png"),
+        ] {
+            let image = named.image(name, None);
+            assert!(
+                matches!(image, Some(ImageFile::Path(p)) if &*p == kept),
+                "{name}"
+            );
+        }
         let warning = &named.warnings()[0].message;
         assert!(warning.starts_with("a.gltf is held in memory"), "{warning}");
-        assert!(
-            warning.ends_with("../wood.png, /etc/hosts, a.bin"),
-            "{warning}"
-        );
+        assert!(warning.ends_with(": a.bin"), "{warning}");
     }
 
     #[test]

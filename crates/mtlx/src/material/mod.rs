@@ -78,7 +78,7 @@ pub struct MaterialNode {
 pub enum Bound {
     /// A value of the input's type. A color's or a file name's color space
     /// is what the document says it is in (`lin_rec709`, `srgb_texture`);
-    /// none where nothing is said or it is said to be none.
+    /// none where nothing is said.
     Value {
         /// The value; a file name with its `fileprefix`.
         value: Value,

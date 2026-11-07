@@ -30,7 +30,7 @@ impl Digests {
     /// rows but for `changed` (ascending), for the blocks holding none of
     /// them.
     pub(super) fn after(t: &Primitives, changed: &[u32], base: Option<&Digests>) -> Self {
-        let blocks = parallel::map(t.len().div_ceil(ROWS), 1, |blocks| {
+        let blocks = parallel::blocks(t.len().div_ceil(ROWS), 1, |blocks| {
             (blocks.map(|b| {
                 let first = changed.partition_point(|&row| (row as usize) < b * ROWS);
                 let touched = changed

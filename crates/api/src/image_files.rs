@@ -94,7 +94,7 @@ pub const OP: &str = "op:";
 /// a node reading a source ([`reading`](image_node::reading)).
 pub mod image_node {
     use crate::network::NewNode;
-    use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
+    use kinogaki_geometry::image::{ImageFile, ImageSource};
     use kinogaki_value::Value;
     use std::sync::Arc;
 
@@ -112,12 +112,10 @@ pub mod image_node {
     /// source reads.
     pub const RESULT: &str = "result";
     /// How its colors read (a [`ColorSpace`](kinogaki_value::ValueKind::ColorSpace)
-    /// choice): [`AUTO`], [`DATA`], or the name of the space they are in.
+    /// choice): an [`ImageColor`](kinogaki_geometry::image::ImageColor)'s
+    /// [`key`](kinogaki_geometry::image::ImageColor::key), `auto`,
+    /// `data` or the name of the space they are in.
     pub const COLOR: &str = "color";
-    /// A Color: as the file says.
-    pub const AUTO: &str = "auto";
-    /// A Color: the values as stored.
-    pub const DATA: &str = "data";
     /// Its button holding the file it reads embedded (the host reads it).
     pub const EMBED: &str = "embed";
     /// Its button writing the file it holds out (the host writes it), every
@@ -140,12 +138,7 @@ pub mod image_node {
                     Value::Data(super::embedded_file().wrap(file.clone())),
                 ),
         };
-        let color = match source.color() {
-            ImageColor::Auto => AUTO,
-            ImageColor::Data => DATA,
-            ImageColor::Space(space) => space,
-        };
-        node.with(COLOR, choice(color))
+        node.with(COLOR, choice(source.color().key()))
     }
 }
 
@@ -176,12 +169,10 @@ pub fn image_source(parameters: &Parameters) -> Result<Option<ImageSource>, Erro
             path => ImageFile::Path(Arc::from(path)),
         },
     };
-    let color = match choice(COLOR) {
-        AUTO | "" => ImageColor::Auto,
-        DATA => ImageColor::Data,
-        space => ImageColor::Space(Arc::from(space)),
-    };
-    Ok(Some(ImageSource::new(file, color)))
+    Ok(Some(ImageSource::new(
+        file,
+        ImageColor::of_key(choice(COLOR)),
+    )))
 }
 
 #[cfg(test)]
@@ -206,12 +197,12 @@ mod tests {
         ]);
         let read = image_source(&file).unwrap().unwrap();
         assert_eq!(read.name(), "t/wood.png");
-        assert_eq!(read.color(), &ImageColor::Space(Arc::from("ACEScg")));
+        assert_eq!(read.color(), &ImageColor::space("ACEScg").unwrap());
         let bytes = EmbeddedFile::new("wood.png", vec![1, 2, 3]);
         let embedded = rows(&[
             (SOURCE, choice(EMBEDDED)),
             (EMBEDDED, Value::Data(embedded_file().wrap(bytes.clone()))),
-            (COLOR, choice(DATA)),
+            (COLOR, choice(ImageColor::Data.key())),
         ]);
         let read = image_source(&embedded).unwrap().unwrap();
         assert_eq!(read.file(), &ImageFile::Embedded(bytes));
@@ -219,7 +210,7 @@ mod tests {
         let result = rows(&[(SOURCE, choice(RESULT))]);
         assert!(image_source(&result).unwrap().is_none());
         // A node reading a source reads it back.
-        let space = ImageColor::Space(Arc::from("ACEScg"));
+        let space = ImageColor::space("ACEScg").unwrap();
         for source in [
             read,
             ImageSource::new(ImageFile::Path(Arc::from("/a.exr")), space),

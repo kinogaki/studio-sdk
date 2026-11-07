@@ -45,7 +45,7 @@ pub(super) fn primitives(
         (_, Some(c)) => curve_columns(c, primitives, vertices.len())?,
         _ => {}
     }
-    let faults = parallel::map(primitives, BLOCK, |range| {
+    let faults = parallel::blocks(primitives, BLOCK, |range| {
         range
             .into_iter()
             .find_map(|p| primitive(points, offsets, vertices, kind(p), curves, p).map(|m| (p, m)))

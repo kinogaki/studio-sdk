@@ -53,7 +53,7 @@ pub(crate) fn bounds(positions: &Column<[f64; 3]>) -> Option<Bounds> {
     let mut boxes = Vec::new();
     for run in positions.runs() {
         let points: &[Vec3] = bytemuck::cast_slice(run);
-        boxes.extend(parallel::map(points.len(), BLOCK, |range| {
+        boxes.extend(parallel::blocks(points.len(), BLOCK, |range| {
             Bounds::of(points[range].iter().copied())
         }));
     }
@@ -113,7 +113,7 @@ pub(crate) fn moved(before: &Column<[f64; 3]>, after: &Column<[f64; 3]>) -> Vec<
         .unshared(before)
         .filter(|r| r.start < after.len())
         .collect();
-    let blocks = parallel::map(ranges.len(), 1, |pieces| {
+    let blocks = parallel::blocks(ranges.len(), 1, |pieces| {
         let mut out = Vec::new();
         for range in &ranges[pieces] {
             let range = range.start..range.end.min(after.len());

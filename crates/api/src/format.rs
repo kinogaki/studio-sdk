@@ -49,18 +49,23 @@
 //! ([`ReadBudget::expand`]). Recursion is bounded by the budget's depth, so
 //! it holds on the 2 MiB stack a read runs on; references are followed
 //! once each, by the identity of what they name. The files a file names
-//! are found and read through [`files::Named`] alone: in the file's folder
-//! and below, regular files only, within the budget. What a file asks
+//! are found and read through [`files::Named`] alone: wherever they are,
+//! regular files only, within the budget. What a file asks
 //! beyond its budget is an error naming the file; what a reader left out, a
 //! warning. A read never panics, overflows its stack or aborts on a failed
 //! allocation.
 mod budget;
+mod conversion;
 pub mod files;
 mod input;
+pub mod materialx;
 pub mod options;
+mod unique;
 
 pub use budget::{ReadBudget, ReadLimits};
+pub use conversion::Conversion;
 pub use input::Input;
+pub use unique::Unique;
 
 use crate::cancel::CancelToken;
 use crate::color::ColorService;

@@ -23,16 +23,31 @@
 //! runners; a package never carries a copy of it.
 //!
 //! Spaces are named as the host's configuration names them, or by its
-//! aliases (`lin_rec709`, `srgb_texture`, `ACEScg`).
+//! aliases. A format names the spaces files mean by their interop names,
+//! the Color Interop Forum's, which configurations alias: [`LIN_REC709`],
+//! [`SRGB_TEXTURE`], [`SRGB_DISPLAY`]. A file format with names of its own
+//! (MaterialX's `lin_rec709`, USD's `sRGB`) keeps them in its files and
+//! maps them at its boundary.
 
 use crate::{Diagnostic, Error};
 use std::fmt::Debug;
+
+/// Linear Rec.709 (sRGB's primaries, linear light) by its interop name
+/// (`lin_rec709_scene`): the space glTF's, FBX's, USD's and OBJ's
+/// material colors and linear vertex colors are in.
+pub const LIN_REC709: &str = "lin_rec709_scene";
+
+/// sRGB-encoded Rec.709 by its interop name (`srgb_rec709_scene`): a
+/// texture's colors as an 8-bit picture holds them (USD's `sRGB`
+/// `sourceColorSpace`).
+pub const SRGB_TEXTURE: &str = "srgb_rec709_scene";
 
 /// The sRGB display's space by its interop name, which configurations
 /// alias (the Color Interop Forum's `srgb_rec709_display`): what a file's
 /// own sRGB tag says (a PNG's `sRGB` chunk), so a format tags such a file
 /// with it, and what the host tags an image with for a file of sRGB code
-/// values, so its writer writes that tag.
+/// values, so its writer writes that tag; an OBJ's vertex colors, which
+/// are a display's.
 pub const SRGB_DISPLAY: &str = "srgb_rec709_display";
 
 /// `v`, a color a conversion gave, to twelve significant digits (eleven

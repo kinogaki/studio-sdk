@@ -287,8 +287,9 @@ impl NetworkSeed {
 
     /// Every length as [`scale_lengths`](Self::scale_lengths) converts it,
     /// input `input` of node `at` times `by(at, input)`: a file saying a
-    /// unit per input (a MaterialX document's `unit`).
-    pub fn scale_lengths_by(&mut self, by: impl Fn(usize, &str) -> f64) -> usize {
+    /// unit per input (a MaterialX document's `unit`, which
+    /// `format::materialx` reads).
+    pub(crate) fn scale_lengths_by(&mut self, by: impl Fn(usize, &str) -> f64) -> usize {
         use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
         let def_of = |node: &NewNode| match node.parameters.get(SIGNATURE) {
             Some(Value::Choice(signature)) => def(signature),

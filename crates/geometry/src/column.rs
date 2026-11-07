@@ -128,7 +128,7 @@ impl<T> Column<T> {
         T: Send + Sync,
     {
         let cell = Self::CELL;
-        let blocks = crate::parallel::map(len, cell, |range| {
+        let blocks = crate::parallel::blocks(len, cell, |range| {
             let mut cells = Vec::with_capacity(range.len() / cell + 1);
             for start in range.clone().step_by(cell) {
                 let end = (start + cell).min(range.end);

@@ -4,6 +4,7 @@
 //! read ([`ImageColor`]). The host reads a source through the installed
 //! formats into an [`Image`](super::Image); a material's texture holds one
 //! until the host sends the engine the Texture prim it read.
+use crate::Error;
 use std::fmt;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
@@ -122,7 +123,7 @@ fn hash(bytes: &[u8]) -> [u8; 32] {
     if bytes.len() <= PIECE {
         return *blake3::hash(bytes).as_bytes();
     }
-    let pieces: Vec<[u8; 32]> = crate::parallel::map(bytes.len().div_ceil(PIECE), 1, |range| {
+    let pieces: Vec<[u8; 32]> = crate::parallel::blocks(bytes.len().div_ceil(PIECE), 1, |range| {
         (range.map(|k| {
             let at = k * PIECE;
             let mut hasher = blake3::Hasher::new();
@@ -197,8 +198,52 @@ pub enum ImageColor {
     /// roughness).
     Data,
     /// In this space of the project's color configuration, whatever the file
-    /// says.
+    /// says. Made by [`space`](ImageColor::space), which refuses a name a
+    /// save would read back as another color.
     Space(Arc<str>),
+}
+
+impl ImageColor {
+    /// Colors in space `name` of the project's color configuration.
+    ///
+    /// ```
+    /// use kinogaki_geometry::image::ImageColor;
+    /// assert!(ImageColor::space("srgb_rec709_scene").is_ok());
+    /// assert!(ImageColor::space("data").is_err(), "Data's key");
+    /// ```
+    ///
+    /// # Errors
+    /// A blank name, or one that is [`Auto`](Self::Auto)'s or
+    /// [`Data`](Self::Data)'s key ([`key`](Self::key)): saved, it would read
+    /// back as that color.
+    pub fn space(name: &str) -> Result<ImageColor, Error> {
+        match ImageColor::of_key(name) {
+            ImageColor::Space(space) if !space.trim().is_empty() => Ok(ImageColor::Space(space)),
+            _ => Err(Error::invalid(format_args!(
+                "{name:?} names no color space"
+            ))),
+        }
+    }
+
+    /// How an Image node's Color and a saved source spell it: `auto`,
+    /// `data`, or the space's name.
+    pub fn key(&self) -> &str {
+        match self {
+            ImageColor::Auto => "auto",
+            ImageColor::Data => "data",
+            ImageColor::Space(space) => space,
+        }
+    }
+
+    /// The color `key` spells ([`key`](Self::key)); a blank one is
+    /// [`Auto`](Self::Auto).
+    pub fn of_key(key: &str) -> ImageColor {
+        match key {
+            "" | "auto" => ImageColor::Auto,
+            "data" => ImageColor::Data,
+            space => ImageColor::Space(Arc::from(space)),
+        }
+    }
 }
 
 /// Where an image's pixels come from, and how its colors read (see the
@@ -242,6 +287,26 @@ impl ImageSource {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_space_is_never_a_key_of_another_color() {
+        for color in [
+            ImageColor::Auto,
+            ImageColor::Data,
+            ImageColor::space("ACEScg").unwrap(),
+        ] {
+            assert_eq!(ImageColor::of_key(color.key()), color);
+        }
+        assert_eq!(ImageColor::of_key(""), ImageColor::Auto);
+        for refused in ["", "  ", "auto", "data"] {
+            assert!(ImageColor::space(refused).is_err(), "{refused:?}");
+        }
+        // Another case is another name: the configuration's to resolve.
+        assert_eq!(
+            ImageColor::space("Data").unwrap(),
+            ImageColor::Space(Arc::from("Data"))
+        );
+    }
 
     #[test]
     fn embedded_files_are_equal_by_name_and_bytes() {

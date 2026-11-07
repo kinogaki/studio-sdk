@@ -179,9 +179,23 @@ fn sure<T>(result: Result<T, Infallible>) -> T {
     }
 }
 
+/// `f(i)` for every `i` in `0..count`, each a job of its own on the
+/// installed workers, the results in index order: what a format runs over
+/// its independent pieces (meshes, chunks of a file, a codec's tiles).
+///
+/// ```
+/// use kinogaki_geometry::parallel;
+/// let squares = parallel::map(4, |i| i * i);
+/// assert_eq!(squares, [0, 1, 4, 9]);
+/// ```
+#[track_caller]
+pub fn map<R: Send>(count: usize, f: impl Fn(usize) -> R + Sync) -> Vec<R> {
+    sure(map_blocks(count, 1, |range| Ok(f(range.start))))
+}
+
 /// [`map_blocks`] of work that cannot fail.
 #[track_caller]
-pub(crate) fn map<R: Send>(
+pub(crate) fn blocks<R: Send>(
     len: usize,
     block: usize,
     work: impl Fn(Range<usize>) -> R + Sync,
@@ -198,7 +212,7 @@ pub(crate) fn first_refused<T: Sync>(
     block: usize,
     fine: impl Fn(&T) -> bool + Sync,
 ) -> Option<usize> {
-    let bad = map(values.len(), block, |range| {
+    let bad = blocks(values.len(), block, |range| {
         let start = range.start;
         let values = &values[range];
         if values.iter().fold(true, |ok, v| ok & fine(v)) {
@@ -212,7 +226,7 @@ pub(crate) fn first_refused<T: Sync>(
 /// `work(i)` for every `i` in `0..len`, in blocks of `block`.
 #[track_caller]
 pub(crate) fn each(len: usize, block: usize, work: impl Fn(usize) + Sync) {
-    map(len, block, |range| range.for_each(&work));
+    blocks(len, block, |range| range.for_each(&work));
 }
 
 /// [`chunks_mut`] of work that cannot fail.
@@ -292,6 +306,13 @@ mod tests {
             let empty = map_on(workers, site, 0, 10, |r| Ok::<_, ()>(r.len()));
             assert!(empty.unwrap().is_empty());
         }
+    }
+
+    #[test]
+    fn a_map_gives_each_index_its_result_in_order() {
+        let squares = map(1000, |i| i * i);
+        assert!(squares.iter().enumerate().all(|(i, &s)| s == i * i));
+        assert!(map(0, |i| i).is_empty());
     }
 
     #[test]

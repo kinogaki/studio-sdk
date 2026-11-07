@@ -15,6 +15,7 @@
 //! assert!(budget.vec::<u32>(1 << 30).is_err());
 //! assert!(budget.nest(300).is_err(), "deeper than 256");
 //! assert!(budget.expand(10, 100_000).is_err(), "a decoder giving 10,000 bytes a byte");
+//! assert!(budget.pixels(1 << 15, 1 << 15).is_err(), "a picture over 2²⁸ pixels");
 //! ```
 use crate::Error;
 use crate::cancel::CancelToken;
@@ -40,6 +41,9 @@ pub struct ReadLimits {
     /// Bytes a decoder gives for each byte it decodes: 1032, the most
     /// DEFLATE gives.
     pub ratio: u64,
+    /// Pixels of one picture (an image, a part of one, the window its parts
+    /// join into): 2²⁸, a picture of 16,384 × 16,384.
+    pub pixels: u64,
 }
 
 impl Default for ReadLimits {
@@ -50,6 +54,7 @@ impl Default for ReadLimits {
             total: 16 << 30,
             depth: 256,
             ratio: 1032,
+            pixels: 1 << 28,
         }
     }
 }
@@ -165,6 +170,20 @@ impl ReadBudget {
             ))),
         }
     }
+
+    /// Refused when a picture of `width` × `height` pixels is over
+    /// [`ReadLimits::pixels`]: what a picture's header claims is checked
+    /// before its samples are sized.
+    pub fn pixels(&self, width: u64, height: u64) -> Result<(), Error> {
+        self.check()?;
+        match width.saturating_mul(height) <= self.limits.pixels {
+            true => Ok(()),
+            false => Err(Error::invalid(format_args!(
+                "{width} × {height} pixels, over the read's limit of {}",
+                self.limits.pixels
+            ))),
+        }
+    }
 }
 
 /// The budget refusing `what` `asked` bytes, `most` its limit.
@@ -227,6 +246,9 @@ mod tests {
         assert!(budget.nest(256).is_ok() && budget.nest(257).is_err());
         assert!(budget.expand(1, 1032).is_ok() && budget.expand(1, 1033).is_err());
         assert!(budget.expand(0, 0).is_ok());
+        assert!(budget.pixels(1 << 14, 1 << 14).is_ok());
+        assert!(budget.pixels((1 << 14) + 1, 1 << 14).is_err());
+        assert!(budget.pixels(u64::MAX, 2).is_err(), "an overflowing area");
         assert_eq!(size(4 << 30), "4.0 GiB");
     }
 
@@ -242,6 +264,7 @@ mod tests {
             budget.take(1),
             budget.nest(1),
             budget.expand(1, 1),
+            budget.pixels(1, 1),
         ] {
             assert_eq!(stopped, Err(Error::cancelled()));
         }

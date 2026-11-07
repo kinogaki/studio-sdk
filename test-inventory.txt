@@ -164,8 +164,10 @@ kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry:
 kinogaki-geometry/doc test crates/geometry/src/image/mod.rs - image
 kinogaki-geometry/doc test crates/geometry/src/image/sampler.rs - image::sampler::Sampler
 kinogaki-geometry/doc test crates/geometry/src/image/source.rs - image::source::EmbeddedFile
+kinogaki-geometry/doc test crates/geometry/src/image/source.rs - image::source::ImageColor::space
 kinogaki-geometry/doc test crates/geometry/src/instancing.rs - instancing::placements
 kinogaki-geometry/doc test crates/geometry/src/lib.rs -
+kinogaki-geometry/doc test crates/geometry/src/parallel.rs - parallel::map
 kinogaki-geometry/doc test crates/geometry/src/primitives/components.rs - primitives::components::Components
 kinogaki-geometry/doc test crates/geometry/src/primitives/index/mod.rs - primitives::index::Index
 kinogaki-geometry/doc test crates/geometry/src/primitives/index/walk.rs - primitives::index::walk::Index::edge_loop
@@ -231,6 +233,7 @@ kinogaki-geometry/lib test image::sampler::tests::pixels_outside_the_data_window
 kinogaki-geometry/lib test image::sampler::tests::v_runs_up_from_the_bottom_row
 kinogaki-geometry/lib test image::sampler::tests::values_decode_as_read_pixel_decodes_them
 kinogaki-geometry/lib test image::source::tests::a_hash_made_a_piece_at_a_time_is_blake3s
+kinogaki-geometry/lib test image::source::tests::a_space_is_never_a_key_of_another_color
 kinogaki-geometry/lib test image::source::tests::embedded_files_are_equal_by_name_and_bytes
 kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
 kinogaki-geometry/lib test image::tests::a_held_layer_has_no_tiles_and_compares_by_its_key
@@ -249,6 +252,7 @@ kinogaki-geometry/lib test instancing::tests::placements_follow_the_standard_att
 kinogaki-geometry/lib test limits::tests::a_count_past_its_limit_is_refused
 kinogaki-geometry/lib test nearest::tests::a_search_over_spots_agrees_with_trying_them_all
 kinogaki-geometry/lib test nearest::tests::the_nearest_place_and_a_ray_find_a_cubes_face
+kinogaki-geometry/lib test parallel::tests::a_map_gives_each_index_its_result_in_order
 kinogaki-geometry/lib test parallel::tests::every_item_is_visited_once_with_its_index
 kinogaki-geometry/lib test parallel::tests::maps_come_back_in_order_and_errors_stop
 kinogaki-geometry/lib test parallel::tests::prepared_blocks_and_chunks_cover_everything
@@ -410,8 +414,10 @@ kinogaki-render-api/lib test tests::descriptors::settings_fit_their_descriptors
 kinogaki-render-api/lib test tests::descriptors::standard_lights_and_fog_round_trip_through_their_prims
 kinogaki-render-api/lib test thread::tests::a_view_dropped_before_its_thread_takes_it_publishes_nothing
 kinogaki-render-api/lib test thread::tests::what_an_engine_says_reaches_the_host_once
+kinogaki-studio-api-testing/doc test crates/api-testing/src/format.rs - format::Scratch
 kinogaki-studio-api-testing/doc test crates/api-testing/src/hostile.rs - hostile::read_hostile
 kinogaki-studio-api-testing/doc test crates/api-testing/src/lib.rs -
+kinogaki-studio-api-testing/doc test crates/api-testing/src/workers.rs - workers::install
 kinogaki-studio-api-testing/turns test alone_waits_for_the_shared_turns_and_ends_with_its_thread
 kinogaki-studio-api/admission test a_context_adopts_a_node_type_once
 kinogaki-studio-api/admission test a_node_type_is_offered_in_declared_contexts
@@ -442,10 +448,14 @@ kinogaki-studio-api/doc test crates/api/src/cook/placement.rs - cook::placement:
 kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement
 kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::is_name
 kinogaki-studio-api/doc test crates/api/src/format/budget.rs - format::budget
+kinogaki-studio-api/doc test crates/api/src/format/conversion.rs - format::conversion::Conversion
 kinogaki-studio-api/doc test crates/api/src/format/files.rs - format::files
+kinogaki-studio-api/doc test crates/api/src/format/files.rs - format::files::replace
 kinogaki-studio-api/doc test crates/api/src/format/files/named.rs - format::files::named::Named
 kinogaki-studio-api/doc test crates/api/src/format/input.rs - format::input::Input
+kinogaki-studio-api/doc test crates/api/src/format/materialx/mod.rs - format::materialx::image_color
 kinogaki-studio-api/doc test crates/api/src/format/options.rs - format::options
+kinogaki-studio-api/doc test crates/api/src/format/unique.rs - format::unique::Unique
 kinogaki-studio-api/doc test crates/api/src/icon.rs - icon
 kinogaki-studio-api/doc test crates/api/src/kernel.rs - kernel
 kinogaki-studio-api/doc test crates/api/src/network/context.rs - network::context::NetworkContext
@@ -497,13 +507,18 @@ kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewpor
 kinogaki-studio-api/lib test format::budget::tests::allocations_are_refused_alone_and_together_and_clones_share_them
 kinogaki-studio-api/lib test format::budget::tests::every_check_stops_a_cancelled_read
 kinogaki-studio-api/lib test format::budget::tests::files_read_depth_and_expansion_have_their_limits
+kinogaki-studio-api/lib test format::conversion::tests::a_centimetre_z_up_file_lands_in_metres_y_up_with_its_hierarchy
+kinogaki-studio-api/lib test format::conversion::tests::a_frame_keeps_what_it_looks_down
+kinogaki-studio-api/lib test format::conversion::tests::left_handed_axes_mirror_and_bad_ones_are_refused
+kinogaki-studio-api/lib test format::conversion::tests::the_inverse_takes_points_and_placements_back_exactly
 kinogaki-studio-api/lib test format::files::named::tests::a_file_held_in_memory_names_no_file_on_disk
-kinogaki-studio-api/lib test format::files::named::tests::a_link_out_of_the_folder_is_out_of_reach
+kinogaki-studio-api/lib test format::files::named::tests::a_link_is_followed_to_a_regular_file_alone
 kinogaki-studio-api/lib test format::files::named::tests::names_are_normalized_as_text_and_long_lists_counted
-kinogaki-studio-api/lib test format::files::named::tests::names_reach_the_folder_and_below_and_nothing_else
+kinogaki-studio-api/lib test format::files::named::tests::names_reach_files_anywhere_and_regular_ones_alone
 kinogaki-studio-api/lib test format::files::named::tests::of_several_spellings_the_first_found_is_taken_and_only_a_miss_said
 kinogaki-studio-api/lib test format::files::named::tests::pictures_embed_within_the_budget_and_stay_paths_otherwise
 kinogaki-studio-api/lib test format::files::tests::a_document_named_relative_names_an_absolute_file_as_it_reads_back
+kinogaki-studio-api/lib test format::files::tests::a_failed_replacement_leaves_the_file_and_nothing_beside_it
 kinogaki-studio-api/lib test format::files::tests::a_file_reached_through_a_link_is_named_relative_to_the_document
 kinogaki-studio-api/lib test format::files::tests::embedded_files_are_written_once_and_numbered_past_a_clash
 kinogaki-studio-api/lib test format::files::tests::paths_are_relative_to_the_document_where_one_reaches
@@ -511,11 +526,16 @@ kinogaki-studio-api/lib test format::input::tests::a_file_is_read_as_it_is_asked
 kinogaki-studio-api/lib test format::input::tests::a_kept_file_is_lent_and_held_without_a_copy
 kinogaki-studio-api/lib test format::input::tests::bytes_in_memory_are_lent_and_their_head_is_at_most_its_length
 kinogaki-studio-api/lib test format::input::tests::only_a_regular_file_is_read
+kinogaki-studio-api/lib test format::materialx::tests::a_colorspace_of_no_conversion_reads_as_data_and_writes_as_none
+kinogaki-studio-api/lib test format::materialx::tests::a_documents_material_reads_and_writes_back_as_itself
 kinogaki-studio-api/lib test format::options::tests::a_node_holds_a_formats_options_in_rows_of_its_id
 kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values
 kinogaki-studio-api/lib test format::tests::a_writer_has_no_options_by_default_whatever_its_reading_has
 kinogaki-studio-api/lib test format::tests::options_save_and_read_back_by_default
 kinogaki-studio-api/lib test format::tests::readings_lend_settings_by_type_and_poll_cancellation
+kinogaki-studio-api/lib test format::unique::tests::copies_are_numbered_per_base_name
+kinogaki-studio-api/lib test format::unique::tests::file_names_number_before_their_extension_and_ignore_case
+kinogaki-studio-api/lib test format::unique::tests::many_alike_take_linear_time
 kinogaki-studio-api/lib test icon::tests::a_well_formed_icon_checks_as_its_text
 kinogaki-studio-api/lib test icon::tests::documents_are_bounded_utf8_text
 kinogaki-studio-api/lib test icon::tests::names_are_lowercase_words_joined_by_dashes

@@ -6,7 +6,6 @@ use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
-use crate::image_files::image_node::{AUTO, DATA};
 use crate::network::{NetworkSeed, NewNode, SeedWire};
 use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
 use kinogaki_value::{NodeTypeId, Parameters, Value};
@@ -168,12 +167,7 @@ fn write_image(image: &ImportedImage, out: &mut dyn ElementWriter) -> Result<(),
         ImageFile::Embedded(file) => out.data("embedded", &embedded_file().wrap(file.clone()))?,
     }
     // As an Image node's Color holds it: Auto, Data or a space's name.
-    let color = match image.source.color() {
-        ImageColor::Auto => AUTO,
-        ImageColor::Data => DATA,
-        ImageColor::Space(space) => space,
-    };
-    out.set("color", Field::Text(color.to_owned()))
+    out.set("color", Field::Text(image.source.color().key().to_owned()))
 }
 
 fn read_image(e: &dyn ElementReader) -> Result<ImportedImage, Error> {
@@ -190,10 +184,8 @@ fn read_image(e: &dyn ElementReader) -> Result<ImportedImage, Error> {
         _ => return Err(wrong("it reads no one file")),
     };
     let color = match e.text("color")? {
-        AUTO => ImageColor::Auto,
-        DATA => ImageColor::Data,
         "" => return Err(wrong("its color is no Color")),
-        space => ImageColor::Space(Arc::from(space)),
+        key => ImageColor::of_key(key),
     };
     Ok(ImportedImage {
         key: e.text("key")?.to_owned(),

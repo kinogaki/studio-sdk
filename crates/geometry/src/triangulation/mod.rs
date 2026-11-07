@@ -240,7 +240,7 @@ fn triangles_of(
 /// The triangulation of every polygon, in parallel blocks.
 fn build(value: &Geometry) -> Triangulation {
     let layout = Layout::of(value.primitives());
-    let blocks = parallel::map(value.primitives().len(), BLOCK, |r| {
+    let blocks = parallel::blocks(value.primitives().len(), BLOCK, |r| {
         triangles_of(value, &layout, r)
     });
     let total = blocks.iter().map(|(t, _)| t.len()).sum();
