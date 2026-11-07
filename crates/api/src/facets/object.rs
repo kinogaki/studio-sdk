@@ -83,6 +83,15 @@ pub trait Materials {
     /// A number that changes whenever any answer may change (an edited
     /// library, a file read, another color management). Looks cache by it.
     fn revision(&self) -> u64;
+
+    /// A stamp of what `path` answers: the same stamp, the same
+    /// [`display`](Self::display) and images, so a look keeps what it made
+    /// from the materials it names while theirs stay, whatever else
+    /// changed. By default the store's [`revision`](Self::revision).
+    fn revision_of(&self, path: &str) -> u64 {
+        let _ = path;
+        self.revision()
+    }
 }
 
 /// How a value looks against the scene: its pieces' colors while shaded

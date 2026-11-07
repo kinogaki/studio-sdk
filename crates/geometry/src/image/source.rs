@@ -98,8 +98,15 @@ impl EmbeddedFile {
     }
 
     /// The BLAKE3 hash of its bytes, made the first time it is asked for.
+    /// A host asks where it reads the file (a worker), so a later ask on the
+    /// window's thread finds it made.
     pub fn hash(&self) -> &[u8; 32] {
         self.held.hash.get_or_init(|| hash(self.bytes()))
+    }
+
+    /// Its hash, when it was made already.
+    pub fn hashed(&self) -> Option<&[u8; 32]> {
+        self.held.hash.get()
     }
 }
 
