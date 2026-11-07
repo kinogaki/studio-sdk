@@ -41,10 +41,25 @@
 //! [`CHROMATICITIES`](kinogaki_geometry::image::metadata::CHROMATICITIES),
 //! writes each layer as the file can hold it, and says, as a warning, what
 //! it left out.
+//!
+//! **Untrusted files.** A file may be hostile: a reader never trusts what
+//! it says. Every size, count or depth it claims is checked against the
+//! read's [`ReadBudget`] ([`Reading::budget`]) before anything is
+//! allocated or followed, and a decoder checks its output against its input
+//! ([`ReadBudget::expand`]). Recursion is bounded by the budget's depth, so
+//! it holds on the 2 MiB stack a read runs on; references are followed
+//! once each, by the identity of what they name. The files a file names
+//! are found and read through [`files::Named`] alone: in the file's folder
+//! and below, regular files only, within the budget. What a file asks
+//! beyond its budget is an error naming the file; what a reader left out, a
+//! warning. A read never panics, overflows its stack or aborts on a failed
+//! allocation.
+mod budget;
 pub mod files;
 mod input;
 pub mod options;
 
+pub use budget::{ReadBudget, ReadLimits};
 pub use input::Input;
 
 use crate::cancel::CancelToken;
@@ -130,9 +145,10 @@ pub struct Reading<'a> {
     /// Values of the project the host lends formats, found by their Rust
     /// type (`Reading::setting`): a CAD kernel's tolerances.
     pub settings: &'a [&'a (dyn Any + Send + Sync)],
-    /// Raised once the read is no longer wanted; long reads poll it
-    /// ([`Reading::check`]) and stop with [`Error::cancelled()`].
-    pub cancel: CancelToken,
+    /// What the read may spend, and its cancellation: what the file claims
+    /// is checked against it, and long reads poll it ([`Reading::check`])
+    /// and stop with [`Error::cancelled()`].
+    pub budget: ReadBudget,
     /// The data type the host wants the file read as, for
     /// [`Purpose::Value`]: a File node's output (a STEP file as B-rep or
     /// as polygons); `None` for Import, which takes any.
@@ -140,22 +156,22 @@ pub struct Reading<'a> {
 }
 
 impl<'a> Reading<'a> {
-    /// A read for `purpose` into `units` and `colors`' working space, of
-    /// origin 0, lent nothing and never cancelled.
+    /// A read for `purpose` into `units` and `colors`' working space, lent
+    /// nothing, of the default budget and never cancelled.
     pub fn new(purpose: Purpose, units: Units, colors: &'a dyn ColorService) -> Self {
         Self {
             purpose,
             units,
             colors,
             settings: &[],
-            cancel: CancelToken::default(),
+            budget: ReadBudget::default(),
             wants: None,
         }
     }
 
     /// `Err(Error::cancelled())` once the read is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
-        self.cancel.check()
+        self.budget.check()
     }
 }
 
@@ -479,7 +495,7 @@ mod tests {
         let units = Units::new(0.001, UpAxis::Z).unwrap();
         let reading = Reading {
             settings: &lent,
-            cancel: stop,
+            budget: ReadBudget::default().cancelled_by(stop),
             ..Reading::new(Purpose::Value, units, &Unconverted)
         };
         let input = Input::memory("a.plain", b"");

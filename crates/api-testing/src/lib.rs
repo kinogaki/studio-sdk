@@ -1,5 +1,6 @@
 //! The SDK's test support (a dev-dependency only): [`assert_refused`] for
-//! admission tests, with `wgpu` an engine's GPU tests' device, their turns
+//! admission tests, [`read_hostile`] for a format's tests of hostile files,
+//! with `wgpu` an engine's GPU tests' device, their turns
 //! on it and counted wakes (`engine`), and the conformance suite of the
 //! standard data types: producers make standard values, consumers check
 //! them, and [`run`] tries every pair.
@@ -25,11 +26,13 @@ mod colors;
 #[cfg(feature = "wgpu")]
 pub mod engine;
 mod fixtures;
+mod hostile;
 mod refusals;
 
 pub use checks::{Codecs, Invariants};
 pub use colors::Unconverted;
 pub use fixtures::Fixtures;
+pub use hostile::{IMPORT_STACK, read_hostile};
 pub use refusals::assert_refused;
 
 use kinogaki_studio_api::data::Data;

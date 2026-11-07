@@ -1,8 +1,9 @@
-//! The image files a written document names ([`Beside`]): what a format
-//! writing materials (an MTL library, a MaterialX document) writes for the
-//! Image nodes feeding its textures. A file on disk is named by its path
-//! relative to the document; an embedded file is written beside the
-//! document, once for equal bytes, and named so.
+//! The files a file names: those a file being read names, found and read
+//! by one rule ([`Named`]), and the image files a written document names
+//! ([`Beside`]): what a format writing materials (an MTL library, a
+//! MaterialX document) writes for the Image nodes feeding its textures. A
+//! file on disk is named by its path relative to the document; an embedded
+//! file is written beside the document, once for equal bytes, and named so.
 //!
 //! ```
 //! use kinogaki_studio_api::format::files::Beside;
@@ -19,6 +20,10 @@
 //! assert_eq!(beside.name(&beside_it).unwrap(), "../maps/a.png");
 //! # std::fs::remove_dir_all(&folder).unwrap();
 //! ```
+mod named;
+
+pub use named::Named;
+
 use crate::Error;
 use kinogaki_geometry::image::{EmbeddedFile, ImageFile};
 use std::collections::HashMap;
@@ -40,7 +45,7 @@ impl Beside {
     pub fn new(document: &Path) -> Beside {
         let folder = document
             .parent()
-            .map_or_else(PathBuf::new, Path::to_path_buf);
+            .map_or_else(PathBuf::new, |f| real(f).into_owned());
         let stem = document
             .file_stem()
             .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
@@ -52,8 +57,9 @@ impl Beside {
     }
 
     /// What the document names `file` by, `/` between its parts: a file on
-    /// disk by its path relative to the document's folder (`..` climbing out
-    /// of it; absolute where none reaches it, on another volume); an
+    /// disk by its path relative to the document's folder, both with their
+    /// links followed where they exist (`..` climbing out of the folder;
+    /// absolute where none reaches it, on another volume); an
     /// embedded file written into the `<stem>_textures` folder beside the
     /// document under its own name, once for equal bytes, numbered past a
     /// file of that name holding other bytes (`wood 2.png`), and named by
@@ -63,7 +69,7 @@ impl Beside {
     /// Why an embedded file can't be written.
     pub fn name(&mut self, file: &ImageFile) -> Result<String, Error> {
         let held = match file {
-            ImageFile::Path(path) => return Ok(relative(Path::new(&**path), &self.folder)),
+            ImageFile::Path(path) => return Ok(relative(&real(Path::new(&**path)), &self.folder)),
             ImageFile::Embedded(held) => held,
         };
         if let Some(name) = self.written.get(held.hash()) {
@@ -73,6 +79,27 @@ impl Beside {
         let name = relative(&path, &self.folder);
         self.written.insert(*held.hash(), name.clone());
         Ok(name)
+    }
+}
+
+/// `path` with the links of its longest existing part followed (a file's
+/// canonical path, as the files a read names are given, with what isn't
+/// there yet after it), so two spellings of one place (`/var` and
+/// `/private/var` on macOS) meet.
+fn real(path: &Path) -> std::borrow::Cow<'_, Path> {
+    let mut rest = Vec::new();
+    let mut at = path;
+    loop {
+        if let Ok(real) = at.canonicalize() {
+            return std::borrow::Cow::Owned(rest.iter().rev().fold(real, |p, part| p.join(part)));
+        }
+        match (at.parent(), at.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name);
+                at = parent;
+            }
+            _ => return std::borrow::Cow::Borrowed(path),
+        }
     }
 }
 
@@ -162,6 +189,26 @@ mod tests {
             "maps/wood.png"
         );
         assert_eq!(relative(Path::new("/x.png"), Path::new("/")), "x.png");
+    }
+
+    #[test]
+    fn a_file_reached_through_a_link_is_named_relative_to_the_document() {
+        let dir = std::env::temp_dir().join(format!("kinogaki-beside-link-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("real/maps")).unwrap();
+        std::fs::write(dir.join("real/maps/a.png"), [1]).unwrap();
+        std::os::unix::fs::symlink(dir.join("real"), dir.join("link")).unwrap();
+        let mut beside = Beside::new(&dir.join("link/look.mtl"));
+        for path in ["real/maps/a.png", "link/maps/a.png", "link/maps/gone.png"] {
+            let file = ImageFile::Path(dir.join(path).display().to_string().into());
+            let name = Path::new(path).file_name().unwrap().to_string_lossy();
+            assert_eq!(
+                beside.name(&file).unwrap(),
+                format!("maps/{name}"),
+                "{path}"
+            );
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
