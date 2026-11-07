@@ -64,7 +64,7 @@ impl Scene {
         while let Ok(first) = mailbox.receiver.recv() {
             let rest = std::iter::from_fn(|| mailbox.receiver.try_recv().ok());
             for message in std::iter::once(first).chain(rest) {
-                if !self.take(message, &mailbox.published) {
+                if !self.take(message) {
                     return;
                 }
             }
@@ -124,7 +124,7 @@ impl Scene {
     }
 
     /// Takes `message`; `false` once the handle went.
-    fn take(&mut self, message: Message<()>, published: &Mutex<Published>) -> bool {
+    fn take(&mut self, message: Message<()>) -> bool {
         match message {
             Message::Update(update) => {
                 self.settings = update.settings.unwrap_or_else(|| self.settings.clone());
@@ -136,12 +136,12 @@ impl Scene {
                     .extend(update.changed.into_iter().map(|c| (c.id, c.prim)));
                 self.stale.extend(self.views.keys());
             }
-            Message::View(id, desc) => {
+            Message::View(id, desc, drops) => {
                 self.views.insert(
                     id,
                     View {
                         desc,
-                        drops: lock(published).drops(id),
+                        drops,
                         generation: 0,
                         pixels: None,
                     },

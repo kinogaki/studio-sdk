@@ -8,7 +8,10 @@
 //! - **Views.** A dropped view's frame and problem go on the host's thread at
 //!   once, and the thread publishes for a view only while the host hasn't
 //!   dropped it since it gave it ([`Published::publish`]): a view id given
-//!   again never shows the old view's frame.
+//!   again never shows the old view's frame. How often the host had dropped
+//!   the id travels with the view ([`Message::View`]), counted when the host
+//!   gives it, so a drop the host makes before the thread takes the view
+//!   still counts against it.
 //! - **Reads.** A final render and a preview are both a [`Reading`] of a
 //!   finished view: its outputs, or a preview's beauty as its picture.
 //! - **Previews** render as a view of their own ([`PREVIEW`]): a request's
@@ -114,8 +117,10 @@ impl PreviewScene {
 pub enum Message<E> {
     /// [`RenderEngine::update`].
     Update(SceneUpdate),
-    /// [`RenderEngine::view`].
-    View(ViewId, ViewDesc),
+    /// [`RenderEngine::view`], and how often the host had dropped the id
+    /// when it gave it: what the thread publishes the view's frames and
+    /// problems under ([`Published::publish`]).
+    View(ViewId, ViewDesc, u64),
     /// [`RenderEngine::drop_view`]: its frame and problem already went.
     Drop(ViewId),
     /// [`RenderEngine::pause`].
@@ -144,9 +149,8 @@ pub struct Published {
 }
 
 impl Published {
-    /// How often the host dropped view `view` so far: what the thread notes
-    /// when the host gives a view, and publishes under.
-    pub fn drops(&self, view: ViewId) -> u64 {
+    /// How often the host dropped view `view` so far.
+    fn drops(&self, view: ViewId) -> u64 {
         self.drops.get(&view).copied().unwrap_or(0)
     }
 
@@ -315,7 +319,8 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
     }
 
     fn view(&mut self, view: ViewId, desc: ViewDesc) {
-        self.send(Message::View(view, desc));
+        let drops = lock(&self.published).drops(view);
+        self.send(Message::View(view, desc, drops));
     }
 
     fn drop_view(&mut self, view: ViewId) {
@@ -355,7 +360,7 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         let scene = request.scene().replacing(&mut self.previewed);
         let view = (self.preview_view)(&scene, request.side);
         self.send(Message::Update(scene.update));
-        self.send(Message::View(PREVIEW, view));
+        self.send(Message::View(PREVIEW, view, 0));
         self.send(Message::Read(PREVIEW, Reading(Read::Preview(deliver))));
         result
     }
@@ -367,8 +372,8 @@ mod tests {
     use crate::{EngineId, PrimId};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    /// The preview's view: unused here.
-    fn unseen(_: &PreviewScene, side: u32) -> ViewDesc {
+    /// A final view `side` across.
+    fn desc(side: u32) -> ViewDesc {
         ViewDesc {
             camera: crate::ViewCamera::Prim(crate::Id::of(PrimId {
                 slot: 0,
@@ -379,6 +384,11 @@ mod tests {
             mode: crate::ViewMode::Final,
             values: Arc::default(),
         }
+    }
+
+    /// The preview's view: unused here.
+    fn unseen(_: &PreviewScene, side: u32) -> ViewDesc {
+        desc(side)
     }
 
     #[test]
@@ -408,5 +418,55 @@ mod tests {
         assert_eq!(said.len(), 1);
         assert!(said[0].message.contains("hextiledimage"), "{said:?}");
         assert_eq!(engine.said(), Vec::new(), "taken once");
+    }
+
+    /// The host gives a view, drops it and gives its id again before the
+    /// thread takes the first: the first's frame, published under the drops
+    /// it came with, never shows as the second's.
+    #[test]
+    fn a_view_dropped_before_its_thread_takes_it_publishes_nothing() {
+        let (taken, take) = std::sync::mpsc::channel::<()>();
+        let description = EngineDescription::builder(EngineId::declared("toy.views.engine"), "Toy");
+        let run = move |mailbox: Mailbox<()>| {
+            // Each view it takes renders one frame at once, between the
+            // host's messages: as a thread would that takes the first view
+            // while the host's drop is on its way.
+            while take.recv().is_ok() {
+                let (view, desc, drops) = match mailbox.receiver.recv() {
+                    Ok(Message::View(view, desc, drops)) => (view, desc, drops),
+                    Ok(Message::Stop) | Err(_) => return,
+                    Ok(_) => continue,
+                };
+                let frame = Frame {
+                    view,
+                    generation: 0,
+                    desc,
+                    width: 1,
+                    height: 1,
+                    pixels: Arc::from(vec![0; 4]),
+                    image: 0,
+                    stats: crate::RenderStats::default(),
+                };
+                lock(&mailbox.published).publish(Arc::new(frame), drops);
+            }
+        };
+        let start = (description.build(), |_| ());
+        let wake: Wake = Arc::new(|| {});
+        let mut engine = EngineThread::start("toy", start, wake, unseen, run).expect("its thread");
+        let view = ViewId(3);
+        engine.view(view, desc(8));
+        engine.drop_view(view);
+        // The thread takes the first view and renders it.
+        taken.send(()).expect("the thread");
+        engine.view(view, desc(16));
+        // Then the drop, then the second view.
+        taken.send(()).expect("the thread");
+        taken.send(()).expect("the thread");
+        while engine.latest(view).is_none() {
+            std::thread::yield_now();
+        }
+        let shown = engine.latest(view).expect("the second view's frame");
+        assert_eq!(shown.desc.width, 16, "the dropped view's frame showed");
+        drop(taken);
     }
 }

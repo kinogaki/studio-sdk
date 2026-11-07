@@ -18,7 +18,7 @@
 //! prototype's.
 use crate::id::PrimId;
 use crate::prim::{Subsets, Visibility};
-use kinogaki_geometry::{Attributes, Column, Domain, Error, Sampled, Xform};
+use kinogaki_geometry::{Attribute, Attributes, Column, Domain, Error, Sampled, Xform};
 use std::sync::Arc;
 
 /// Placements of other prims (see the module docs).
@@ -85,6 +85,14 @@ impl Instancer {
     /// [`Domain::Detail`] primvars.
     pub fn primvars(&self) -> &Arc<Attributes> {
         &self.primvars
+    }
+
+    /// Instance `i`'s primvar `name`: its own ([`Domain::Instance`]), else
+    /// the Instancer's ([`Domain::Detail`]); the attribute and the element
+    /// holding it.
+    pub fn primvar(&self, i: usize, name: &str) -> Option<(&Attribute, usize)> {
+        let own = self.primvars.get(Domain::Instance, name).map(|a| (a, i));
+        own.or_else(|| self.primvars.get(Domain::Detail, name).map(|a| (a, 0)))
     }
 
     /// The material each instance renders with in place of its prototype's

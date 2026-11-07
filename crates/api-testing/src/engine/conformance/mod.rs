@@ -1,17 +1,19 @@
 //! An engine checked against what a host sends ([`conformance`]): scenes of
 //! prims built with the SDK's builders, one for each prim kind and standard
 //! type the engine declares (`scenes`), each rendered as a final frame and
-//! read back beside the same scene without its subject; then what a host
-//! does over time (`lifecycle`): an empty scene, a camera not in the scene,
-//! an edit after the first frame, a view id given again, a scene of 6.4
-//! million triangles and a material's nodes adoption cut.
+//! read back beside the same scene without its subject; scenes that render
+//! as their twins (`twins`): a glTF cut-out through its factor and vertex
+//! colors, a float image's first channel, instances' own colors; then what a
+//! host does over time (`lifecycle`): an empty scene, a camera not in the
+//! scene, an edit after the first frame, a view id given again, a scene of
+//! 6.4 million triangles and a material's nodes adoption cut.
 //!
 //! A scene passes when the engine renders it without failing, its final
 //! frame is an Image of the view's size whose main layer is the beauty (RGBA
 //! colors), its beauty is finite, and its subject shows (the two beauties
-//! differ). A view that can't render fails its read at once and says why,
-//! never leaving it unanswered; an edit and a view given again render as a
-//! fresh engine does; what an engine doesn't render it says
+//! differ). Twins render alike. A view that can't render fails its read at
+//! once and says why, never leaving it unanswered; an edit and a view given
+//! again render as a fresh engine does; what an engine doesn't render it says
 //! ([`RenderEngine::said`]).
 use super::Waiter;
 use crate::{Outcome, Report};
@@ -29,6 +31,7 @@ use std::time::Duration;
 
 mod lifecycle;
 mod scenes;
+mod twins;
 
 /// The film's side, in pixels.
 const SIDE: u32 = 48;
@@ -61,10 +64,12 @@ pub fn conformance(name: &str, make: Make<'_>) -> Report {
     };
     let scenes = (scenes::scenes(&description).into_iter())
         .map(|scene| outcome(&scene.name, scenes::check(make, &scene)));
-    let over_time = (lifecycle::checks(make, &description).into_iter())
+    let checks = [twins::checks, lifecycle::checks];
+    let more = (checks.iter())
+        .flat_map(|checks| checks(make, &description))
         .map(|(what, result)| outcome(what, result));
     Report {
-        outcomes: scenes.chain(over_time).collect(),
+        outcomes: scenes.chain(more).collect(),
     }
 }
 
@@ -148,6 +153,20 @@ fn beauty(make: Make<'_>, prims: Vec<Prim>) -> Result<Arc<[f32]>, String> {
         return Err(why.message);
     }
     finite_beauty(&outputs, [SIDE; 2])
+}
+
+/// Whether beauty `a` agrees with `b`: at most one pixel in a hundred
+/// differs by more than a hundredth (sampling noise apart).
+fn alike(a: &[f32], b: &[f32]) -> Result<(), String> {
+    let differs = |(x, y): (&f32, &f32)| (x - y).abs() > 1e-2 * x.abs().max(y.abs()).max(1.0);
+    let pixels = a.len() / 4;
+    let off = (a.chunks(4).zip(b.chunks(4)))
+        .filter(|(p, q)| p.iter().zip(q.iter()).any(differs))
+        .count();
+    match off * 100 <= pixels {
+        true => Ok(()),
+        false => Err(format!("{off} of {pixels} pixels differ from its twin's")),
+    }
 }
 
 /// The beauty of `outputs`, when they are an Image of `size` whose main

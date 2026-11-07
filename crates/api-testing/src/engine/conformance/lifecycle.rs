@@ -5,7 +5,7 @@
 //! saying why, never a read let go unanswered; and the nodes adoption cut
 //! from a material, each said.
 use super::scenes::{camera, dome, node, quad};
-use super::{Make, SIDE, Session, VIEW, beauty, finite_beauty, id};
+use super::{Make, SIDE, Session, VIEW, alike, beauty, finite_beauty, id};
 use kinogaki_render_api::geometry::{Column, Error};
 use kinogaki_render_api::{
     Change, Dirty, EngineDescription, Engines, Id, Material, MaterialNetwork, Prim, SceneUpdate,
@@ -182,22 +182,6 @@ fn cut(make: Make<'_>, description: &EngineDescription) -> Result<(), String> {
         true => Ok(()),
         false => Err(format!(
             "it says nothing of {unsaid:?}, which it doesn't render"
-        )),
-    }
-}
-
-/// Whether beauty `a` agrees with `b`: at most one pixel in a hundred
-/// differs by more than a hundredth (sampling noise apart).
-fn alike(a: &[f32], b: &[f32]) -> Result<(), String> {
-    let differs = |(x, y): (&f32, &f32)| (x - y).abs() > 1e-2 * x.abs().max(y.abs()).max(1.0);
-    let pixels = a.len() / 4;
-    let off = (a.chunks(4).zip(b.chunks(4)))
-        .filter(|(p, q)| p.iter().zip(q.iter()).any(differs))
-        .count();
-    match off * 100 <= pixels {
-        true => Ok(()),
-        false => Err(format!(
-            "{off} of {pixels} pixels differ from a fresh engine's"
         )),
     }
 }

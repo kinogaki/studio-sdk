@@ -60,6 +60,31 @@ fn an_inheriting_definition_holds_its_parents_inputs_first() {
 }
 
 #[test]
+fn kinogakis_gltf_images_read_their_wraps_in_gltfs_order() {
+    let library = library();
+    // The color image's graph passes its wraps to the image it reads,
+    // placed in glTF's order.
+    let color = library.def("ND_kinogaki_gltf_colorimage").unwrap();
+    let graph = library.implementation(color).unwrap();
+    let image = (graph.nodes.iter())
+        .find(|n| n.def.node == "gltf_image")
+        .unwrap();
+    let bound = |name: &str| &image.inputs.iter().find(|(n, _)| n == name).unwrap().1;
+    for wrap in ["uaddressmode", "vaddressmode"] {
+        assert_eq!(bound(wrap), &Binding::Interface(wrap.into()));
+    }
+    assert_eq!(bound("operationorder"), &Binding::Value(Value::Integer(0)));
+    // Every glTF image of Kinogaki's places in glTF's order.
+    for signature in ["color3", "color4", "float", "vector3"] {
+        let def = library
+            .def(&format!("ND_kinogaki_gltf_image_{signature}"))
+            .unwrap();
+        let order = def.input("operationorder").unwrap();
+        assert_eq!(order.value, Some(Value::Integer(0)), "{signature}");
+    }
+}
+
+#[test]
 fn every_graph_implementation_resolves_and_type_checks() {
     let library = library();
     let mut graphs = 0;

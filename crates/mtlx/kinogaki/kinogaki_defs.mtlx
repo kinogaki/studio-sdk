@@ -43,13 +43,15 @@
     glTF's texture nodes with its minification filter, and an undefined
     magnification filter (`filtertype` empty): what a sampler holds that
     MaterialX's one filter doesn't. Engines that don't mipmap read the
-    parent's graph alone.
+    parent's graph alone. The color4 image places in glTF's order (0), where
+    MaterialX's own defaults to the other.
   -->
   <nodedef name="ND_kinogaki_gltf_image_color3" node="kinogaki_gltf_image" nodegroup="texture2d" inherit="ND_gltf_image_color3_color3_1_0" uiname="glTF Image">
     <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
     <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
   </nodedef>
   <nodedef name="ND_kinogaki_gltf_image_color4" node="kinogaki_gltf_image" nodegroup="texture2d" inherit="ND_gltf_image_color4_color4_1_0" uiname="glTF Image">
+    <input name="operationorder" type="integer" value="0" />
     <input name="filtertype" type="string" uniform="true" value="linear" enum=",closest,linear,cubic" />
     <input name="minfilter" type="string" uniform="true" value="" enum=",nearest,linear,nearest_mipmap_nearest,linear_mipmap_nearest,nearest_mipmap_linear,linear_mipmap_linear" uiname="Minification Filter" />
   </nodedef>
