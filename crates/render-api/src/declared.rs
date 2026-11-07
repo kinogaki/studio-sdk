@@ -29,7 +29,7 @@ pub enum Role {
 /// A prim type an engine declares.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrimType {
-    /// Its id (`kinogaki.render.area_light`, `kinogaki.pixel.rim_light`).
+    /// Its id (`acme.ray.area_light`, `kinogaki.pixel.rim_light`).
     pub id: PrimTypeId,
     /// What a UI calls it (`Area Light`).
     pub label: Arc<str>,

@@ -205,7 +205,7 @@ declare_id!(
     /// A creation: one way menus, keys and shelves make a node
     /// (`NodeCreation`) or an object
     /// (`KindCreation`), under its package's vendor
-    /// (`kinogaki.render.spot_light`).
+    /// (`acme.ray.spot_light`).
     CreationId,
     "creation"
 );
@@ -218,7 +218,7 @@ declare_id!(
 );
 
 declare_id!(
-    /// A declared prim type (`kinogaki.render.area_light`,
+    /// A declared prim type (`acme.ray.area_light`,
     /// `kinogaki.pixel.rim_light`): what a light or fog object and its prims
     /// name their schema by. Declared by an `EngineDescription`, under its
     /// package's vendor; the standard ones are the SDK's.

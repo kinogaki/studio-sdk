@@ -149,7 +149,7 @@ pub trait ObjectKindSpec: Send + Sync {
 #[derive(Clone, Debug, PartialEq)]
 pub struct KindCreation {
     /// Its item id, which menus, keys and shelves name it by
-    /// (`kinogaki.render.spot_light`, `example.pins.board`).
+    /// (`acme.ray.spot_light`, `example.pins.board`).
     pub id: CreationId,
     /// What menus call it ("Spot Light").
     pub label: String,
