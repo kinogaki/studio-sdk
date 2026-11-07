@@ -5,97 +5,19 @@
 //! its VRayMtl) and its description lists them
 //! ([`EngineDescription::node_defs`](crate::EngineDescription::node_defs)).
 //! A host makes node types of them in the Shading context of a Material.
+//!
+//! What a port carries is a MaterialX [`Type`]: a value (`float`, `color3`,
+//! ...), an image (`filename`: wired from the host's Image node; a network an
+//! engine receives holds no wire into it, but the image's Texture prim, in
+//! its node's [`textures`](super::Node::textures)), or a closure or shader
+//! by its name (MaterialX's `BSDF`, `surfaceshader`, ...; or one an
+//! engine's own nodes alone agree on, a [`Type::Named`] of its own). Colors
+//! are linear: authored in the working space, ACEScg in the network an
+//! engine receives ([`crate::RENDER_SPACE`]).
 use kinogaki_mtlx::Type;
 use kinogaki_value::NodeTypeId;
 use kinogaki_value::{Parameter, Section};
 use std::sync::Arc;
-
-/// What a wire between material nodes carries: MaterialX's types.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Socket {
-    /// `boolean`.
-    Boolean,
-    /// `integer`.
-    Integer,
-    /// `float`.
-    Float,
-    /// `color3`: linear (authored in the working space, ACEScg in the network
-    /// an engine receives, [`crate::RENDER_SPACE`]).
-    Color3,
-    /// `color4`: a linear color and its alpha.
-    Color4,
-    /// `vector2`: a texture coordinate.
-    Vector2,
-    /// `vector3`: a position, direction or normal.
-    Vector3,
-    /// `vector4`.
-    Vector4,
-    /// `matrix33`.
-    Matrix33,
-    /// `matrix44`.
-    Matrix44,
-    /// `string`.
-    String,
-    /// `filename`: an image, wired from the host's Image node. A network an
-    /// engine receives holds no wire into it: the image's Texture prim, in
-    /// its node's `textures` (see [`Node`](super::Node)).
-    Image,
-    /// A closure or shader, by its name: MaterialX's (`BSDF`, `EDF`, `VDF`,
-    /// `surfaceshader`, `displacementshader`, `volumeshader`, `material`) or
-    /// one an engine's own nodes alone agree on.
-    Closure(Arc<str>),
-}
-
-impl Socket {
-    /// The socket of MaterialX type `ty`.
-    pub fn of(ty: &Type) -> Socket {
-        match ty {
-            Type::Boolean => Socket::Boolean,
-            Type::Integer => Socket::Integer,
-            Type::Float => Socket::Float,
-            Type::Color3 => Socket::Color3,
-            Type::Color4 => Socket::Color4,
-            Type::Vector2 => Socket::Vector2,
-            Type::Vector3 => Socket::Vector3,
-            Type::Vector4 => Socket::Vector4,
-            Type::Matrix33 => Socket::Matrix33,
-            Type::Matrix44 => Socket::Matrix44,
-            Type::String => Socket::String,
-            Type::Filename => Socket::Image,
-            Type::Named(name) => Socket::Closure(name.clone()),
-        }
-    }
-
-    /// MaterialX's `surfaceshader`: what a surface's output carries.
-    pub fn surface() -> Socket {
-        Socket::Closure(Arc::from("surfaceshader"))
-    }
-
-    /// The numbers a value of it holds (a color3: 3); 0 for a closure, text
-    /// or matrix.
-    pub fn width(&self) -> usize {
-        match self {
-            Socket::Boolean | Socket::Integer | Socket::Float => 1,
-            Socket::Vector2 => 2,
-            Socket::Color3 | Socket::Vector3 => 3,
-            Socket::Color4 | Socket::Vector4 => 4,
-            _ => 0,
-        }
-    }
-
-    /// Whether an output of this socket may drive an input of `input`:
-    /// numbers drive numbers (an engine converts between widths, as
-    /// MaterialX's `convert` would), text drives text, an image an image, a
-    /// matrix one of its size, and a closure its own kind alone.
-    pub fn drives(&self, input: &Socket) -> bool {
-        match (self, input) {
-            (Socket::Closure(a), Socket::Closure(b)) => a == b,
-            (Socket::String, Socket::String) | (Socket::Image, Socket::Image) => true,
-            (Socket::Matrix33, Socket::Matrix33) | (Socket::Matrix44, Socket::Matrix44) => true,
-            _ => self.width() > 0 && input.width() > 0,
-        }
-    }
-}
 
 /// One input of a node.
 #[derive(Clone, Debug, PartialEq)]
@@ -104,7 +26,7 @@ pub enum NodeInput {
     /// uniform inputs).
     Setting(Parameter),
     /// A value a wire may drive; unwired, it holds its value.
-    Driven(Parameter, Socket),
+    Driven(Parameter, Type),
     /// A wire alone: a closure, an image, or what reads a geometric property
     /// while unwired (MaterialX's `defaultgeomprop`: the shading normal, a
     /// texture coordinate).
@@ -114,13 +36,13 @@ pub enum NodeInput {
         /// What a UI labels it.
         label: Arc<str>,
         /// What it takes.
-        socket: Socket,
+        socket: Type,
     },
 }
 
 impl NodeInput {
     /// Wire input `name`, labelled `label`, taking `socket`.
-    pub fn wire(name: &str, label: &str, socket: Socket) -> NodeInput {
+    pub fn wire(name: &str, label: &str, socket: Type) -> NodeInput {
         NodeInput::Wire {
             name: Arc::from(name),
             label: Arc::from(label),
@@ -153,7 +75,7 @@ impl NodeInput {
     }
 
     /// What a wire into it carries, when one may be.
-    pub fn socket(&self) -> Option<&Socket> {
+    pub fn socket(&self) -> Option<&Type> {
         match self {
             NodeInput::Setting(_) => None,
             NodeInput::Driven(_, socket) | NodeInput::Wire { socket, .. } => Some(socket),
@@ -169,12 +91,12 @@ pub struct NodeOutput {
     /// What a UI labels it.
     pub label: Arc<str>,
     /// What it carries.
-    pub socket: Socket,
+    pub socket: Type,
 }
 
 impl NodeOutput {
     /// Output `name`, labelled `label`, carrying `socket`.
-    pub fn new(name: &str, label: &str, socket: Socket) -> NodeOutput {
+    pub fn new(name: &str, label: &str, socket: Type) -> NodeOutput {
         NodeOutput {
             name: Arc::from(name),
             label: Arc::from(label),

@@ -79,7 +79,7 @@ pub use material::preview::{
 };
 pub use material::{
     DisplayTexture, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef,
-    NodeIndex, NodeInput, NodeOutput, Socket,
+    NodeIndex, NodeInput, NodeOutput,
 };
 pub use prim::{
     Camera, Instancer, InstancerBuilder, Map, Material, MaterialMaps, Prim, PrimKind, Projection,

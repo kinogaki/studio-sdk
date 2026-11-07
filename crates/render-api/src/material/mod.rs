@@ -25,13 +25,14 @@ pub mod mtlx;
 pub mod preview;
 pub mod standard;
 
-pub use def::{NodeDef, NodeInput, NodeOutput, Socket};
+pub use def::{NodeDef, NodeInput, NodeOutput};
 pub use display::{DisplayTexture, MaterialDisplay};
 
 use crate::id::Id;
 use crate::settings::Textures;
 use kinogaki_geometry::Error;
 use kinogaki_geometry::image::{Image, ImageColor, ImageSource};
+use kinogaki_mtlx::Type;
 use kinogaki_value::{Parameter, Parameters, Value, ValueKind};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -41,7 +42,7 @@ use std::sync::Arc;
 pub type NodeIndex = u32;
 
 /// A node: its definition, every input's value (its default when never
-/// set), the images its [`Image`](Socket::Image) inputs read, and, as an
+/// set), the images its Image (`filename`) inputs read, and, as an
 /// engine receives it, the Texture prims the host read those to, by input
 /// name. Read-only: a network's nodes change only through the network,
 /// which checks what they hold ([`MaterialNetwork::set_texture`],
@@ -90,13 +91,13 @@ impl Node {
     /// channels).
     pub fn reads_data(&self, input: &str) -> bool {
         let color =
-            (self.def.outputs.iter()).any(|o| matches!(o.socket, Socket::Color3 | Socket::Color4));
+            (self.def.outputs.iter()).any(|o| matches!(o.socket, Type::Color3 | Type::Color4));
         !color || (self.images.get(input)).is_some_and(|i| *i.color() == ImageColor::Data)
     }
 
     /// `Ok` when `input` is one of its Image inputs.
     fn image_input(&self, input: &str) -> Result<(), Error> {
-        match self.def.find_input(input).and_then(NodeInput::socket) == Some(&Socket::Image) {
+        match self.def.find_input(input).and_then(NodeInput::socket) == Some(&Type::Filename) {
             true => Ok(()),
             false => {
                 let label = &self.def.label;
@@ -312,6 +313,25 @@ impl MaterialNetwork {
     }
 }
 
+/// Whether an output carrying `output` may drive an input taking `input`:
+/// numbers drive numbers (an engine converts between widths, as
+/// MaterialX's `convert` would; a boolean or an integer is a number of one),
+/// text drives text, an image an image, a matrix one of its size, and a
+/// closure its own kind alone.
+fn drives(output: &Type, input: &Type) -> bool {
+    let numbers = |t: &Type| match t {
+        Type::Boolean | Type::Integer => 1,
+        Type::Matrix33 | Type::Matrix44 | Type::String | Type::Filename | Type::Named(_) => 0,
+        other => other.width(),
+    };
+    match (output, input) {
+        (Type::Named(a), Type::Named(b)) => a == b,
+        (Type::String, Type::String) | (Type::Filename, Type::Filename) => true,
+        (Type::Matrix33, Type::Matrix33) | (Type::Matrix44, Type::Matrix44) => true,
+        _ => numbers(output) > 0 && numbers(input) > 0,
+    }
+}
+
 /// The primvars value `value` of input `input` names: an attribute
 /// input's names, none for any other.
 fn attributes(input: &Parameter, value: &Value) -> Vec<Arc<str>> {
@@ -377,8 +397,11 @@ impl NetworkBuilder {
     /// Output `output` of node `from` driving input `input` of node `to`.
     ///
     /// # Errors
-    /// No such node or port, an input already driven, or sockets that don't
-    /// meet ([`Socket::drives`]).
+    /// No such node or port, an input already driven, or types that don't
+    /// meet: numbers drive numbers (an engine converts between widths, as
+    /// MaterialX's `convert` would; a boolean or an integer is a number of
+    /// one), text drives text, an image an image, a matrix one of its size,
+    /// and a closure its own kind alone.
     pub fn link(
         &mut self,
         from: NodeIndex,
@@ -404,7 +427,7 @@ impl NetworkBuilder {
                 "{label} has no input {input} a wire can drive"
             ))
         })?;
-        if !out.socket.drives(takes) {
+        if !drives(&out.socket, takes) {
             let (a, b) = (&source.label, &driven.label);
             return Err(Error::invalid(format_args!(
                 "{a}'s {output} can't drive {b}'s {input}"
@@ -478,9 +501,9 @@ mod tests {
     /// A surface output taking a color, a texture reading an attribute, and
     /// an output node taking a surface.
     fn defs() -> [Arc<NodeDef>; 3] {
-        let closure = || Socket::Closure(Arc::from("surface"));
+        let closure = || Type::Named(Arc::from("surface"));
         let surface = NodeDef::new(NodeTypeId::declared("toy.m.surface"), "Surface", "Surface")
-            .input(NodeInput::Driven(color("base"), Socket::Color3))
+            .input(NodeInput::Driven(color("base"), Type::Color3))
             .output(NodeOutput::new("out", "Out", closure()));
         let attribute = ValueKind::Attribute {
             menu: Vec::new(),
@@ -489,8 +512,8 @@ mod tests {
         let read = Parameter::new("name", "Name", attribute, "Cd");
         let reader = NodeDef::new(NodeTypeId::declared("toy.m.read"), "Read", "Input")
             .input(NodeInput::Setting(read))
-            .input(NodeInput::Driven(color("gain"), Socket::Color3))
-            .output(NodeOutput::new("out", "Out", Socket::Color3));
+            .input(NodeInput::Driven(color("gain"), Type::Color3))
+            .output(NodeOutput::new("out", "Out", Type::Color3));
         let output = NodeDef::new(NodeTypeId::declared("toy.m.output"), "Output", "Output")
             .input(NodeInput::wire("surface", "Surface", closure()));
         [Arc::new(surface), Arc::new(reader), Arc::new(output)]
@@ -653,15 +676,15 @@ mod tests {
 
     #[test]
     fn sockets_meet_by_kind() {
-        let closure = |n: &str| Socket::Closure(Arc::from(n));
-        assert!(Socket::Float.drives(&Socket::Color3));
-        assert!(Socket::Color4.drives(&Socket::Vector2));
-        assert!(Socket::Image.drives(&Socket::Image));
-        assert!(!Socket::Image.drives(&Socket::String));
-        assert!(!Socket::Matrix33.drives(&Socket::Matrix44));
-        assert!(!Socket::Float.drives(&Socket::String));
-        assert!(closure("a").drives(&closure("a")));
-        assert!(!closure("a").drives(&closure("b")));
-        assert!(!closure("a").drives(&Socket::Float));
+        let closure = |n: &str| Type::Named(Arc::from(n));
+        assert!(drives(&Type::Float, &Type::Color3));
+        assert!(drives(&Type::Color4, &Type::Vector2));
+        assert!(drives(&Type::Filename, &Type::Filename));
+        assert!(!drives(&Type::Filename, &Type::String));
+        assert!(!drives(&Type::Matrix33, &Type::Matrix44));
+        assert!(!drives(&Type::Float, &Type::String));
+        assert!(drives(&closure("a"), &closure("a")));
+        assert!(!drives(&closure("a"), &closure("b")));
+        assert!(!drives(&closure("a"), &Type::Float));
     }
 }

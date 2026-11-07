@@ -1,6 +1,7 @@
 use super::super::mtlx::def;
 use super::super::standard::open_pbr;
-use crate::{Capabilities, EngineDescription, Engines, MaterialNetwork, Socket};
+use crate::{Capabilities, EngineDescription, Engines, MaterialNetwork};
+use kinogaki_mtlx::Type;
 use kinogaki_mtlx::library;
 use kinogaki_value::{EngineId, Parameters, Value};
 use std::sync::Arc;
@@ -332,7 +333,7 @@ fn another_engines_material_goes_as_its_standard_form() {
         ValueKind::Color,
         [0.5; 3],
     )))
-    .output(NodeOutput::new("out", "Out", Socket::surface()));
+    .output(NodeOutput::new("out", "Out", Type::of("surfaceshader")));
     let painter = EngineDescription::builder(EngineId::declared("toy.paint.engine"), "Paint")
         .materials(vec![paint], Arc::new(Paint))
         .build();

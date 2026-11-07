@@ -83,7 +83,11 @@ fn def(engine: &str) -> NodeDef {
     } else {
         "toy.there.paint"
     });
-    NodeDef::new(id, "Paint", "Surface").output(NodeOutput::new("out", "Out", Socket::surface()))
+    NodeDef::new(id, "Paint", "Surface").output(NodeOutput::new(
+        "out",
+        "Out",
+        kinogaki_mtlx::Type::of("surfaceshader"),
+    ))
 }
 
 /// The network of `def` alone.

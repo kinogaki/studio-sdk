@@ -8,10 +8,10 @@
 //!   drive;
 //! - an input reading a geometric property while unwired (a texture
 //!   coordinate, the shading normal), a matrix and a closure are wires alone;
-//! - a `filename` input is an [`Image`](Socket::Image) wire alone: the host's
+//! - a `filename` input is an image wire alone: the host's
 //!   Image node reads the file, and holds what MaterialX's `colorspace`
 //!   attribute says.
-use super::def::{NodeDef, NodeInput, NodeOutput, Socket};
+use super::def::{NodeDef, NodeInput, NodeOutput};
 use kinogaki_mtlx::{Port, Type, library};
 use kinogaki_value::NodeTypeId;
 use kinogaki_value::{Choice, Number, NumberLook, Parameter, Section, Value, ValueKind};
@@ -61,7 +61,7 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
         def = def.output(NodeOutput::new(
             &port.name,
             &words(&port.name),
-            Socket::of(&port.ty),
+            port.ty.clone(),
         ));
     }
     Some(def.of_mtlx(source))
@@ -69,7 +69,7 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
 
 /// `port` of node `node` as an input.
 fn input(node: &str, port: &Port) -> NodeInput {
-    let socket = Socket::of(&port.ty);
+    let socket = port.ty.clone();
     let label = port.label.clone().unwrap_or_else(|| words(&port.name));
     let wire = port.geomprop.is_some()
         || matches!(
@@ -429,7 +429,7 @@ mod tests {
         assert!(matches!(
             image.find_input("file"),
             Some(NodeInput::Wire {
-                socket: Socket::Image,
+                socket: Type::Filename,
                 ..
             })
         ));
@@ -438,7 +438,7 @@ mod tests {
         assert!(matches!(
             image.find_input("texcoord"),
             Some(NodeInput::Wire {
-                socket: Socket::Vector2,
+                socket: Type::Vector2,
                 ..
             })
         ));
@@ -460,7 +460,7 @@ mod tests {
         );
         let open_pbr = def("ND_open_pbr_surface_surfaceshader").unwrap();
         assert_eq!(&*open_pbr.label, "OpenPBR Surface");
-        assert_eq!(open_pbr.outputs[0].socket, Socket::surface());
+        assert_eq!(open_pbr.outputs[0].socket, Type::of("surfaceshader"));
         let alpha = def("ND_gltf_pbr_surfaceshader").unwrap();
         let mode = alpha
             .find_input("alpha_mode")

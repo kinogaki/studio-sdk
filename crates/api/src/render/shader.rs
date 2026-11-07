@@ -8,7 +8,8 @@ use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
 use crate::network::{NewNode, NodeCreation};
 use crate::params::Schema;
 use crate::{CookCx, Error, NodeType, Outputs};
-use kinogaki_render_api::{NodeDef, NodeInput, Socket};
+use kinogaki_render_api::materialx::Type;
+use kinogaki_render_api::{NodeDef, NodeInput};
 use std::sync::Arc;
 
 /// Inside a Material node: its shading network.
@@ -40,9 +41,9 @@ pub const SHADER: DataTypeId = DataTypeId::declared("kinogaki.core.shader");
 /// What the wire at a material node's port of `socket` carries: an image
 /// ([`standard::image`](crate::standard::image)) at an Image input, where the
 /// host's Image node is wired, a shading wire ([`SHADER`]) at every other.
-pub fn wire_type(socket: &Socket) -> DataTypeId {
+pub fn wire_type(socket: &Type) -> DataTypeId {
     match socket {
-        Socket::Image => crate::standard::image().id(),
+        Type::Filename => crate::standard::image().id(),
         _ => SHADER,
     }
 }
