@@ -42,6 +42,10 @@ pub struct ImportedMaterial {
     /// material written beside its MaterialX form). None when `inside` is
     /// MaterialX's or nothing standard approximates it.
     pub standard: Option<NetworkSeed>,
+    /// Whether a surface's back shows it too (the Material's Double Sided:
+    /// glTF's `doubleSided`, USD's `doubleSided`); off, a realtime engine
+    /// leaves the back out.
+    pub double_sided: bool,
 }
 
 /// An image a file's lights name, which the host makes an Image node of.
@@ -59,16 +63,17 @@ pub struct ImportedImage {
 }
 
 /// Saves a file's materials as imported: `count`, then one `material` child
-/// `m<i>` each holding its `key`, `name`, its `inside` and, when it has one,
-/// its `standard` (each a `network`); then `images` and one `image` child
-/// `i<k>` each holding its `key`, `name` and source (`file`, a path, or an
-/// `embedded` file through its type's codec, once a save for equal bytes;
-/// `color`, `space`). A network holds `nodes`, one `node` child `n<k>` each
-/// (`type`, a `name` when it has one, `display`, its values `valueNames`,
-/// `valueKinds` and `v<j>`, and an `inside` network when it holds one) and
-/// its wires (`from`, `output`, `to`, `input`). A round trip is exact.
-/// Numbers, colors, toggles, choices, texts and data (an Image node's
-/// embedded file) save; a file's material holds no other value.
+/// `m<i>` each holding its `key`, `name`, `doubleSided`, its `inside` and,
+/// when it has one, its `standard` (each a `network`); then `images` and
+/// one `image` child `i<k>` each holding its `key`, `name` and source
+/// (`file`, a path, or an `embedded` file through its type's codec, once a
+/// save for equal bytes; `color`, `space`). A network holds `nodes`, one
+/// `node` child `n<k>` each (`type`, a `name` when it has one, `display`,
+/// its values `valueNames`, `valueKinds` and `v<j>`, and an `inside`
+/// network when it holds one) and its wires (`from`, `output`, `to`,
+/// `input`). A round trip is exact. Numbers, colors, toggles, choices,
+/// texts and data (an Image node's embedded file) save; a file's material
+/// holds no other value.
 ///
 /// ```
 /// use kinogaki_studio_api::DataCodec;
@@ -80,7 +85,7 @@ pub struct ImportedImage {
 ///
 /// let mut inside = NetworkSeed::default();
 /// inside.node(NewNode::new(NodeTypeId::declared("acme.obj.surface")).with("red", 0.8).displayed());
-/// let red = ImportedMaterial { key: "red".into(), name: "Red".into(), inside, standard: None };
+/// let red = ImportedMaterial { key: "red".into(), name: "Red".into(), inside, standard: None, double_sided: true };
 /// let sky = ImportedImage { key: "sky".into(), name: "Sky".into(), source: ImageSource::path("/hdr/sky.exr") };
 /// let held = Materials { materials: vec![red], images: vec![sky] };
 /// let data = standard::materials().wrap(held.clone());
@@ -136,6 +141,7 @@ fn count(e: &dyn ElementReader, name: &str) -> Result<usize, Error> {
 fn write_material(m: &ImportedMaterial, out: &mut dyn ElementWriter) -> Result<(), Error> {
     out.set("key", Field::Text(m.key.clone()))?;
     out.set("name", Field::Text(m.name.clone()))?;
+    out.set("doubleSided", Field::Bool(m.double_sided))?;
     write_network(&m.inside, &mut *out.child("inside", "network")?)?;
     match &m.standard {
         Some(standard) => write_network(standard, &mut *out.child("standard", "network")?),
@@ -150,6 +156,7 @@ fn read_material(e: &dyn ElementReader) -> Result<ImportedMaterial, Error> {
         name: e.text("name")?.to_owned(),
         inside: read_network(&*e.required_child("inside")?)?,
         standard,
+        double_sided: e.bool("doubleSided")?,
     })
 }
 
@@ -381,12 +388,14 @@ mod tests {
             name: "Steel 2".into(),
             inside,
             standard: Some(standard),
+            double_sided: false,
         };
         let bare = ImportedMaterial {
             key: "plain".into(),
             name: "Plain".into(),
             inside: NetworkSeed::default(),
             standard: None,
+            double_sided: true,
         };
         let sky = |source| ImportedImage {
             key: "sky".into(),
