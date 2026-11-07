@@ -355,6 +355,8 @@ pub struct Library {
     /// Each definition's graph, resolved on first use.
     graphs: Vec<OnceLock<Option<Arc<Graph>>>>,
     geomprops: HashMap<String, GeomProp>,
+    /// Each unit of the unit definitions: its unit type and its scale.
+    units: HashMap<String, (String, f64)>,
 }
 
 impl Library {
@@ -377,6 +379,7 @@ impl Library {
             sources: Vec::new(),
             graphs: Vec::new(),
             geomprops: HashMap::new(),
+            units: HashMap::new(),
         };
         let mut graphs: HashMap<&str, usize> = HashMap::new();
         let mut implemented: HashMap<&str, &str> = HashMap::new();
@@ -418,6 +421,15 @@ impl Library {
                         index: e.attr("index").and_then(|i| i.parse().ok()),
                     };
                     library.geomprops.insert(e.get("name").to_owned(), geomprop);
+                }
+                "unitdef" => {
+                    for unit in e.elements().filter(|c| c.category == "unit") {
+                        let Ok(scale) = unit.get("scale").parse::<f64>() else {
+                            continue;
+                        };
+                        let named = (e.get("unittype").to_owned(), scale);
+                        library.units.insert(unit.get("name").to_owned(), named);
+                    }
                 }
                 _ => {}
             }
@@ -531,6 +543,22 @@ impl Library {
     /// Every node the library defines, by name, in name order.
     pub fn nodes(&self) -> impl Iterator<Item = &str> {
         self.by_node.keys().map(String::as_str)
+    }
+
+    /// Unit `name` (`millimeter`, `degree`): its unit type (`distance`,
+    /// `angle`) and its scale against the type's base unit (metres for a
+    /// distance, degrees for an angle).
+    pub fn unit(&self, name: &str) -> Option<(&str, f64)> {
+        let (unit_type, scale) = self.units.get(name)?;
+        Some((unit_type, *scale))
+    }
+
+    /// The distance unit `metres` long (`millimeter` for 0.001), when the
+    /// unit definitions have one.
+    pub fn distance_unit(&self, metres: f64) -> Option<&str> {
+        let mut distances = self.units.iter().filter(|(_, (t, _))| t == "distance");
+        let found = distances.find(|(_, (_, scale))| (scale / metres - 1.0).abs() < 1e-12);
+        found.map(|(name, _)| name.as_str())
     }
 
     /// Geometric property `name` (`UV0`, `Nworld`).

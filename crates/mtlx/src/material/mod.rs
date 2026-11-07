@@ -12,6 +12,8 @@
 //! - a value's color space (its `colorspace`, else its nearest enclosing
 //!   element's) kept with each color and file name, and file names prefixed
 //!   by their `fileprefix`;
+//! - each input's unit (its `unit`, else its nearest enclosing element's)
+//!   kept by the node ([`MaterialNode::units`]);
 //! - its name the material node's, its label its `uiname`.
 //!
 //! What a flat network can't hold (looks and their assignments, a node no
@@ -22,9 +24,10 @@
 //! its material node, which reads the graph's outputs: names made valid and
 //! unique (a material's own as its `uiname` when that changes it), each value
 //! of a color or a file name with its color space where it isn't the
-//! document's, one of no color space said so (`colorspace=""`), and
-//! a node's `nodedef` where its category, type and inputs wouldn't resolve
-//! to it.
+//! document's, one of no color space said so (`colorspace=""`), each
+//! input of a unit with it and its unit type (`unit="millimeter"
+//! unittype="distance"`), and a node's `nodedef` where its category, type
+//! and inputs wouldn't resolve to it.
 //!
 //! [`Document::materials`]: crate::Document::materials
 //! [`Document::of_materials`]: crate::Document::of_materials
@@ -33,6 +36,7 @@ mod write;
 
 use crate::library::NodeDef;
 use crate::types::Value;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// A material: its material node and the nodes it holds (see the module
@@ -63,6 +67,10 @@ pub struct MaterialNode {
     /// Its inputs the document binds, by name, in order; the others hold
     /// their definition's defaults.
     pub inputs: Vec<(String, Bound)>,
+    /// The unit each input's value is in where the document says (`unit`
+    /// on the input, else on its node, its graph or the document), by
+    /// input name: a distance's (`millimeter`) or an angle's.
+    pub units: BTreeMap<String, String>,
 }
 
 /// What an input of a [`MaterialNode`] is bound to.

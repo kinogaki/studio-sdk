@@ -85,6 +85,17 @@ fn kinogakis_gltf_images_read_their_wraps_in_gltfs_order() {
 }
 
 #[test]
+fn units_are_the_unit_definitions() {
+    let library = library();
+    assert_eq!(library.unit("millimeter"), Some(("distance", 0.001)));
+    assert_eq!(library.unit("degree"), Some(("angle", 1.0)));
+    assert_eq!(library.unit("parsec"), None);
+    assert_eq!(library.distance_unit(0.01), Some("centimeter"));
+    assert_eq!(library.distance_unit(0.0254), Some("inch"));
+    assert_eq!(library.distance_unit(0.1), None, "no decimetre");
+}
+
+#[test]
 fn kinogakis_definitions_travel_as_the_materialx_ones_they_inherit() {
     let library = library();
     let def = |name: &str| library.def(name).unwrap();

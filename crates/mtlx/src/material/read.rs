@@ -5,7 +5,7 @@ use crate::graph::node_def;
 use crate::library::{NodeDef, Port, library};
 use crate::types::{Type, Value};
 use crate::xml::{DEPTH as CHAIN, Element};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 /// How deep definitions' graphs may hold one another.
@@ -281,6 +281,7 @@ impl<'a, 'd> Flat<'a, 'd> {
             None => {
                 let def = node_def(library(), e)?.clone();
                 let mut inputs = Vec::new();
+                let mut units = BTreeMap::new();
                 for input in e.elements().filter(|c| c.category == "input") {
                     let Some(port) = def.input(input.get("name")) else {
                         let why = format!(
@@ -292,6 +293,9 @@ impl<'a, 'd> Flat<'a, 'd> {
                         continue;
                     };
                     if let Some(bound) = self.bind(scope, input, e, &port.ty)? {
+                        if let Some(unit) = self.said(scope, input, e, "unit") {
+                            units.insert(port.name.clone(), unit.to_owned());
+                        }
                         inputs.push((port.name.clone(), bound));
                     }
                 }
@@ -299,6 +303,7 @@ impl<'a, 'd> Flat<'a, 'd> {
                     name: unique(e.get("name").to_owned(), &mut self.taken),
                     def,
                     inputs,
+                    units,
                 };
                 self.nodes.push((position, node));
                 Made::Node(self.nodes.len() - 1)
@@ -428,13 +433,7 @@ impl<'a, 'd> Flat<'a, 'd> {
             }
             return Ok(None);
         };
-        let ancestors = [
-            Some(e),
-            Some(node),
-            self.scopes[scope].graph,
-            Some(self.doc.root),
-        ];
-        let said = |name: &str| ancestors.iter().flatten().find_map(|a| a.attr(name));
+        let said = |name: &str| self.said(scope, e, node, name);
         if *ty == Type::Filename
             && let (Value::Text(file), Some(prefix)) = (&mut value, said("fileprefix"))
         {
@@ -447,6 +446,19 @@ impl<'a, 'd> Flat<'a, 'd> {
             false => None,
         };
         Ok(Some(Bound::Value { value, colorspace }))
+    }
+
+    /// Attribute `name` of input `e` of `node` in `scope` as the document
+    /// says it: the input's own, else its node's, its graph's or the
+    /// document's.
+    fn said(&self, scope: usize, e: &'d Element, node: &'d Element, name: &str) -> Option<&'d str> {
+        let ancestors = [
+            Some(e),
+            Some(node),
+            self.scopes[scope].graph,
+            Some(self.doc.root),
+        ];
+        ancestors.into_iter().flatten().find_map(|a| a.attr(name))
     }
 
     /// Top-level node graph `name`'s scope, made once.

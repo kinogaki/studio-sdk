@@ -379,3 +379,49 @@ fn a_chain_of_nodes_deeper_than_its_limit_is_cut_and_said() {
         "{left:?}"
     );
 }
+
+#[test]
+fn an_input_s_unit_is_its_own_else_its_node_s_and_writes_back() {
+    let text = r#"<?xml version="1.0"?>
+<materialx version="1.39" unit="meter" unittype="distance">
+  <gltf_pbr name="glass" type="surfaceshader" unit="centimeter" unittype="distance">
+    <input name="thickness" type="float" value="2" />
+    <input name="attenuation_distance" type="float" value="5" unit="millimeter" unittype="distance" />
+  </gltf_pbr>
+  <open_pbr_surface name="honey" type="surfaceshader">
+    <input name="transmission_depth" type="float" value="1" />
+  </open_pbr_surface>
+  <surfacematerial name="Glass" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="glass" />
+  </surfacematerial>
+  <surfacematerial name="Honey" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="honey" />
+  </surfacematerial>
+</materialx>
+"#;
+    let document: Document = text.parse().unwrap();
+    let (materials, said) = document.materials();
+    assert!(said.is_empty(), "{said:?}");
+    let units = |m: &Material, name: &str| -> Vec<(String, String)> {
+        let units = &node(m, name).units;
+        units.iter().map(|(i, u)| (i.clone(), u.clone())).collect()
+    };
+    let unit = |input: &str, unit: &str| (input.to_owned(), unit.to_owned());
+    assert_eq!(
+        units(&materials[0], "glass"),
+        [
+            unit("attenuation_distance", "millimeter"),
+            unit("thickness", "centimeter")
+        ]
+    );
+    // The document's own, where nothing nearer says.
+    assert_eq!(
+        units(&materials[1], "honey"),
+        [unit("transmission_depth", "meter")]
+    );
+    let written = Document::of_materials(&materials, "lin_rec709").to_string();
+    let said = r#"name="thickness" type="float" value="2" unittype="distance" unit="centimeter""#;
+    assert!(written.contains(said), "{written}");
+    let (again, _) = written.parse::<Document>().unwrap().materials();
+    assert_eq!(units(&again[0], "glass"), units(&materials[0], "glass"));
+}

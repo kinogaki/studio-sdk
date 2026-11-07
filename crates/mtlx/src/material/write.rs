@@ -91,7 +91,9 @@ fn material(m: &Material, name: &str, graph: &str, colorspace: &str) -> (Option<
                 read.set("output", input);
                 inputs.push(Child::Element(read));
             }
-            Bound::Value { .. } => inputs.push(Child::Element(written.input(input, &ty, bound))),
+            Bound::Value { .. } => {
+                inputs.push(Child::Element(written.input(shown, input, &ty, bound)))
+            }
         }
     }
     let mut material = header(shown, name);
@@ -131,13 +133,14 @@ impl Named<'_> {
         for (input, bound) in &node.inputs {
             let ty = port_type(&node.def, input);
             e.children
-                .push(Child::Element(self.input(input, &ty, bound)));
+                .push(Child::Element(self.input(node, input, &ty, bound)));
         }
         e
     }
 
-    /// Input `input` of type `ty` bound to `bound`.
-    fn input(&self, input: &str, ty: &Type, bound: &Bound) -> Element {
+    /// Input `input` of node `of`, of type `ty`, bound to `bound`, with its
+    /// unit where the node gives one.
+    fn input(&self, of: &MaterialNode, input: &str, ty: &Type, bound: &Bound) -> Element {
         let mut e = Element {
             category: "input".into(),
             ..Element::default()
@@ -165,6 +168,12 @@ impl Named<'_> {
                     e.set("output", output);
                 }
             }
+        }
+        if let Some(unit) = of.units.get(input) {
+            if let Some((unit_type, _)) = library().unit(unit) {
+                e.set("unittype", unit_type);
+            }
+            e.set("unit", unit);
         }
         e
     }

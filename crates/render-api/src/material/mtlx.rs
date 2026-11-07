@@ -166,6 +166,13 @@ fn kind(node: &str, port: &Port) -> Option<ValueKind> {
     })
 }
 
+/// Whether input `input` of MaterialX definition `def` is a length in the
+/// scene's units (its kind a `Length`), which a format converts between
+/// units as it converts geometry.
+pub fn is_length(def: &kinogaki_mtlx::NodeDef, input: &str) -> bool {
+    def.input(input).is_some_and(|port| length(&def.node, port))
+}
+
 /// Whether input `port` of node `node` is a length in the scene's units,
 /// which a format converts as it converts geometry: a distance its
 /// definition fixes no unit for, or one of [`LENGTHS`].

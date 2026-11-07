@@ -282,37 +282,45 @@ impl NetworkSeed {
     /// `convert`, `dot`). How many driven lengths it couldn't convert (a
     /// texture of no factor drives one).
     pub fn scale_lengths(&mut self, by: f64) -> usize {
+        self.scale_lengths_by(|_, _| by)
+    }
+
+    /// Every length as [`scale_lengths`](Self::scale_lengths) converts it,
+    /// input `input` of node `at` times `by(at, input)`: a file saying a
+    /// unit per input (a MaterialX document's `unit`).
+    pub fn scale_lengths_by(&mut self, by: impl Fn(usize, &str) -> f64) -> usize {
         use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
-        if by == 1.0 {
-            return 0;
-        }
         let def_of = |node: &NewNode| match node.parameters.get(SIGNATURE) {
             Some(Value::Choice(signature)) => def(signature),
             _ => None,
         };
-        for node in &mut self.nodes {
+        for (at, node) in self.nodes.iter_mut().enumerate() {
             let Some(def) = def_of(node) else { continue };
             for (name, value) in &mut node.parameters {
-                if is_length(&def, name) {
-                    scaled(value, by);
+                let k = by(at, name);
+                if k != 1.0 && is_length(&def, name) {
+                    scaled(value, k);
                 }
             }
         }
-        let driven: Vec<usize> = (self.wires.iter())
-            .filter(|w| def_of(&self.nodes[w.to]).is_some_and(|d| is_length(&d, &w.input)))
-            .map(|w| w.from)
+        let driven: Vec<(usize, f64)> = (self.wires.iter())
+            .map(|w| (w, by(w.to, &w.input)))
+            .filter(|(w, k)| {
+                *k != 1.0 && def_of(&self.nodes[w.to]).is_some_and(|d| is_length(&d, &w.input))
+            })
+            .map(|(w, k)| (w.from, k))
             .collect();
         let mut unconverted = 0;
-        for from in driven {
+        for (from, k) in driven {
             match self.scale_of(from) {
                 Some((at, input)) => {
                     let node = &mut self.nodes[at];
                     let default = (def_of(node))
                         .and_then(|d| Some(d.find_input(&input)?.value()?.value.clone()));
                     if let Some(held) = node.parameters.get_mut(&input) {
-                        scaled(held, by);
+                        scaled(held, k);
                     } else if let Some(mut held) = default {
-                        scaled(&mut held, by);
+                        scaled(&mut held, k);
                         node.parameters.insert(input, held);
                     }
                 }
@@ -350,15 +358,9 @@ impl NetworkSeed {
 
 /// Whether input `name` of `def` holds a length in the scene's units.
 fn is_length(def: &kinogaki_render_api::NodeDef, name: &str) -> bool {
-    use crate::value::{Unit, ValueKind};
-    match def
-        .find_input(name)
-        .and_then(|i| i.value())
-        .map(|p| &p.kind)
-    {
-        Some(ValueKind::Number(n) | ValueKind::Vector { number: n, .. }) => n.unit == Unit::Length,
-        _ => false,
-    }
+    use kinogaki_render_api::material::mtlx;
+    def.mtlx()
+        .is_some_and(|source| mtlx::is_length(source, name))
 }
 
 /// `value`'s numbers times `by`.

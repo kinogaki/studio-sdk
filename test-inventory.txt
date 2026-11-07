@@ -324,6 +324,7 @@ kinogaki-mtlx/lib test library::tests::kinogakis_definitions_travel_as_the_mater
 kinogaki-mtlx/lib test library::tests::kinogakis_gltf_images_read_their_wraps_in_gltfs_order
 kinogaki-mtlx/lib test library::tests::nodes_resolve_as_materialx_resolves_them
 kinogaki-mtlx/lib test library::tests::the_library_reads_every_definition
+kinogaki-mtlx/lib test library::tests::units_are_the_unit_definitions
 kinogaki-mtlx/lib test translate::tests::models_translate_by_the_shortest_chain
 kinogaki-mtlx/lib test types::tests::values_read_and_write_as_materialx_text
 kinogaki-mtlx/lib test upgrade::tree::tests::names_count_up_as_materialx_counts_them
@@ -333,6 +334,7 @@ kinogaki-mtlx/lib test xml::tests::broken_documents_are_refused_with_their_line
 kinogaki-mtlx/lib test xml::tests::nesting_past_its_depth_is_refused_on_a_small_stack
 kinogaki-mtlx/materials test a_chain_of_nodes_deeper_than_its_limit_is_cut_and_said
 kinogaki-mtlx/materials test a_document_s_own_definition_flattens_into_the_material_reading_it
+kinogaki-mtlx/materials test an_input_s_unit_is_its_own_else_its_node_s_and_writes_back
 kinogaki-mtlx/materials test files_keep_their_prefix_and_values_their_color_space
 kinogaki-mtlx/materials test includes_naming_one_document_many_times_read_it_once
 kinogaki-mtlx/materials test includes_read_the_documents_they_name_relative_to_the_one_naming_them
