@@ -339,6 +339,7 @@ kinogaki-render-api/lib test material::adopt::tests::a_conditional_of_values_pas
 kinogaki-render-api/lib test material::adopt::tests::a_model_expands_for_an_engine_of_every_leaf_and_translates_for_one_of_openpbr
 kinogaki-render-api/lib test material::adopt::tests::a_node_the_engine_implements_passes_as_it_is
 kinogaki-render-api/lib test material::adopt::tests::a_surface_with_no_way_renders_the_default
+kinogaki-render-api/lib test material::adopt::tests::an_image_wired_into_a_graph_defined_texture_reaches_the_image_inside
 kinogaki-render-api/lib test material::adopt::tests::an_unconnected_geometric_input_reads_its_property_through_an_expansion
 kinogaki-render-api/lib test material::adopt::tests::another_engines_material_goes_as_its_standard_form
 kinogaki-render-api/lib test material::adopt::tests::standard_surface_translates_by_materialx_own_graph

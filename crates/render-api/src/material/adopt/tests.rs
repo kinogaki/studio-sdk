@@ -246,6 +246,39 @@ fn an_unconnected_geometric_input_reads_its_property_through_an_expansion() {
 }
 
 #[test]
+fn an_image_wired_into_a_graph_defined_texture_reaches_the_image_inside() {
+    // glTF's normal map is a graph around MaterialX's image: expanded, its
+    // image reads what was wired into the normal map, as data.
+    use kinogaki_geometry::image::ImageSource;
+    let mut built = MaterialNetwork::builder();
+    let map = built
+        .node(
+            &def("ND_gltf_normalmap_vector3_1_0").unwrap(),
+            &Parameters::new(),
+        )
+        .unwrap();
+    built
+        .image(map, "file", ImageSource::path("bumps.png"))
+        .unwrap();
+    let s = built
+        .node(
+            &def("ND_open_pbr_surface_surfaceshader").unwrap(),
+            &Parameters::new(),
+        )
+        .unwrap();
+    built.link(map, "out", s, "geometry_normal").unwrap();
+    let network = built.build(s).unwrap();
+    let leaves = engine("toy.leaves.engine", &leaves());
+    let expanded = Engines::new(vec![leaves.clone()]).adopt(&network, leaves.id());
+    assert!(expanded.cut().is_empty(), "{:?}", expanded.cut());
+    let read: Vec<_> = (expanded.nodes().iter())
+        .filter(|n| n.def.mtlx().is_some_and(|d| d.node == "image"))
+        .map(|n| (n.images["file"].name(), n.reads_data("file")))
+        .collect();
+    assert_eq!(read, [("bumps.png", true)]);
+}
+
+#[test]
 fn another_engines_material_goes_as_its_standard_form() {
     use crate::material::{Input, NodeDef, Output};
     use crate::{MaterialRules, Parameter};

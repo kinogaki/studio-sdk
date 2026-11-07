@@ -94,6 +94,11 @@ pub mod image_node {
     pub const AUTO: &str = "auto";
     /// A Color: the values as stored.
     pub const DATA: &str = "data";
+    /// Its button holding the file it reads embedded (the host reads it).
+    pub const EMBED: &str = "embed";
+    /// Its button writing the file it holds out (the host writes it), every
+    /// Image node holding the same bytes then reading it.
+    pub const EXTRACT: &str = "extract";
 }
 
 /// What an Image node holding `parameters` reads: its file or its embedded
