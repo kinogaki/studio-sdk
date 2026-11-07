@@ -7,7 +7,9 @@ use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
 use kinogaki_edit::editor::{Placed, gather, gather_table, spread};
-use kinogaki_geometry::{Attribute, Attributes, Column, Domain, Geometry, Meaning, Xform, names};
+use kinogaki_geometry::{
+    Attribute, Attributes, Column, Domain, Geometry, Meaning, Text, Values, Xform, names,
+};
 use std::sync::Arc;
 
 /// The Primitive integer a realize numbers each copy's primitives by.
@@ -16,6 +18,86 @@ pub const COPYNUM: &str = "copynum";
 /// How deep instances of instances nest: a value holding instances of
 /// itself this many times over is refused.
 pub const MAX_DEPTH: usize = 8;
+
+/// Instance `i`'s [`MATERIAL_MAP`](names::MATERIAL_MAP) in `attributes`:
+/// pairs of a material its prototype's primitives name and the one it
+/// renders them with, a pair naming a blank left out; empty when it maps
+/// none.
+///
+/// ```
+/// use kinogaki_studio_api::geometry::{Attribute, AttributeType, Attributes, Domain, Text, Values, names};
+/// use kinogaki_studio_api::standard::material_map;
+///
+/// let ty = AttributeType { array: true, ..AttributeType::TEXT };
+/// let pairs = Text::from_strs(["/m/Red", "/m/Blue"]);
+/// let map = Attribute::arrays(ty, vec![0, 0, 2].into(), Values::Text(pairs)).unwrap();
+/// let attributes = Attributes::new().with(Domain::Instance, names::MATERIAL_MAP, map).unwrap();
+/// assert!(material_map(&attributes, 0).is_empty());
+/// assert_eq!(material_map(&attributes, 1), [("/m/Red", "/m/Blue")]);
+/// ```
+pub fn material_map(attributes: &Attributes, i: usize) -> Vec<(&str, &str)> {
+    let map = attributes.get(Domain::Instance, names::MATERIAL_MAP);
+    let (Some(offsets), Some(Values::Text(text))) =
+        (map.and_then(Attribute::offsets), map.map(Attribute::values))
+    else {
+        return Vec::new();
+    };
+    let run = |k: usize| offsets.as_slice().get(k).map(|&at| at as usize);
+    let (Some(from), Some(to)) = (run(i), run(i + 1)) else {
+        return Vec::new();
+    };
+    ((from..to).step_by(2))
+        .filter(|&k| k + 1 < to)
+        .filter_map(|k| Some((text.get(k)?, text.get(k + 1)?)))
+        .collect()
+}
+
+/// `value` as instance `i` of `attributes` renders it: its primitives'
+/// `material` the instance's own `material`, else its [`material_map`]'s in
+/// place of theirs ([`materials_mapped`]); none when it renders them as they
+/// are.
+///
+/// # Errors
+/// None for a value as attributes check it; the table's refusal otherwise.
+pub fn instance_materials(
+    value: &Geometry,
+    attributes: &Attributes,
+    i: usize,
+) -> Result<Option<Geometry>, Error> {
+    match (attributes.text(Domain::Instance, names::MATERIAL)).and_then(|t| t.get(i)) {
+        Some(whole) => {
+            let every = Text::from_strs(std::iter::repeat_n(whole, value.primitives().len()));
+            let named = (value.attributes()).with(
+                Domain::Primitive,
+                names::MATERIAL,
+                Attribute::text(every),
+            )?;
+            value.with_attributes(named).map(Some)
+        }
+        None => materials_mapped(value, &material_map(attributes, i)),
+    }
+}
+
+/// `value` with each `material` its primitives name that `map` pairs with
+/// another named that other instead; none when `map` is empty or the value
+/// names no materials.
+///
+/// # Errors
+/// As [`instance_materials`].
+pub fn materials_mapped(value: &Geometry, map: &[(&str, &str)]) -> Result<Option<Geometry>, Error> {
+    let own = value.attributes().text(Domain::Primitive, names::MATERIAL);
+    let (Some(own), false) = (own, map.is_empty()) else {
+        return Ok(None);
+    };
+    let to = |name: &Arc<str>| (map.iter()).find(|(from, _)| **from == **name);
+    let table: Arc<[Arc<str>]> = (own.table().iter())
+        .map(|name| to(name).map_or_else(|| name.clone(), |&(_, to)| Arc::from(to)))
+        .collect();
+    let text = Text::new(own.indices().clone(), table)?;
+    let named =
+        (value.attributes()).with(Domain::Primitive, names::MATERIAL, Attribute::text(text))?;
+    value.with_attributes(named).map(Some)
+}
 
 /// Placements of prototypes of any registered type (Geometry, a B-rep,
 /// instances of instances…): the standard value `kinogaki.core.instances`.
@@ -221,10 +303,12 @@ impl Instances {
 
     /// These instances as one [`Geometry`]: each its prototype's elements at
     /// its placement ([`gather`]), instances of instances followed, what
-    /// isn't [`Geometry`] made polygons by `polygons`. An Instance attribute
-    /// lands on the copy's points, under its name (its placing ones, used
-    /// up, stay out), and the Primitive integer `copynum` numbers the
-    /// instances. Instances `polygons` makes nothing of give nothing, and
+    /// isn't [`Geometry`] made polygons by `polygons`. A copy's primitives
+    /// name the materials its instance renders them with
+    /// ([`instance_materials`]). Another Instance
+    /// attribute lands on the copy's points, under its name (its placing
+    /// ones, used up, stay out), and the Primitive integer `copynum` numbers
+    /// the instances. Instances `polygons` makes nothing of give nothing, and
     /// the count of them is the second value.
     ///
     /// # Errors
@@ -245,11 +329,20 @@ impl Instances {
                 (None, None) => polygons(p),
             })
             .collect();
+        // Each copy as its instance renders it, where it names materials.
+        let rendered: Vec<Option<Geometry>> = (0..self.len())
+            .map(|i| match &made[self.prototype_index(i)] {
+                Some(value) => instance_materials(value, &self.attributes, i),
+                None => Ok(None),
+            })
+            .collect::<Result<_, Error>>()?;
         let mut placed = Vec::with_capacity(self.len());
         let mut kept = Vec::with_capacity(self.len());
         let (mut points, mut primitives) = (Vec::new(), Vec::new());
         for i in 0..self.len() {
-            let value = made[self.prototype_index(i)].as_ref();
+            let value = rendered[i]
+                .as_ref()
+                .or(made[self.prototype_index(i)].as_ref());
             let (p, q) = value.map_or((0, 0), |v| (v.positions().len(), v.primitives().len()));
             points.push(p);
             primitives.push(q);
@@ -279,6 +372,7 @@ impl Instances {
                 names::SCALE,
                 names::ORIENT,
                 names::TRANSFORM,
+                names::MATERIAL,
             ];
             if domain == Domain::Instance
                 && !placing.contains(&name)

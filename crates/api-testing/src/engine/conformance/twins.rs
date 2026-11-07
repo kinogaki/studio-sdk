@@ -10,6 +10,8 @@
 //!   channel holds the first: MaterialX's float image is its first channel.
 //! - Instances colored by their own `Cd`, against shapes holding it, a
 //!   material reading it.
+//! - Instances whose material map renders one of their prototype's
+//!   materials as another, against shapes holding the materials.
 //! - An image placed by a `place2d` whose coordinates nothing drives (it
 //!   reads its value, (0, 0), whatever the mesh's), against the texel there
 //!   as a constant.
@@ -24,8 +26,8 @@ use kinogaki_render_api::geometry::{
 };
 use kinogaki_render_api::value::Value;
 use kinogaki_render_api::{
-    EngineDescription, Engines, Id, Instancer, Material, MaterialNetwork, NetworkBuilder, Prim,
-    PrimKind, RENDER_SPACE, Shape, Subsets,
+    EngineDescription, Engines, Id, Instancer, Material, MaterialMaps, MaterialNetwork,
+    NetworkBuilder, Prim, PrimKind, RENDER_SPACE, Shape, Subsets,
 };
 use std::sync::Arc;
 
@@ -49,6 +51,7 @@ pub(super) fn checks(
     }
     if renders(PrimKind::Material) && renders(PrimKind::Instancer) {
         checks.push(("instances' own colors", instance_colors(make, description)));
+        checks.push(("instances' material maps", material_maps(make, description)));
     }
     checks
 }
@@ -277,5 +280,50 @@ fn instance_colors(make: Make<'_>, description: &EngineDescription) -> Result<()
     for (at, color) in places.into_iter().zip(colors) {
         shapes.push(Prim::Shape(painted(0.25, at, first, Some((color, 1.0)))));
     }
+    twins(make, instanced, shapes)
+}
+
+/// Two quads in a row, each half red and half green (a material slot a
+/// triangle), through OpenPBR Surfaces of those base colors: placed by an
+/// Instancer whose second instance's map renders its red half blue, against
+/// two shapes holding those materials.
+fn material_maps(make: Make<'_>, description: &EngineDescription) -> Result<(), String> {
+    let row = |x: f64| Xform::from_axes(Vec3::X, Vec3::Y, Vec3::Z, Vec3::new(x, 0.0, 0.0));
+    let places = [row(-0.3), row(0.3)];
+    // Red, green and blue Materials, the first at the index it gives.
+    let colored = |prims: &mut Vec<Prim>| {
+        let first = prims.len();
+        for color in [[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]] {
+            let mut built = MaterialNetwork::builder();
+            let base = [("base_color", Value::Color(color))];
+            let surface = node(&mut built, "ND_open_pbr_surface_surfaceshader", &base);
+            prims.push(material(built, surface, description, None));
+        }
+        first
+    };
+    let halves = |at: Xform, [a, b]: [usize; 2]| {
+        let slots = Subsets::new(vec![0u16, 1].into(), vec![Id::of(id(a)), Id::of(id(b))]);
+        (quad(0.25)
+            .rebuilt()
+            .subsets(slots)
+            .xform(Sampled::still(at)))
+        .build()
+        .expect("a quad of two halves")
+    };
+    let (mut instanced, _) = lit(description);
+    let m = colored(&mut instanced);
+    instanced.push(Prim::Shape(halves(Xform::IDENTITY, [m, m + 1])));
+    let map = Arc::from([(Id::of(id(m)), Id::of(id(m + 2)))]);
+    let maps = MaterialMaps::new(vec![Subsets::DEFAULT, 0].into(), vec![map]);
+    let instancer = Instancer::builder(vec![id(m + 3)], places.to_vec().into())
+        .material_maps(maps)
+        .path("/mapped")
+        .build()
+        .expect("whole instances");
+    instanced.push(Prim::Instancer(instancer));
+    let (mut shapes, _) = lit(description);
+    let m = colored(&mut shapes);
+    shapes.push(Prim::Shape(halves(places[0], [m, m + 1])));
+    shapes.push(Prim::Shape(halves(places[1], [m + 2, m + 1])));
     twins(make, instanced, shapes)
 }

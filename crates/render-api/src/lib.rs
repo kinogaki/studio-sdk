@@ -82,8 +82,8 @@ pub use material::{
     NodeIndex, Output, Socket,
 };
 pub use prim::{
-    Camera, Instancer, InstancerBuilder, Material, Prim, PrimKind, Projection, STANDARD_PRIMVARS,
-    Shape, ShapeBuilder, Subsets, Topology, Visibility,
+    Camera, Instancer, InstancerBuilder, Map, Material, MaterialMaps, Prim, PrimKind, Projection,
+    STANDARD_PRIMVARS, Shape, ShapeBuilder, Subsets, Topology, Visibility,
 };
 pub use ranges::Ranges;
 pub use recording::{Counts, RecordingEngine};

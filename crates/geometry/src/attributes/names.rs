@@ -24,6 +24,7 @@
 //! | [`REST`] | Point | f64 × 3 point (positions' precision) |
 //! | [`WIDTH`] | Point, Primitive | f32 |
 //! | [`MATERIAL`], [`NAME`], [`PART`] | any | text |
+//! | [`MATERIAL_MAP`] | Instance | an array of text |
 //! | groups [`SHARP`], [`SMOOTH`] / [`HIDDEN`] | Edge / Primitive | group |
 //!
 //! [`Attributes::with`]: crate::Attributes::with
@@ -65,6 +66,12 @@ pub const REST: &str = "rest";
 pub const WIDTH: &str = "width";
 /// The Material a primitive renders with, by its path.
 pub const MATERIAL: &str = "material";
+/// The Materials an instance renders its prototype's primitives with in
+/// place of the ones they name, by path, in pairs: a [`MATERIAL`] the
+/// prototype's primitives name, then the one this instance renders them
+/// with (a file's mesh several nodes show with their own materials in its
+/// slots).
+pub const MATERIAL_MAP: &str = "material_map";
 /// A name: an element's, or an instance's occurrence path.
 pub const NAME: &str = "name";
 /// The part an element belongs to.
@@ -145,6 +152,13 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
         ),
         WIDTH => attribute(f32s(1, Meaning::None), &[Point, Primitive]),
         MATERIAL | NAME | PART => attribute(AttributeType::TEXT, ANY),
+        MATERIAL_MAP => attribute(
+            AttributeType {
+                array: true,
+                ..AttributeType::TEXT
+            },
+            &[Instance],
+        ),
         SHARP | SMOOTH => Some(Standard::Group(Edge)),
         HIDDEN => Some(Standard::Group(Primitive)),
         _ => None,

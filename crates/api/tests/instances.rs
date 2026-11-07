@@ -1,4 +1,5 @@
-//! Instances: what they refuse, what a move shares, and how they save.
+//! Instances: what they refuse, what a move shares, how they save, and
+//! their copies realized with the materials they render with.
 use kinogaki_studio_api::Data;
 use kinogaki_studio_api::DataCodec;
 use kinogaki_studio_api::element::MemoryElement;
@@ -145,4 +146,50 @@ fn instances_round_trip_with_each_prototype_written_once() {
     );
     let inner = standard::instances().get(&read.prototypes()[0]).unwrap();
     assert_eq!(inner.len(), copies.len());
+}
+
+/// Two triangles naming Materials `A` and `B`, placed three times: as they
+/// are, in `C` (an instance's own material), and with `A` mapped to `D`.
+/// Realized, each copy's primitives name what its instance renders them
+/// with.
+#[test]
+fn realized_copies_name_the_materials_their_instances_render() {
+    use kinogaki_studio_api::geometry::{AttributeType, Primitives, Text, Values};
+    let two = Primitives::of_polygons(4, vec![0, 3, 6].into(), vec![0, 1, 2, 0, 2, 3].into());
+    let named = Attribute::text(Text::from_strs(["A", "B"]));
+    let attributes = Attributes::new()
+        .with(Domain::Primitive, names::MATERIAL, named)
+        .unwrap();
+    let value = Geometry::new(vec![[0.0; 3]; 4].into(), two.unwrap(), attributes).unwrap();
+    let whole = Attribute::text(Text::from_strs(["", "C", ""]));
+    let ty = AttributeType {
+        array: true,
+        ..AttributeType::TEXT
+    };
+    let pairs = Values::Text(Text::from_strs(["A", "D"]));
+    let map = Attribute::arrays(ty, vec![0, 0, 0, 2].into(), pairs).unwrap();
+    let placing = (Attributes::new().with(Domain::Instance, names::MATERIAL, whole))
+        .and_then(|a| a.with(Domain::Instance, names::MATERIAL_MAP, map))
+        .unwrap();
+    let copies = Instances::new(
+        vec![standard::geometry().wrap(value)],
+        along(3).into(),
+        None,
+        placing,
+    )
+    .unwrap();
+    assert_eq!(standard::material_map(copies.attributes(), 2), [("A", "D")]);
+    let (realized, _) = copies.realized(&|_| None).unwrap();
+    let text = realized
+        .attributes()
+        .text(Domain::Primitive, names::MATERIAL)
+        .unwrap();
+    let named: Vec<_> = text.iter().map(Option::unwrap).collect();
+    assert_eq!(named, ["A", "B", "C", "C", "D", "B"]);
+    assert!(
+        realized
+            .attributes()
+            .get(Domain::Point, names::MATERIAL)
+            .is_none()
+    );
 }

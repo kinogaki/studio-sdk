@@ -396,6 +396,7 @@ kinogaki-render-api/lib test tests::batches::a_result_dropped_is_no_longer_wante
 kinogaki-render-api/lib test tests::batches::a_shape_is_refused_unless_whole
 kinogaki-render-api/lib test tests::batches::an_add_then_a_remove_cancel
 kinogaki-render-api/lib test tests::batches::an_instancer_is_refused_unless_whole
+kinogaki-render-api/lib test tests::batches::an_instances_material_map_renders_its_prototypes_slots_with_others
 kinogaki-render-api/lib test tests::batches::dirty_bits_or_and_the_later_payload_wins
 kinogaki-render-api/lib test tests::batches::ids_are_reused_only_with_a_new_generation
 kinogaki-render-api/lib test tests::batches::many_prims_fold_by_id_in_order
@@ -467,6 +468,7 @@ kinogaki-studio-api/doc test crates/api/src/standard/geometry.rs - standard::geo
 kinogaki-studio-api/doc test crates/api/src/standard/image.rs - standard::image::ImageCodec
 kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances
 kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances::gathered
+kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::material_map
 kinogaki-studio-api/doc test crates/api/src/standard/materials.rs - standard::materials::MaterialsCodec
 kinogaki-studio-api/doc test crates/api/src/standard/mod.rs - standard
 kinogaki-studio-api/doc test crates/api/src/standard/output.rs - standard::output::DisplayOutput
@@ -479,6 +481,7 @@ kinogaki-studio-api/image_codec test reading_is_strict
 kinogaki-studio-api/instances test a_move_shares_the_prototypes_and_attributes
 kinogaki-studio-api/instances test instances_refuse_what_they_cant_place
 kinogaki-studio-api/instances test instances_round_trip_with_each_prototype_written_once
+kinogaki-studio-api/instances test realized_copies_name_the_materials_their_instances_render
 kinogaki-studio-api/lib test color::tests::a_converted_color_settles_where_a_conversion_left_its_last_bits
 kinogaki-studio-api/lib test components::tests::a_selection_reads_back_only_as_its_own_representation
 kinogaki-studio-api/lib test cook::binding::tests::a_component_reads_and_writes_one_number_of_a_vector

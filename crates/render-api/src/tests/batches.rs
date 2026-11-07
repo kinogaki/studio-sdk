@@ -376,3 +376,40 @@ fn an_instancer_is_refused_unless_whole() {
     let none: Vec<PrimId> = Vec::new();
     assert!(refused(Instancer::builder(none, xforms())).contains("no prototype"));
 }
+
+/// An instance's map renders the primitives naming one material with
+/// another; its own material wins over its map; a map past the list, or
+/// maps for another count of instances, are refused.
+#[test]
+fn an_instances_material_map_renders_its_prototypes_slots_with_others() {
+    use crate::geometry::Xform;
+    use crate::{MaterialMaps, Subsets};
+    let [a, b, c] = [3, 4, 5].map(|k| Id::<Material>::of(id(k)));
+    let maps = |which: Vec<u16>| MaterialMaps::new(which.into(), vec![Arc::from([(a, b)])]);
+    let xforms = || vec![Xform::IDENTITY; 3].into();
+    let copies = || Instancer::builder(vec![id(1)], xforms());
+    let whole = Subsets::new(vec![Subsets::DEFAULT, Subsets::DEFAULT, 0].into(), vec![c]);
+    let mapped = copies()
+        .material_maps(maps(vec![Subsets::DEFAULT, 0, 0]))
+        .subsets(whole)
+        .build()
+        .unwrap();
+    assert_eq!(mapped.material(0, Some(a)), Some(a), "no map: its own");
+    assert_eq!(mapped.material(1, Some(a)), Some(b), "mapped");
+    assert_eq!(
+        mapped.material(1, Some(c)),
+        Some(c),
+        "a material it doesn't map"
+    );
+    assert_eq!(mapped.material(1, None), None, "no material: the default");
+    assert_eq!(
+        mapped.material(2, Some(a)),
+        Some(c),
+        "its own material wins"
+    );
+    let refused = |b: InstancerBuilder| b.build().unwrap_err().message().to_owned();
+    let past = maps(vec![0, 1, 0]);
+    assert!(refused(copies().material_maps(past)).contains("map 1 of 1"));
+    let few = maps(vec![0]);
+    assert!(refused(copies().material_maps(few)).contains("1 material maps for 3"));
+}

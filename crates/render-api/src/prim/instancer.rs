@@ -15,9 +15,11 @@
 //! [`Domain::Instance`] (`Cd`, `id`, `name`, `v` in scene units a second:
 //! linear motion across the shutter) and [`Domain::Detail`]. An instance may
 //! render with a material of its own ([`Instancer::subsets`]) in place of its
-//! prototype's.
-use crate::id::PrimId;
-use crate::prim::{Subsets, Visibility};
+//! prototype's, or with others in place of some of its prototype's
+//! ([`Instancer::material_maps`]): a file's mesh several nodes show with
+//! their own materials in its slots stays one prototype.
+use crate::id::{Id, PrimId};
+use crate::prim::{Material, Subsets, Visibility};
 use kinogaki_geometry::{Attribute, Attributes, Column, Domain, Error, Sampled, Xform};
 use std::sync::Arc;
 
@@ -29,9 +31,72 @@ pub struct Instancer {
     xforms: Column<Xform>,
     primvars: Arc<Attributes>,
     subsets: Subsets,
+    material_maps: MaterialMaps,
     xform: Sampled<Xform>,
     visibility: Visibility,
     path: Arc<str>,
+}
+
+/// The materials instances render with in place of some of their
+/// prototypes': each instance's map, pairs of a material the shapes it
+/// places name and the one it renders those primitives with. An optional
+/// table of an [`Instancer`]; empty, none maps.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MaterialMaps {
+    which: Column<u16>,
+    maps: Arc<[Map]>,
+}
+
+/// One instance's map: pairs of the material a primitive names and the one
+/// it renders with instead.
+pub type Map = Arc<[(Id<Material>, Id<Material>)]>;
+
+impl MaterialMaps {
+    /// Each instance's index into `maps`, or [`Subsets::DEFAULT`] (none: its
+    /// prototype's own materials).
+    pub fn new(which: Column<u16>, maps: impl Into<Arc<[Map]>>) -> Self {
+        Self {
+            which,
+            maps: maps.into(),
+        }
+    }
+
+    /// Each instance's index into the maps; empty: none maps.
+    pub fn which(&self) -> &Column<u16> {
+        &self.which
+    }
+
+    /// The distinct maps.
+    pub fn maps(&self) -> &Arc<[Map]> {
+        &self.maps
+    }
+
+    /// Instance `i`'s map, when it has one.
+    pub fn of(&self, i: usize) -> Option<&Map> {
+        let which = *self.which.get(i)?;
+        self.maps.get(usize::from(which))
+    }
+
+    fn check(&self, instances: usize) -> Result<(), Error> {
+        if self.which.is_empty() {
+            return Ok(());
+        }
+        if self.which.len() != instances {
+            return Err(Error::invalid(format_args!(
+                "{} material maps for {instances} instances",
+                self.which.len()
+            )));
+        }
+        let past = (self.which.iter())
+            .find(|&&k| k != Subsets::DEFAULT && usize::from(k) >= self.maps.len());
+        match past {
+            Some(k) => Err(Error::invalid(format_args!(
+                "an instance names material map {k} of {}",
+                self.maps.len()
+            ))),
+            None => Ok(()),
+        }
+    }
 }
 
 impl Instancer {
@@ -48,6 +113,7 @@ impl Instancer {
             xforms,
             primvars: Arc::default(),
             subsets: Subsets::default(),
+            material_maps: MaterialMaps::default(),
             xform: Sampled::still(Xform::IDENTITY),
             visibility: Visibility::SHOWN,
             path: Arc::from(""),
@@ -99,6 +165,26 @@ impl Instancer {
     /// (none named, or none: its prototype's).
     pub fn subsets(&self) -> &Subsets {
         &self.subsets
+    }
+
+    /// The materials each instance renders with in place of some of its
+    /// prototype's, where it has no material of its own (`subsets`).
+    pub fn material_maps(&self) -> &MaterialMaps {
+        &self.material_maps
+    }
+
+    /// The material instance `i` renders a primitive of the shapes it places
+    /// with, the primitive naming `own`: the instance's own material, else
+    /// its map's in place of `own`, else `own`.
+    pub fn material(&self, i: usize, own: Option<Id<Material>>) -> Option<Id<Material>> {
+        if let Some(whole) = self.subsets.of(i) {
+            return Some(whole);
+        }
+        let mapped = (self.material_maps.of(i)).and_then(|map| {
+            let own = own?;
+            map.iter().find(|(from, _)| *from == own).map(|&(_, to)| to)
+        });
+        mapped.or(own)
     }
 
     /// The Instancer to world across the shutter.
@@ -154,6 +240,13 @@ impl InstancerBuilder {
         self
     }
 
+    /// With each instance's materials in place of its prototype's as `maps`
+    /// says.
+    pub fn material_maps(mut self, maps: MaterialMaps) -> Self {
+        self.0.material_maps = maps;
+        self
+    }
+
     /// With `xform` across the shutter.
     pub fn xform(mut self, xform: Sampled<Xform>) -> Self {
         self.0.xform = xform;
@@ -198,6 +291,7 @@ impl InstancerBuilder {
             }
         }
         i.subsets.check(instances)?;
+        i.material_maps.check(instances)?;
         i.primvars
             .check("instancers", None, |domain| match domain {
                 Domain::Instance => Some(instances),

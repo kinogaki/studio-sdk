@@ -50,7 +50,9 @@ pub use color::ColorConfiguration;
 pub use embedded::EmbeddedFileCodec;
 pub use geometry::GeometryCodec;
 pub use image::ImageCodec;
-pub use instances::{Instances, InstancesCodec, MAX_DEPTH};
+pub use instances::{
+    Instances, InstancesCodec, MAX_DEPTH, instance_materials, material_map, materials_mapped,
+};
 pub use materials::{ImportedImage, ImportedMaterial, Materials, MaterialsCodec};
 pub use output::{BackgroundSpace, DisplayOutput};
 

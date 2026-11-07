@@ -17,7 +17,7 @@ mod instancer;
 mod shape;
 
 pub use camera::{Camera, Projection};
-pub use instancer::{Instancer, InstancerBuilder};
+pub use instancer::{Instancer, InstancerBuilder, Map, MaterialMaps};
 pub use shape::{STANDARD_PRIMVARS, Shape, ShapeBuilder, Subsets, Topology};
 
 use crate::declared::Declared;
