@@ -468,6 +468,7 @@ kinogaki-studio-api/lib test cook::sheet::tests::ports_past_the_ends_are_unwired
 kinogaki-studio-api/lib test element::memory::tests::a_shared_value_is_written_once_and_read_once
 kinogaki-studio-api/lib test element::memory::tests::bad_names_and_rows_are_refused
 kinogaki-studio-api/lib test element::memory::tests::fields_children_and_metadata_round_trip
+kinogaki-studio-api/lib test element::memory::tests::values_are_the_same_as_the_caller_says
 kinogaki-studio-api/lib test element::values::tests::a_damaged_ramp_or_curve_is_refused
 kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused
 kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back

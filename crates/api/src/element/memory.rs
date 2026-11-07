@@ -93,6 +93,25 @@ impl MemoryElement {
             .map(|(_, e)| e)
     }
 
+    /// Whether `other` holds what this element holds, each value
+    /// [`ElementWriter::data`] wrote the same allocation or, of one type,
+    /// the same as `same` says (Studio's registry: by content). `==`
+    /// compares values by allocation alone.
+    pub fn same_as(&self, other: &Self, same: &dyn Fn(&Data, &Data) -> bool) -> bool {
+        let values = |(n, a): &(String, Value), (m, b): &(String, Value)| {
+            n == m && (a.0.ptr_eq(&b.0) || a.0.ty() == b.0.ty() && same(&a.0, &b.0))
+        };
+        let children =
+            |(n, a): &(String, Self), (m, b): &(String, Self)| n == m && a.same_as(b, same);
+        self.kind == other.kind
+            && self.fields == other.fields
+            && self.metadata == other.metadata
+            && self.values.len() == other.values.len()
+            && (self.values.iter().zip(&other.values)).all(|(a, b)| values(a, b))
+            && self.children.len() == other.children.len()
+            && (self.children.iter().zip(&other.children)).all(|(a, b)| children(a, b))
+    }
+
     /// The element at `path` (`/a/b`, relative to this one; `""` is this).
     fn at(&self, path: &str) -> Option<&MemoryElement> {
         path.split('/')
@@ -442,5 +461,23 @@ mod tests {
             })
             .unwrap();
         assert!(Arc::ptr_eq(&a, &b) && *a == 4 && reads == 1);
+    }
+
+    #[test]
+    fn values_are_the_same_as_the_caller_says() {
+        let ty = crate::DataTypeId::declared("example.counts.count");
+        let holding = |n: i64| {
+            let mut e = MemoryElement::new("holder");
+            e.write(|w| w.data("value", &Data::new(ty, n))).unwrap();
+            e
+        };
+        let (a, b, c) = (holding(4), holding(4), holding(5));
+        assert!(a != b, "== compares values by allocation");
+        let by_count = |x: &Data, y: &Data| x.downcast_ref::<i64>() == y.downcast_ref::<i64>();
+        assert!(a.same_as(&b, &by_count) && !a.same_as(&c, &by_count));
+        assert!(
+            a.same_as(&a.clone(), &|_, _| false),
+            "one allocation is the same"
+        );
     }
 }
