@@ -101,7 +101,7 @@ A value's kind is the SDK's `ValueKind`, its descriptor the one lights use, so a
 
 What needs your code is `MaterialRules`:
 - `standard`: one of your own materials in the standard form, an OpenPBR Surface (`material::standard::open_pbr`), as close as it comes: what another engine renders, the shaded viewport shows and formats write of it. None: nothing standard approximates it (a volume).
-- `translate`: a material of yours from the standard form, when you render a vocabulary of your own and adoption cut what you don't. None renders what adoption made of it.
+- `translate`: a material of yours from the standard form, when you render a vocabulary of your own and adoption cut the surface. None renders your default material.
 - `display`: a simple approximation of your material for the shaded viewport, by default your standard form's (`material::standard::display`): a color, the primvar it multiplies by, the image it multiplies by (`DisplayTexture`: the file value a node holds, the primvar of its coordinates, by default `uv`, the transform that moves them before the image is read, and its `Sampling`: each axis's wrap past the image's edges, and smooth or nearest texels) and whether it fills its shape as a volume. All of it multiplies, linear. The host reads the file through the color service as it reads a render's, once, and shows the color alone until it is read; you never decode or upload anything for it. Render views show the real look.
 
 An engine's starting materials are `NodeCreation`s (`Package::with_creation`): a Material with its inside seeded. A host offers MaterialX's shading models first (`material::standard::MODELS`).

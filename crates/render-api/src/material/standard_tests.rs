@@ -56,6 +56,15 @@ fn each_model_shows_its_constant_base_color() {
             }
             _ => vec![(input, orange.clone())],
         };
+        // Its constants fold away: an OpenPBR Surface alone, shown.
+        let form = Engines::default()
+            .standard(&material(surface, &extra, None))
+            .unwrap();
+        let mut nodes: Vec<&str> = (form.nodes().iter())
+            .map(|n| n.def.mtlx().unwrap().node.as_str())
+            .collect();
+        nodes.sort_unstable();
+        assert_eq!(nodes, ["open_pbr_surface", "surfacematerial"], "{surface}");
         let display = shown(&material(surface, &extra, None));
         let near =
             (display.color.iter().zip(ORANGE)).all(|(a, b)| (f64::from(*a) - b).abs() < 1e-6);

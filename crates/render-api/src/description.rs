@@ -35,8 +35,8 @@ pub trait MaterialRules: Send + Sync {
     }
 
     /// A material of its own from `standard`, a material in the standard form
-    /// it doesn't render as it is: an engine of a vocabulary of its own
-    /// translates it here. None: it renders what adoption made of it.
+    /// whose surface adoption cut: an engine of a vocabulary of its own
+    /// translates it here. None: it renders its default material.
     fn translate(&self, standard: &MaterialNetwork) -> Option<MaterialNetwork> {
         let _ = standard;
         None
@@ -298,7 +298,7 @@ impl Engines {
     /// `network` as engine `to` renders it: its MaterialX nodes adopted
     /// ([`material`](crate::material): as they are, expanded, translated or
     /// cut, then folded) and its own as they are; another engine's material
-    /// adopted as its standard form. Where adoption cut something and `to`
+    /// adopted as its standard form. Where adoption cut the surface and `to`
     /// translates the standard form itself ([`MaterialRules::translate`]),
     /// its translation. Empty, `to`'s default material, when nothing
     /// renders.
@@ -318,7 +318,7 @@ impl Engines {
             (false, _) => network,
         };
         let adopted = crate::material::adopt::adopt(source, engine);
-        if adopted.cut().is_empty() {
+        if adopted.surface().is_some() {
             return adopted;
         }
         let standard = standard.or_else(|| self.standard(network));

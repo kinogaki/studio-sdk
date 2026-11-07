@@ -47,6 +47,10 @@ const EVALUATED: &[&str] = &[
     "combine2",
     "combine3",
     "combine4",
+    "separate2",
+    "separate3",
+    "separate4",
+    "convert",
     "luminance",
     "rotate2d",
     "ifgreater",
@@ -58,19 +62,42 @@ const EVALUATED: &[&str] = &[
 ];
 
 impl NodeDef {
-    /// Whether [`evaluate`](Self::evaluate) evaluates a node of this
-    /// definition once its inputs hold values: stdlib's arithmetic, channel,
-    /// conditional and adjustment leaves of numbers, flags and text (not a
-    /// closure's or a matrix's).
+    /// Whether [`evaluate_output`](Self::evaluate_output) evaluates a node
+    /// of this definition once its inputs hold values: stdlib's arithmetic,
+    /// channel, conditional and adjustment leaves of numbers, flags and text
+    /// (not a closure's or a matrix's).
     pub fn evaluates(&self) -> bool {
-        let ty = self.ty();
-        let held = ty.width() > 0
-            || matches!(
-                ty,
-                Type::Boolean | Type::Integer | Type::String | Type::Filename
-            );
-        held && !matches!(ty, Type::Matrix33 | Type::Matrix44)
+        let held = |ty: &Type| {
+            let numbers = ty.width() > 0 && !matches!(ty, Type::Matrix33 | Type::Matrix44);
+            numbers
+                || matches!(
+                    ty,
+                    Type::Boolean | Type::Integer | Type::String | Type::Filename
+                )
+        };
+        !self.outputs.is_empty()
+            && self.outputs.iter().all(|o| held(&o.ty))
             && EVALUATED.contains(&self.node.as_str())
+    }
+
+    /// What output `output` of a node of this definition yields when its
+    /// inputs hold `values`: [`evaluate`](Self::evaluate)'s value for a node
+    /// of one output, a component for `separate`'s.
+    pub fn evaluate_output(
+        &self,
+        output: &str,
+        values: &dyn Fn(&str) -> Option<Value>,
+    ) -> Option<Value> {
+        if self.node.starts_with("separate") {
+            let k = self.outputs.iter().position(|o| o.name == output)?;
+            let whole = values("in").or_else(|| self.input("in")?.value.clone())?;
+            let v = *whole.numbers()?.get(k)?;
+            return v.is_finite().then(|| Value::Numbers(vec![v]));
+        }
+        let [one] = &self.outputs[..] else {
+            return None;
+        };
+        (one.name == output).then(|| self.evaluate(values))?
     }
 
     /// What a node of this definition yields when its inputs hold `values`
@@ -131,6 +158,18 @@ impl NodeDef {
         match self.node.as_str() {
             "dot" => held("in"),
             "constant" => held("value"),
+            // As MaterialX's graphs convert: a float spreads, a wider value
+            // keeps its first numbers, a narrower one gains 0, then 1 (an
+            // alpha, a w).
+            "convert" => {
+                let n = numbers("in")?;
+                let each = (0..out.width()).map(|k| match (n.len(), n.get(k)) {
+                    (1, _) => n[0],
+                    (_, Some(v)) => *v,
+                    _ => f64::from(u8::from(k == 3)),
+                });
+                Some(Value::Numbers(each.collect()))
+            }
             "add" => binary(|a, b| a + b),
             "subtract" => binary(|a, b| a - b),
             "multiply" => binary(|a, b| a * b),
@@ -370,6 +409,25 @@ mod tests {
         .unwrap();
         let r = rotated.numbers().unwrap();
         assert!(r[0].abs() < 1e-12 && (r[1] + 1.0).abs() < 1e-12, "{r:?}");
+        // Converting: a float spreads, a color gains alpha 1, a vector drops z.
+        let convert = |signature, v: &[f64]| eval(signature, &[("in", n(v))]);
+        assert_eq!(
+            convert("ND_convert_float_color3", &[0.5]),
+            Some(n(&[0.5; 3]))
+        );
+        let opaque = convert("ND_convert_color3_color4", &[0.1, 0.2, 0.3]);
+        assert_eq!(opaque, Some(n(&[0.1, 0.2, 0.3, 1.0])));
+        assert_eq!(
+            convert("ND_convert_vector3_vector2", &[1.0, 2.0, 3.0]),
+            Some(n(&[1.0, 2.0]))
+        );
+        let flat = convert("ND_convert_vector2_vector3", &[1.0, 2.0]);
+        assert_eq!(flat, Some(n(&[1.0, 2.0, 0.0])));
+        // `separate` yields each component at its own output.
+        let separate = library().def("ND_separate3_color3").unwrap();
+        let held = |name: &str| (name == "in").then(|| c.clone());
+        assert_eq!(separate.evaluate_output("outb", &held), Some(n(&[0.8])));
+        assert!(separate.evaluates() && separate.evaluate(&held).is_none());
     }
 
     #[test]

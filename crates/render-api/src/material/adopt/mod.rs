@@ -55,9 +55,7 @@ impl Ways<'_> {
     }
 
     fn seek(&mut self, def: &kinogaki_mtlx::NodeDef) -> Way {
-        // A node of values alone folds away; one reading more is cut once
-        // folding is done ([`rewrite`]).
-        if (self.native)(def) || def.evaluates() {
+        if (self.native)(def) {
             return Way::Native;
         }
         let library = library();
@@ -68,6 +66,11 @@ impl Ways<'_> {
                 .all(|n| !matches!(self.way(&n.def), Way::Cut))
         {
             return Way::Expand;
+        }
+        // A node of values alone folds away; one reading more is cut once
+        // folding is done ([`rewrite`]).
+        if def.evaluates() {
+            return Way::Native;
         }
         if def.ty() != Type::of("surfaceshader") {
             return Way::Cut;
@@ -338,7 +341,7 @@ fn through(work: &Work, at: NodeIndex) -> Option<String> {
 }
 
 /// A node of values alone, every reader taking a value where it reads it: the
-/// value it yields, in its readers' inputs.
+/// value each output yields, in its readers' inputs.
 fn fold(work: &mut Work, at: NodeIndex) -> bool {
     let Some(node) = work.node(at) else {
         return false;
@@ -346,15 +349,15 @@ fn fold(work: &mut Work, at: NodeIndex) -> bool {
     let Some(def) = node.def.mtlx().cloned() else {
         return false;
     };
-    if work.driven(at) || work.output == Some(at) || def.outputs.len() != 1 {
+    if work.driven(at) || work.output == Some(at) || !def.evaluates() {
         return false;
     }
-    let Some(value) = def.evaluate(&mtlx_values(&node.values)) else {
-        return false;
-    };
+    let values = node.values.clone();
+    let held = mtlx_values(&values);
     let readers = work.out_of(at);
     let kinds: Option<Vec<_>> = (readers.iter())
-        .map(|(_, reader, input)| {
+        .map(|(output, reader, input)| {
+            let value = def.evaluate_output(output, &held)?;
             let p = work.node(*reader)?.def.find_input(input)?.value()?;
             mtlx::value(&p.kind, &value).filter(|v| p.kind.accepts(v))
         })

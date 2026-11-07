@@ -100,4 +100,4 @@ The SDK is licensed under the Kinogaki Studio SDK license, [LICENSE.md](LICENSE.
 
 ## Third-party notices
 
-Some of `kinogaki-studio-ui-api`'s geometry and color arithmetic follows egui's, formula for formula, so Studio's egui-based UI library converts its values bit for bit. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits it, and egui's licenses are in [licenses/](licenses/). The SDK copies no third-party code otherwise; its crates.io dependencies (blake3 and bytemuck; wgpu behind its feature; and the crates they use) carry their own licenses, which THIRD_PARTY_NOTICES.md lists.
+Some of `kinogaki-studio-ui-api`'s geometry and color arithmetic follows egui's, formula for formula, so Studio's egui-based UI library converts its values bit for bit. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) credits it, and egui's licenses are in [licenses/](licenses/), with MaterialX's, whose libraries `kinogaki-mtlx` vendors. The SDK copies no third-party code otherwise; its crates.io dependencies (blake3 and bytemuck; wgpu behind its feature; and the crates they use) carry their own licenses, which THIRD_PARTY_NOTICES.md lists.
