@@ -35,8 +35,11 @@ type Named<T> = BTreeMap<Domain, BTreeMap<Arc<str>, Arc<T>>>;
 ///
 /// Immutable and shared: [`with`](Self::with), [`without`](Self::without)
 /// and [`with_group`](Self::with_group) return a new table sharing every
-/// entry they didn't touch, and check only the entry they add. Attributes
-/// and groups are two namespaces.
+/// entry they didn't touch, and check only the entry they add. A table
+/// being made adds its entries in place ([`set`](Self::set),
+/// [`set_group`](Self::set_group)), copying nothing, so a reader adding
+/// many takes time in proportion to them. Attributes and groups are two
+/// namespaces.
 ///
 /// **Rules** (checked as entries are added): every name passes
 /// [`check_name`]; a [standard name](names) has its standard type and
@@ -126,6 +129,16 @@ impl Attributes {
         self.with_shared(domain, name, Arc::new(attribute))
     }
 
+    /// Sets attribute `name` of `domain` to `attribute` in this table
+    /// (replacing one so named), as [`with`](Self::with) sets it in a new
+    /// one.
+    ///
+    /// # Errors
+    /// As [`with`](Self::with); the table is left as it was.
+    pub fn set(&mut self, domain: Domain, name: &str, attribute: Attribute) -> Result<(), Error> {
+        self.set_shared(domain, name, Arc::new(attribute))
+    }
+
     /// The table with `attribute`, read from an attribute of a checked table
     /// (a render's domain over a value's), set as `name` of `domain`: its
     /// type and domain are checked as [`with`](Self::with) checks them, but
@@ -172,14 +185,22 @@ impl Attributes {
         name: &str,
         attribute: Arc<Attribute>,
     ) -> Result<Attributes, Error> {
+        let mut out = self.clone();
+        out.set_shared(domain, name, attribute)?;
+        Ok(out)
+    }
+
+    /// [`set`](Self::set) for an attribute shared with another table.
+    fn set_shared(
+        &mut self,
+        domain: Domain,
+        name: &str,
+        attribute: Arc<Attribute>,
+    ) -> Result<(), Error> {
         check_name(name)?;
         check_standard_attribute(domain, name, &attribute, self.get(domain, name))?;
-        let mut out = self.clone();
-        out.values
-            .entry(domain)
-            .or_default()
-            .insert(name.into(), attribute);
-        Ok(out)
+        (self.values.entry(domain).or_default()).insert(name.into(), attribute);
+        Ok(())
     }
 
     /// The table without attribute `name` of `domain` (nothing changes
@@ -209,6 +230,17 @@ impl Attributes {
         name: &str,
         group: Elements,
     ) -> Result<Attributes, Error> {
+        let mut out = self.clone();
+        out.set_group(domain, name, group)?;
+        Ok(out)
+    }
+
+    /// Sets group `name` of `domain` to `group` in this table, as
+    /// [`with_group`](Self::with_group) sets it in a new one.
+    ///
+    /// # Errors
+    /// As [`with_group`](Self::with_group); the table is left as it was.
+    pub fn set_group(&mut self, domain: Domain, name: &str, group: Elements) -> Result<(), Error> {
         check_name(name)?;
         match names::standard(name) {
             Some(Standard::Group(must)) if must != domain => {
@@ -225,12 +257,8 @@ impl Attributes {
             }
             _ => {}
         }
-        let mut out = self.clone();
-        out.groups
-            .entry(domain)
-            .or_default()
-            .insert(name.into(), Arc::new(group));
-        Ok(out)
+        (self.groups.entry(domain).or_default()).insert(name.into(), Arc::new(group));
+        Ok(())
     }
 
     /// Attribute `name` of `domain`'s items as `T`, when it holds that
