@@ -1,6 +1,8 @@
 //! Evaluating a node whose inputs all hold values: MaterialX's own formulas
 //! (its GLSL implementations') for stdlib's arithmetic, channel, conditional
-//! and adjustment leaves, component by component, a float spreading over a
+//! and adjustment leaves and pbrlib's `roughness_anisotropy` (what the
+//! translations between shading models compute roughness with), component
+//! by component, a float spreading over a
 //! wider operand as MaterialX's `FA` signatures do. What folds a material's
 //! constants reads it, so an engine receives values where a network only
 //! computed them.
@@ -59,6 +61,7 @@ const EVALUATED: &[&str] = &[
     "and",
     "or",
     "not",
+    "roughness_anisotropy",
 ];
 
 impl NodeDef {
@@ -162,7 +165,11 @@ impl NodeDef {
             // keeps its first numbers, a narrower one gains 0, then 1 (an
             // alpha, a w).
             "convert" => {
-                let n = numbers("in")?;
+                let n = match held("in")? {
+                    Value::Boolean(on) => vec![f64::from(u8::from(on))],
+                    Value::Integer(n) => vec![n as f64],
+                    _ => numbers("in")?,
+                };
                 let each = (0..out.width()).map(|k| match (n.len(), n.get(k)) {
                     (1, _) => n[0],
                     (_, Some(v)) => *v,
@@ -303,6 +310,17 @@ impl NodeDef {
                 ]))
             }
             "ifgreater" | "ifgreatereq" | "ifequal" => self.choose(&held),
+            // mx_roughness_anisotropy: the roughness squared, stretched along
+            // the tangent by the anisotropy.
+            "roughness_anisotropy" => {
+                let (r, a) = (numbers("roughness")?[0], numbers("anisotropy")?[0]);
+                let squared = (r * r).clamp(1e-8, 1.0);
+                let aspect = (1.0 - a.clamp(0.0, 0.98)).sqrt();
+                Some(Value::Numbers(match a > 0.0 {
+                    true => vec![(squared / aspect).min(1.0), squared * aspect],
+                    false => vec![squared; 2],
+                }))
+            }
             "and" | "or" => match (held("in1")?, held("in2")?) {
                 (Value::Boolean(a), Value::Boolean(b)) => {
                     Some(Value::Boolean(if self.node == "and" {
@@ -423,6 +441,16 @@ mod tests {
         );
         let flat = convert("ND_convert_vector2_vector3", &[1.0, 2.0]);
         assert_eq!(flat, Some(n(&[1.0, 2.0, 0.0])));
+        let on = eval("ND_convert_boolean_float", &[("in", Value::Boolean(true))]);
+        assert_eq!(on, Some(n(&[1.0])));
+        // Roughness squared, stretched along the tangent by the anisotropy.
+        let rough = |r: f64, a: f64| {
+            let inputs = [("roughness", n(&[r])), ("anisotropy", n(&[a]))];
+            eval("ND_roughness_anisotropy", &inputs).unwrap()
+        };
+        assert_eq!(rough(0.5, 0.0), n(&[0.25, 0.25]));
+        let stretched = rough(0.5, 0.75);
+        assert_eq!(stretched, n(&[0.5, 0.125]));
         // `separate` yields each component at its own output.
         let separate = library().def("ND_separate3_color3").unwrap();
         let held = |name: &str| (name == "in").then(|| c.clone());

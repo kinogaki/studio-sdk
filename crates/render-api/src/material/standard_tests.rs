@@ -279,3 +279,32 @@ fn a_preview_surface_translates_input_by_input() {
         );
     }
 }
+
+/// A file format writing glTF PBR reads OpenPBR Surface translated into it,
+/// through Standard Surface: its constants fold into glTF PBR's, the
+/// roughness through MaterialX's `roughness_anisotropy` included.
+#[test]
+fn openpbr_translates_into_gltf_pbr_as_constants() {
+    let open = [
+        ("base_color", Value::Color(ORANGE)),
+        ("base_metalness", Value::Number(1.0)),
+        ("specular_roughness", Value::Number(0.25)),
+    ];
+    let network = material("ND_open_pbr_surface_surfaceshader", &open, None);
+    let gltf = network.translated("gltf_pbr").expect("translates");
+    let mut nodes: Vec<&str> = (gltf.nodes().iter())
+        .map(|n| n.def.mtlx().unwrap().node.as_str())
+        .collect();
+    nodes.sort_unstable();
+    assert_eq!(nodes, ["gltf_pbr", "surfacematerial"], "folded");
+    let values = &gltf.nodes()[gltf.surface().unwrap() as usize].values;
+    let color = values["base_color"].color().unwrap();
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    assert!(
+        (color.iter().zip(ORANGE)).all(|(a, b)| near(*a, b)),
+        "{color:?}"
+    );
+    assert_eq!(values.get("metallic").and_then(Value::number), Some(1.0));
+    let roughness = values.get("roughness").and_then(Value::number).unwrap();
+    assert!(near(roughness, 0.25), "{roughness}");
+}

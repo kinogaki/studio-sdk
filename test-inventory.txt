@@ -362,6 +362,7 @@ kinogaki-render-api/lib test material::standard::tests::a_vertex_color_shows_as_
 kinogaki-render-api/lib test material::standard::tests::an_image_shows_through_any_model_with_its_placement
 kinogaki-render-api/lib test material::standard::tests::each_model_shows_its_constant_base_color
 kinogaki-render-api/lib test material::standard::tests::open_pbr_makes_a_shown_surface
+kinogaki-render-api/lib test material::standard::tests::openpbr_translates_into_gltf_pbr_as_constants
 kinogaki-render-api/lib test material::tests::a_builder_refuses_what_isnt_whole
 kinogaki-render-api/lib test material::tests::a_network_is_whole_once_built
 kinogaki-render-api/lib test material::tests::an_image_input_reads_a_source_as_color_or_data
