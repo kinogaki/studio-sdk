@@ -15,9 +15,11 @@ example-flat-engine/lib gpu tests::flat_renders_what_a_host_sends
 example-pin-board/lib test tests::levels_choose_and_commands_are_undo_steps
 example-pin-board/lib test tests::the_inspector_shows_the_count
 example-pin-board/lib test tests::the_package_registers_whole
+example-points-format/lib test tests::a_bad_line_is_refused_naming_it
 example-points-format/lib test tests::a_file_reads_in_the_projects_units_scaled_by_its_option
-example-points-format/lib test tests::a_line_of_two_numbers_is_refused_naming_it
 example-points-format/lib test tests::every_fixtures_points_survive_a_round_trip
+example-points-format/lib test tests::materials_and_faces_write_back_as_they_read
+example-points-format/lib test tests::materials_read_first_their_colors_in_the_working_space_and_pictures_as_image_nodes
 kinogaki-edit/doc test crates/edit/src/deform.rs - deform
 kinogaki-edit/doc test crates/edit/src/editor/carry.rs - editor::carry::rule
 kinogaki-edit/doc test crates/edit/src/editor/finish.rs - editor::finish::place
@@ -53,6 +55,7 @@ kinogaki-edit/editor test values::a_new_element_without_sources_takes_its_types_
 kinogaki-edit/editor test values::a_new_point_takes_each_attribute_by_its_rule
 kinogaki-edit/editor test values::blends_made_again_in_place_are_an_edits_own
 kinogaki-edit/editor test values::each_rule_is_declared_by_storage_and_meaning
+kinogaki-edit/editor test values::ids_past_the_largest_id_are_an_invalid_edit
 kinogaki-edit/editor test values::moving_points_copies_the_positions_alone
 kinogaki-edit/editor test values::nothing_changed_is_the_value_itself
 kinogaki-edit/editor test values::numbers_stay_put_during_an_edit_and_the_change_says_where_they_went
@@ -370,6 +373,7 @@ kinogaki-render-api/lib test material::adopt::tests::another_engines_material_go
 kinogaki-render-api/lib test material::adopt::tests::standard_surface_translates_by_materialx_own_graph
 kinogaki-render-api/lib test material::adopt::tests::what_no_way_reaches_is_cut_and_named_once
 kinogaki-render-api/lib test material::mtlx::tests::every_node_has_a_label_of_its_own
+kinogaki-render-api/lib test material::mtlx::tests::every_signature_is_one_shared_definition
 kinogaki-render-api/lib test material::mtlx::tests::lengths_in_the_scenes_units_are_lengths
 kinogaki-render-api/lib test material::mtlx::tests::materialx_nodes_keep_their_names_and_meaning
 kinogaki-render-api/lib test material::mtlx::tests::names_read_as_words
@@ -383,6 +387,7 @@ kinogaki-render-api/lib test material::standard::tests::open_pbr_makes_a_shown_s
 kinogaki-render-api/lib test material::standard::tests::openpbr_translates_into_gltf_pbr_as_constants
 kinogaki-render-api/lib test material::tests::a_builder_refuses_what_isnt_whole
 kinogaki-render-api/lib test material::tests::a_network_is_whole_once_built
+kinogaki-render-api/lib test material::tests::a_networks_nodes_change_only_as_it_checks_them
 kinogaki-render-api/lib test material::tests::an_image_input_reads_a_source_as_color_or_data
 kinogaki-render-api/lib test material::tests::sockets_meet_by_kind
 kinogaki-render-api/lib test source::tests::plain_triangles_are_flat_and_default_material
@@ -535,7 +540,7 @@ kinogaki-studio-api/lib test format::options::tests::a_node_holds_a_formats_opti
 kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values
 kinogaki-studio-api/lib test format::tests::a_writer_has_no_options_by_default_whatever_its_reading_has
 kinogaki-studio-api/lib test format::tests::options_save_and_read_back_by_default
-kinogaki-studio-api/lib test format::tests::readings_lend_settings_by_type_and_poll_cancellation
+kinogaki-studio-api/lib test format::tests::readings_poll_cancellation
 kinogaki-studio-api/lib test format::unique::tests::copies_are_numbered_per_base_name
 kinogaki-studio-api/lib test format::unique::tests::file_names_number_before_their_extension_and_ignore_case
 kinogaki-studio-api/lib test format::unique::tests::many_alike_take_linear_time
@@ -578,12 +583,13 @@ kinogaki-studio-api/network test a_context_registers_once_under_its_vendor
 kinogaki-studio-api/network test a_held_node_type_names_a_registered_delta
 kinogaki-studio-api/network test a_library_holds_unwired_results_without_flags
 kinogaki-studio-api/network test a_package_adds_ways_to_make_another_packages_nodes
-kinogaki-studio-api/network test a_package_makes_the_engines_it_describes
+kinogaki-studio-api/network test a_packages_engine_comes_with_its_description_and_maker
 kinogaki-studio-api/network test a_port_required_while_a_parameter_holds_a_value
 kinogaki-studio-api/network test a_runner_runs_a_compiled_context_its_package_declares
 kinogaki-studio-api/network test an_engine_id_is_declared_once_under_its_vendor
 kinogaki-studio-api/network test an_engine_setting_is_never_named_as_a_render_outputs_own
 kinogaki-studio-api/network test an_engines_own_prim_type_is_declared_once_under_its_vendor_and_its_outputs_are_standard
+kinogaki-studio-api/network test an_engines_standard_nodes_and_every_default_are_checked_at_admission
 kinogaki-studio-api/network test nodes_hold_networks_of_declared_contexts_without_loops
 kinogaki-studio-api/render test a_drag_is_a_points_update_of_the_same_topology
 kinogaki-studio-api/render test an_item_names_its_part_and_says_what_it_is
@@ -676,11 +682,11 @@ kinogaki-studio-ui-api/lib test sheet::from_params::tests::conditions_hide_and_d
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::curves_channels_and_texts_become_their_fields
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::parameters_become_fields_keyed_by_name
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::shaped_rows_show_their_menus_and_buttons
+kinogaki-studio-ui-api/lib test sheet::items::tests::keys_map_and_filter
+kinogaki-studio-ui-api/lib test sheet::items::tests::values_read_by_key
 kinogaki-studio-ui-api/lib test sheet::keyed::tests::equal_hashes_get_distinct_field_keys
 kinogaki-studio-ui-api/lib test sheet::keyed::tests::field_keys_follow_the_key_not_the_row
 kinogaki-studio-ui-api/lib test sheet::keyed::tests::schemas_and_edits_come_back_with_the_owners_keys
-kinogaki-studio-ui-api/lib test sheet::schema::tests::keys_map_and_filter
-kinogaki-studio-ui-api/lib test sheet::schema::tests::values_read_by_key
 kinogaki-studio-ui-api/lib test theme::tests::light_fills_take_dark_ink_and_dark_fills_light
 kinogaki-studio-ui-api/lib test theme::tests::the_ink_follows_the_theme_text
 kinogaki-studio-ui-api/network test a_cooks_handles_are_checked_and_read_back
@@ -698,8 +704,10 @@ kinogaki-studio-ui-api/recording test menus_run_only_while_open
 kinogaki-studio-ui-api/recording test overlays_are_recorded_as_shapes
 kinogaki-studio-ui-api/recording test text_and_choices_take_scripted_input
 kinogaki-studio-ui-api/recording test value_fields_show_what_was_typed_and_hold_the_keys
+kinogaki-value/doc test crates/value/src/data.rs - data::Checked
 kinogaki-value/doc test crates/value/src/data.rs - data::Typed
 kinogaki-value/lib test condition::tests::a_condition_holds_while_every_value_does
+kinogaki-value/lib test data::tests::a_checked_type_wraps_only_what_its_check_takes
 kinogaki-value/lib test data::tests::another_type_reads_as_none
 kinogaki-value/lib test data::tests::clones_share_the_value
 kinogaki-value/lib test data::tests::wrapped_values_read_back

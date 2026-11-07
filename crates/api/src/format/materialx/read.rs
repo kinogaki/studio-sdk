@@ -8,7 +8,7 @@ use crate::network::{NetworkSeed, NewNode};
 use crate::standard::ImportedMaterial;
 use crate::{Diagnostic, Error};
 use kinogaki_geometry::image::ImageSource;
-use kinogaki_render_api::material::Input as Port;
+use kinogaki_render_api::material::NodeInput as Port;
 use kinogaki_render_api::material::mtlx::{def, value};
 use kinogaki_render_api::materialx::{Bound, Document, Included, Material, Type, library};
 use kinogaki_value::Value;
@@ -29,7 +29,7 @@ pub fn read(
     reading: &Reading<'_>,
 ) -> Result<(Vec<ImportedMaterial>, Vec<Diagnostic>), Error> {
     let mut document: Document =
-        (text.parse()).map_err(|why: String| Error::invalid(format!("{input}: {why}")))?;
+        (text.parse()).map_err(|why: Error| Error::invalid(format!("{input}: {why}")))?;
     let mut unread = Vec::new();
     let identity = input.path().and_then(|p| p.canonicalize().ok());
     let identity = identity.map(|p| p.display().to_string());

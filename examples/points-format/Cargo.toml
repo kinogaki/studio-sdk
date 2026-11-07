@@ -1,6 +1,6 @@
 [package]
 name = "example-points-format"
-description = "An example Kinogaki Studio file format: XYZ point lists read into the standard geometry and written from it, checked by the SDK's conformance suite"
+description = "An example Kinogaki Studio file format: XYZ, points, faces over them and the materials they show, read into the standard values and written from them"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,7 +16,10 @@ workspace = true
 
 [dependencies]
 kinogaki-studio-api.workspace = true
+# Material networks, read as MaterialX takes them.
+kinogaki-render-api.workspace = true
 
 [dev-dependencies]
-# The conformance suite's fixtures, and a color service for its reads.
+# The conformance suite's fixtures, a color service for its reads, and
+# scratch folders and round trips.
 kinogaki-studio-api-testing.workspace = true

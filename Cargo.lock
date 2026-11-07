@@ -228,6 +228,7 @@ dependencies = [
 name = "example-points-format"
 version = "0.1.0"
 dependencies = [
+ "kinogaki-render-api",
  "kinogaki-studio-api",
  "kinogaki-studio-api-testing",
 ]
