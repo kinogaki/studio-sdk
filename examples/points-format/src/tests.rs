@@ -3,7 +3,7 @@
 use super::Points;
 use kinogaki_studio_api::geometry::Units;
 use kinogaki_studio_api::{
-    Data, FileFormat, FileItem, FormatOptions, Purpose, Reading, Writing, standard,
+    Data, FileFormat, FileItem, FormatOptions, Input, Purpose, Reading, Writing, standard,
 };
 use kinogaki_studio_api_testing::{Consumer, Fixtures, Unconverted, run};
 use std::path::PathBuf;
@@ -47,8 +47,8 @@ impl Consumer for RoundTrip {
         (writer.write(&file.0, &[item], &writing, &FormatOptions::new()))
             .map_err(|e| e.to_string())?;
         let reading = Reading::new(Purpose::Objects, units, &colors);
-        let read =
-            (Points.read(&file.0, &Points.options(), &reading)).map_err(|e| e.to_string())?;
+        let read = (Points.read(&Input::file(&file.0), &Points.options(), &reading))
+            .map_err(|e| e.to_string())?;
         let back = (read.items.first().and_then(|i| i.data.as_ref()))
             .and_then(|d| standard::geometry().get(d))
             .ok_or("no geometry read")?;
@@ -73,8 +73,10 @@ fn a_file_reads_in_the_projects_units_scaled_by_its_option() {
     let millimetres = Units::MILLIMETERS;
     let mut options = Points.options();
     options.insert("scale".into(), 2.0.into());
-    let reading = Reading::new(Purpose::Node, millimetres, &colors);
-    let read = Points.read(&file.0, &options, &reading).unwrap();
+    let reading = Reading::new(Purpose::Value, millimetres, &colors);
+    let read = Points
+        .read(&Input::file(&file.0), &options, &reading)
+        .unwrap();
     let points = standard::geometry()
         .get(read.items[0].data.as_ref().unwrap())
         .unwrap();
@@ -89,9 +91,13 @@ fn a_line_of_two_numbers_is_refused_naming_it() {
     let file = Scratch::new();
     std::fs::write(&file.0, "1 2 3\n4 5\n").unwrap();
     let colors = Unconverted;
-    let reading = Reading::new(Purpose::Node, Units::default(), &colors);
+    let reading = Reading::new(Purpose::Value, Units::default(), &colors);
     let error = Points
-        .read(&file.0, &Points.options(), &reading)
+        .read(&Input::file(&file.0), &Points.options(), &reading)
         .unwrap_err();
     assert!(error.to_string().contains("line 2"), "{error}");
+    // In memory, as an embedded file reads.
+    let held = Input::memory("held.xyz", b"1 2 3\n");
+    let read = Points.read(&held, &Points.options(), &reading).unwrap();
+    assert_eq!(read.items[0].name, "held");
 }

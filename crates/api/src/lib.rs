@@ -132,7 +132,8 @@ pub use facets::{
     Tabular, Tally,
 };
 pub use format::{
-    FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Purpose, Reading, Writing,
+    FileFormat, FileItem, FormatOptions, FormatWriter, Frames, Imported, Input, Purpose, Reading,
+    Writing,
 };
 pub use held::HeldEdit;
 pub use icon::Icon;

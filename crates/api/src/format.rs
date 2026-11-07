@@ -1,11 +1,13 @@
 //! [`FileFormat`]: readers and writers of outside files.
 //!
-//! A format reads a file into [`Imported`] items carrying [`Data`] of the
-//! types it declares. The environment turns the items into objects (File
-//! ▸ Import, [`Purpose::Objects`]), or a File node takes the one value it
-//! reads ([`Purpose::Node`]); a File node offers every format whose output
-//! its port accepts. With no format registered, nothing can be imported,
-//! and nothing breaks.
+//! A format reads a file, on disk or held in memory ([`Input`]), into
+//! [`Imported`] items carrying [`Data`] of the types it declares. The
+//! environment turns the items into objects (File ▸ Import,
+//! [`Purpose::Objects`]), or takes the one value a file is
+//! ([`Purpose::Value`]: a File node's output, an image the host's image
+//! store reads); a File node offers every format whose output its port
+//! accepts. With no format registered, nothing can be imported, and
+//! nothing breaks.
 //!
 //! **Options.** A format's options are [`Parameters`] by name with
 //! defaults ([`FileFormat::options`]), shown by its [`Schema`]
@@ -13,8 +15,34 @@
 //! ([`FileFormat::write_options`]), so a File node's options and the
 //! application's import defaults keep the format's own spelling. A
 //! format's writer has options of its own ([`FormatWriter::options`],
-//! [`FormatWriter::schema`]): writing never gets the reading options.
+//! [`FormatWriter::schema`]): writing never gets the reading options. A
+//! node holding a reader's or a writer's options holds each as a row
+//! named by [`options::row`].
+//!
+//! **Images.** A format of pictures reads a file as one item holding one
+//! standard [`Image`](kinogaki_geometry::image::Image)
+//! ([`standard::image`](crate::standard::image)), as the file holds it,
+//! and converts nothing:
+//! - its samples as stored, each channel group a layer (several images
+//!   in one file, an OpenEXR's parts, are the layers of one Image);
+//! - its color layers tagged as the file says
+//!   ([`ColorTag`](kinogaki_geometry::image::ColorTag): a space's name, an
+//!   ICC profile, primaries, else unknown, linear for float samples), with
+//!   its alpha straight or premultiplied as the file has it; its data
+//!   layers raw;
+//! - every attribute the file carries as the Image's metadata, beside the
+//!   standard names ([`metadata`](kinogaki_geometry::image::metadata)).
+//!
+//! The host resolves the tag to a space of its configuration and converts
+//! (a format holds no color maths). A writer of pictures takes one item
+//! holding an Image the host tagged for the file, copies the tag and
+//! [`CHROMATICITIES`](kinogaki_geometry::image::metadata::CHROMATICITIES),
+//! writes each layer as the file can hold it, and says, as a warning, what
+//! it left out.
+mod input;
 pub mod options;
+
+pub use input::Input;
 
 use crate::cancel::CancelToken;
 use crate::color::ColorService;
@@ -78,9 +106,11 @@ pub enum Purpose {
     /// File ▸ Import: the file's items become objects, so options that
     /// shape them (keeping a hierarchy, a piece per object) apply.
     Objects,
-    /// A File node: the file is one value of the node's port type, so the
-    /// format reads it as one item and its schema leaves those options out.
-    Node,
+    /// One value of the type the host wants ([`Reading::wants`]): a File
+    /// node's output, an image of the host's image store. The format reads
+    /// the file as one item, and its schema leaves the options shaping
+    /// objects out.
+    Value,
 }
 
 /// What a read is for and what it reads into, besides the format's
@@ -101,7 +131,7 @@ pub struct Reading<'a> {
     /// ([`Reading::check`]) and stop with [`Error::cancelled()`].
     pub cancel: CancelToken,
     /// The data type the host wants the file read as, for
-    /// [`Purpose::Node`]: the File node's output (a STEP file as B-rep or
+    /// [`Purpose::Value`]: a File node's output (a STEP file as B-rep or
     /// as polygons); `None` for Import, which takes any.
     pub wants: Option<DataTypeId>,
 }
@@ -137,9 +167,9 @@ pub trait FileFormat: Send + Sync {
     /// Its file name extensions, lowercase and without the dot (`obj`).
     fn extensions(&self) -> &[&str];
 
-    /// Whether a file starting with `head` (its first bytes, up to 64) is
-    /// of this format, for a file whose extension names no format; no by
-    /// default.
+    /// Whether a file starting with `head` (its first bytes, up to 64:
+    /// [`Input::head`]) is of this format, for a file whose extension names
+    /// no format; no by default.
     fn detects(&self, head: &[u8]) -> bool {
         let _ = head;
         false
@@ -217,10 +247,11 @@ pub trait FileFormat: Send + Sync {
         Ok(options)
     }
 
-    /// Reads the file at `path` with `options`, as `reading` says.
+    /// Reads `input` with `options`, as `reading` says. Called on a
+    /// worker; a message about the file names it as `input` displays.
     fn read(
         &self,
-        path: &Path,
+        input: &Input<'_>,
         options: &FormatOptions,
         reading: &Reading<'_>,
     ) -> Result<Imported, Error>;
@@ -373,7 +404,12 @@ mod tests {
             ]
             .into()
         }
-        fn read(&self, _: &Path, _: &FormatOptions, r: &Reading<'_>) -> Result<Imported, Error> {
+        fn read(
+            &self,
+            _: &Input<'_>,
+            _: &FormatOptions,
+            r: &Reading<'_>,
+        ) -> Result<Imported, Error> {
             r.check()?;
             Ok(Imported::default())
         }
@@ -433,15 +469,12 @@ mod tests {
         let reading = Reading {
             settings: &lent,
             cancel: stop,
-            ..Reading::new(Purpose::Node, units, &Unconverted)
+            ..Reading::new(Purpose::Value, units, &Unconverted)
         };
-        let read = Plain.read(Path::new("a.plain"), &Plain.options(), &reading);
+        let input = Input::memory("a.plain", b"");
+        let read = Plain.read(&input, &Plain.options(), &reading);
         assert_eq!(read.unwrap_err(), Error::cancelled());
         let fine = Reading::new(Purpose::Objects, Units::default(), &Unconverted);
-        assert!(
-            Plain
-                .read(Path::new("a.plain"), &Plain.options(), &fine)
-                .is_ok()
-        );
+        assert!(Plain.read(&input, &Plain.options(), &fine).is_ok());
     }
 }

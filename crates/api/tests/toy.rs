@@ -214,7 +214,7 @@ impl FileFormat for XyzFormat {
     }
     fn read(
         &self,
-        _path: &std::path::Path,
+        _input: &kinogaki_studio_api::Input<'_>,
         _options: &FormatOptions,
         reading: &Reading<'_>,
     ) -> Result<Imported, Error> {
@@ -341,7 +341,7 @@ fn objects_adopt_imported_values_of_their_result_type() {
         .unwrap();
     let imported = format
         .read(
-            std::path::Path::new("in.xyz"),
+            &kinogaki_studio_api::Input::memory("in.xyz", b""),
             &format.options(),
             &Reading::new(Purpose::Objects, Units::default(), &Unconverted),
         )

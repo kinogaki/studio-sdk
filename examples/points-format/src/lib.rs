@@ -10,7 +10,7 @@ use kinogaki_studio_api::geometry::{Attributes, Geometry, Primitives, Units};
 use kinogaki_studio_api::params::{Number, Parameter, Schema, Value};
 use kinogaki_studio_api::{
     DataTypeId, Diagnostic, Error, FileFormat, FileItem, FormatId, FormatOptions, FormatWriter,
-    Imported, Package, PackageId, Purpose, Reading, Writing, export_package, standard,
+    Imported, Input, Package, PackageId, Purpose, Reading, Writing, export_package, standard,
 };
 use std::fmt::Write as _;
 use std::path::Path;
@@ -56,12 +56,13 @@ impl FileFormat for Points {
     }
     fn read(
         &self,
-        path: &Path,
+        input: &Input<'_>,
         options: &FormatOptions,
         reading: &Reading<'_>,
     ) -> Result<Imported, Error> {
-        let text = (std::fs::read_to_string(path))
-            .map_err(|e| Error::missing(format_args!("{}: {e}", path.display())))?;
+        let bytes = input.bytes()?;
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|_| Error::invalid(format_args!("{input}: not text")))?;
         let scale = options.get(SCALE).and_then(Value::number).unwrap_or(1.0);
         let factor = scale * per_metre(reading.units);
         let mut points = Vec::new();
@@ -85,7 +86,8 @@ impl FileFormat for Points {
         }
         let primitives = Primitives::empty().with_points(points.len())?;
         let geometry = Geometry::new(points.into(), primitives, Attributes::new())?;
-        let name = path.file_stem().map(|s| s.to_string_lossy().into_owned());
+        let name = Path::new(input.name()).file_stem();
+        let name = name.map(|s| s.to_string_lossy().into_owned());
         let item = FileItem::top(
             name.unwrap_or_default(),
             standard::geometry().wrap(geometry),
