@@ -69,7 +69,7 @@ impl std::fmt::Debug for Rendered {
 }
 
 /// What a render asks of [`Renderable::items`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[non_exhaustive]
 pub struct RenderCx<'a> {
     /// The scene time it renders.
@@ -83,6 +83,22 @@ pub struct RenderCx<'a> {
     pub tolerances: Tolerances,
     /// Set when the render no longer wants the items.
     pub cancel: &'a CancelToken,
+    /// What the host made of values other values hold, which a type
+    /// rendering values its value holds asks for each (the host fills it;
+    /// none otherwise, and the type renders them itself).
+    pub held: Option<&'a dyn super::Held>,
+}
+
+impl std::fmt::Debug for RenderCx<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RenderCx")
+            .field("time", &self.time)
+            .field("detail", &self.detail)
+            .field("tolerances", &self.tolerances)
+            .field("cancelled", &self.cancel.is_cancelled())
+            .field("held", &self.held.is_some())
+            .finish()
+    }
 }
 
 impl<'a> RenderCx<'a> {
@@ -94,6 +110,7 @@ impl<'a> RenderCx<'a> {
             detail: Detail::default(),
             tolerances: Tolerances::default(),
             cancel,
+            held: None,
         }
     }
 
@@ -105,6 +122,14 @@ impl<'a> RenderCx<'a> {
     /// At the project's `tolerances`.
     pub fn with_tolerances(self, tolerances: Tolerances) -> Self {
         Self { tolerances, ..self }
+    }
+
+    /// With the host's `held`.
+    pub fn with_held(self, held: &'a dyn super::Held) -> Self {
+        Self {
+            held: Some(held),
+            ..self
+        }
     }
 }
 

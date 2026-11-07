@@ -164,6 +164,8 @@ Facets are optional:
 
 If a type does not provide a facet, the surface that needs it simply leaves the type's values out.
 
+A type whose values hold other values (the standard Instances, their prototypes) draws and renders each held value through what the host gives in the request (`DisplayRequest::held`, `RenderCx::held`: a `Held`), handing it the call that would make the value's drawing or items: the host keeps what was made by the held value's identity while a holder holds it, so a value many objects hold is prepared, uploaded and sent to an engine once. Without one (a type's own tests), the type makes its own.
+
 `Components` is a component selection described in the data type's own terms. A mesh uses element indices. A CAD body uses persistent topology names. The environment stores, undoes and counts a selection, but only the data type that made it reads what is inside.
 
 A `Mesher` (`Package::with_mesher`) is a kernel's display mesh of a B-rep body (`takes` names the data type it meshes, the B-rep's, which the host shows at a display quality while it is installed): its faces' polygons in face order (`face`), then one polyline per edge over the same shared points (`edge`), at a `Detail` (in a view, `Viewport` of the object's display quality, one mesher preset a step) and the project's `Tolerances`, with the faces it couldn't mesh and why. The B-rep value holds no triangles; core caches each body's mesh, and draws, picks, renders and exports from it. `Registry::meshers` lists them in registration order; which one meshes is the host's choice (a user setting), never a vendor's. With none installed a body shows grey, without faces.
@@ -331,7 +333,7 @@ Long work polls a `CancelToken`: preparing a display, converting, reading a file
 
 ## Rendering
 
-Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport(DisplayQuality)`, the object's, or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, a standard value that render-api re-exports, the project's `Tolerances` an approximate value is made to, and a cancel token), and returns `RenderItem`s:
+Engines never see kernel types. A data type's `Renderable` facet is asked through a `RenderCx` (the scene time, a `Detail` of `Viewport(DisplayQuality)`, the object's, or `Render { chord, angle }` that says how fine to make geometry such as a CAD body's tessellation, a standard value that render-api re-exports, the project's `Tolerances` an approximate value is made to, a cancel token, and the host's `Held`), and returns `RenderItem`s:
 - `RenderItem::Shape { part, source, label }`: `part` is a key stable across recooks (a CAD body's index), so the host matches the items of successive values; `source` is a `ShapeSource`, an immutable snapshot with shared columns; `label` is the name Cryptomatte gives the object.
 - `RenderItem::Instances { part, prototypes, which, xforms, primvars, label }`: placements of other items, which an engine instances: what it made of each prototype is shared however many instances place it.
 

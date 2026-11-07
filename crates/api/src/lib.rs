@@ -127,7 +127,7 @@ pub use data_type::{DataType, InfoRow, Stamp, WireColor, stamp_of};
 pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use facets::{
     Canvas, CanvasPiece, CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn,
-    Look, Materials, ObjectPicking, Pickable, Picture, Piece, Probe, RenderCx, Renderable,
+    Held, Look, Materials, ObjectPicking, Pickable, Picture, Piece, Probe, RenderCx, Renderable,
     Rendered, Role, SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable, Table, TableColumn,
     Tabular, Tally,
 };

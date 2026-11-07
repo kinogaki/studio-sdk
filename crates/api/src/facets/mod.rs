@@ -13,10 +13,13 @@
 //!
 //! A type offers a facet by returning it from the matching `DataType`
 //! method; a facet it doesn't return is absent and the surface leaves its
-//! values out.
+//! values out. A type whose values hold others (instances, their
+//! prototypes) draws and renders them through what the host gives in the
+//! requests ([`Held`]), so a value many objects hold is made once.
 mod canvas;
 mod display;
 mod glyph;
+mod held;
 mod object;
 mod pick;
 mod render;
@@ -29,6 +32,7 @@ pub use canvas::{
 };
 pub use display::{DisplayRequest, Displayable, DrawPurpose, Drawn, Piece, Role, Tally};
 pub use glyph::{GlyphScale, Glyphs};
+pub use held::Held;
 pub use object::{Look, Marquee, Materials, ObjectPicking};
 pub use pick::{Combine, Pickable};
 pub use render::{RenderCx, Renderable, Rendered};

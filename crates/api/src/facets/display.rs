@@ -30,8 +30,9 @@ pub enum DrawPurpose {
 /// curvature, what the value is drawn for, the object's body when the value is an object's
 /// result (its display settings: a mesh's subdivision display), the
 /// project's tolerances, which an approximate display (a B-rep's mesh, a
-/// sampled surface) is made to, and the project's units, which a display
-/// of physical sizes (a grid in millimetres) draws in.
+/// sampled surface) is made to, the project's units, which a display
+/// of physical sizes (a grid in millimetres) draws in, and what the host
+/// made of values other values hold ([`Held`](super::Held)).
 #[derive(Clone, Default)]
 pub struct DisplayRequest {
     /// How finely the object shows: types whose display is tessellated (a
@@ -59,6 +60,10 @@ pub struct DisplayRequest {
     pub tolerances: Tolerances,
     /// The project's units (the host fills them; the default otherwise).
     pub units: Units,
+    /// What the host made of values other values hold, which a type
+    /// drawing values its value holds asks for each (the host fills it;
+    /// none otherwise, and the type draws them itself).
+    pub held: Option<Arc<dyn super::Held>>,
 }
 
 impl fmt::Debug for DisplayRequest {
@@ -71,6 +76,7 @@ impl fmt::Debug for DisplayRequest {
             .field("body", &self.body.is_some())
             .field("tolerances", &self.tolerances)
             .field("units", &self.units)
+            .field("held", &self.held.is_some())
             .finish()
     }
 }
