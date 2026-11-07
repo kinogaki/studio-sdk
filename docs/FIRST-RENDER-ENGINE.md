@@ -2,7 +2,7 @@
 
 A render engine is a package that renders what a host sends it. Its renderer depends on `kinogaki-render-api` alone, and sees no kernel, no document and no network: only prims, in batches, with what changed about each. Its package (the lights it brings as object kinds, `export_package!`) depends on `kinogaki-studio-api` too, with its `wgpu` feature.
 
-Studio's engines, Spectre (a spectral path tracer) and Pixel (a realtime pixel-art engine, open source, building beside this repository alone: [plugin-pixel](https://github.com/kinogaki/plugin-pixel)), are written against this page and nothing else. [`examples/flat-engine`](../examples/flat-engine) is a whole engine in three files: a CPU ray caster on the SDK's render thread, shown through a texture on the host's device. The snippets below are an engine called Ray under the `acme` vendor.
+Studio's engines, Spectre (a spectral path tracer) and Pixel (a realtime pixel-art engine, open source, building beside this repository alone: [plugin-pixel](https://github.com/kinogaki/plugin-pixel)), are written against this page and nothing else. [`examples/flat-engine`](../examples/flat-engine) is a whole engine in four files (`lib`, `render`, `display`, `paint`): a CPU ray caster on the SDK's render thread, shown through a texture on the host's device. The snippets below are an engine called Ray under the `acme` vendor.
 
 ## What a host knows of an engine
 
