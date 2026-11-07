@@ -80,11 +80,18 @@ pub enum Kind {
     /// holding the eye button shows it.
     Secret,
     /// `Value::Text`: a file's path, typed or chosen with the folder
-    /// button. The button opens the host's file dialog as `FileDialog`
-    /// says; the chosen file is written into the field as an edit of its
-    /// own (one undo step), stored relative to the project's folder when it
-    /// lies inside it.
-    Path(FileDialog),
+    /// button. The button opens the host's file dialog as `dialog` says;
+    /// the chosen file is written into the field as an edit of its own (one
+    /// undo step), stored relative to the project's folder when it lies
+    /// inside it. With `nodes`, a picker beside it offers the scene's nodes
+    /// it may name instead, each written as its absolute path (an image row
+    /// naming an Image node, `op:/Images/Sky`).
+    Path {
+        /// The folder button's dialog.
+        dialog: FileDialog,
+        /// The nodes the picker offers; none: no picker.
+        nodes: Vec<PathChoice>,
+    },
     /// `Value::Text`: a free path in the scene's tree with a picker of
     /// `choices` (a [`Reference`](Kind::Reference) when only some things
     /// fit).
@@ -153,6 +160,17 @@ pub enum Kind {
         /// The channels, in curve order: each one's tab.
         channels: Vec<CurveChannel>,
     },
+}
+
+impl Kind {
+    /// A file's path asking with `dialog`, offering no node
+    /// ([`Kind::Path`]).
+    pub fn path(dialog: FileDialog) -> Self {
+        Kind::Path {
+            dialog,
+            nodes: Vec::new(),
+        }
+    }
 }
 
 /// Whether a choice of `choices` shows as segments: three at most, 18

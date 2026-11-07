@@ -10,7 +10,8 @@
 //!
 //! Values are authored [`Value`](kinogaki_value::Value)s by name ([`Parameters`]). An image value
 //! of a declared prim ([`ValueKind::File`](kinogaki_value::ValueKind::File)) is authored as its
-//! file's path, and a material node's image is the host's Image node wired
+//! file's path, or `op:` and the path of the host's Image node it reads, and a material node's
+//! image is the host's Image node wired
 //! into it ([`Socket::Image`](crate::Socket::Image)); an engine receives the
 //! Texture prim the host read either to, in the prim's or node's `textures`,
 //! by the value's or input's name.

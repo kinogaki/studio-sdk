@@ -37,7 +37,9 @@ pub enum ValueKind {
     /// language, plain text by default.
     Code,
     /// [`Value::Text`]: a file's path, as typed (empty: none). An image a
-    /// render reads is sent as its texture, never as the path.
+    /// render reads is sent as its texture, never as the path; a row of an
+    /// object's kind reading one (a dome's) may instead hold `op:` and an
+    /// Image node's absolute path, read as that node reads.
     File,
     /// [`Value::Text`]: the path of a file to write, as typed (empty: none):
     /// the panel asks for a new name.

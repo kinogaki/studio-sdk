@@ -90,8 +90,8 @@ impl From<&ValueKind> for Kind {
                 fill: false,
                 lines: None,
             },
-            ValueKind::File => Kind::Path(FileDialog::open()),
-            ValueKind::SaveFile => Kind::Path(FileDialog::save()),
+            ValueKind::File => Kind::path(FileDialog::open()),
+            ValueKind::SaveFile => Kind::path(FileDialog::save()),
             // The host fills the pickers and menus from the scene and the
             // node's input.
             ValueKind::Reference(filter) | ValueKind::Object(filter) => {
