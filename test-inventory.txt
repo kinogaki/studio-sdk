@@ -80,6 +80,7 @@ kinogaki-edit/lib test editor::gather::tests::one_value_where_it_is_is_that_valu
 kinogaki-edit/lib test editor::gather::tests::text_tables_join_and_details_are_the_first_holders
 kinogaki-edit/lib test ids::tests::ids_are_found_whether_they_ascend_or_not
 kinogaki-edit/lib test ids::tests::merge_keeps_the_first_inputs_ids_and_renames_later_collisions
+kinogaki-edit/lib test select::tests::target_by_target_conversions_are_one_pass_conversions
 kinogaki-edit/select test a_boundary_is_a_regions_outline
 kinogaki-edit/select test a_few_elements_convert_as_the_whole_value_says
 kinogaki-edit/select test a_selection_is_valid_on_its_own_topology_and_within_its_elements

@@ -55,7 +55,8 @@
 //!    [`Column`] for BVHs and bounds; an attribute's `Column` for anything
 //!    built from that attribute.
 //! 2. **Where caches live.** Use [`Primitives::derived`] and
-//!    [`Column::derived`]. A slot lives exactly as long as its part and is
+//!    [`Column::derived`] (a viewport packet keeps its own [`Derived`]
+//!    slots, for what is made from it). A slot lives exactly as long as its part and is
 //!    shared by every value that shares the part, so a points-only edit
 //!    (`with_positions`) keeps every table cache. Never keep a cache in
 //!    a global map keyed by address.
@@ -139,6 +140,7 @@ pub use attributes::{
 pub use bounds::Bounds;
 pub use column::{Column, Writer as ColumnWriter};
 pub use curve::{Curve, Span};
+pub use derived::Derived;
 pub use detail::{Detail, DisplayQuality};
 pub use diagnostic::{Diagnostic, Severity, TextSpan};
 pub use elements::Elements;

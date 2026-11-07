@@ -8,7 +8,9 @@
 //!   [`DrawUpdate`] ranges; a [`ShadingPlan`] lets the renderer
 //!   derive vertex shading from positions; [`FaceRun`]s draw some faces
 //!   see-through ([`FaceLook`]). A kernel reads its own packets back with
-//!   [`packet_as`].
+//!   [`packet_as`]; what a host makes from a packet (its picking
+//!   structure) is kept with it ([`SurfaceSource::derived`], an
+//!   [`Identity`]'s caches).
 //! - [`pack_linear`]: a linear color as the RGB9E5 word surface colors
 //!   are carried in ([`ColorLayout`]).
 //! - [`SurfaceTextures`]: the images ([`SurfaceImage`]) a surface's polygons
@@ -37,13 +39,15 @@ mod shading;
 mod textures;
 mod updates;
 pub use color::pack_linear;
+pub use kinogaki_geometry::Derived;
 pub use lines::{ACCENT, LineClass, LineClassId, LineHighlight, LineLook, LineStyle};
 pub use looks::{FaceLook, FaceRun, check_runs};
 pub use overlay::{
     FaceNormals, GuideDraw, LineLayer, OverlayDraw, OverlayLayer, OverlayLine, SceneLines,
 };
 pub use packet::{
-    ColorLayout, Column, ElementKind, ElementSet, OverlayVertex, SurfaceSource, Vertex, packet_as,
+    ColorLayout, Column, ElementKind, ElementSet, Identity, OverlayVertex, SurfaceSource, Vertex,
+    packet_as,
 };
 pub use selection::ElementSelection;
 pub use shading::{

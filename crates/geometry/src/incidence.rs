@@ -9,8 +9,9 @@ use crate::geometry::Geometry;
 /// A value's elements per domain and how they touch: a polygon its
 /// points, vertices and edges; an edge its points; a B-rep body its faces,
 /// edges and vertices; and the elements' stable ids where the value keeps
-/// them. Structure and identity: no positions, no other attributes.
-pub trait Incidence {
+/// them. Structure and identity: no positions, no other attributes. Values
+/// are shared between threads, so rules read them on several at once.
+pub trait Incidence: Sync {
     /// How many elements `domain` has; `None` for a domain the value has
     /// none of.
     fn count(&self, domain: Domain) -> Option<usize>;

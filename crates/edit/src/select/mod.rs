@@ -92,9 +92,27 @@ pub fn convert_by(
     to: Domain,
     coverage: Coverage,
 ) -> Result<Selection, Error> {
+    if to == s.domain() {
+        s.validate(on)?;
+        return Ok(s.clone());
+    }
+    Selection::on(on, to, members_by(s, on, to, coverage)?, None)
+}
+
+/// The elements [`convert_by`] selects, without the selection made of them
+/// (its stable ids): what a count or a pass over them needs.
+///
+/// # Errors
+/// As [`convert`].
+pub fn members_by(
+    s: &Selection,
+    on: &dyn Incidence,
+    to: Domain,
+    coverage: Coverage,
+) -> Result<Elements, Error> {
     s.validate(on)?;
     if to == s.domain() {
-        return Ok(s.clone());
+        return Ok(s.members().clone());
     }
     let targets = target(on, to)?;
     let sources = on.count(s.domain()).unwrap_or(0);
@@ -102,12 +120,28 @@ pub fn convert_by(
     if s.members().len().saturating_mul(FEW) < sources
         && let Some(members) = few_elements(s, on, to, coverage, targets)?
     {
-        return Selection::on(on, to, members, None);
+        return Ok(members);
     }
     let mut chosen = vec![false; sources];
     for i in s.members().iter() {
         chosen[i as usize] = true;
     }
+    match by_targets(s, on, to, coverage, targets, &chosen)? {
+        Some(members) => Ok(members),
+        None => Ok(by_incidence(s, on, to, coverage, targets, &chosen)),
+    }
+}
+
+/// What [`convert_by`] makes of `s` (its members flagged in `chosen`) in
+/// one pass over every incidence of its domain with `to`.
+fn by_incidence(
+    s: &Selection,
+    on: &dyn Incidence,
+    to: Domain,
+    coverage: Coverage,
+    targets: usize,
+    chosen: &[bool],
+) -> Elements {
     let whole = coverage == Coverage::Whole;
     let mut touched = vec![false; targets];
     let mut missing = vec![false; if whole { targets } else { 0 }];
@@ -119,10 +153,9 @@ pub fn convert_by(
             missing[target] = true;
         }
     });
-    let members = Elements::from_fn(targets, |i| {
+    Elements::from_fn(targets, |i| {
         touched[i as usize] && (!whole || !missing[i as usize])
-    });
-    Selection::on(on, to, members, None)
+    })
 }
 
 /// A selection this many times smaller than its domain converts by
@@ -160,6 +193,51 @@ fn few_elements(
         touched.retain(|target| missing.binary_search(target).is_err());
     }
     Elements::from_indices(targets, touched).map(Some)
+}
+
+/// Targets a worker decides at once in [`by_targets`].
+const TARGETS: usize = 16_384;
+
+/// What [`convert_by`] makes of `s` (its members flagged in `chosen`)
+/// target by target, each looking at the elements it touches, on the
+/// workers: the same members as one pass over every incidence, at the
+/// cost of the targets divided among threads. `None` when `on` can't list
+/// a target's elements of `s`'s domain.
+fn by_targets(
+    s: &Selection,
+    on: &dyn Incidence,
+    to: Domain,
+    coverage: Coverage,
+    targets: usize,
+    chosen: &[bool],
+) -> Result<Option<Elements>, Error> {
+    let whole = coverage == Coverage::Whole;
+    let blocks = kinogaki_geometry::parallel::map_blocks(targets, TARGETS, |range| {
+        let first = range.start;
+        // Per target of the block: one of its elements chosen, and one not.
+        let mut touched = vec![false; range.len()];
+        let mut missing = vec![false; range.len()];
+        let listed = on.incident_of(
+            to,
+            s.domain(),
+            &mut range.map(|t| t as u32),
+            &mut |target, source| {
+                let at = target as usize - first;
+                match chosen.get(source as usize) {
+                    Some(true) => touched[at] = true,
+                    _ => missing[at] = true,
+                }
+            },
+        );
+        let picked = (0..touched.len()).filter(|&k| touched[k] && (!whole || !missing[k]));
+        let picked: Vec<u32> = picked.map(|k| (first + k) as u32).collect();
+        Ok::<_, std::convert::Infallible>(listed.then_some(picked))
+    });
+    let Ok(blocks) = blocks;
+    let picked: Option<Vec<Vec<u32>>> = blocks.into_iter().collect();
+    picked
+        .map(|blocks| Elements::from_indices(targets, blocks.concat()))
+        .transpose()
 }
 
 /// The selected elements of `on`, ascending (shared when the selection
@@ -245,4 +323,92 @@ fn selection_of(
 /// Point `p`'s position.
 fn at(value: &Geometry, p: u32) -> Vec3 {
     value.positions()[p as usize].into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kinogaki_geometry::{Attributes, Kind, Primitives};
+
+    /// A 9 × 9 grid of quads, one triangle fanned in, a polyline and a
+    /// loose point: every kind of incidence a conversion meets.
+    fn mixed() -> Geometry {
+        let n = 9u32;
+        let side = n + 1;
+        let mut offsets = vec![0u32];
+        let mut corners = Vec::new();
+        for j in 0..n {
+            for i in 0..n {
+                let a = j * side + i;
+                corners.extend([a, a + 1, a + side + 1, a + side]);
+                offsets.push(corners.len() as u32);
+            }
+        }
+        corners.extend([0, side * side, 1]);
+        offsets.push(corners.len() as u32);
+        corners.extend([2, 3, 4]);
+        offsets.push(corners.len() as u32);
+        let points = side * side + 2;
+        let mut kinds = vec![Kind::POLYGON; offsets.len() - 2];
+        kinds.push(Kind::POLYLINE);
+        let topology = Primitives::new(
+            points as usize,
+            offsets.into(),
+            corners.into(),
+            kinds.into(),
+            None,
+        )
+        .expect("polygons and a polyline");
+        let positions = (0..points)
+            .map(|p| [p as f64, 0.0, 0.0])
+            .collect::<Vec<_>>();
+        Geometry::new(positions.into(), topology, Attributes::new()).expect("a value")
+    }
+
+    #[test]
+    fn target_by_target_conversions_are_one_pass_conversions() {
+        // Random selections of every domain, as every other, both ways of
+        // covering: the workers' answer is the one-pass answer.
+        let value = mixed();
+        let domains = [
+            Domain::Point,
+            Domain::Edge,
+            Domain::Primitive,
+            Domain::Vertex,
+        ];
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let mut compared = 0;
+        for from in domains {
+            let count = value.count(from).expect("a domain");
+            for density in [3, 50, 97] {
+                let members = (0..count as u32).filter(|_| next() % 100 < density);
+                let members = Elements::from_indices(count, members.collect::<Vec<_>>()).unwrap();
+                let s = Selection::on(&value, from, members, None).unwrap();
+                let chosen: Vec<bool> = (0..count as u32).map(|i| s.contains(i)).collect();
+                for to in domains.into_iter().filter(|&to| to != from) {
+                    let targets = value.count(to).unwrap();
+                    for coverage in [Coverage::Any, Coverage::Whole] {
+                        let one = by_incidence(&s, &value, to, coverage, targets, &chosen);
+                        let each = by_targets(&s, &value, to, coverage, targets, &chosen).unwrap();
+                        if let Some(each) = each {
+                            compared += 1;
+                            assert_eq!(
+                                each.indices().to_vec(),
+                                one.indices().to_vec(),
+                                "{from:?} to {to:?} by {coverage:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        // Points, edges and primitives each way (vertices go one pass).
+        assert_eq!(compared, 6 * 3 * 2);
+    }
 }

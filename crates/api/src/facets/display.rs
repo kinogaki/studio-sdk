@@ -198,6 +198,12 @@ impl Drawn {
         Self::new(vec![Piece::own(packet)])
     }
 
+    /// The first piece that is the value's own surface ([`Role::Own`]):
+    /// the one its components are picked on.
+    pub fn own(&self) -> Option<&Piece> {
+        (self.pieces.iter()).find(|p| matches!(p.role, Role::Own { .. }))
+    }
+
     /// With `detail` beside the pieces, for the type's own later calls.
     pub fn with_detail<T: Any + Send + Sync>(mut self, detail: T) -> Self {
         self.detail = Some(Arc::new(detail));

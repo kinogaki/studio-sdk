@@ -17,7 +17,7 @@ use crate::render::Ranges;
 use kinogaki_geometry::Column as GeometryColumn;
 use kinogaki_geometry::{Bounds, Vec3};
 use kinogaki_viewport_api::{
-    BufferRanges, Column, DrawUpdate, LineClass, LineClassId, LineStyle, Vertex,
+    BufferRanges, Column, Derived, DrawUpdate, Identity, LineClass, LineClassId, LineStyle, Vertex,
 };
 pub use kinogaki_viewport_api::{
     ElementKind, ElementSet, GuideDraw, LineLayer, OverlayDraw, OverlayLayer, OverlayLine,
@@ -71,7 +71,7 @@ pub struct Surface {
     /// The lines' one class, edges (none without lines).
     classes: Arc<[LineClass]>,
     topology: u64,
-    identity: Arc<()>,
+    identity: Identity,
     /// What changed since the surface this one was derived from (and the
     /// few before it).
     update: Option<Arc<DrawUpdate>>,
@@ -138,7 +138,7 @@ impl Surface {
             lines: GeometryColumn::default(),
             classes: Arc::from([]),
             topology,
-            identity: Arc::new(()),
+            identity: Identity::default(),
             update: None,
         })
     }
@@ -268,7 +268,7 @@ impl Surface {
     /// identity, derived from nothing.
     fn renewed(mut self, topology: u64) -> Self {
         self.topology = topology;
-        self.identity = Arc::new(());
+        self.identity = Identity::default();
         self.update = None;
         self
     }
@@ -289,7 +289,7 @@ impl Surface {
         }
         let unchanged = |len: usize| BufferRanges::new::<u32>(len);
         let mut update = DrawUpdate::new(
-            self.identity.clone(),
+            self.identity.token().clone(),
             [
                 positions,
                 BufferRanges::new::<Vertex>(self.corners.len()),
@@ -303,7 +303,7 @@ impl Surface {
         }
         Self {
             points,
-            identity: Arc::new(()),
+            identity: Identity::default(),
             update: Some(Arc::new(update)),
             ..self.clone()
         }
@@ -341,7 +341,7 @@ impl Surface {
 
     /// Whether `self` and `other` are the same surface.
     pub fn same(&self, other: &Surface) -> bool {
-        Arc::ptr_eq(&self.identity, &other.identity)
+        Arc::ptr_eq(self.identity.token(), other.identity.token())
     }
 
     /// Corner `corner` as the vertex record the host uploads.
@@ -440,7 +440,11 @@ impl SurfaceSource for Surface {
     }
 
     fn identity(&self) -> &Arc<()> {
-        &self.identity
+        self.identity.token()
+    }
+
+    fn derived(&self) -> &Derived {
+        self.identity.derived()
     }
 
     fn update(&self) -> Option<&Arc<DrawUpdate>> {

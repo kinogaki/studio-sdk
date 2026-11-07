@@ -7,7 +7,7 @@
 //! index points. Columns may be paged, so they are read through callbacks at
 //! column granularity rather than per element.
 use crate::{DrawUpdate, UpdateRanges};
-use kinogaki_geometry::{Bounds, Domain, Error, Vec3};
+use kinogaki_geometry::{Bounds, Derived, Domain, Error, Vec3};
 use std::{
     any::Any,
     collections::BTreeSet,
@@ -164,10 +164,15 @@ pub struct ElementSet {
     revision: u64,
 }
 impl ElementSet {
-    /// Sorts and deduplicates `ids`.
+    /// Sorts and deduplicates `ids` (at the cost of a check when they
+    /// come sorted, as a box's do).
     pub fn new(kind: ElementKind, all: bool, ids: impl IntoIterator<Item = u32>) -> Self {
-        let ids: BTreeSet<u32> = ids.into_iter().collect();
-        Self::from_sorted(kind, all, ids.into_iter().collect())
+        let mut ids: Vec<u32> = ids.into_iter().collect();
+        if !ids.is_sorted() {
+            ids.sort_unstable();
+        }
+        ids.dedup();
+        Self::from_sorted(kind, all, ids.into())
     }
     /// `ids` must already be sorted and unique (checked in debug builds).
     pub(crate) fn from_sorted(kind: ElementKind, all: bool, ids: Arc<[u32]>) -> Self {
@@ -255,6 +260,27 @@ impl ColorLayout {
     }
 }
 
+/// A packet's identity: the token renderers and draw updates know it by
+/// ([`SurfaceSource::identity`]) and the caches made from it
+/// ([`SurfaceSource::derived`]: a host's picking structure), made together.
+/// A packet made from another takes a new one, so it starts with none of
+/// the other's caches; clones of one packet share both.
+#[derive(Clone, Debug, Default)]
+pub struct Identity {
+    token: Arc<()>,
+    derived: Arc<Derived>,
+}
+impl Identity {
+    /// The token ([`SurfaceSource::identity`]).
+    pub fn token(&self) -> &Arc<()> {
+        &self.token
+    }
+    /// The caches ([`SurfaceSource::derived`]).
+    pub fn derived(&self) -> &Derived {
+        &self.derived
+    }
+}
+
 /// An immutable surface packet. Implementations are shared as
 /// `Arc<dyn SurfaceSource>`; renderers treat the allocation as the packet's
 /// identity (two packets are the same when they are one allocation), and its maker reads it back as its own
@@ -305,6 +331,10 @@ pub trait SurfaceSource: Any + Send + Sync {
     fn topology_key(&self) -> [u8; 32];
     /// Exact-parent identity token of this packet.
     fn identity(&self) -> &Arc<()>;
+    /// What is made from this packet and kept with it (a host's picking
+    /// structure), dropped with it: the caches of its [`Identity`]. Only
+    /// the crate that defines a cache asks for it.
+    fn derived(&self) -> &Derived;
     /// Ranges changed relative to the packet this one was derived from.
     fn update(&self) -> Option<&Arc<DrawUpdate>>;
     /// The display range of curvature measure `measure` (98th percentile).
@@ -374,7 +404,7 @@ mod tests {
     use crate::LineClass;
 
     /// An empty packet; `N` makes distinct types of one shape.
-    struct Empty<const N: u8>(Arc<()>);
+    struct Empty<const N: u8>(Identity);
     impl<const N: u8> SurfaceSource for Empty<N> {
         fn origin(&self) -> Vec3 {
             Vec3::ZERO
@@ -409,7 +439,10 @@ mod tests {
             [0; 32]
         }
         fn identity(&self) -> &Arc<()> {
-            &self.0
+            self.0.token()
+        }
+        fn derived(&self) -> &Derived {
+            self.0.derived()
         }
         fn update(&self) -> Option<&Arc<DrawUpdate>> {
             None
@@ -451,7 +484,7 @@ mod tests {
 
     #[test]
     fn a_packet_reads_back_as_its_own_type_only() {
-        let packet: Arc<dyn SurfaceSource> = Arc::new(Empty::<0>(Arc::new(())));
+        let packet: Arc<dyn SurfaceSource> = Arc::new(Empty::<0>(Identity::default()));
         let read = packet_as::<Empty<0>>(&packet).expect("its own type");
         assert!(std::ptr::addr_eq(&*read, &*packet));
         assert!(packet_as::<Empty<1>>(&packet).is_none());
