@@ -173,6 +173,11 @@ impl RenderEngine for RecordingEngine {
         None
     }
 
+    /// It renders nothing, so it says nothing.
+    fn said(&mut self) -> Vec<Diagnostic> {
+        Vec::new()
+    }
+
     /// Delivers black outputs of the view's size at once (a view it wasn't
     /// given fails).
     fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Image> {

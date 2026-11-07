@@ -2,8 +2,8 @@
 //! [`RenderEngine`] a host holds, a handle that never blocks. Every call sends
 //! a [`Message`] to the thread and returns; the thread owns the engine's
 //! renderer and scene and answers through what it shares with the handle
-//! ([`Published`]: each view's newest frame and problem). Dropping the handle
-//! stops the thread and joins it.
+//! ([`Published`]: each view's newest frame and problem, and what the engine
+//! said of the scene). Dropping the handle stops the thread and joins it.
 //!
 //! - **Views.** A dropped view's frame and problem go on the host's thread at
 //!   once, and the thread publishes for a view only while the host hasn't
@@ -133,12 +133,14 @@ pub enum Message<E> {
 }
 
 /// What the handle, the thread and an engine's display share: each view's
-/// newest frame and problem, and how often the host dropped each view.
+/// newest frame and problem, how often the host dropped each view, and what
+/// the engine said that the host hasn't taken.
 #[derive(Default)]
 pub struct Published {
     frames: BTreeMap<ViewId, Arc<Frame>>,
     problems: BTreeMap<ViewId, Diagnostic>,
     drops: BTreeMap<ViewId, u64>,
+    said: Vec<Diagnostic>,
 }
 
 impl Published {
@@ -183,6 +185,17 @@ impl Published {
     /// View `view`'s problem cleared: it renders again.
     pub fn clear_problem(&mut self, view: ViewId) {
         self.problems.remove(&view);
+    }
+
+    /// Says `problem` of the scene to the host, which takes it once
+    /// ([`RenderEngine::said`]); the engine wakes the host after.
+    pub fn say(&mut self, problem: Diagnostic) {
+        self.said.push(problem);
+    }
+
+    /// What the engine said since the host last took it.
+    fn take_said(&mut self) -> Vec<Diagnostic> {
+        std::mem::take(&mut self.said)
     }
 
     fn drop_view(&mut self, view: ViewId) {
@@ -326,6 +339,10 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         lock(&self.published).problem(view).cloned()
     }
 
+    fn said(&mut self) -> Vec<Diagnostic> {
+        lock(&self.published).take_said()
+    }
+
     fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Image> {
         let (deliver, result) = pending(self.wake.clone());
         let reading = Reading(Read::Outputs(outputs.to_vec(), deliver));
@@ -341,5 +358,55 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         self.send(Message::View(PREVIEW, view));
         self.send(Message::Read(PREVIEW, Reading(Read::Preview(deliver))));
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{EngineId, PrimId};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// The preview's view: unused here.
+    fn unseen(_: &PreviewScene, side: u32) -> ViewDesc {
+        ViewDesc {
+            camera: crate::ViewCamera::Prim(crate::Id::of(PrimId {
+                slot: 0,
+                generation: 0,
+            })),
+            width: side,
+            height: side,
+            mode: crate::ViewMode::Final,
+            values: Arc::default(),
+        }
+    }
+
+    #[test]
+    fn what_an_engine_says_reaches_the_host_once() {
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let woken = wakes.clone();
+        let wake: Wake = Arc::new(move || {
+            woken.fetch_add(1, Ordering::SeqCst);
+        });
+        let thread_wake = wake.clone();
+        let description = EngineDescription::builder(EngineId::declared("toy.say.engine"), "Toy");
+        let run = move |mailbox: Mailbox<()>| {
+            // Each update it takes says a node it doesn't render, and wakes.
+            while let Ok(Message::Update(_)) = mailbox.receiver.recv() {
+                let said = Diagnostic::warning("/m: Toy doesn't render `hextiledimage`");
+                lock(&mailbox.published).say(said);
+                thread_wake();
+            }
+        };
+        let start = (description.build(), |_| ());
+        let mut engine = EngineThread::start("toy", start, wake, unseen, run).expect("its thread");
+        engine.update(SceneUpdate::new());
+        while wakes.load(Ordering::SeqCst) == 0 {
+            std::thread::yield_now();
+        }
+        let said = engine.said();
+        assert_eq!(said.len(), 1);
+        assert!(said[0].message.contains("hextiledimage"), "{said:?}");
+        assert_eq!(engine.said(), Vec::new(), "taken once");
     }
 }

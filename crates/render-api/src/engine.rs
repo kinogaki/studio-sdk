@@ -73,8 +73,6 @@ pub struct RenderStats {
     pub target: u32,
     /// The last pass's GPU time, in milliseconds.
     pub pass_ms: f32,
-    /// Problems to report once (an unsupported node, a missing texture).
-    pub problems: Vec<Diagnostic>,
 }
 
 /// The last whole pass of a view: its display image and stats.
@@ -222,12 +220,19 @@ pub trait RenderEngine: Send {
     /// first turn. Restarts nothing.
     fn focus(&mut self, view: ViewId);
     /// Why the view can't render, once it failed (it wakes the host once
-    /// when it does); its neighbours render on.
+    /// when it does): its camera isn't in the scene, its film is more than
+    /// the device holds, a pass failed. Its neighbours render on.
     fn problem(&self, view: ViewId) -> Option<Diagnostic>;
+    /// What the engine said of the scene since the host last asked, each
+    /// once: what it doesn't render as sent (a node adoption cut, a missing
+    /// texture), apart from a view's failure ([`problem`](Self::problem)).
+    /// It wakes the host once when it says something.
+    fn said(&mut self) -> Vec<Diagnostic>;
     /// Read a view's outputs once its samples are done. The result
     /// resolves once: the outputs as one Image, a layer each (the beauty the
     /// main one; [`crate::aov::image`] makes it), or why there are none (a
-    /// failed read, or the request dropped with the view or the engine).
+    /// view that can't render fails at once, saying its problem; a failed
+    /// read; the request dropped with the view or the engine).
     fn finish(&mut self, view: ViewId, outputs: &[AovDesc]) -> Pending<Image>;
     /// A picture of a material, rendered off the caller's thread; never
     /// blocks. The host drops the result to cancel it ([`Deliver::wanted`]).

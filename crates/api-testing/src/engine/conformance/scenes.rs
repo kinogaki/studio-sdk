@@ -1,10 +1,6 @@
-//! An engine checked against what a host sends ([`conformance`]): scenes of
-//! prims built with the SDK's builders, one for each prim kind and standard
-//! type the engine declares, each rendered as a final frame and read back
-//! beside the same scene without its subject. A scene passes when the
-//! engine renders it without failing, its final frame is an Image of the
-//! view's size whose main layer is the beauty (RGBA colors), its beauty is
-//! finite, and its subject shows (the two beauties differ).
+//! The scenes the conformance renders: one for each prim kind and standard
+//! type the engine declares, each a final frame beside the same scene without
+//! its subject (`check`).
 //!
 //! The subjects stand on a quad facing +Z, lit by the standard dome when
 //! the engine declares it, seen by an orthographic camera from above a
@@ -14,85 +10,31 @@
 //! occlusion-roughness-metallic texture, cut out by its alpha; a USD Preview
 //! Surface whose color and opacity a texture gives, cut out at a threshold;
 //! a Surface Unlit.
-use super::Waiter;
-use crate::{Outcome, Report};
-use kinogaki_render_api::aov::standard as aovs;
-use kinogaki_render_api::display::Made;
+use super::{Make, beauty, id};
 use kinogaki_render_api::geometry::image::{Encoding, Format, Image, ImageSource, Rect, Sample};
 use kinogaki_render_api::geometry::{
-    Attribute, Domain, Error, Kind, Meaning, Primitives, Sampled, Vec3, Xform, names,
+    Attribute, Domain, Kind, Meaning, Primitives, Sampled, Vec3, Xform, names,
 };
 use kinogaki_render_api::material::mtlx;
-use kinogaki_render_api::settings::defaults;
 use kinogaki_render_api::value::{Parameters, Value};
 use kinogaki_render_api::{
-    AovDesc, AovFormat, Camera, Declared, EngineDescription, Engines, Id, Instancer, Material,
-    MaterialNetwork, Prim, PrimId, PrimKind, Projection, SceneSettings, SceneUpdate, Shape,
-    Subsets, Topology, ViewCamera, ViewDesc, ViewId, ViewMode, Wake, standard,
+    Camera, Declared, EngineDescription, Engines, Id, Instancer, Material, MaterialNetwork, Prim,
+    PrimKind, Projection, Shape, Subsets, Topology, standard,
 };
 use std::sync::Arc;
-use std::time::Duration;
-
-/// The film's side, in pixels.
-const SIDE: u32 = 48;
-
-/// The view rendered.
-const VIEW: ViewId = ViewId(1);
-
-/// How long a final frame may take.
-const LIMIT: Duration = Duration::from_secs(120);
-
-/// What makes the engine under test, waking the given wake once per result.
-pub type Make<'a> = &'a dyn Fn(Wake) -> Result<Made, Error>;
 
 /// One scene: what it shows, and what it stands in.
-struct Scene {
-    name: String,
+pub(super) struct Scene {
+    pub name: String,
     subject: Vec<Prim>,
     setting: Vec<Prim>,
 }
 
-/// Engine `name`, made by `make`, rendering every scene its description
-/// declares the prims of (see the module docs): one outcome a scene.
-pub fn conformance(name: &str, make: Make<'_>) -> Report {
-    let outcomes = match made(make) {
-        Err(why) => vec![outcome(name, "making the engine", Err(why))],
-        Ok((engine, waiter)) => {
-            let description = engine.0.description().as_ref().clone();
-            drop(engine);
-            drop(waiter);
-            (scenes(&description).into_iter())
-                .map(|scene| {
-                    let result = check(make, &description, &scene);
-                    outcome(name, &scene.name, result)
-                })
-                .collect()
-        }
-    };
-    Report { outcomes }
-}
-
-fn outcome(engine: &str, scene: &str, result: Result<(), String>) -> Outcome {
-    Outcome {
-        producer: "prims".into(),
-        fixture: scene.into(),
-        consumer: engine.into(),
-        result,
-    }
-}
-
-/// An engine made for one render, and its wakes.
-fn made(make: Make<'_>) -> Result<(Made, Waiter), String> {
-    let waiter = Waiter::default();
-    let made = make(waiter.wake()).map_err(|e| e.to_string())?;
-    Ok((made, waiter))
-}
-
 /// `scene` rendered with and without its subject: they must differ.
-fn check(make: Make<'_>, description: &EngineDescription, scene: &Scene) -> Result<(), String> {
+pub(super) fn check(make: Make<'_>, scene: &Scene) -> Result<(), String> {
     let with = [&scene.setting[..], &scene.subject[..]].concat();
-    let shown = beauty(make, description, with)?;
-    let without = beauty(make, description, scene.setting.clone())?;
+    let shown = beauty(make, with)?;
+    let without = beauty(make, scene.setting.clone())?;
     let differs = |(a, b): (&f32, &f32)| (a - b).abs() > 1e-3 * b.abs().max(1.0);
     let covered = (shown.chunks(4).zip(without.chunks(4)))
         .filter(|(p, q)| p.iter().zip(q.iter()).any(differs))
@@ -103,90 +45,25 @@ fn check(make: Make<'_>, description: &EngineDescription, scene: &Scene) -> Resu
     }
 }
 
-/// The beauty of `prims` (ids in order, so a prim names those before it)
-/// through the camera: an error when the engine fails or it isn't finite.
-fn beauty(
-    make: Make<'_>,
-    description: &EngineDescription,
-    prims: Vec<Prim>,
-) -> Result<Arc<[f32]>, String> {
-    let ((mut engine, _display), waiter) = made(make)?;
-    let added = (prims.into_iter().enumerate())
-        .map(|(i, prim)| (id(i), prim))
-        .collect();
-    engine.update(SceneUpdate {
-        added,
-        settings: Some(SceneSettings::default()),
-        ..SceneUpdate::default()
-    });
-    engine.view(
-        VIEW,
-        ViewDesc {
-            camera: ViewCamera::Free(camera()),
-            width: SIDE,
-            height: SIDE,
-            mode: ViewMode::Final,
-            values: Arc::new(defaults(description.settings())),
+/// The standard dome, which the camera doesn't see, when the engine
+/// declares it: what lights the subjects.
+pub(super) fn dome(description: &EngineDescription) -> Option<Prim> {
+    description.prim_type(standard::DOME_LIGHT)?;
+    let light = standard::Light {
+        shape: standard::Shape::Dome {
+            image: None,
+            ground: None,
         },
-    );
-    let asked = [AovDesc {
-        aov: aovs::beauty(),
-        format: AovFormat::F32,
-    }];
-    let pending = engine.finish(VIEW, &asked);
-    let mut outcome = None;
-    waiter.until(LIMIT, || {
-        outcome = pending.take();
-        outcome.is_some()
-    });
-    let outputs = (outcome.expect("taken above")).map_err(|e| e.to_string())?;
-    if let Some(why) = engine.problem(VIEW) {
-        return Err(why.message);
-    }
-    if outputs.data().size() != [SIDE; 2] {
-        return Err(format!(
-            "a frame of {:?}, not the view's",
-            outputs.data().size()
-        ));
-    }
-    let main = outputs.layers().first().map(|l| l.format());
-    if !main
-        .is_some_and(|f| f.name.is_empty() && f.channels.len() == 4 && f.encoding.space().is_some())
-    {
-        return Err("its main layer isn't the beauty".into());
-    }
-    let side = SIDE as i32;
-    let beauty: Arc<[f32]> = (0..side * side)
-        .flat_map(|p| outputs.read_pixel(0, p % side, p / side))
-        .collect();
-    match beauty.iter().all(|v| v.is_finite()) {
-        true => Ok(beauty),
-        false => Err("the beauty isn't finite".into()),
-    }
-}
-
-/// The prim id of the `i`th prim of a scene.
-fn id(i: usize) -> PrimId {
-    PrimId {
-        slot: i as u32,
-        generation: 0,
-    }
+        camera: false,
+        ..standard::Light::default()
+    };
+    Some(Prim::Declared(filled(light.declared(), description)))
 }
 
 /// The scenes `description` declares the prims of.
-fn scenes(description: &EngineDescription) -> Vec<Scene> {
+pub(super) fn scenes(description: &EngineDescription) -> Vec<Scene> {
     let renders = |kind| description.capabilities().renders(kind);
-    let dome = (description.prim_type(standard::DOME_LIGHT)).map(|_| {
-        let light = standard::Light {
-            shape: standard::Shape::Dome {
-                image: None,
-                ground: None,
-            },
-            camera: false,
-            ..standard::Light::default()
-        };
-        Prim::Declared(filled(light.declared(), description))
-    });
+    let dome = dome(description);
     let lit = |subject: Vec<Prim>| (dome.iter().cloned().collect(), subject);
     let mut scenes = Vec::new();
     let mut add = |name: &str, (setting, subject): (Vec<Prim>, Vec<Prim>)| {
@@ -268,7 +145,7 @@ enum Model {
 }
 
 /// A node of MaterialX signature `signature` holding `values`.
-fn node(
+pub(super) fn node(
     built: &mut kinogaki_render_api::NetworkBuilder,
     signature: &str,
     values: &[(&str, Value)],
@@ -415,7 +292,7 @@ fn filled(prim: Declared, description: &EngineDescription) -> Declared {
 }
 
 /// A square `side` across in the XY plane, facing +Z.
-fn quad(side: f32) -> Shape {
+pub(super) fn quad(side: f32) -> Shape {
     let s = side;
     let points = vec![[-s, -s, 0.0], [s, -s, 0.0], [s, s, 0.0], [-s, s, 0.0]];
     let triangles = vec![[0, 1, 2], [0, 2, 3]];
@@ -481,7 +358,7 @@ fn instances(first: usize, depth: usize) -> Vec<Prim> {
 }
 
 /// An orthographic camera looking at the quad from above its corner.
-fn camera() -> Camera {
+pub(super) fn camera() -> Camera {
     let back = Vec3::new(1.0, 0.9, 1.3).normalized().expect("a direction");
     let right = Vec3::new(0.0, 1.0, 0.0)
         .cross(back)

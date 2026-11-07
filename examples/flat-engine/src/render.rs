@@ -1,16 +1,17 @@
 //! Flat's render thread, on the SDK's [`EngineThread`]: it keeps the prims
 //! it was sent and each view's desc, and after the messages that arrived it
-//! renders every view they changed, publishes the frame, wakes the host
-//! once, and answers the reads waiting for it.
+//! says the MaterialX nodes it doesn't render (once each), renders every
+//! view they changed, publishes the frame (or why a view can't render),
+//! wakes the host once, and answers the reads waiting for it.
 use super::paint::Paint;
-use kinogaki_render_api::geometry::{Vec3, Xform};
-use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Reading, lock};
+use kinogaki_render_api::geometry::{Diagnostic, Error, Vec3, Xform};
+use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Published, Reading, lock};
 use kinogaki_render_api::{
     Camera, Frame, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, Topology,
     ViewCamera, ViewDesc, ViewId, ViewMode, Wake, aov, f32_to_half,
 };
 use std::collections::{BTreeMap, BTreeSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// Flat as a host holds it.
 pub(crate) type Handle = EngineThread<()>;
@@ -36,12 +37,12 @@ fn preview_view(scene: &PreviewScene, side: u32) -> ViewDesc {
 }
 
 /// One view: its desc, how often the host had dropped it when it gave it,
-/// and its last render.
+/// and its last render (or why it can't render).
 struct View {
     desc: ViewDesc,
     drops: u64,
     generation: u64,
-    pixels: Option<Arc<[f32]>>,
+    pixels: Option<Result<Arc<[f32]>, String>>,
 }
 
 /// What the thread holds.
@@ -54,6 +55,8 @@ struct Scene {
     stale: BTreeSet<ViewId>,
     /// Reads waiting for their view's render.
     reads: Vec<(ViewId, Reading)>,
+    /// The (material, node) pairs said so far: each is said once.
+    said: BTreeSet<(Arc<str>, Arc<str>)>,
 }
 
 impl Scene {
@@ -61,43 +64,67 @@ impl Scene {
         while let Ok(first) = mailbox.receiver.recv() {
             let rest = std::iter::from_fn(|| mailbox.receiver.try_recv().ok());
             for message in std::iter::once(first).chain(rest) {
-                if !self.take(message) {
+                if !self.take(message, &mailbox.published) {
                     return;
                 }
             }
-            let mut published = false;
+            let mut woke = self.say_cuts(&mailbox.published);
             for id in std::mem::take(&mut self.stale) {
                 let Some(view) = self.views.get_mut(&id) else {
                     continue;
                 };
-                let pixels = render(&self.prims, &self.settings, &view.desc);
+                let rendered = render(&self.prims, &self.settings, &view.desc);
                 view.generation += 1;
-                view.pixels = Some(pixels.clone());
-                let frame = Frame {
-                    view: id,
-                    generation: view.generation,
-                    desc: view.desc.clone(),
-                    width: view.desc.width,
-                    height: view.desc.height,
-                    pixels: pixels.iter().map(|&v| f32_to_half(v)).collect(),
-                    image: 0,
-                    stats: RenderStats {
-                        samples: 1,
-                        target: 1,
-                        ..RenderStats::default()
-                    },
+                view.pixels = Some(rendered.clone());
+                let mut published = lock(&mailbox.published);
+                woke |= match rendered {
+                    Ok(pixels) => {
+                        let frame = Frame {
+                            view: id,
+                            generation: view.generation,
+                            desc: view.desc.clone(),
+                            width: view.desc.width,
+                            height: view.desc.height,
+                            pixels: pixels.iter().map(|&v| f32_to_half(v)).collect(),
+                            image: 0,
+                            stats: RenderStats {
+                                samples: 1,
+                                target: 1,
+                                ..RenderStats::default()
+                            },
+                        };
+                        published.publish(Arc::new(frame), view.drops)
+                    }
+                    Err(why) => published.fail(id, Diagnostic::error(why), view.drops),
                 };
-                published |= lock(&mailbox.published).publish(Arc::new(frame), view.drops);
             }
-            if published {
+            if woke {
                 wake();
             }
             self.answer();
         }
     }
 
+    /// Says each MaterialX node adoption cut from a material (what Flat
+    /// doesn't render) not said before; whether it said one.
+    fn say_cuts(&mut self, published: &Mutex<Published>) -> bool {
+        let materials = (self.prims.values()).filter_map(|prim| match prim {
+            Prim::Material(m) => Some(m),
+            _ => None,
+        });
+        let cut =
+            materials.flat_map(|m| (m.network.cut().iter()).map(|n| (m.path.clone(), n.clone())));
+        let new: Vec<_> = cut.filter(|pair| !self.said.contains(pair)).collect();
+        for (material, node) in &new {
+            let said = format!("{material}: Flat doesn't render `{node}`");
+            lock(published).say(Diagnostic::warning(said));
+        }
+        self.said.extend(new.iter().cloned());
+        !new.is_empty()
+    }
+
     /// Takes `message`; `false` once the handle went.
-    fn take(&mut self, message: Message<()>) -> bool {
+    fn take(&mut self, message: Message<()>, published: &Mutex<Published>) -> bool {
         match message {
             Message::Update(update) => {
                 self.settings = update.settings.unwrap_or_else(|| self.settings.clone());
@@ -114,7 +141,7 @@ impl Scene {
                     id,
                     View {
                         desc,
-                        drops: 0,
+                        drops: lock(published).drops(id),
                         generation: 0,
                         pixels: None,
                     },
@@ -131,16 +158,15 @@ impl Scene {
         true
     }
 
-    /// Answers the reads whose view rendered; a read of a view that went
-    /// fails.
+    /// Answers the reads whose view rendered; a read of a view that went,
+    /// or can't render, fails saying why.
     fn answer(&mut self) {
         for (id, reading) in std::mem::take(&mut self.reads) {
             match self.views.get(&id).map(|v| (&v.desc, v.pixels.clone())) {
-                None => reading.fail(kinogaki_render_api::geometry::Error::invalid(
-                    "the view went",
-                )),
+                None => reading.fail(Error::invalid("the view went")),
                 Some((_, None)) => self.reads.push((id, reading)),
-                Some((desc, Some(pixels))) => {
+                Some((_, Some(Err(why)))) => reading.fail(Error::invalid(why)),
+                Some((desc, Some(Ok(pixels)))) => {
                     let planes: Vec<_> = (reading.outputs().into_iter())
                         .filter(|o| o.aov.is_beauty())
                         .map(|o| (o, pixels.clone()))
@@ -224,13 +250,17 @@ fn world(prims: &BTreeMap<PrimId, Prim>) -> (Vec<Triangle>, Vec<Paint>) {
 
 /// The view's image: RGBA floats, rows from the top, each pixel the
 /// facing ratio of the nearest triangle its ray hits times its paint there
-/// (black where none).
-fn render(prims: &BTreeMap<PrimId, Prim>, settings: &SceneSettings, desc: &ViewDesc) -> Arc<[f32]> {
+/// (black where none); why not, when its camera isn't in the scene.
+fn render(
+    prims: &BTreeMap<PrimId, Prim>,
+    settings: &SceneSettings,
+    desc: &ViewDesc,
+) -> Result<Arc<[f32]>, String> {
     let camera = match &desc.camera {
-        ViewCamera::Free(camera) => Some(camera),
+        ViewCamera::Free(camera) => camera,
         ViewCamera::Prim(id) => match prims.get(&id.prim()) {
-            Some(Prim::Camera(camera)) => Some(camera),
-            _ => None,
+            Some(Prim::Camera(camera)) => camera,
+            _ => return Err("the view's camera isn't in the scene".into()),
         },
     };
     let (triangles, paints) = world(prims);
@@ -242,9 +272,8 @@ fn render(prims: &BTreeMap<PrimId, Prim>, settings: &SceneSettings, desc: &ViewD
                 (f64::from(x) + 0.5) / f64::from(width) * 2.0 - 1.0,
                 1.0 - (f64::from(y) + 0.5) / f64::from(height) * 2.0,
             ];
-            let hit = camera
-                .map(|c| ray(c, settings, film))
-                .and_then(|(from, toward)| nearest(&triangles, from, toward));
+            let (from, toward) = ray(camera, settings, film);
+            let hit = nearest(&triangles, from, toward);
             let color = hit.map_or([0.0; 3], |(shade, triangle, [u, v])| {
                 let t = &triangles[triangle];
                 let uv: [f32; 2] = std::array::from_fn(|k| {
@@ -255,7 +284,7 @@ fn render(prims: &BTreeMap<PrimId, Prim>, settings: &SceneSettings, desc: &ViewD
             pixels.extend([color[0], color[1], color[2], 1.0]);
         }
     }
-    pixels.into()
+    Ok(pixels.into())
 }
 
 /// The ray through film point `film` (-1 to 1 across each side) of
