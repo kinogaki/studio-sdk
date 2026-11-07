@@ -1,6 +1,7 @@
 //! The prims a host sends: shapes (meshes and curves), instancers, cameras,
 //! materials and textures (the structural prims every scene is made of; a
-//! texture is the SDK's one decoded picture, an [`Image`]), and
+//! texture is the SDK's one picture, an image with its decoding:
+//! [`TextureImage`]), and
 //! prims of the types an engine declares (lights, fog: [`crate::declared`]).
 //! Payloads are shared columns, so sending a prim again costs a few reference
 //! counts, never a copy of its arrays. A prim is made by its builder, which
@@ -21,7 +22,7 @@ pub use instancer::{Instancer, InstancerBuilder, Map, MaterialMaps};
 pub use shape::{STANDARD_PRIMVARS, Shape, ShapeBuilder, Subsets, Topology};
 
 use crate::declared::Declared;
-use crate::geometry::image::Image;
+use crate::geometry::image::TextureImage;
 use crate::material::MaterialNetwork;
 use std::sync::Arc;
 
@@ -83,16 +84,19 @@ pub enum Prim {
     Declared(Declared),
     /// A material.
     Material(Material),
-    /// A texture: an image file as the host's image files answer it (as a
-    /// package's `ImageFiles` reader gets it), read over the image's data
-    /// window, which is its display window. RGBA half floats; its main
-    /// layer's encoding says what the values are: colors in
-    /// [`RENDER_SPACE`] (linear ACEScg), premultiplied, or data as stored
-    /// ([`Encoding::Raw`]), straight.
+    /// A texture: the image a material node or a light reads, as the
+    /// host's image files hold the file: its first layer the texture, in the
+    /// file's own samples and 1 to 4 channels, over the image's data window
+    /// (its display window). A color layer's colors reach linear ACEScg
+    /// ([`RENDER_SPACE`]) through the texture's decoding, which the engine
+    /// runs where it likes (on its device after fetching texels, or as it
+    /// uploads them); premultiplied when its encoding says so. Data
+    /// ([`Encoding::Raw`]) is read as stored. The engine picks the form it
+    /// holds it in.
     ///
     /// [`RENDER_SPACE`]: crate::RENDER_SPACE
     /// [`Encoding::Raw`]: crate::geometry::image::Encoding::Raw
-    Texture(Image),
+    Texture(TextureImage),
 }
 
 /// The kinds of prim: the structural ones, for what an engine supports

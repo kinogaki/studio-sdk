@@ -3,7 +3,7 @@
 //!
 //! An engine owns its render thread. [`RenderEngine::update`] and
 //! [`RenderEngine::view`] queue work and return at once; the engine applies
-//! it at a pass boundary and publishes each whole pass as a [`Frame`], then
+//! it at a pass boundary and publishes each whole pass as a [`ViewPass`] (its pixels an Image), then
 //! calls the host's [`Wake`] once. The host never waits on the engine.
 
 use std::sync::{Arc, Mutex};
@@ -11,10 +11,10 @@ use std::sync::{Arc, Mutex};
 use crate::aov::AovDesc;
 use crate::description::EngineDescription;
 use crate::id::Id;
-use crate::material::preview::{PreviewImage, PreviewRequest};
+use crate::material::preview::PreviewRequest;
 use crate::prim::Camera;
 use crate::update::SceneUpdate;
-use kinogaki_geometry::image::Image;
+use kinogaki_geometry::image::{Encoding, Format, HeldPixels, Image, Rect, Sample};
 use kinogaki_geometry::{Diagnostic, Error, ErrorKind};
 use kinogaki_value::Parameters;
 
@@ -77,9 +77,9 @@ pub struct RenderStats {
     pub pass_ms: f32,
 }
 
-/// The last whole pass of a view: its display image and stats.
+/// The last whole pass of a view: its image and stats.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Frame {
+pub struct ViewPass {
     /// The view.
     pub view: ViewId,
     /// Which edit of the view this frame shows (each [`RenderEngine::view`]
@@ -89,21 +89,64 @@ pub struct Frame {
     /// pass of the camera it sent last from one of an earlier camera that
     /// finished before the engine took the new one.
     pub desc: ViewDesc,
-    /// Display width, in pixels.
-    pub width: u32,
-    /// Display height, in pixels.
-    pub height: u32,
-    /// RGBA half floats (their bits; [`f32_to_half`](crate::f32_to_half)),
-    /// linear ACEScg, rows from the top;
-    /// empty when the image reaches the display another way (a shared GPU
-    /// texture).
-    pub pixels: Arc<[u16]>,
-    /// Which of the engine's display images holds it, for hosts that show
-    /// those images where they are (the engine's own identifier; 0 when it
-    /// shares none).
-    pub image: u64,
+    /// The pass at the display's size: its main layer RGBA, linear ACEScg,
+    /// premultiplied; tiles of half floats ([`ViewPass::pixels`]: an engine
+    /// rendering on the CPU, or asked for its pixels), or held as one of the
+    /// engine's display images ([`EngineImage`]), which a host shows where it
+    /// is ([`Display`](crate::display::Display)).
+    pub image: Image,
     /// What it cost.
     pub stats: RenderStats,
+}
+
+impl ViewPass {
+    /// A frame's image of `size` pixels holding `halves`, RGBA half floats'
+    /// bits ([`f32_to_half`](crate::f32_to_half)), rows from the top.
+    ///
+    /// # Errors
+    /// No pixels, or `halves` not four a pixel.
+    pub fn pixels(size: [u32; 2], halves: &[u16]) -> Result<Image, Error> {
+        let window = Rect::new([0, 0], size.map(|v| v as i32))?;
+        let bytes: Vec<u8> = halves.iter().flat_map(|h| h.to_ne_bytes()).collect();
+        let format = Format::rgba(Sample::F16, Encoding::color(crate::RENDER_SPACE, true));
+        Image::builder(window).plane(format, &bytes).build()
+    }
+
+    /// Its width and height, in pixels.
+    pub fn size(&self) -> [u32; 2] {
+        self.image.display().size()
+    }
+
+    /// The engine's display image holding it, when one does.
+    pub fn engine_image(&self) -> Option<u64> {
+        let held = self.image.layers().first()?.held()?;
+        let held: &dyn std::any::Any = &**held;
+        held.downcast_ref::<EngineImage>().map(|i| i.0)
+    }
+}
+
+/// One of an engine's display images, by the engine's own identifier: a
+/// frame's pixels where the engine keeps them on the host's device
+/// ([`HeldPixels`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct EngineImage(pub u64);
+
+impl EngineImage {
+    /// A frame's image of `size` pixels held as this one.
+    ///
+    /// # Errors
+    /// No pixels.
+    pub fn image(self, size: [u32; 2]) -> Result<Image, Error> {
+        let window = Rect::new([0, 0], size.map(|v| v as i32))?;
+        let format = Format::rgba(Sample::F16, Encoding::color(crate::RENDER_SPACE, true));
+        Image::builder(window).held(format, Arc::new(self)).build()
+    }
+}
+
+impl HeldPixels for EngineImage {
+    fn key(&self) -> u64 {
+        self.0
+    }
 }
 
 /// What a pending result holds: nothing yet, its outcome, or its outcome
@@ -215,7 +258,7 @@ pub trait RenderEngine: Send {
     /// Remove a view.
     fn drop_view(&mut self, view: ViewId);
     /// The view's last whole pass.
-    fn latest(&self, view: ViewId) -> Option<Arc<Frame>>;
+    fn latest(&self, view: ViewId) -> Option<Arc<ViewPass>>;
     /// Pause or resume a view's refinement.
     fn pause(&mut self, view: ViewId, paused: bool);
     /// Name the view the user works with: after a restart it takes the
@@ -241,7 +284,10 @@ pub trait RenderEngine: Send {
     /// A host asks previews of an engine it made for them, never of one
     /// showing views: each request's scene replaces the last one's, and the
     /// engine renders it as it renders a view, with no second engine.
-    fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage>;
+    ///
+    /// The picture is an Image of the request's side a side, its main layer
+    /// RGBA floats, linear ACEScg, premultiplied.
+    fn preview(&mut self, request: PreviewRequest) -> Pending<Image>;
 }
 
 #[cfg(test)]

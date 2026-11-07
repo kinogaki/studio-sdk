@@ -14,7 +14,7 @@ pub struct PrimId {
 }
 
 /// A prim of type `T`, as what names it holds it: a shape's materials
-/// (`Id<Material>`), a node's textures (`Id<Image>`), a view's camera
+/// (`Id<Material>`), a node's textures (`Id<TextureImage>`), a view's camera
 /// (`Id<Camera>`).
 pub struct Id<T>(PrimId, PhantomData<fn() -> T>);
 

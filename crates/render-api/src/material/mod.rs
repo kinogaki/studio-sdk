@@ -31,7 +31,7 @@ pub use display::{DisplayTexture, MaterialDisplay};
 use crate::id::Id;
 use crate::settings::Textures;
 use kinogaki_geometry::Error;
-use kinogaki_geometry::image::{Image, ImageColor, ImageSource};
+use kinogaki_geometry::image::{ImageColor, ImageSource, TextureImage};
 use kinogaki_mtlx::Type;
 use kinogaki_value::{Parameter, Parameters, Value, ValueKind};
 use std::collections::{BTreeMap, BTreeSet};
@@ -74,7 +74,7 @@ impl Node {
 
     /// Its Image inputs' Texture prims, by input name: what the host read
     /// their images to as it sent the network.
-    pub fn textures(&self) -> &BTreeMap<String, Id<Image>> {
+    pub fn textures(&self) -> &BTreeMap<String, Id<TextureImage>> {
         &self.textures
     }
 
@@ -273,7 +273,7 @@ impl MaterialNetwork {
         &mut self,
         at: NodeIndex,
         input: &str,
-        texture: Id<Image>,
+        texture: Id<TextureImage>,
     ) -> Result<(), Error> {
         let node = (self.nodes.get_mut(at as usize))
             .ok_or_else(|| Error::invalid(format_args!("no node {at} to read a texture")))?;

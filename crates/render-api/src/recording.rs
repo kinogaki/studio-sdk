@@ -10,12 +10,12 @@ use crate::description::{Capabilities, EngineDescription, Motion};
 use crate::dirty::Dirty;
 use crate::engine::{Pending, RenderEngine, ViewDesc, ViewId, Wake, pending};
 use crate::id::PrimId;
-use crate::material::preview::{PreviewImage, PreviewRequest};
+use crate::material::preview::PreviewRequest;
 use crate::prim::{Prim, PrimKind, Topology};
 use crate::settings::SceneSettings;
 use crate::update::SceneUpdate;
 use kinogaki_geometry::Diagnostic;
-use kinogaki_geometry::image::Image;
+use kinogaki_geometry::image::{Encoding, Format, Image, Rect, Sample};
 use kinogaki_value::EngineId;
 
 /// What a [`RecordingEngine`] was sent.
@@ -155,7 +155,7 @@ impl RenderEngine for RecordingEngine {
         self.views.remove(&view);
     }
 
-    fn latest(&self, _view: ViewId) -> Option<Arc<crate::engine::Frame>> {
+    fn latest(&self, _view: ViewId) -> Option<Arc<crate::engine::ViewPass>> {
         None
     }
 
@@ -186,10 +186,12 @@ impl RenderEngine for RecordingEngine {
         let pixels = size.map_or(0, |[w, h]| w as usize * h as usize);
         let planes: Vec<_> = (outputs.iter())
             .map(|desc| {
-                (
-                    desc.clone(),
-                    vec![0.0f32; pixels * desc.aov.channels()].into(),
-                )
+                let count = pixels * desc.aov.channels();
+                let values = match desc.aov.class {
+                    crate::AovClass::Id => crate::aov::Values::Whole(vec![0; count].into()),
+                    _ => crate::aov::Values::Floats(vec![0.0; count].into()),
+                };
+                (desc.clone(), values)
             })
             .collect();
         let image = size.ok_or_else(|| kinogaki_geometry::Error::invalid("no such view"));
@@ -201,15 +203,21 @@ impl RenderEngine for RecordingEngine {
     }
 
     /// Delivers a black picture at once, keeping what it was asked.
-    fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage> {
+    fn preview(&mut self, request: PreviewRequest) -> Pending<Image> {
         let (deliver, result) = pending(self.wake.clone());
         let side = request.side;
         self.previews.push(request);
-        let pixels = side as usize * side as usize * 4;
-        deliver.deliver(PreviewImage {
-            side,
-            pixels: Arc::from(vec![0.0f32; pixels]),
+        let black = vec![0.0f32; side as usize * side as usize * 4];
+        let window = Rect::new([0, 0], [side as i32; 2]);
+        let format = Format::rgba(Sample::F32, Encoding::color(crate::RENDER_SPACE, true));
+        let built = window.and_then(|w| {
+            let bytes: Vec<u8> = black.iter().flat_map(|v| v.to_ne_bytes()).collect();
+            Image::builder(w).plane(format, &bytes).build()
         });
+        match built {
+            Ok(image) => deliver.deliver(image),
+            Err(why) => deliver.fail(why),
+        }
         result
     }
 }

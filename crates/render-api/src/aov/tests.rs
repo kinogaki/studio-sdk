@@ -24,10 +24,13 @@ fn shape(image: &Image, at: usize) -> (String, String, Sample, Encoding) {
 #[test]
 fn each_output_class_is_its_layer_and_sample() {
     let pixels = 2;
-    let plane = |desc: &AovDesc| -> Arc<[f32]> {
-        (0..pixels * desc.aov.channels())
-            .map(|v| v as f32 * 0.25)
-            .collect()
+    let plane = |desc: &AovDesc| match desc.aov.class {
+        AovClass::Id => Values::Whole((0..pixels as u32).map(|v| v * 7 + 1).collect()),
+        _ => Values::Floats(
+            (0..pixels * desc.aov.channels())
+                .map(|v| v as f32 * 0.25)
+                .collect(),
+        ),
     };
     let outputs: Vec<AovDesc> = [
         (standard::BEAUTY, AovFormat::F32),
@@ -60,9 +63,9 @@ fn each_output_class_is_its_layer_and_sample() {
     assert_eq!(image.data().size(), [2, 1]);
     assert_eq!(image.read_pixel(0, 1, 0), [1.0, 1.25, 1.5, 1.75]);
     assert_eq!(image.read_pixel(3, 1, 0)[..3], [0.75, 1.0, 1.25]);
-    // Ids keep their bits.
+    // Ids are whole numbers, as they were given.
     let ids = image.plane(6).unwrap();
-    assert_eq!(ids[4..8], 0.25f32.to_bits().to_ne_bytes());
+    assert_eq!(ids[4..8], 8u32.to_ne_bytes());
     assert_eq!(
         (layer(standard::BEAUTY), output("")),
         ("", standard::BEAUTY)
@@ -91,7 +94,7 @@ fn cryptomatte_ranks_fill_layers_of_two_and_name_what_they_hold() {
     let names: Vec<Arc<str>> = ["/floor", "/hero", "/Looks/Red", "/hero"]
         .map(Arc::from)
         .to_vec();
-    let planes = [(desc("CryptoObject", AovFormat::F16), ranks)];
+    let planes = [(desc("CryptoObject", AovFormat::F16), Values::Floats(ranks))];
     let image = image([2, 1], &planes, &names).unwrap();
     assert_eq!(image.layers().len(), 2, "three ranks, two layers");
     let raw = |name: &str| {
@@ -150,7 +153,22 @@ fn the_specifications_hashes_and_keys() {
 #[test]
 fn values_not_of_the_frame_are_refused() {
     let beauty = desc(standard::BEAUTY, AovFormat::F32);
-    let short: Arc<[f32]> = vec![0.0; 3].into();
-    assert!(image([2, 1], &[(beauty, short)], &[]).is_err());
+    let short = Values::Floats(vec![0.0; 3].into());
+    assert!(image([2, 1], &[(beauty.clone(), short)], &[]).is_err());
+    let ids = desc(standard::OBJECT_ID, AovFormat::U32);
+    let floats = Values::Floats(vec![0.0; 2].into());
+    assert!(
+        image([2, 1], &[(ids, floats)], &[]).is_err(),
+        "ids as floats"
+    );
+    let beauty = Values::Floats(vec![0.0; 4].into());
     assert!(image([0, 1], &[], &[]).is_err(), "a frame of no pixels");
+    assert!(
+        image(
+            [1, 1],
+            &[(desc(standard::BEAUTY, AovFormat::F32), beauty)],
+            &[]
+        )
+        .is_ok()
+    );
 }

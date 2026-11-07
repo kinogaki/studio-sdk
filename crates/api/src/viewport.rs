@@ -21,8 +21,7 @@ use kinogaki_viewport_api::{
 };
 pub use kinogaki_viewport_api::{
     ElementKind, ElementSet, GuideDraw, LineLayer, OverlayDraw, OverlayLayer, OverlayLine,
-    OverlayVertex, Streams, SurfaceImage, SurfaceSource, SurfaceTextures, TextureCorner,
-    pack_linear, packet_as,
+    OverlayVertex, Streams, SurfaceSource, SurfaceTextures, TextureCorner, pack_linear, packet_as,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

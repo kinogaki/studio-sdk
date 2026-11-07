@@ -4,10 +4,10 @@
 //! covers how it looks against the scene's [`MaterialDisplays`].
 use crate::data::Data;
 use crate::facets::Drawn;
-use kinogaki_geometry::image::ImageSource;
+use kinogaki_geometry::image::{ImageSource, TextureImage};
 use kinogaki_geometry::{Bounds, Projective, Ray, Xform};
 use kinogaki_render_api::MaterialDisplay;
-use kinogaki_viewport_api::{SurfaceImage, SurfaceTextures};
+use kinogaki_viewport_api::SurfaceTextures;
 use std::sync::Arc;
 
 /// A marquee over a view: its box, running 0–1 across the view and down
@@ -70,12 +70,13 @@ pub trait MaterialDisplays {
     fn display(&self, path: &str) -> Option<MaterialDisplay>;
 
     /// Image `image` (a material's [`DisplayTexture::image`]) as the shaded
-    /// views show it. `None` while it is read, or when it can't be. Asking
-    /// starts reading it, once; when it is read the host wakes once and the
-    /// [`revision`](Self::revision) moves.
+    /// views show it: at most [`SurfaceTextures::MOST`] pixels a side, its
+    /// colors' decoding into the working space. `None` while it is read, or
+    /// when it can't be. Asking starts reading it, once; when it is read the
+    /// host wakes once and the [`revision`](Self::revision) moves.
     ///
     /// [`DisplayTexture::image`]: kinogaki_render_api::DisplayTexture::image
-    fn image(&self, image: &ImageSource) -> Option<Arc<SurfaceImage>> {
+    fn image(&self, image: &ImageSource) -> Option<Arc<TextureImage>> {
         let _ = image;
         None
     }

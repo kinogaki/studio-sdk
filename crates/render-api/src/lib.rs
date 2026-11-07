@@ -5,7 +5,7 @@
 //! batches ([`SceneUpdate`]) with dirty bits ([`Dirty`]) and point ranges
 //! ([`Ranges`]); batches an engine has not applied yet coalesce
 //! ([`SceneUpdate::merge`]). Engines implement [`RenderEngine`], publish
-//! whole passes as [`Frame`]s and wake the host once per result ([`Wake`]).
+//! whole passes as [`ViewPass`]s and wake the host once per result ([`Wake`]).
 //! Each engine describes itself without a device ([`EngineDescription`]):
 //! its settings ([`Parameter`]s), the prim types it declares
 //! (lights and fog, [`PrimType`]s; the [`standard`] ones shared), its
@@ -14,7 +14,7 @@
 //! ([`MaterialNetwork`]): an engine implements the MaterialX nodes it lists
 //! and receives the rest expanded or translated ([`Engines::adopt`]), says
 //! what its own materials come to in the standard form, an OpenPBR Surface
-//! ([`MaterialRules`]), and renders a [`PreviewImage`] of a material.
+//! ([`MaterialRules`]), and renders a preview of a material.
 //! Engines output linear ACEScg.
 //! Hosts make shape prims from [`ShapeSource`]s: triangles or curves, from a
 //! polygon value, a CAD tessellation or a toolpath preview alike.
@@ -58,15 +58,15 @@ pub use description::{
 };
 pub use dirty::Dirty;
 pub use engine::{
-    Deliver, Frame, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId, ViewMode,
-    Wake, pending,
+    Deliver, EngineImage, Pending, RenderEngine, RenderStats, ViewCamera, ViewDesc, ViewId,
+    ViewMode, ViewPass, Wake, pending,
 };
 pub use id::{Id, IdAllocator, PrimId};
 /// The standard geometry values, which engines read prims' data as.
 pub use kinogaki_geometry as geometry;
 /// How fine to make geometry for a render: the standard geometry values'.
 pub use kinogaki_geometry::Detail;
-/// Half floats, as [`Frame::pixels`] and Texture prims hold them.
+/// Half floats, as [`ViewPass::pixels`] holds them.
 pub use kinogaki_geometry::image::{f32_to_half, half_to_f32};
 /// MaterialX itself: its library of definitions, their types and values,
 /// which a material node's definition is of ([`NodeDef::mtlx`]).
@@ -74,9 +74,7 @@ pub use kinogaki_mtlx as materialx;
 pub use kinogaki_value as value;
 pub use kinogaki_value::{EngineId, PrimTypeId};
 pub use kinogaki_value::{Parameter, Section};
-pub use material::preview::{
-    PreviewImage, PreviewLighting, PreviewRequest, PreviewScene, PreviewShape,
-};
+pub use material::preview::{PreviewLighting, PreviewRequest, PreviewScene, PreviewShape};
 pub use material::{
     DisplayTexture, Link, MaterialDisplay, MaterialNetwork, NetworkBuilder, Node, NodeDef,
     NodeIndex, NodeInput, NodeOutput,

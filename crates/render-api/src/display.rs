@@ -30,7 +30,7 @@ pub use wgpu;
 
 use crate::aov::standard;
 use crate::geometry::image::{Encoding, Format, HeldPixels, Image, Layer, Rect, Sample};
-use crate::{Aov, AovClass, EngineDescription, Frame, RenderEngine, ViewId, Wake};
+use crate::{Aov, AovClass, EngineDescription, RenderEngine, ViewId, ViewPass, Wake};
 
 /// The images an engine shows its frames in.
 pub trait Display: Send {
@@ -38,19 +38,19 @@ pub trait Display: Send {
     /// pinned; none when that image no longer holds `frame` (a newer pass
     /// is writing it, or the view's film changed size since): the host
     /// keeps showing what it showed.
-    fn acquire(&mut self, frame: &Arc<Frame>) -> Option<Shown>;
+    fn acquire(&mut self, frame: &Arc<ViewPass>) -> Option<Shown>;
 
     /// `frame`'s film as an Image ([`film`]), pinned as [`Display::acquire`]
     /// pins while any of its layers is held: the beauty and those of `aovs`
     /// the engine keeps for its views (it may start keeping one asked for
     /// from a later frame on). By default the shown image is the beauty and
     /// nothing else is kept.
-    fn acquire_film(&mut self, frame: &Arc<Frame>, aovs: &[Aov]) -> Option<Image> {
+    fn acquire_film(&mut self, frame: &Arc<ViewPass>, aovs: &[Aov]) -> Option<Image> {
         let _ = aovs;
         let shown = self.acquire(frame)?;
         let (key, view) = (shown.key(), shown.view().clone());
         let id = key.0 << 16 ^ u64::from(key.1);
-        let size = [frame.width, frame.height];
+        let size = frame.size();
         film(frame, size, vec![(standard::beauty(), view, id)], shown)
     }
 
@@ -64,7 +64,7 @@ pub trait Display: Send {
 /// An image the host shows. The engine does not write it while this
 /// lives; drop it when the GPU is done sampling it.
 pub struct Shown {
-    frame: Arc<Frame>,
+    frame: Arc<ViewPass>,
     key: (u64, u32),
     view: wgpu::TextureView,
     _retire: Box<dyn Send>,
@@ -74,7 +74,7 @@ impl Shown {
     /// `frame`'s image `view`, known by `key`, held until `retire` drops
     /// (the engine's pin on it).
     pub fn new(
-        frame: Arc<Frame>,
+        frame: Arc<ViewPass>,
         key: (u64, u32),
         view: wgpu::TextureView,
         retire: impl Send + 'static,
@@ -88,7 +88,7 @@ impl Shown {
     }
 
     /// The frame it shows.
-    pub fn frame(&self) -> &Arc<Frame> {
+    pub fn frame(&self) -> &Arc<ViewPass> {
         &self.frame
     }
 
@@ -179,7 +179,7 @@ impl std::fmt::Debug for Texture {
 /// in [`RENDER_SPACE`](crate::RENDER_SPACE), premultiplied); held by `pin`
 /// until the image's last holder goes. None when `size` holds no pixels.
 pub fn film(
-    frame: &Arc<Frame>,
+    frame: &Arc<ViewPass>,
     size: [u32; 2],
     outputs: Vec<(Aov, wgpu::TextureView, u64)>,
     pin: impl Send + 'static,
@@ -198,11 +198,11 @@ pub fn film(
 }
 
 /// Which pass `frame` is, among those its view published and that live.
-fn pass(frame: &Arc<Frame>) -> u64 {
+fn pass(frame: &Arc<ViewPass>) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::hash::DefaultHasher::new();
     (Arc::as_ptr(frame) as usize, frame.view, frame.generation).hash(&mut h);
-    (frame.image, frame.stats.samples).hash(&mut h);
+    (frame.engine_image(), frame.stats.samples).hash(&mut h);
     h.finish()
 }
 
@@ -232,8 +232,8 @@ pub struct Options {
     /// A directory the engine may keep caches in between runs (compiled
     /// kernels); none: no cache.
     pub cache: Option<PathBuf>,
-    /// Frames also carry their pixels (`Frame::pixels`), for tests that
-    /// check what the shown images hold.
+    /// Frames hold their pixels as tiles ([`ViewPass::pixels`]), for tests
+    /// that check what the shown images hold.
     pub read_pixels: bool,
 }
 

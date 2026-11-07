@@ -87,10 +87,10 @@ pub const fn image() -> Typed<kinogaki_geometry::image::Image> {
 }
 
 /// The handle on an image file's original bytes kept in a project
-/// ([`EmbeddedFile`](kinogaki_geometry::image::EmbeddedFile),
+/// ([`EmbeddedFile`](kinogaki_geometry::EmbeddedFile),
 /// `kinogaki.core.embedded_file`): what an Image node holds when its file is
 /// embedded ([`EmbeddedFileCodec`]).
-pub const fn embedded_file() -> Typed<kinogaki_geometry::image::EmbeddedFile> {
+pub const fn embedded_file() -> Typed<kinogaki_geometry::EmbeddedFile> {
     Typed::new(DataTypeId::declared("kinogaki.core.embedded_file"))
 }
 

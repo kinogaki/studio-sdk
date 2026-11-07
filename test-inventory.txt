@@ -161,12 +161,16 @@ kinogaki-geometry/doc test crates/geometry/src/detail.rs - detail::DisplayQualit
 kinogaki-geometry/doc test crates/geometry/src/elements.rs - elements::Elements
 kinogaki-geometry/doc test crates/geometry/src/elements.rs - elements::Elements::from_fn
 kinogaki-geometry/doc test crates/geometry/src/elements.rs - elements::Elements::union
+kinogaki-geometry/doc test crates/geometry/src/embedded.rs - embedded::EmbeddedFile
 kinogaki-geometry/doc test crates/geometry/src/frame.rs - frame::Frame
 kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry
 kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry::with_moved
+kinogaki-geometry/doc test crates/geometry/src/image/convert.rs - image::convert::Image::converted
+kinogaki-geometry/doc test crates/geometry/src/image/convert.rs - image::convert::reduction
+kinogaki-geometry/doc test crates/geometry/src/image/decoding.rs - image::decoding::Decoding
+kinogaki-geometry/doc test crates/geometry/src/image/decoding.rs - image::decoding::TextureImage::texel
 kinogaki-geometry/doc test crates/geometry/src/image/mod.rs - image
 kinogaki-geometry/doc test crates/geometry/src/image/sampler.rs - image::sampler::Sampler
-kinogaki-geometry/doc test crates/geometry/src/image/source.rs - image::source::EmbeddedFile
 kinogaki-geometry/doc test crates/geometry/src/image/source.rs - image::source::ImageColor::space
 kinogaki-geometry/doc test crates/geometry/src/instancing.rs - instancing::placements
 kinogaki-geometry/doc test crates/geometry/src/lib.rs -
@@ -224,7 +228,17 @@ kinogaki-geometry/lib test brep::tests::refusals::consistency_is_checked_at_ends
 kinogaki-geometry/lib test brep::tests::refusals::structure_is_checked
 kinogaki-geometry/lib test curve::tests::a_span_reads_only_its_own_knots
 kinogaki-geometry/lib test diagnostic::tests::messages_say_where
+kinogaki-geometry/lib test embedded::tests::a_hash_made_a_piece_at_a_time_is_blake3s
+kinogaki-geometry/lib test embedded::tests::a_small_slice_lets_its_package_go
+kinogaki-geometry/lib test embedded::tests::debug_prints_the_name_and_length_alone
+kinogaki-geometry/lib test embedded::tests::embedded_files_are_equal_by_name_and_bytes
 kinogaki-geometry/lib test error::tests::an_error_is_its_diagnostic_and_its_kind
+kinogaki-geometry/lib test image::convert::tests::a_conversion_that_fails_fails_the_layer
+kinogaki-geometry/lib test image::convert::tests::a_layer_converts_a_tile_at_a_time_where_its_pixels_are
+kinogaki-geometry/lib test image::convert::tests::a_reduced_layer_holds_each_boxs_mean
+kinogaki-geometry/lib test image::decoding::tests::a_decoding_runs_its_curve_then_its_matrix
+kinogaki-geometry/lib test image::decoding::tests::a_texel_spreads_its_channels_decodes_and_is_made_straight
+kinogaki-geometry/lib test image::decoding::tests::srgbs_curve_is_iecs_within_a_hundredth_of_an_8_bit_step
 kinogaki-geometry/lib test image::sampler::tests::bilinear_and_bicubic_reproduce_a_ramp_between_texels
 kinogaki-geometry/lib test image::sampler::tests::each_wrap_reads_past_the_edges_as_it_says
 kinogaki-geometry/lib test image::sampler::tests::every_filter_and_wrap_reads_a_texel_center_as_stored
@@ -235,9 +249,7 @@ kinogaki-geometry/lib test image::sampler::tests::nothing_to_read_reads_nothing
 kinogaki-geometry/lib test image::sampler::tests::pixels_outside_the_data_window_read_nothing
 kinogaki-geometry/lib test image::sampler::tests::v_runs_up_from_the_bottom_row
 kinogaki-geometry/lib test image::sampler::tests::values_decode_as_read_pixel_decodes_them
-kinogaki-geometry/lib test image::source::tests::a_hash_made_a_piece_at_a_time_is_blake3s
 kinogaki-geometry/lib test image::source::tests::a_space_is_never_a_key_of_another_color
-kinogaki-geometry/lib test image::source::tests::embedded_files_are_equal_by_name_and_bytes
 kinogaki-geometry/lib test image::tests::a_data_window_apart_from_the_display_window
 kinogaki-geometry/lib test image::tests::a_held_layer_has_no_tiles_and_compares_by_its_key
 kinogaki-geometry/lib test image::tests::a_plane_reads_back_as_it_was_built
@@ -488,6 +500,7 @@ kinogaki-studio-api/instances test instances_round_trip_with_each_prototype_writ
 kinogaki-studio-api/instances test realized_copies_name_the_materials_their_instances_render
 kinogaki-studio-api/instances test the_instances_kept_take_their_attributes_and_groups_and_the_rest_go
 kinogaki-studio-api/lib test color::tests::a_converted_color_settles_where_a_conversion_left_its_last_bits
+kinogaki-studio-api/lib test color::tests::a_layer_converts_straight_and_comes_out_as_asked
 kinogaki-studio-api/lib test components::tests::a_selection_reads_back_only_as_its_own_representation
 kinogaki-studio-api/lib test cook::binding::tests::a_component_reads_and_writes_one_number_of_a_vector
 kinogaki-studio-api/lib test cook::binding::tests::mixed_vectors_write_only_their_parameters
@@ -737,9 +750,5 @@ kinogaki-viewport-api/lib test packet::tests::a_packet_reads_back_as_its_own_typ
 kinogaki-viewport-api/lib test packet::tests::a_vertex_writes_its_fields_in_order_and_sets_answer_membership
 kinogaki-viewport-api/lib test selection::tests::misplaced_sets_and_objects_beside_components_are_refused
 kinogaki-viewport-api/lib test selection::tests::sets_go_to_their_kinds_slots
-kinogaki-viewport-api/lib test textures::tests::a_row_that_fails_says_why
-kinogaki-viewport-api/lib test textures::tests::a_small_image_repeats_its_texels_and_a_large_one_averages_them
-kinogaki-viewport-api/lib test textures::tests::it_takes_the_smallest_side_holding_it_and_every_level
-kinogaki-viewport-api/lib test textures::tests::levels_average_in_linear_light
 kinogaki-viewport-api/lib test updates::tests::ranges_coalesce_small_gaps_and_fall_back_to_one_full_write
 kinogaki-viewport-api/lib test updates::tests::updates_bridge_undisplayed_packets_with_the_union_of_their_changes

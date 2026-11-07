@@ -1,12 +1,14 @@
 //! Image files as the host reads them: a package asks by source
 //! ([`ImageSource`]: a file on disk or one embedded in the project, and how
-//! its colors read) and never waits. What a reader gets are standard
-//! [`Image`]s of half floats, premultiplied: the host holds the formats and
-//! the color maths (a file's own tag, its file rules, its working space).
-//! [`image`](ImageFiles::image) is linear ACEScg, for a scene-referred
-//! network; [`picture`](ImageFiles::picture) is what the file holds, for a
-//! page. An engine receives the same answers as Texture prims, never a
-//! source: one decoded shape of a file for every package.
+//! its colors read) and never waits. What a reader gets is the file as the
+//! installed format decoded it, held once for everyone: every layer in its
+//! own samples and channels, each color layer tagged with the space of the
+//! host's configuration its colors are in (the file's own tag resolved, or
+//! the space the source names), data as stored. A reader takes it into its
+//! own form where it uses it, a tile at a time
+//! ([`Image::converted`](kinogaki_geometry::image::Image::converted) through
+//! [`color::converting`](crate::color::converting)). An engine receives the
+//! same image as a Texture prim, never a source.
 //!
 //! **The Image node.** Core's Image node ([`IMAGE_NODE`]) is the one node
 //! reading a picture, in every context that carries images. Its source is a
@@ -49,16 +51,9 @@ pub enum FileImage {
 /// again, a source that hasn't changed answers with the same tiles, so what
 /// shows it uploads nothing.
 pub trait ImageFiles: Send + Sync {
-    /// `source` (a path relative to the project's folder unless absolute),
-    /// its colors in linear ACEScg (data as stored).
+    /// `source` (a path relative to the project's folder unless absolute):
+    /// the file as it holds it (see the module docs).
     fn image(&self, source: &ImageSource) -> FileImage;
-
-    /// `source` to place on a page: a display-referred file (a PNG, a JPEG)
-    /// keeps its code values, in the space of the display its tag says; a
-    /// scene-referred one (a linear OpenEXR) is linear ACEScg, as
-    /// [`image`](Self::image) has it. Every layer the file holds, each
-    /// color one so.
-    fn picture(&self, source: &ImageSource) -> FileImage;
 
     /// Moves whenever a source's answer does.
     fn revision(&self) -> u64;
@@ -72,10 +67,6 @@ pub struct NoFiles;
 impl ImageFiles for NoFiles {
     fn image(&self, _: &ImageSource) -> FileImage {
         FileImage::Failed(Error::missing("nothing reads image files here"))
-    }
-
-    fn picture(&self, source: &ImageSource) -> FileImage {
-        self.image(source)
     }
 
     fn revision(&self) -> u64 {
@@ -178,7 +169,7 @@ pub fn image_source(parameters: &Parameters) -> Result<Option<ImageSource>, Erro
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kinogaki_geometry::image::EmbeddedFile;
+    use kinogaki_geometry::EmbeddedFile;
 
     fn rows(rows: &[(&str, Value)]) -> Parameters {
         (rows.iter())

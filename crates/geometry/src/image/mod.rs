@@ -23,12 +23,21 @@
 //! - **Attributes.** An image's metadata is its Detail [`Attributes`]: every
 //!   attribute a file carries, and the standard names ([`metadata`]).
 //! - **Sampling.** Where a texture names an image, [`Sampling`] says how it
-//!   is read past its edges and between its texels.
+//!   is read past its edges ([`Wrap`]) and between its texels
+//!   ([`SampleFilter`]).
 //! - **Reading at points.** A [`Sampler`] ([`Image::sampler`]) reads a layer
 //!   at coordinates, through a [`SampleFilter`] and a [`Wrap`]: what every
 //!   reader of an image at points shares.
+//! - **Converting.** [`Image::converted`] makes a layer anew in another
+//!   format, a tile at a time on the process's workers, through a
+//!   conversion of its pixels and reduced by whole-pixel boxes: the one
+//!   converter every reader taking an image into its own form uses.
+//! - **Decoding.** A reader that runs the color conversion itself (a GPU
+//!   after it fetches texels) takes an image with its [`Decoding`]: a transfer
+//!   function on each channel, then a matrix ([`TextureImage`]).
 //! - **Sources.** Where an image a node names comes from ([`ImageSource`]): a
-//!   file on disk, or the file's bytes kept in the project ([`EmbeddedFile`]).
+//!   file on disk, or the file's bytes kept in the project
+//!   ([`EmbeddedFile`](crate::EmbeddedFile)).
 //!
 //! ```
 //! use kinogaki_geometry::image::{Encoding, Format, Image, Rect, Sample};
@@ -37,12 +46,14 @@
 //! let format = Format::rgba(Sample::F32, Encoding::color("ACEScg", true));
 //! let pixels = vec![0.25f32; 4 * 100 * 80];
 //! let image = Image::builder(window)
-//!     .plane(format, bytemuck::cast_slice(&pixels))
+//!     .plane(format, &pixels)
 //!     .build()
 //!     .unwrap();
 //! assert_eq!(image.read_pixel(0, 99, 79), [0.25; 4]);
 //! assert_eq!(image.read_pixel(0, 100, 0), [0.0; 4]); // outside the data window
 //! ```
+mod convert;
+mod decoding;
 mod encoding;
 mod held;
 pub mod metadata;
@@ -54,13 +65,15 @@ mod source;
 #[cfg(test)]
 mod tests;
 
+pub use convert::{Convert, reduction};
+pub use decoding::{Decoding, TextureImage, Transfer};
 pub use encoding::{ColorTag, Encoding};
 pub use held::HeldPixels;
 pub use pyramid::Pyramid;
 pub use sample::{Sample, f32_to_half, half_to_f32};
 pub use sampler::{SampleFilter, Sampler};
-pub use sampling::{Filter, Sampling, Wrap};
-pub use source::{EmbeddedFile, ImageColor, ImageFile, ImageSource};
+pub use sampling::{Sampling, Wrap};
+pub use source::{ImageColor, ImageFile, ImageSource};
 
 use crate::attributes::Attributes;
 use crate::column::Column;
@@ -287,12 +300,17 @@ pub fn tiles_of(size: [u32; 2]) -> [u32; 2] {
 }
 
 impl Image {
-    /// An image framed by `display`: its data window that too until
-    /// [`data`](ImageBuilder::data) says otherwise.
-    pub fn builder(display: Rect) -> ImageBuilder {
+    /// An image over `window`: its data window and its display window.
+    pub fn builder(window: Rect) -> ImageBuilder {
+        Image::framed(window, window)
+    }
+
+    /// An image framed by `display`, its pixels stored over `data` (a blur's
+    /// or a file's data window past or within its frame).
+    pub fn framed(display: Rect, data: Rect) -> ImageBuilder {
         ImageBuilder {
             display,
-            data: display,
+            data,
             aspect: 1.0,
             layers: Vec::new(),
             attributes: Attributes::new(),
@@ -323,6 +341,15 @@ impl Image {
     /// Its metadata: Detail attributes.
     pub fn attributes(&self) -> &Attributes {
         &self.attributes
+    }
+
+    /// Whether `other` is this very image: its layers and metadata shared,
+    /// over the same windows. What a holder compares an answer by, at no
+    /// cost of its pixels.
+    pub fn ptr_eq(&self, other: &Image) -> bool {
+        Arc::ptr_eq(&self.layers, &other.layers)
+            && Arc::ptr_eq(&self.attributes, &other.attributes)
+            && (self.display, self.data, self.aspect) == (other.display, other.data, other.aspect)
     }
 
     /// It held weakly ([`WeakImage`]).
@@ -458,6 +485,16 @@ pub(crate) fn decode(sample: Sample, channels: usize, bytes: &[u8]) -> [f32; 4] 
     out
 }
 
+/// A pixel [`decode`] read of a layer of `channels` channels, as a color
+/// reads it: one channel grey in red, green and blue, two grey and alpha.
+pub(crate) fn spread(channels: usize, [r, g, b, a]: [f32; 4]) -> [f32; 4] {
+    match channels {
+        1 => [r, r, r, a],
+        2 => [r, r, r, g],
+        _ => [r, g, b, a],
+    }
+}
+
 fn check_tile(tile: &Tile, format: &Format) -> Result<(), Error> {
     if tile.len() != format.tile_bytes() {
         return Err(Error::invalid(format_args!(
@@ -511,9 +548,28 @@ fn check_format(format: &Format) -> Result<(), Error> {
     Ok(())
 }
 
-/// Builds an [`Image`], checking its rules: a positive finite aspect; layers
-/// of unique names and 1 to 4 channels; a tile a place, of its layer's size;
-/// metadata in Detail alone.
+/// What a plane handed to [`ImageBuilder::plane`] holds: bytes, or the
+/// values of a sample type (16-bit whole numbers or halves' bits, 32-bit
+/// whole numbers, floats), taken as their bytes in native order.
+pub trait PlaneValue: bytemuck::Pod + sealed::Sealed {}
+
+impl PlaneValue for u8 {}
+impl PlaneValue for u16 {}
+impl PlaneValue for u32 {}
+impl PlaneValue for f32 {}
+
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for u8 {}
+    impl Sealed for u16 {}
+    impl Sealed for u32 {}
+    impl Sealed for f32 {}
+}
+
+/// Builds an [`Image`] over the windows it was made with
+/// ([`Image::builder`], [`Image::framed`]), checking its rules: a positive
+/// finite aspect; one or more layers, of unique names and 1 to 4 channels;
+/// a tile a place, of its layer's size; metadata in Detail alone.
 #[derive(Debug)]
 pub struct ImageBuilder {
     display: Rect,
@@ -525,12 +581,6 @@ pub struct ImageBuilder {
 }
 
 impl ImageBuilder {
-    /// Stores its pixels over `data` (set this before the layers).
-    pub fn data(mut self, data: Rect) -> Self {
-        self.data = data;
-        self
-    }
-
     /// A pixel's width over its height.
     pub fn aspect(mut self, aspect: f64) -> Self {
         self.aspect = aspect;
@@ -562,8 +612,11 @@ impl ImageBuilder {
     }
 
     /// A layer of `pixels`, row-major over the whole data window, split into
-    /// tiles; a tile of nothing but zero bytes is left absent.
-    pub fn plane(mut self, format: Format, pixels: &[u8]) -> Self {
+    /// tiles; a tile of nothing but zero bytes is left absent. The values
+    /// are its samples as stored (bytes, or the samples themselves: halves'
+    /// bits as `u16`, floats, whole numbers), with no copy but the tiles.
+    pub fn plane<T: PlaneValue>(mut self, format: Format, pixels: &[T]) -> Self {
+        let pixels: &[u8] = bytemuck::cast_slice(pixels);
         let [width, height] = self.data.size().map(|n| n as usize);
         let bytes = format.pixel_bytes();
         if pixels.len() != width * height * bytes {
@@ -612,6 +665,9 @@ impl ImageBuilder {
             )));
         }
         check_attributes(&self.attributes)?;
+        if self.layers.is_empty() {
+            return Err(Error::invalid("an image holds one or more layers"));
+        }
         let across = tiles_of(self.data.size());
         let count = across[0] as usize * across[1] as usize;
         for (at, layer) in self.layers.iter().enumerate() {

@@ -4,7 +4,7 @@ use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use kinogaki_geometry::image::EmbeddedFile;
+use kinogaki_geometry::EmbeddedFile;
 
 /// Saves an [`EmbeddedFile`]: its `name`, and a child `bytes` holding its
 /// bytes as a field `bytes`, written once per save for every file holding the
@@ -15,7 +15,7 @@ use kinogaki_geometry::image::EmbeddedFile;
 /// ```
 /// use kinogaki_studio_api::DataCodec;
 /// use kinogaki_studio_api::element::MemoryElement;
-/// use kinogaki_studio_api::geometry::image::EmbeddedFile;
+/// use kinogaki_studio_api::geometry::EmbeddedFile;
 /// use kinogaki_studio_api::standard::{self, EmbeddedFileCodec};
 ///
 /// let file = EmbeddedFile::new("wood.png", vec![0x89, b'P', b'N', b'G']);

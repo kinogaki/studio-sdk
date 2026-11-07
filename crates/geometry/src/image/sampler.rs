@@ -5,13 +5,15 @@ use std::sync::Arc;
 #[cfg(test)]
 mod tests;
 
-/// Which texels a [`Sampler`] reads about a point, and how it blends them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// Which texels a reader reads about a point, and how it blends them: a
+/// [`Sampler`]'s, a texture's ([`Sampling`](super::Sampling)).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum SampleFilter {
-    /// The texel the point lies in.
+    /// The texel the point lies in, as it is: pixel art's.
     Nearest,
     /// The four texels whose centers surround the point, blended by its place
-    /// between them.
+    /// between them (a GPU's mip levels besides, where it keeps them).
+    #[default]
     Bilinear,
     /// The sixteen texels about the point, through Keys' cubic (a = −0.5,
     /// Catmull–Rom): it passes through every texel and reproduces a ramp.
@@ -64,7 +66,7 @@ struct Level {
 /// let format = Format::rgba(Sample::F32, Encoding::Raw);
 /// let pixels = [0.0f32, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0];
 /// let image = Image::builder(Rect::new([0, 0], [2, 1]).unwrap())
-///     .plane(format, bytemuck::cast_slice(&pixels))
+///     .plane(format, &pixels)
 ///     .build()
 ///     .unwrap();
 /// let read = image.sampler(0, SampleFilter::Bilinear, [Wrap::Clamp; 2]);

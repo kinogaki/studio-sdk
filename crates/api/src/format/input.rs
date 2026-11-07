@@ -1,7 +1,7 @@
 //! [`Input`]: the file a format reads, on disk or held in memory.
 use super::files::{regular, whole};
 use crate::Error;
-use kinogaki_geometry::image::EmbeddedFile;
+use kinogaki_geometry::EmbeddedFile;
 use std::borrow::Cow;
 use std::fmt;
 use std::io::Read as _;
@@ -215,8 +215,10 @@ mod tests {
         );
         let held = input.held().unwrap();
         assert!(std::ptr::eq(held.bytes(), package.bytes()));
-        let entry = held.slice("wood.png", 10..20).unwrap();
-        assert!(std::ptr::eq(entry.bytes(), &package.bytes()[10..20]));
+        let entry = held.slice("mesh.usdc", 10..80).unwrap();
+        assert!(std::ptr::eq(entry.bytes(), &package.bytes()[10..80]));
+        let small = held.slice("wood.png", 10..20).unwrap();
+        assert_eq!(small.bytes(), &package.bytes()[10..20], "copied out");
         let lent = Input::memory("b.bin", b"abc").held().unwrap();
         assert_eq!((lent.name(), lent.bytes()), ("b.bin", &b"abc"[..]));
     }

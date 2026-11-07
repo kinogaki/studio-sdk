@@ -249,7 +249,11 @@ fn a_result_dropped_is_no_longer_wanted_and_a_preview_answers() {
         side: 8,
     });
     let image = result.take().expect("at once").unwrap();
-    assert_eq!((image.side, image.pixels.len()), (8, 8 * 8 * 4));
+    let layer = image.layers()[0].format();
+    assert_eq!(
+        (image.data().size(), layer.sample),
+        ([8, 8], geometry::image::Sample::F32)
+    );
     assert_eq!(engine.previews.len(), 1);
 }
 

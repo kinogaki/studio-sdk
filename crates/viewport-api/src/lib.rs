@@ -14,7 +14,7 @@
 //!   draw (wires, curvature): a maker builds them when a host asks.
 //! - [`pack_linear`]: a linear color as the RGB9E5 word surface colors
 //!   are carried in ([`ColorLayout`]).
-//! - [`SurfaceTextures`]: the images ([`SurfaceImage`]) a surface's polygons
+//! - [`SurfaceTextures`]: the images (each a `TextureImage`) a surface's polygons
 //!   show over their colors, read through a [`TextureCorner`] a polygon vertex.
 //! - [`ElementSet`]: the selected points, edges, faces, vertices or
 //!   objects; [`ElementSelection`]: one set per drawn family (faces,
@@ -56,5 +56,5 @@ pub use shading::{
     AuthoredNormals, FaceVertices, Link, NormalClass, PointFans, ShadingPlan, Smoothing,
 };
 pub use streams::Streams;
-pub use textures::{SurfaceImage, SurfaceTextures, TextureCorner};
+pub use textures::{SurfaceTextures, TextureCorner};
 pub use updates::{BufferRanges, DrawUpdate, UpdateRanges};

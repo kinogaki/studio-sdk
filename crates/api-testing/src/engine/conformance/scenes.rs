@@ -11,7 +11,9 @@
 //! Surface whose color and opacity a texture gives, cut out at a threshold;
 //! a Surface Unlit.
 use super::{Make, beauty, id};
-use kinogaki_render_api::geometry::image::{Encoding, Format, Image, ImageSource, Rect, Sample};
+use kinogaki_render_api::geometry::image::{
+    Encoding, Format, Image, ImageSource, Rect, Sample, TextureImage,
+};
 use kinogaki_render_api::geometry::{
     Attribute, Domain, Kind, Meaning, Primitives, Sampled, Vec3, Xform, names,
 };
@@ -233,7 +235,7 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
         _ => None,
     };
     if let Some(file) = file {
-        let texture: Id<Image> = Id::of(id(first));
+        let texture: Id<TextureImage> = Id::of(id(first));
         let window = Rect::new([0, 0], [2, 2]).expect("a window");
         let format = Format::rgba(Sample::F32, Encoding::Raw);
         // glTF: occlusion 1; rough, then smooth; metal, then not. USD: an
@@ -249,7 +251,10 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
             .plane(format, &texels)
             .build()
             .expect("a texture");
-        prims.push(Prim::Texture(image));
+        prims.push(Prim::Texture(TextureImage {
+            image,
+            decoding: None,
+        }));
         let reading: Vec<(u32, String)> = (network.nodes().iter().zip(0..))
             .flat_map(|(node, at)| {
                 (node.images().iter())

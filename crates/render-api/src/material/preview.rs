@@ -1,10 +1,11 @@
 //! The material preview: a shape in the SDK, an image from the engine. A host
-//! asks a material's engine for a [`PreviewImage`] of a [`PreviewRequest`]
-//! ([`RenderEngine::preview`](crate::RenderEngine::preview)) and shows it when
+//! asks a material's engine for a picture of a [`PreviewRequest`], an Image
+//! whose main layer is RGBA floats
+//! ([`RenderEngine::preview`](crate::RenderEngine::preview)), and shows it when
 //! it arrives; it never renders a material itself. The engine renders on its
 //! own thread, by any means it likes; [`PreviewRequest::scene`] gives it the
 //! request as prims it can render as any other scene.
-use crate::geometry::image::Image;
+use crate::geometry::image::TextureImage;
 use crate::id::{Id, IdAllocator, PrimId};
 use crate::material::MaterialNetwork;
 use crate::prim::{Camera, Material, Prim, Shape, Subsets, Topology};
@@ -41,23 +42,13 @@ pub struct PreviewRequest {
     /// The material, its colors in the render space and its files resolved.
     pub network: Arc<MaterialNetwork>,
     /// The Texture prims its nodes name.
-    pub textures: Vec<(Id<Image>, Image)>,
+    pub textures: Vec<(Id<TextureImage>, TextureImage)>,
     /// What it is shown on.
     pub shape: PreviewShape,
     /// What it is lit by.
     pub lighting: PreviewLighting,
     /// The image's side, in pixels.
     pub side: u32,
-}
-
-/// A preview's image: linear ACEScg RGBA, four floats a pixel, rows from the
-/// top.
-#[derive(Clone, Debug, PartialEq)]
-pub struct PreviewImage {
-    /// Its side, in pixels.
-    pub side: u32,
-    /// `side × side × 4` values.
-    pub pixels: Arc<[f32]>,
 }
 
 /// A request as prims: what a scene of its own takes to show it.
@@ -255,12 +246,15 @@ mod tests {
 
     #[test]
     fn a_request_is_a_scene_of_its_own() {
-        use kinogaki_geometry::image::{Encoding, Format, Rect, Sample};
+        use kinogaki_geometry::image::{Encoding, Format, Image, Rect, Sample};
         let format = Format::rgba(Sample::U8, Encoding::Raw);
         let window = Rect::new([0, 0], [1, 1]).unwrap();
-        let texture = Image::builder(window).plane(format, &[9; 4]).build();
-        let texture = texture.unwrap();
-        let id: Id<Image> = Id::of(PrimId {
+        let image = Image::builder(window).plane(format, &[9u8; 4]).build();
+        let texture = TextureImage {
+            image: image.unwrap(),
+            decoding: None,
+        };
+        let id: Id<TextureImage> = Id::of(PrimId {
             slot: 7,
             generation: 0,
         });

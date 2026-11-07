@@ -111,11 +111,31 @@ pub fn output(layer: &str) -> &str {
     }
 }
 
+/// An output's values as an engine holds them: interleaved
+/// [`Aov::channels`] a pixel, rows from the top. Floats (a Cryptomatte's
+/// ids as their bits), or whole numbers (object and material ids).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Values {
+    /// Floats.
+    Floats(Arc<[f32]>),
+    /// Whole numbers.
+    Whole(Arc<[u32]>),
+}
+
+impl Values {
+    fn len(&self) -> usize {
+        match self {
+            Values::Floats(v) => v.len(),
+            Values::Whole(v) => v.len(),
+        }
+    }
+}
+
 /// A final frame's outputs as one Image of `size` pixels (rows from the top):
-/// each of `planes` (an output, and its values interleaved
-/// [`Aov::channels`] a pixel, ids as their bits) as its layers, in order, and
-/// the Cryptomatte manifests naming those of `names` its layers hold as
-/// metadata. The layers:
+/// each of `planes` (an output, and its values) as its layers, in order,
+/// tiled once from the engine's own values (half floats made where they are
+/// asked for), and the Cryptomatte manifests naming those of `names` its
+/// layers hold as metadata. The layers:
 ///
 /// | Output | Layer | Channels | Sample, encoding |
 /// |---|---|---|---|
@@ -127,10 +147,11 @@ pub fn output(layer: &str) -> &str {
 /// | Cryptomatte | `<id>00`, `<id>01`… | `R G B A` | F32; raw |
 ///
 /// # Errors
-/// Values not of the size's pixels, or a size of none.
+/// Values not of the size's pixels, ids that aren't whole numbers or a
+/// Cryptomatte that isn't floats, or a size of none.
 pub fn image(
     size: [u32; 2],
-    planes: &[(AovDesc, Arc<[f32]>)],
+    planes: &[(AovDesc, Values)],
     names: &[Arc<str>],
 ) -> Result<Image, Error> {
     let wide = |v: u32| i32::try_from(v).map_err(|_| Error::invalid("a frame too large"));
@@ -147,7 +168,11 @@ pub fn image(
                 values.len()
             )));
         }
+        let unlike = || Error::invalid(format_args!("output {} holds other values", aov.id));
         if let AovClass::Cryptomatte { levels } = aov.class {
+            let Values::Floats(values) = values else {
+                return Err(unlike());
+            };
             for set in 0..usize::from(levels).div_ceil(2) {
                 let format = Format {
                     name: format!("{}{set:02}", aov.id).into(),
@@ -156,11 +181,10 @@ pub fn image(
                     encoding: Encoding::Raw,
                 };
                 let ranks = 2 * usize::from(levels);
-                let bytes: Vec<u8> = (values.chunks_exact(ranks))
+                let set: Vec<f32> = (values.chunks_exact(ranks))
                     .flat_map(|px| (0..4).map(move |k| px.get(set * 4 + k).copied().unwrap_or(0.0)))
-                    .flat_map(f32::to_ne_bytes)
                     .collect();
-                builder = builder.plane(format, &bytes);
+                builder = builder.plane(format, &set);
             }
             metadata = cryptomatte::manifest(metadata, &aov.id, names, values)?;
             continue;
@@ -180,18 +204,15 @@ pub fn image(
                 _ => Encoding::Raw,
             },
         };
-        let bytes: Vec<u8> = match sample {
-            Sample::U32 => values
-                .iter()
-                .flat_map(|v| v.to_bits().to_ne_bytes())
-                .collect(),
-            Sample::F16 => values
-                .iter()
-                .flat_map(|v| f32_to_half(*v).to_ne_bytes())
-                .collect(),
-            _ => values.iter().flat_map(|v| v.to_ne_bytes()).collect(),
+        builder = match (sample, values) {
+            (Sample::U32, Values::Whole(v)) => builder.plane(format, &v[..]),
+            (Sample::F32, Values::Floats(v)) => builder.plane(format, &v[..]),
+            (Sample::F16, Values::Floats(v)) => {
+                let halves: Vec<u16> = v.iter().map(|v| f32_to_half(*v)).collect();
+                builder.plane(format, &halves)
+            }
+            _ => return Err(unlike()),
         };
-        builder = builder.plane(format, &bytes);
     }
     builder.attributes(metadata).build()
 }

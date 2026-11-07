@@ -14,7 +14,7 @@ use super::adopt;
 use super::mtlx;
 use super::{DisplayTexture, MaterialDisplay, MaterialNetwork, NodeIndex};
 use kinogaki_geometry::Error;
-use kinogaki_geometry::image::{Filter, Sampling, Wrap};
+use kinogaki_geometry::image::{SampleFilter, Sampling, Wrap};
 use kinogaki_value::{Parameters, Value};
 use std::sync::Arc;
 
@@ -117,8 +117,9 @@ fn traced(network: &MaterialNetwork, at: NodeIndex, depth: usize) -> Option<Mate
                 _ => Wrap::Repeat,
             };
             let filter = match node.values.get("filtertype").and_then(Value::choice) {
-                Some("closest") => Filter::Nearest,
-                _ => Filter::Smooth,
+                Some("closest") => SampleFilter::Nearest,
+                Some("cubic") => SampleFilter::Bicubic,
+                _ => SampleFilter::Bilinear,
             };
             let mut texture = DisplayTexture::new(image.clone());
             texture.uv = uv;

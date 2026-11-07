@@ -15,12 +15,18 @@
 //! - An image placed by a `place2d` whose coordinates nothing drives (it
 //!   reads its value, (0, 0), whatever the mesh's), against the texel there
 //!   as a constant.
+//! - An 8-bit sRGB-encoded grey texture as a host sends it (its one channel
+//!   as stored, its decoding sRGB's transfer function and a matrix), against
+//!   the color its decoding gives as a constant: an engine runs a texture's
+//!   decoding, whatever form it holds it in.
 //!
 //! An engine that renders neither twin's difference renders them alike; one
 //! that renders them otherwise says what it doesn't render of the first.
 use super::scenes::{dome, node, quad};
 use super::{Make, alike, beauty, id, rendered};
-use kinogaki_render_api::geometry::image::{Encoding, Format, Image, ImageSource, Rect, Sample};
+use kinogaki_render_api::geometry::image::{
+    Decoding, Encoding, Format, Image, ImageSource, Rect, Sample, TextureImage, Transfer,
+};
 use kinogaki_render_api::geometry::{
     Attribute, Attributes, Domain, Meaning, Sampled, Vec3, Xform, names,
 };
@@ -48,6 +54,7 @@ pub(super) fn checks(
             first_channel(make, description),
         ));
         checks.push(("a place2d's own coordinates", placed(make, description)));
+        checks.push(("a texture's decoding", decoded(make, description)));
     }
     if renders(PrimKind::Material) && renders(PrimKind::Instancer) {
         checks.push(("instances' own colors", instance_colors(make, description)));
@@ -69,15 +76,9 @@ fn twins(make: Make<'_>, a: Vec<Prim>, b: Vec<Prim>) -> Result<(), String> {
 /// A 2 × 2 texture of RGBA floats, `a` at two opposite corners and `b` at
 /// the others: straight values, premultiplied where `encoding` says (as a
 /// host sends colors).
-fn texture(a: [f32; 4], b: [f32; 4], encoding: Encoding) -> Image {
+fn texture(a: [f32; 4], b: [f32; 4], encoding: Encoding) -> TextureImage {
     let window = Rect::new([0, 0], [2, 2]).expect("a window");
-    let premultiplied = matches!(
-        encoding,
-        Encoding::Color {
-            premultiplied: true,
-            ..
-        }
-    );
+    let premultiplied = encoding.premultiplied();
     let stored = |[r, g, b, a]: [f32; 4]| match premultiplied {
         true => [r * a, g * a, b * a, a],
         false => [r, g, b, a],
@@ -85,9 +86,12 @@ fn texture(a: [f32; 4], b: [f32; 4], encoding: Encoding) -> Image {
     let texels: Vec<u8> = ([a, b, b, a].map(stored).iter().flatten())
         .flat_map(|v| v.to_ne_bytes())
         .collect();
-    (Image::builder(window).plane(Format::rgba(Sample::F32, encoding), &texels))
-        .build()
-        .expect("a texture")
+    let decoding = (encoding != Encoding::Raw).then_some(Decoding::IDENTITY);
+    let image = Image::builder(window).plane(Format::rgba(Sample::F32, encoding), &texels);
+    TextureImage {
+        image: image.build().expect("a texture"),
+        decoding,
+    }
 }
 
 /// `built`'s surface `surface` shown by a Surface Material, adopted for the
@@ -221,6 +225,45 @@ fn placed(make: Make<'_>, description: &EngineDescription) -> Result<(), String>
     let (mut constant, first) = lit(description);
     let mut built = MaterialNetwork::builder();
     let base = [("base_color", Value::Color([0.2; 3]))];
+    let surface = node(&mut built, "ND_open_pbr_surface_surfaceshader", &base);
+    constant.push(material(built, surface, description, None));
+    constant.push(Prim::Shape(painted(1.0, Xform::IDENTITY, first, None)));
+    twins(make, texture_scene, constant)
+}
+
+/// An OpenPBR Surface whose base color an 8-bit grey sRGB-encoded texture
+/// gives (one channel, code 150, through sRGB's transfer function and a
+/// matrix taking grey to (0.5, 0.25, 0.125) of it), against that color as a
+/// constant.
+fn decoded(make: Make<'_>, description: &EngineDescription) -> Result<(), String> {
+    let decoding = Decoding {
+        transfer: Transfer::SRGB,
+        matrix: [[0.5, 0.0, 0.0], [0.0, 0.25, 0.0], [0.0, 0.0, 0.125]],
+    };
+    let format = Format {
+        channels: ["Y"].map(Arc::from).into(),
+        ..Format::rgba(Sample::U8, Encoding::color("sRGB", false))
+    };
+    let window = Rect::new([0, 0], [2, 2]).expect("a window");
+    let image = Image::builder(window).plane(format, &[150u8; 4]).build();
+    let texture = TextureImage {
+        image: image.expect("a texture"),
+        decoding: Some(decoding),
+    };
+    let (mut texture_scene, first) = lit(description);
+    texture_scene.push(Prim::Texture(texture));
+    let mut built = MaterialNetwork::builder();
+    let surface = node(&mut built, "ND_open_pbr_surface_surfaceshader", &[]);
+    let image = node(&mut built, "ND_image_color3", &[]);
+    (built.image(image, "file", ImageSource::path("grey.png"))).expect("an image input");
+    (built.link(image, "out", surface, "base_color")).expect("a color");
+    texture_scene.push(material(built, surface, description, Some(first)));
+    texture_scene.push(Prim::Shape(painted(1.0, Xform::IDENTITY, first + 1, None)));
+    let v = 150.0 / 255.0;
+    let color = decoding.apply([v; 3]).map(f64::from);
+    let (mut constant, first) = lit(description);
+    let mut built = MaterialNetwork::builder();
+    let base = [("base_color", Value::Color(color))];
     let surface = node(&mut built, "ND_open_pbr_surface_surfaceshader", &base);
     constant.push(material(built, surface, description, None));
     constant.push(Prim::Shape(painted(1.0, Xform::IDENTITY, first, None)));

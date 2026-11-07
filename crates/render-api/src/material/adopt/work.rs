@@ -5,7 +5,7 @@
 use super::super::mtlx::{self, value};
 use super::super::{Link, MaterialNetwork, Node, NodeDef, NodeIndex};
 use crate::Id;
-use crate::geometry::image::{Image, ImageSource};
+use crate::geometry::image::{ImageSource, TextureImage};
 use crate::settings::Textures;
 use kinogaki_mtlx::{Binding, GeomProp, Graph, library};
 use kinogaki_value::{Parameters, Value, ValueKind};
@@ -26,7 +26,7 @@ pub(super) struct Work {
 enum Source {
     Link(NodeIndex, Arc<str>),
     Value(Value),
-    Image(ImageSource, Option<Id<Image>>),
+    Image(ImageSource, Option<Id<TextureImage>>),
     Nothing,
 }
 

@@ -13,9 +13,8 @@ fn ramp_over(display: Rect, data: Rect) -> Image {
         }
     }
     let format = Format::rgba(Sample::F32, Encoding::Raw);
-    Image::builder(display)
-        .data(data)
-        .plane(format, bytemuck::cast_slice(&px))
+    Image::framed(display, data)
+        .plane(format, &px)
         .build()
         .unwrap()
 }
@@ -173,7 +172,7 @@ fn checker() -> Image {
         ..Format::rgba(Sample::F32, Encoding::Raw)
     };
     Image::builder(window(8, 8))
-        .plane(format, bytemuck::cast_slice(&px))
+        .plane(format, &px)
         .build()
         .unwrap()
 }

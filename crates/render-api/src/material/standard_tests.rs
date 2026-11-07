@@ -1,7 +1,7 @@
 use super::*;
 use crate::Engines;
 use crate::material::mtlx::def;
-use kinogaki_geometry::image::{Filter, ImageSource, Wrap};
+use kinogaki_geometry::image::{ImageSource, Wrap};
 
 /// A node feeding a surface: its signature, its output, its values and the
 /// surface's input it feeds.
@@ -147,7 +147,7 @@ fn an_image_shows_through_any_model_with_its_placement() {
     );
     let texture = shown(&gltf).texture.expect("the image");
     assert_eq!(texture.sampling.wrap, [Wrap::Clamp, Wrap::MirrorRepeat]);
-    assert_eq!(texture.sampling.filter, Filter::Nearest);
+    assert_eq!(texture.sampling.filter, SampleFilter::Nearest);
     // glTF scales coordinates by its scale about (0, 1): u 0.5 reads 1, v 0.5 reads -1.
     let at = texture.at([0.5, 0.5]);
     assert!(

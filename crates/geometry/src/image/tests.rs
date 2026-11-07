@@ -18,10 +18,7 @@ fn ramp(w: i32, h: i32) -> Image {
         }
     }
     Image::builder(window(w, h))
-        .plane(
-            Format::rgba(Sample::F32, linear()),
-            bytemuck::cast_slice(&px),
-        )
+        .plane(Format::rgba(Sample::F32, linear()), &px)
         .build()
         .unwrap()
 }
@@ -38,7 +35,7 @@ fn windows_and_refusals() {
     let build = |b: ImageBuilder| b.build().unwrap_err().to_string();
     let format = || Format::rgba(Sample::U8, linear());
     assert!(build(Image::builder(window(2, 2)).aspect(0.0)).contains("aspect"));
-    assert!(build(Image::builder(window(2, 2)).plane(format(), &[0; 3])).contains("bytes"));
+    assert!(build(Image::builder(window(2, 2)).plane(format(), &[0u8; 3])).contains("bytes"));
     assert!(build(Image::builder(window(2, 2)).tiles(format(), Vec::new())).contains("tiles"));
     let short = Tile::new(vec![0; 5]);
     let wrong = Image::builder(window(2, 2)).tiles(format(), vec![Some(short)]);
@@ -86,12 +83,8 @@ fn a_plane_reads_back_as_it_was_built() {
 
 #[test]
 fn a_data_window_apart_from_the_display_window() {
-    let image = Image::builder(window(4, 4))
-        .data(Rect::new([-1, -1], [1, 1]).unwrap())
-        .plane(
-            Format::rgba(Sample::F32, linear()),
-            bytemuck::cast_slice(&[1.0f32; 16]),
-        )
+    let image = Image::framed(window(4, 4), Rect::new([-1, -1], [1, 1]).unwrap())
+        .plane(Format::rgba(Sample::F32, linear()), &[1.0f32; 16])
         .build()
         .unwrap();
     assert_eq!(image.read_pixel(0, -1, -1), [1.0; 4]);
@@ -214,7 +207,7 @@ fn half_floats_round_trip() {
 #[test]
 fn zero_tiles_stay_absent() {
     let image = Image::builder(window(130, 10))
-        .plane(Format::rgba(Sample::U8, linear()), &vec![0; 4 * 130 * 10])
+        .plane(Format::rgba(Sample::U8, linear()), &vec![0u8; 4 * 130 * 10])
         .build()
         .unwrap();
     assert!(image.layers()[0].tiles().iter().all(Option::is_none));
@@ -256,10 +249,7 @@ fn a_pyramid_means_tiles_and_derives_only_what_an_edit_touched() {
 #[test]
 fn edges_of_a_level_are_not_darkened_by_padding() {
     let image = Image::builder(window(3, 1))
-        .plane(
-            Format::rgba(Sample::F32, linear()),
-            bytemuck::cast_slice(&[1.0f32; 12]),
-        )
+        .plane(Format::rgba(Sample::F32, linear()), &[1.0f32; 12])
         .build()
         .unwrap();
     let mut pyramid = Pyramid::new(image.layers()[0].format().clone(), [3, 1]);

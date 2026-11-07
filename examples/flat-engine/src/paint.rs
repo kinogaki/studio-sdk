@@ -4,7 +4,7 @@
 //! implements are those ([`NODES`], with the Surface Material showing the
 //! surface); a host adopts every other material into them, or cuts it to
 //! the default, white.
-use kinogaki_render_api::geometry::image::Image;
+use kinogaki_render_api::geometry::image::TextureImage;
 use kinogaki_render_api::material::standard;
 use kinogaki_render_api::value::Value;
 use kinogaki_render_api::{Prim, PrimId};
@@ -16,7 +16,7 @@ pub(crate) const NODES: [&str; 3] = [standard::OPEN_PBR, "surfacematerial", "ND_
 /// A material as Flat paints it: a color, times an image where it has one.
 pub(crate) struct Paint {
     color: [f32; 3],
-    image: Option<Image>,
+    image: Option<TextureImage>,
 }
 
 impl Paint {
@@ -64,15 +64,15 @@ impl Paint {
     /// Its color at texture coordinates `uv` (v up from the image's bottom
     /// row).
     pub fn at(&self, [u, v]: [f32; 2]) -> [f32; 3] {
-        let Some(image) = &self.image else {
+        let Some(texture) = &self.image else {
             return self.color;
         };
-        let window = image.data();
+        let window = texture.image.data();
         let [w, h] = window.size().map(|s| s.max(1) as f32);
         let x = ((u - u.floor()) * w).min(w - 1.0) as i32;
         let y = (h - 1.0 - ((v - v.floor()) * h).min(h - 1.0)) as i32;
         let [min_x, min_y] = window.min();
-        let texel = image.read_pixel(0, min_x + x, min_y + y);
+        let texel = texture.texel(min_x + x, min_y + y);
         [0, 1, 2].map(|k| self.color[k] * texel[k])
     }
 }

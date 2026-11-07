@@ -38,8 +38,7 @@ fn an_image_round_trips_byte_exact_and_sparse_stays_sparse() {
     };
     let tile = Tile::new((0..main.tile_bytes()).map(|b| b as u8).collect());
     let z = Tile::new(vec![7; depth.tile_bytes()]);
-    let image = Image::builder(window)
-        .data(Rect::new([0, 0], [65, 65]).unwrap())
+    let image = Image::framed(window, Rect::new([0, 0], [65, 65]).unwrap())
         .aspect(1.5)
         .attributes(detail)
         .tiles(main, vec![None, Some(tile), None, None])
@@ -69,7 +68,7 @@ fn every_color_tag_and_sample_round_trips() {
         };
         let format = Format::rgba(Sample::U16, encoding);
         let image = Image::builder(window)
-            .plane(format, &[9; 3 * 2 * 8])
+            .plane(format, &[9u8; 3 * 2 * 8])
             .build()
             .unwrap();
         assert_eq!(round_trip(&image), image);

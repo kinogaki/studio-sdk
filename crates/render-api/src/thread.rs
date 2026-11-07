@@ -28,8 +28,8 @@ use crate::aov::standard as aovs;
 use crate::geometry::image::{Image, Sample};
 use crate::geometry::{Diagnostic, Error};
 use crate::{
-    AovDesc, AovFormat, Deliver, EngineDescription, Frame, Pending, PreviewImage, PreviewRequest,
-    PreviewScene, PrimId, RenderEngine, SceneUpdate, ViewDesc, ViewId, Wake, pending,
+    AovDesc, AovFormat, Deliver, EngineDescription, Pending, PreviewRequest, PreviewScene, PrimId,
+    RenderEngine, SceneUpdate, ViewDesc, ViewId, ViewPass, Wake, pending,
 };
 
 /// The preview's view, apart from a host's.
@@ -44,7 +44,7 @@ enum Read {
     /// A final render's outputs.
     Outputs(Vec<AovDesc>, Deliver<Image>),
     /// A preview's beauty, as its picture.
-    Preview(Deliver<PreviewImage>),
+    Preview(Deliver<Image>),
 }
 
 impl Reading {
@@ -87,20 +87,23 @@ impl Reading {
     }
 }
 
-/// `outputs`' beauty as a preview's picture: its main layer, RGBA floats, of
-/// a square frame.
-fn picture(outputs: &Image) -> Option<PreviewImage> {
+/// `outputs`' beauty as a preview's picture: its main layer alone, RGBA
+/// floats, of a square frame.
+fn picture(outputs: &Image) -> Option<Image> {
     let layer = outputs.layers().first()?;
     let format = layer.format();
     if !format.name.is_empty() || format.channels.len() != 4 || format.sample != Sample::F32 {
         return None;
     }
-    let bytes = outputs.plane(0)?;
-    let pixels = (bytes.as_chunks::<4>().0.iter()).map(|b| f32::from_ne_bytes(*b));
-    Some(PreviewImage {
-        side: outputs.data().size()[0],
-        pixels: pixels.collect(),
-    })
+    let [width, height] = outputs.data().size();
+    if width != height || layer.held().is_some() {
+        return None;
+    }
+    let builder = Image::framed(outputs.display(), outputs.data());
+    builder
+        .tiles(format.clone(), layer.tiles().to_vec())
+        .build()
+        .ok()
 }
 
 impl PreviewScene {
@@ -142,7 +145,7 @@ pub enum Message<E> {
 /// the engine said that the host hasn't taken.
 #[derive(Default)]
 pub struct Published {
-    frames: BTreeMap<ViewId, Arc<Frame>>,
+    frames: BTreeMap<ViewId, Arc<ViewPass>>,
     problems: BTreeMap<ViewId, Diagnostic>,
     drops: BTreeMap<ViewId, u64>,
     said: Vec<Diagnostic>,
@@ -155,7 +158,7 @@ impl Published {
     }
 
     /// View `view`'s newest frame.
-    pub fn latest(&self, view: ViewId) -> Option<&Arc<Frame>> {
+    pub fn latest(&self, view: ViewId) -> Option<&Arc<ViewPass>> {
         self.frames.get(&view)
     }
 
@@ -166,7 +169,7 @@ impl Published {
 
     /// `frame` as its view's newest, its problem gone, when the host hasn't
     /// dropped the view since it gave it (`drops`); whether it was.
-    pub fn publish(&mut self, frame: Arc<Frame>, drops: u64) -> bool {
+    pub fn publish(&mut self, frame: Arc<ViewPass>, drops: u64) -> bool {
         let view = frame.view;
         let current = self.drops(view) == drops;
         if current {
@@ -328,7 +331,7 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         self.send(Message::Drop(view));
     }
 
-    fn latest(&self, view: ViewId) -> Option<Arc<Frame>> {
+    fn latest(&self, view: ViewId) -> Option<Arc<ViewPass>> {
         lock(&self.published).latest(view).cloned()
     }
 
@@ -355,7 +358,7 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         result
     }
 
-    fn preview(&mut self, request: PreviewRequest) -> Pending<PreviewImage> {
+    fn preview(&mut self, request: PreviewRequest) -> Pending<Image> {
         let (deliver, result) = pending(self.wake.clone());
         let scene = request.scene().replacing(&mut self.previewed);
         let view = (self.preview_view)(&scene, request.side);
@@ -437,14 +440,11 @@ mod tests {
                     Ok(Message::Stop) | Err(_) => return,
                     Ok(_) => continue,
                 };
-                let frame = Frame {
+                let frame = ViewPass {
                     view,
                     generation: 0,
                     desc,
-                    width: 1,
-                    height: 1,
-                    pixels: Arc::from(vec![0; 4]),
-                    image: 0,
+                    image: ViewPass::pixels([1, 1], &[0; 4]).expect("a pixel"),
                     stats: crate::RenderStats::default(),
                 };
                 lock(&mailbox.published).publish(Arc::new(frame), drops);

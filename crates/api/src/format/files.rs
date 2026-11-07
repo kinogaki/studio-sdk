@@ -9,7 +9,8 @@
 //!
 //! ```
 //! use kinogaki_studio_api::format::files::Beside;
-//! use kinogaki_studio_api::geometry::image::{EmbeddedFile, ImageFile};
+//! use kinogaki_studio_api::geometry::EmbeddedFile;
+//! use kinogaki_studio_api::geometry::image::ImageFile;
 //!
 //! let folder = std::env::temp_dir().join(format!("beside-doc-{}", std::process::id()));
 //! let mut beside = Beside::new(&folder.join("scene.mtl"));
@@ -27,7 +28,8 @@ mod named;
 pub use named::Named;
 
 use crate::Error;
-use kinogaki_geometry::image::{EmbeddedFile, ImageFile};
+use kinogaki_geometry::EmbeddedFile;
+use kinogaki_geometry::image::ImageFile;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read as _;

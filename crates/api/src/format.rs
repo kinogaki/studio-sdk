@@ -36,10 +36,10 @@
 //! (a format holds no color maths). A writer of pictures takes one item
 //! holding an Image the host made for the file (as a display shows it when
 //! the writer is [`display_referred`](FormatWriter::display_referred), else
-//! linear light) and tagged for it, copies the tag and
-//! [`CHROMATICITIES`](kinogaki_geometry::image::metadata::CHROMATICITIES),
-//! writes each layer as the file can hold it, and says, as a warning, what
-//! it left out.
+//! linear light) and tagged for it, copies the tag (a space's primaries, a
+//! file that holds them takes from the host's
+//! [`primaries`](crate::color::ColorService::primaries)), writes each layer
+//! as the file can hold it, and says, as a warning, what it left out.
 //!
 //! **Untrusted files.** A file may be hostile: a reader never trusts what
 //! it says. Every size, count or depth it claims is checked against the

@@ -346,7 +346,7 @@ mod tests {
     use super::*;
     use crate::element::MemoryElement;
     use crate::image_files::image_node;
-    use kinogaki_geometry::image::EmbeddedFile;
+    use kinogaki_geometry::EmbeddedFile;
 
     #[test]
     fn every_value_wire_inside_standard_form_and_image_round_trips() {

@@ -7,8 +7,8 @@ use super::paint::Paint;
 use kinogaki_render_api::geometry::{Diagnostic, Error, Vec3, Xform};
 use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Published, Reading};
 use kinogaki_render_api::{
-    Camera, Frame, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, Topology,
-    ViewCamera, ViewDesc, ViewId, ViewMode, Wake, aov, f32_to_half,
+    Camera, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, Topology,
+    ViewCamera, ViewDesc, ViewId, ViewMode, ViewPass, Wake, aov, f32_to_half,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -79,21 +79,27 @@ impl Scene {
                 let mut published = lock(&mailbox.published);
                 woke |= match rendered {
                     Ok(pixels) => {
-                        let frame = Frame {
-                            view: id,
-                            generation: view.generation,
-                            desc: view.desc.clone(),
-                            width: view.desc.width,
-                            height: view.desc.height,
-                            pixels: pixels.iter().map(|&v| f32_to_half(v)).collect(),
-                            image: 0,
-                            stats: RenderStats {
-                                samples: 1,
-                                target: 1,
-                                ..RenderStats::default()
-                            },
-                        };
-                        published.publish(Arc::new(frame), view.drops)
+                        let size = [view.desc.width, view.desc.height];
+                        let halves: Vec<u16> = pixels.iter().map(|&v| f32_to_half(v)).collect();
+                        match ViewPass::pixels(size, &halves) {
+                            Ok(image) => {
+                                let frame = ViewPass {
+                                    view: id,
+                                    generation: view.generation,
+                                    desc: view.desc.clone(),
+                                    image,
+                                    stats: RenderStats {
+                                        samples: 1,
+                                        target: 1,
+                                        ..RenderStats::default()
+                                    },
+                                };
+                                published.publish(Arc::new(frame), view.drops)
+                            }
+                            Err(why) => {
+                                published.fail(id, Diagnostic::error(why.to_string()), view.drops)
+                            }
+                        }
                     }
                     Err(why) => published.fail(id, Diagnostic::error(why), view.drops),
                 };
@@ -169,7 +175,7 @@ impl Scene {
                 Some((desc, Some(Ok(pixels)))) => {
                     let planes: Vec<_> = (reading.outputs().into_iter())
                         .filter(|o| o.aov.is_beauty())
-                        .map(|o| (o, pixels.clone()))
+                        .map(|o| (o, aov::Values::Floats(pixels.clone())))
                         .collect();
                     match aov::image([desc.width, desc.height], &planes, &[]) {
                         Ok(image) => reading.deliver(image),

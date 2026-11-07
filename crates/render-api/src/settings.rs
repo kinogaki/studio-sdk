@@ -20,14 +20,14 @@ use kinogaki_geometry::{Error, Rate, Units};
 use kinogaki_value::{Parameter, Parameters};
 use std::collections::BTreeMap;
 
-use crate::geometry::image::Image;
+use crate::geometry::image::TextureImage;
 use crate::id::Id;
 use crate::prim::Camera;
 
 /// The Texture prims the host read images to, by the value's or input's
 /// name: what an engine reads for each image (one missing: no image, or one
 /// not read yet).
-pub(crate) type Textures = BTreeMap<String, Id<Image>>;
+pub(crate) type Textures = BTreeMap<String, Id<TextureImage>>;
 
 /// What every view of an engine shares. What differs between views travels
 /// with the view ([`crate::ViewDesc::values`]).

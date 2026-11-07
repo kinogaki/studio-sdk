@@ -1,7 +1,7 @@
 //! Where Flat's frames show: each frame's pixels written into a texture of
 //! its own on the host's device, which the host samples while it holds it.
 use kinogaki_render_api::display::{Display, Shown, wgpu};
-use kinogaki_render_api::{Frame, ViewId};
+use kinogaki_render_api::{ViewId, ViewPass};
 use std::sync::Arc;
 
 /// The host's device, and how many textures were made (each one's key).
@@ -24,10 +24,11 @@ impl Textures {
 impl Display for Textures {
     /// A new texture holding `frame`'s pixels: nothing writes it again, so
     /// the host may sample it for as long as it holds it.
-    fn acquire(&mut self, frame: &Arc<Frame>) -> Option<Shown> {
+    fn acquire(&mut self, frame: &Arc<ViewPass>) -> Option<Shown> {
+        let [width, height] = frame.size();
         let size = wgpu::Extent3d {
-            width: frame.width,
-            height: frame.height,
+            width,
+            height,
             depth_or_array_layers: 1,
         };
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
@@ -40,14 +41,14 @@ impl Display for Textures {
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        let bytes: Vec<u8> = frame.pixels.iter().flat_map(|h| h.to_ne_bytes()).collect();
+        let bytes = frame.image.plane(0)?;
         self.queue.write_texture(
             texture.as_image_copy(),
             &bytes,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(frame.width * 8),
-                rows_per_image: Some(frame.height),
+                bytes_per_row: Some(width * 8),
+                rows_per_image: Some(height),
             },
             size,
         );

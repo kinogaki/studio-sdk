@@ -33,7 +33,7 @@ use std::sync::Arc;
 ///
 /// let format = Format::rgba(Sample::U8, Encoding::color("sRGB", false));
 /// let picture = Image::builder(Rect::new([0, 0], [2, 1]).unwrap())
-///     .plane(format, &[255, 0, 0, 255, 0, 255, 0, 255])
+///     .plane(format, &[255u8, 0, 0, 255, 0, 255, 0, 255])
 ///     .build()
 ///     .unwrap();
 /// let data = standard::image().wrap(picture.clone());
@@ -121,8 +121,7 @@ impl DataCodec for ImageCodec {
 
     fn read(&self, from: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
         let data = read_window(from, "data")?;
-        let mut builder: ImageBuilder = Image::builder(read_window(from, "display")?)
-            .data(data)
+        let mut builder: ImageBuilder = Image::framed(read_window(from, "display")?, data)
             .aspect(from.float("aspect")?)
             .attributes(attributes::read(from)?);
         let across = tiles_of(data.size());
