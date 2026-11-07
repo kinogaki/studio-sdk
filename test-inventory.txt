@@ -192,6 +192,7 @@ kinogaki-geometry/geometry test with_points_keeps_the_rows_and_their_columns
 kinogaki-geometry/geometry test with_positions_shares_the_topology_the_attributes_and_their_caches
 kinogaki-geometry/lib test across::tests::axes_carried_round_a_bend_stay_across_and_never_spin
 kinogaki-geometry/lib test across::tests::up_seeds_the_first_axes_and_a_straight_line_keeps_them
+kinogaki-geometry/lib test attributes::tests::a_table_being_made_sets_entries_in_place_and_checks_each
 kinogaki-geometry/lib test attributes::tests::only_replaced_entries_are_checked
 kinogaki-geometry/lib test bounds::tests::boxes_join_center_and_have_corners
 kinogaki-geometry/lib test brep::eval_tests::a_closed_nurbs_direction_wraps
@@ -327,12 +328,16 @@ kinogaki-mtlx/lib test upgrade::tree::tests::names_count_up_as_materialx_counts_
 kinogaki-mtlx/lib test xml::tests::a_document_reads_and_writes_back_as_materialx_writes_it
 kinogaki-mtlx/lib test xml::tests::attributes_read_their_whitespace_as_spaces_and_references_as_characters
 kinogaki-mtlx/lib test xml::tests::broken_documents_are_refused_with_their_line
+kinogaki-mtlx/lib test xml::tests::nesting_past_its_depth_is_refused_on_a_small_stack
+kinogaki-mtlx/materials test a_chain_of_nodes_deeper_than_its_limit_is_cut_and_said
 kinogaki-mtlx/materials test a_document_s_own_definition_flattens_into_the_material_reading_it
 kinogaki-mtlx/materials test files_keep_their_prefix_and_values_their_color_space
+kinogaki-mtlx/materials test includes_naming_one_document_many_times_read_it_once
 kinogaki-mtlx/materials test includes_read_the_documents_they_name_relative_to_the_one_naming_them
 kinogaki-mtlx/materials test kinogaki_s_definitions_travel_with_a_document_using_them
 kinogaki-mtlx/materials test materials_written_as_a_document_read_back_as_themselves
 kinogaki-mtlx/materials test node_graphs_a_material_reads_from_are_the_material_s
+kinogaki-mtlx/materials test nodes_reading_themselves_are_left_unbound_and_said
 kinogaki-render-api/display test engines_and_displays_are_objects_hosts_can_share
 kinogaki-render-api/display test options_default_to_nothing
 kinogaki-render-api/doc test crates/render-api/src/source.rs - source::PlainTriangles
@@ -395,6 +400,7 @@ kinogaki-render-api/lib test tests::descriptors::rows_show_and_apply_by_the_valu
 kinogaki-render-api/lib test tests::descriptors::settings_fit_their_descriptors
 kinogaki-render-api/lib test tests::descriptors::standard_lights_and_fog_round_trip_through_their_prims
 kinogaki-render-api/lib test thread::tests::what_an_engine_says_reaches_the_host_once
+kinogaki-studio-api-testing/doc test crates/api-testing/src/hostile.rs - hostile::read_hostile
 kinogaki-studio-api-testing/doc test crates/api-testing/src/lib.rs -
 kinogaki-studio-api-testing/turns test alone_waits_for_the_shared_turns_and_ends_with_its_thread
 kinogaki-studio-api/admission test a_context_adopts_a_node_type_once
@@ -424,7 +430,9 @@ kinogaki-studio-api/doc test crates/api/src/cook/handle.rs - cook::handle::Handl
 kinogaki-studio-api/doc test crates/api/src/cook/placement.rs - cook::placement::Placement
 kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement
 kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::is_name
+kinogaki-studio-api/doc test crates/api/src/format/budget.rs - format::budget
 kinogaki-studio-api/doc test crates/api/src/format/files.rs - format::files
+kinogaki-studio-api/doc test crates/api/src/format/files/named.rs - format::files::named::Named
 kinogaki-studio-api/doc test crates/api/src/format/input.rs - format::input::Input
 kinogaki-studio-api/doc test crates/api/src/format/options.rs - format::options
 kinogaki-studio-api/doc test crates/api/src/icon.rs - icon
@@ -474,6 +482,16 @@ kinogaki-studio-api/lib test element::values::tests::a_damaged_ramp_or_curve_is_
 kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused
 kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back
 kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewports_detail_unless_told
+kinogaki-studio-api/lib test format::budget::tests::allocations_are_refused_alone_and_together_and_clones_share_them
+kinogaki-studio-api/lib test format::budget::tests::every_check_stops_a_cancelled_read
+kinogaki-studio-api/lib test format::budget::tests::files_read_depth_and_expansion_have_their_limits
+kinogaki-studio-api/lib test format::files::named::tests::a_file_held_in_memory_names_no_file_on_disk
+kinogaki-studio-api/lib test format::files::named::tests::a_link_out_of_the_folder_is_out_of_reach
+kinogaki-studio-api/lib test format::files::named::tests::names_are_normalized_as_text_and_long_lists_counted
+kinogaki-studio-api/lib test format::files::named::tests::names_reach_the_folder_and_below_and_nothing_else
+kinogaki-studio-api/lib test format::files::named::tests::of_several_spellings_the_first_found_is_taken_and_only_a_miss_said
+kinogaki-studio-api/lib test format::files::named::tests::pictures_embed_within_the_budget_and_stay_paths_otherwise
+kinogaki-studio-api/lib test format::files::tests::a_file_reached_through_a_link_is_named_relative_to_the_document
 kinogaki-studio-api/lib test format::files::tests::embedded_files_are_written_once_and_numbered_past_a_clash
 kinogaki-studio-api/lib test format::files::tests::paths_are_relative_to_the_document_where_one_reaches
 kinogaki-studio-api/lib test format::input::tests::a_file_is_read_as_it_is_asked_for_and_a_missing_one_says_so
