@@ -259,6 +259,26 @@ pub struct NodeDef {
 }
 
 impl NodeDef {
+    /// The definition nodedef element `e` declares, its own inputs and
+    /// outputs alone (an inheriting one's parent's aren't read here).
+    pub(crate) fn of(e: &Element) -> NodeDef {
+        NodeDef {
+            name: e.get("name").to_owned(),
+            node: e.get("node").to_owned(),
+            group: e.get("nodegroup").to_owned(),
+            version: e.attr("version").map(str::to_owned),
+            default_version: e.get("isdefaultversion") == "true",
+            label: e.attr("uiname").map(str::to_owned),
+            doc: e.get("doc").to_owned(),
+            inputs: (e.elements().filter(|c| c.category == "input"))
+                .map(Port::read)
+                .collect(),
+            outputs: (e.elements().filter(|c| c.category == "output"))
+                .map(Port::read)
+                .collect(),
+        }
+    }
+
     /// Its input `name`.
     pub fn input(&self, name: &str) -> Option<&Port> {
         self.inputs.iter().find(|p| p.name == name)
@@ -337,21 +357,7 @@ impl Library {
         for (at, e) in elements.iter().enumerate() {
             match &*e.category {
                 "nodedef" => {
-                    let def = NodeDef {
-                        name: e.get("name").to_owned(),
-                        node: e.get("node").to_owned(),
-                        group: e.get("nodegroup").to_owned(),
-                        version: e.attr("version").map(str::to_owned),
-                        default_version: e.get("isdefaultversion") == "true",
-                        label: e.attr("uiname").map(str::to_owned),
-                        doc: e.get("doc").to_owned(),
-                        inputs: (e.elements().filter(|c| c.category == "input"))
-                            .map(Port::read)
-                            .collect(),
-                        outputs: (e.elements().filter(|c| c.category == "output"))
-                            .map(Port::read)
-                            .collect(),
-                    };
+                    let def = NodeDef::of(e);
                     if library.by_name.contains_key(&def.name) {
                         return Err(format!("{} is defined twice", def.name));
                     }

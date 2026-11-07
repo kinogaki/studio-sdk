@@ -20,12 +20,18 @@
 //! - **Translation** ([`Library::translation`]): the chain of
 //!   `<from>_to_<to>` definitions from one shading model to another.
 //! - **Evaluation** ([`NodeDef::evaluate`]): a node of constants as its value.
+//! - **Materials** ([`Material`]): a document's materials as flat networks,
+//!   its graphs and its own graph-defined nodes inlined
+//!   ([`Document::materials`]), its includes read first
+//!   ([`Document::include`]); and a document written of materials
+//!   ([`Document::of_materials`]), Kinogaki's definitions they use with them.
 //!
 //! The crate depends on the standard library alone.
 mod document;
 mod eval;
 mod graph;
 mod library;
+mod material;
 mod translate;
 mod types;
 mod upgrade;
@@ -34,5 +40,6 @@ mod xml;
 pub use document::Document;
 pub use graph::{Binding, Graph, GraphNode};
 pub use library::{GeomProp, Library, NodeDef, Port, library};
+pub use material::{Bound, Material, MaterialNode};
 pub use translate::target;
 pub use types::{Type, Value};

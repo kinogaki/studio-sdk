@@ -161,8 +161,9 @@ fn kind(port: &Port) -> Option<ValueKind> {
     })
 }
 
-/// MaterialX value `v` as a value of `kind`, when it is one.
-pub(crate) fn value(kind: &ValueKind, v: &kinogaki_mtlx::Value) -> Option<Value> {
+/// MaterialX value `v` as a value of `kind`, the kind a node's input holds
+/// it as, when it is one: what a format reads of a document's value.
+pub fn value(kind: &ValueKind, v: &kinogaki_mtlx::Value) -> Option<Value> {
     use kinogaki_mtlx::Value as M;
     Some(match (kind, v) {
         (ValueKind::Toggle, M::Boolean(on)) => Value::Bool(*on),
@@ -178,8 +179,9 @@ pub(crate) fn value(kind: &ValueKind, v: &kinogaki_mtlx::Value) -> Option<Value>
     })
 }
 
-/// Value `v` (held as `kind`) as MaterialX's, when it is one.
-pub(crate) fn of_value(v: &Value) -> Option<kinogaki_mtlx::Value> {
+/// Value `v`, as a MaterialX node's input holds it, as MaterialX's, when
+/// it is one: what a format writes of a node's value.
+pub fn of_value(v: &Value) -> Option<kinogaki_mtlx::Value> {
     use kinogaki_mtlx::Value as M;
     Some(match v {
         Value::Bool(on) => M::Boolean(*on),

@@ -327,6 +327,12 @@ kinogaki-mtlx/lib test upgrade::tree::tests::names_count_up_as_materialx_counts_
 kinogaki-mtlx/lib test xml::tests::a_document_reads_and_writes_back_as_materialx_writes_it
 kinogaki-mtlx/lib test xml::tests::attributes_read_their_whitespace_as_spaces_and_references_as_characters
 kinogaki-mtlx/lib test xml::tests::broken_documents_are_refused_with_their_line
+kinogaki-mtlx/materials test a_document_s_own_definition_flattens_into_the_material_reading_it
+kinogaki-mtlx/materials test files_keep_their_prefix_and_values_their_color_space
+kinogaki-mtlx/materials test includes_read_the_documents_they_name_relative_to_the_one_naming_them
+kinogaki-mtlx/materials test kinogaki_s_definitions_travel_with_a_document_using_them
+kinogaki-mtlx/materials test materials_written_as_a_document_read_back_as_themselves
+kinogaki-mtlx/materials test node_graphs_a_material_reads_from_are_the_material_s
 kinogaki-render-api/display test engines_and_displays_are_objects_hosts_can_share
 kinogaki-render-api/display test options_default_to_nothing
 kinogaki-render-api/doc test crates/render-api/src/source.rs - source::PlainTriangles
