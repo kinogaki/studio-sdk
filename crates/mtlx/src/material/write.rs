@@ -1,19 +1,12 @@
 //! A document made of materials (the module docs say how).
 use super::{Bound, Material, MaterialNode, unique, valid_name};
 use crate::document::{Document, VERSION};
-use crate::library::{NodeDef, library};
+use crate::library::{KINOGAKI, NodeDef, library};
 use crate::types::Type;
 use crate::xml::{self, Child, Element};
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::OnceLock;
-
-/// Kinogaki's definitions as the library reads them (`kinogaki/`): what a
-/// document using one carries, so any MaterialX reader resolves it.
-const KINOGAKI: [&str; 2] = [
-    include_str!("../../kinogaki/kinogaki_defs.mtlx"),
-    include_str!("../../kinogaki/kinogaki_ng.mtlx"),
-];
 
 impl Document {
     /// A document of `materials` (see the module docs), its values' colors
@@ -206,12 +199,13 @@ fn port_type(def: &NodeDef, input: &str) -> Type {
 }
 
 /// The elements of Kinogaki's definitions among `used` (by signature), and
-/// their implementations, in the order the library holds them.
+/// their implementations, in the order the library holds them: what a
+/// document using one carries, so any MaterialX reader resolves it.
 fn kinogaki(used: &[&str]) -> Vec<Element> {
     static ELEMENTS: OnceLock<Vec<Element>> = OnceLock::new();
     let all = ELEMENTS.get_or_init(|| {
         (KINOGAKI.iter())
-            .filter_map(|text| xml::parse_static(text).ok())
+            .filter_map(|(_, text)| xml::parse_static(text).ok())
             .flat_map(|root| root.children)
             .filter_map(|c| match c {
                 Child::Element(e) => Some(e),

@@ -320,6 +320,7 @@ kinogaki-mtlx/lib test eval::tests::conditionals_choose_and_the_rest_wait
 kinogaki-mtlx/lib test library::tests::a_graph_binds_values_interfaces_and_other_nodes
 kinogaki-mtlx/lib test library::tests::an_inheriting_definition_holds_its_parents_inputs_first
 kinogaki-mtlx/lib test library::tests::every_graph_implementation_resolves_and_type_checks
+kinogaki-mtlx/lib test library::tests::kinogakis_definitions_travel_as_the_materialx_ones_they_inherit
 kinogaki-mtlx/lib test library::tests::kinogakis_gltf_images_read_their_wraps_in_gltfs_order
 kinogaki-mtlx/lib test library::tests::nodes_resolve_as_materialx_resolves_them
 kinogaki-mtlx/lib test library::tests::the_library_reads_every_definition
@@ -359,6 +360,8 @@ kinogaki-render-api/lib test material::adopt::tests::an_unconnected_geometric_in
 kinogaki-render-api/lib test material::adopt::tests::another_engines_material_goes_as_its_standard_form
 kinogaki-render-api/lib test material::adopt::tests::standard_surface_translates_by_materialx_own_graph
 kinogaki-render-api/lib test material::adopt::tests::what_no_way_reaches_is_cut_and_named_once
+kinogaki-render-api/lib test material::mtlx::tests::every_node_has_a_label_of_its_own
+kinogaki-render-api/lib test material::mtlx::tests::lengths_in_the_scenes_units_are_lengths
 kinogaki-render-api/lib test material::mtlx::tests::materialx_nodes_keep_their_names_and_meaning
 kinogaki-render-api/lib test material::mtlx::tests::names_read_as_words
 kinogaki-render-api/lib test material::preview::tests::a_request_is_a_scene_of_its_own
@@ -427,6 +430,7 @@ kinogaki-studio-api/cook test withheld_and_wrong_parameters_fail_by_name
 kinogaki-studio-api/creations test a_kinds_creations_are_its_vendors_and_new
 kinogaki-studio-api/creations test node_creations_are_their_vendors_and_new
 kinogaki-studio-api/doc test crates/api/src/cancel.rs - cancel::CancelToken
+kinogaki-studio-api/doc test crates/api/src/color.rs - color::settled
 kinogaki-studio-api/doc test crates/api/src/cook/description.rs - cook::description::Description
 kinogaki-studio-api/doc test crates/api/src/cook/handle.rs - cook::handle::Handle
 kinogaki-studio-api/doc test crates/api/src/cook/placement.rs - cook::placement::Placement
@@ -460,6 +464,7 @@ kinogaki-studio-api/image_codec test reading_is_strict
 kinogaki-studio-api/instances test a_move_shares_the_prototypes_and_attributes
 kinogaki-studio-api/instances test instances_refuse_what_they_cant_place
 kinogaki-studio-api/instances test instances_round_trip_with_each_prototype_written_once
+kinogaki-studio-api/lib test color::tests::a_converted_color_settles_where_a_conversion_left_its_last_bits
 kinogaki-studio-api/lib test components::tests::a_selection_reads_back_only_as_its_own_representation
 kinogaki-studio-api/lib test cook::binding::tests::a_component_reads_and_writes_one_number_of_a_vector
 kinogaki-studio-api/lib test cook::binding::tests::mixed_vectors_write_only_their_parameters
@@ -493,6 +498,7 @@ kinogaki-studio-api/lib test format::files::named::tests::names_are_normalized_a
 kinogaki-studio-api/lib test format::files::named::tests::names_reach_the_folder_and_below_and_nothing_else
 kinogaki-studio-api/lib test format::files::named::tests::of_several_spellings_the_first_found_is_taken_and_only_a_miss_said
 kinogaki-studio-api/lib test format::files::named::tests::pictures_embed_within_the_budget_and_stay_paths_otherwise
+kinogaki-studio-api/lib test format::files::tests::a_document_named_relative_names_an_absolute_file_as_it_reads_back
 kinogaki-studio-api/lib test format::files::tests::a_file_reached_through_a_link_is_named_relative_to_the_document
 kinogaki-studio-api/lib test format::files::tests::embedded_files_are_written_once_and_numbered_past_a_clash
 kinogaki-studio-api/lib test format::files::tests::paths_are_relative_to_the_document_where_one_reaches
@@ -513,6 +519,7 @@ kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_t
 kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup
 kinogaki-studio-api/lib test network::edit::tests::a_compiled_material_seeds_its_nodes_and_an_image_node_an_image
 kinogaki-studio-api/lib test network::edit::tests::a_seed_makes_the_material_it_starts
+kinogaki-studio-api/lib test network::edit::tests::a_seeds_lengths_scale_and_nothing_else
 kinogaki-studio-api/lib test params::schema::tests::a_data_parameter_takes_values_of_its_type_alone
 kinogaki-studio-api/lib test params::schema::tests::a_parameter_check_names_it_by_its_label
 kinogaki-studio-api/lib test params::schema::tests::a_schema_lists_its_parameters_and_values

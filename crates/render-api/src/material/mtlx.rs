@@ -56,7 +56,7 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
             let first = def.groups.is_empty();
             def.groups.push(Section::new(folder, folder, first));
         }
-        def = def.input(input(port));
+        def = def.input(input(&source.node, port));
     }
     for port in &source.outputs {
         def = def.output(Output::new(
@@ -68,8 +68,8 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
     Some(def.of_mtlx(source))
 }
 
-/// `port` as an input.
-fn input(port: &Port) -> Input {
+/// `port` of node `node` as an input.
+fn input(node: &str, port: &Port) -> Input {
     let socket = Socket::of(&port.ty);
     let label = port.label.clone().unwrap_or_else(|| words(&port.name));
     let wire = port.geomprop.is_some()
@@ -77,7 +77,7 @@ fn input(port: &Port) -> Input {
             port.ty,
             Type::Matrix33 | Type::Matrix44 | Type::Filename | Type::Named(_)
         );
-    let kind = kind(port);
+    let kind = kind(node, port);
     let (Some(kind), false) = (kind, wire) else {
         return Input::wire(&port.name, &label, socket);
     };
@@ -98,8 +98,9 @@ fn input(port: &Port) -> Input {
     }
 }
 
-/// The kind a value of `port` is held as; none for a type holding none.
-fn kind(port: &Port) -> Option<ValueKind> {
+/// The kind a value of `port` of node `node` is held as; none for a type
+/// holding none.
+fn kind(node: &str, port: &Port) -> Option<ValueKind> {
     let span = |n: Number| -> Number {
         let low = (port.soft_min.as_ref().or(port.min.as_ref()))
             .and_then(|v| v.numbers()?.first().copied());
@@ -145,6 +146,7 @@ fn kind(port: &Port) -> Option<ValueKind> {
         Type::Float => {
             let number = match port.unit_type.as_deref() {
                 Some("angle") => Number::angle(),
+                _ if length(node, port) => Number::length(),
                 _ => Number::plain(),
             };
             ValueKind::Number(span(number))
@@ -153,13 +155,37 @@ fn kind(port: &Port) -> Option<ValueKind> {
         Type::Color4 => ValueKind::Channels(Number::plain()),
         Type::Vector2 | Type::Vector3 | Type::Vector4 => ValueKind::Vector {
             components: port.ty.width() as u8,
-            number: Number::plain(),
+            number: match length(node, port) {
+                true => Number::length(),
+                false => Number::plain(),
+            },
         },
         Type::String if !port.enumeration.is_empty() => ValueKind::choice(choices()),
         Type::String => ValueKind::Text,
         _ => return None,
     })
 }
+
+/// Whether input `port` of node `node` is a length in the scene's units,
+/// which a format converts as it converts geometry: a distance its
+/// definition fixes no unit for, or one of [`LENGTHS`].
+fn length(node: &str, port: &Port) -> bool {
+    let distance = port.unit_type.as_deref() == Some("distance") && port.unit.is_none();
+    distance || LENGTHS.contains(&(node, port.name.as_str()))
+}
+
+/// The shading models' inputs that are lengths in the scene's units, which
+/// MaterialX's definitions don't say: glTF's volume (in metres in a glTF
+/// file), and OpenPBR's and Standard Surface's depths and scattering
+/// distances (Standard Surface's as the scale of its radius color).
+const LENGTHS: &[(&str, &str)] = &[
+    ("gltf_pbr", "thickness"),
+    ("gltf_pbr", "attenuation_distance"),
+    ("open_pbr_surface", "transmission_depth"),
+    ("open_pbr_surface", "subsurface_radius"),
+    ("standard_surface", "transmission_depth"),
+    ("standard_surface", "subsurface_scale"),
+];
 
 /// MaterialX value `v` as a value of `kind`, the kind a node's input holds
 /// it as, when it is one: what a format reads of a document's value.
@@ -213,8 +239,8 @@ fn zero(kind: &ValueKind) -> Value {
     }
 }
 
-/// What a UI calls definition `def`'s node: MaterialX's label, else its name
-/// in words.
+/// What a UI calls definition `def`'s node: its [`LABELS`] entry, else
+/// MaterialX's label, else its name in words.
 fn label_of(def: &kinogaki_mtlx::NodeDef) -> String {
     let named = LABELS.iter().find(|(n, _)| *n == def.node);
     match (named, &def.label) {
@@ -224,8 +250,12 @@ fn label_of(def: &kinogaki_mtlx::NodeDef) -> String {
     }
 }
 
-/// The nodes whose names run words together, as a UI calls them.
+/// The nodes a UI calls other than their names in words: names that run
+/// words together, and names a host's own node has (the host's Image node
+/// reads a file; MaterialX's `image` samples one). Their types keep
+/// MaterialX's names.
 const LABELS: &[(&str, &str)] = &[
+    ("image", "Image Texture"),
     ("gltf_pbr", "glTF PBR"),
     ("gltf_image", "glTF Image"),
     ("gltf_colorimage", "glTF Color Image"),
@@ -361,12 +391,16 @@ pub(crate) fn words(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kinogaki_value::Unit;
 
     #[test]
     fn materialx_nodes_keep_their_names_and_meaning() {
         let image = def("ND_image_color3").unwrap();
         assert_eq!(image.id.as_str(), "kinogaki.mtlx.image");
-        assert_eq!((&*image.label, &*image.family), ("Image", "Texture 2D"));
+        assert_eq!(
+            (&*image.label, &*image.family),
+            ("Image Texture", "Texture 2D")
+        );
         assert_eq!(image.mtlx().unwrap().name, "ND_image_color3");
         // A file is an image wire alone, with no color space row of its own.
         assert!(matches!(
@@ -413,6 +447,45 @@ mod tests {
             matches!(&mode.kind, ValueKind::Integer { min: 0, max: 2, menu } if menu[1] == "MASK")
         );
         assert!(def("ND_nothing").is_none());
+    }
+
+    #[test]
+    fn lengths_in_the_scenes_units_are_lengths() {
+        let unit = |signature: &str, input: &str| {
+            let def = def(signature).unwrap();
+            match &def.find_input(input).and_then(Input::value).unwrap().kind {
+                ValueKind::Number(n) | ValueKind::Vector { number: n, .. } => n.unit.clone(),
+                other => panic!("{input}: {other:?}"),
+            }
+        };
+        let gltf = "ND_gltf_pbr_surfaceshader";
+        assert_eq!(unit(gltf, "thickness"), Unit::Length);
+        assert_eq!(unit(gltf, "attenuation_distance"), Unit::Length);
+        assert_eq!(unit(gltf, "ior"), Unit::Plain);
+        let open_pbr = "ND_open_pbr_surface_surfaceshader";
+        assert_eq!(unit(open_pbr, "transmission_depth"), Unit::Length);
+        // MaterialX's own distances: in the scene's units unless their
+        // definition fixes one.
+        assert_eq!(
+            unit("ND_tiledimage_color3", "realworldtilesize"),
+            Unit::Length
+        );
+        assert_eq!(
+            unit("ND_dielectric_bsdf", "thinfilm_thickness"),
+            Unit::Plain
+        );
+        assert_eq!(unit(gltf, "iridescence_thickness"), Unit::Plain);
+    }
+
+    #[test]
+    fn every_node_has_a_label_of_its_own() {
+        let mut seen = HashMap::new();
+        for node in library().nodes() {
+            let source = library().signatures(node).next().unwrap();
+            if let Some(other) = seen.insert(label_of(source), node) {
+                panic!("{node} and {other} are both {}", label_of(source));
+            }
+        }
     }
 
     #[test]

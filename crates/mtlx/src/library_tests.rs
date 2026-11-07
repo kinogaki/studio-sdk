@@ -85,6 +85,40 @@ fn kinogakis_gltf_images_read_their_wraps_in_gltfs_order() {
 }
 
 #[test]
+fn kinogakis_definitions_travel_as_the_materialx_ones_they_inherit() {
+    let library = library();
+    let def = |name: &str| library.def(name).unwrap();
+    let in_materialx = |name: &str| library.in_materialx(def(name)).map(|d| d.name.as_str());
+    let colorimage = "ND_kinogaki_gltf_colorimage";
+    assert_eq!(in_materialx(colorimage), Some("ND_gltf_colorimage"));
+    assert_eq!(
+        in_materialx("ND_kinogaki_gltf_image_float"),
+        Some("ND_gltf_image_float_float_1_0")
+    );
+    assert_eq!(
+        in_materialx("ND_kinogaki_surface_unlit"),
+        Some("ND_surface_unlit")
+    );
+    // MaterialX's own stay themselves, inheriting or not.
+    assert_eq!(in_materialx("ND_UsdUVTexture"), Some("ND_UsdUVTexture"));
+    assert_eq!(in_materialx("ND_image_color3"), Some("ND_image_color3"));
+    assert_eq!(
+        in_materialx("ND_kinogaki_phong_surface_surfaceshader"),
+        None
+    );
+    // Read back: the inputs a node holds say which it is.
+    let parent = def("ND_gltf_colorimage");
+    let holding = |inputs: &[&str]| {
+        library
+            .holding(parent, inputs.iter().copied())
+            .map(|d| d.name.as_str())
+    };
+    assert_eq!(holding(&["file", "color"]), Some("ND_gltf_colorimage"));
+    assert_eq!(holding(&["file", "minfilter"]), Some(colorimage));
+    assert_eq!(holding(&["file", "nothing"]), None);
+}
+
+#[test]
 fn every_graph_implementation_resolves_and_type_checks() {
     let library = library();
     let mut graphs = 0;
@@ -175,7 +209,7 @@ fn nodes_resolve_as_materialx_resolves_them() {
 #[ignore = "hand: a measurement, in release"]
 fn hand_run_the_library_reads_in_10_ms() {
     let started = std::time::Instant::now();
-    let library = Library::read(SOURCES).unwrap();
+    let library = Library::read(MATERIALX, KINOGAKI).unwrap();
     let elapsed = started.elapsed();
     println!(
         "MTLX library read: {elapsed:?} for {} definitions",

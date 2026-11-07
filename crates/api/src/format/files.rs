@@ -144,7 +144,8 @@ fn real(path: &Path) -> std::borrow::Cow<'_, Path> {
 
 /// `path` as a document in `folder` names it: relative to the folder (`..`
 /// climbing out of it), `/` between its parts; a relative path as it is; an
-/// absolute one no relative path reaches (another volume) absolute.
+/// absolute one no relative path reaches (another volume, or a folder named
+/// relative) absolute.
 fn relative(path: &Path, folder: &Path) -> String {
     let words = |p: &Path| -> Vec<String> {
         p.components()
@@ -157,12 +158,12 @@ fn relative(path: &Path, folder: &Path) -> String {
             Some(Component::RootDir | Component::Prefix(_))
         )
     };
-    if !rooted(path) || !rooted(folder) {
+    if !rooted(path) {
         return words(path).join("/");
     }
     let (to, from) = (words(path), words(folder));
     let shared = to.iter().zip(&from).take_while(|(a, b)| a == b).count();
-    if shared == 0 {
+    if shared == 0 || !rooted(folder) {
         return path.display().to_string();
     }
     let up = std::iter::repeat_n("..".to_owned(), from.len() - shared);
@@ -228,6 +229,22 @@ mod tests {
             "maps/wood.png"
         );
         assert_eq!(relative(Path::new("/x.png"), Path::new("/")), "x.png");
+        // A document named by a relative path: an absolute file stays as
+        // it is, never `//work/…`.
+        assert_eq!(
+            relative(Path::new("/work/maps/a.png"), Path::new("")),
+            "/work/maps/a.png"
+        );
+    }
+
+    #[test]
+    fn a_document_named_relative_names_an_absolute_file_as_it_reads_back() {
+        // A document in the working folder: its folder is "", whatever the
+        // working folder is.
+        let mut beside = Beside::new(Path::new("scene.usda"));
+        let file = "/kinogaki-nowhere/maps/wood.png";
+        let named = beside.name(&ImageFile::Path(file.into())).unwrap();
+        assert_eq!(named, file);
     }
 
     #[test]

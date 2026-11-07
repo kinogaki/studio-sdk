@@ -35,6 +35,26 @@ use std::fmt::Debug;
 /// values, so its writer writes that tag.
 pub const SRGB_DISPLAY: &str = "srgb_rec709_display";
 
+/// `v`, a color a conversion gave, to twelve significant digits (eleven
+/// places below 1; a zero stays zero, not a conversion's 10⁻¹⁸): what a
+/// writer writes of a color it converted out of the working space, so a
+/// color read and written back is the number it was, not one the
+/// conversion there and back moved in its last bits.
+///
+/// ```
+/// use kinogaki_studio_api::color::settled;
+/// assert_eq!(settled(0.9999999999999963), 1.0);
+/// assert_eq!(settled(123.456_789_012_345_6), 123.456_789_012);
+/// ```
+pub fn settled(v: f64) -> f64 {
+    if !v.is_finite() {
+        return v;
+    }
+    let scale = 10f64.powi(11 - v.abs().max(1.0).log10().floor() as i32);
+    // + 0.0: never a negative zero.
+    (v * scale).round() / scale + 0.0
+}
+
 /// The host's color management.
 pub trait ColorService: Send + Sync + Debug {
     /// The project's working space, by its name in the configuration.
@@ -89,5 +109,20 @@ pub trait ColorService: Send + Sync + Debug {
     /// lacks), with what stands in; none by default.
     fn problem(&self) -> Option<Diagnostic> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::settled;
+
+    #[test]
+    fn a_converted_color_settles_where_a_conversion_left_its_last_bits() {
+        assert_eq!(settled(0.9999999999999963), 1.0);
+        assert_eq!(settled(1.0000000000000038), 1.0);
+        let zero = settled(-3.4694469519500004e-18);
+        assert!(zero == 0.0 && zero.is_sign_positive(), "{zero}");
+        assert_eq!(settled(0.25), 0.25);
+        assert_eq!(settled(123.456_789_012_345_6), 123.456_789_012);
     }
 }

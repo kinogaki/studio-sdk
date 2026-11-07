@@ -13,10 +13,10 @@ use crate::xml::{self, Element};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
 
-/// The documents [`library`] reads, in order: MaterialX's (stdlib first,
-/// as its definitions are what the others' graphs are made of), then
-/// Kinogaki's.
-const SOURCES: &[(&str, &str)] = &[
+/// MaterialX's documents [`library`] reads, in order: stdlib first, as its
+/// definitions are what the others' graphs are made of. Kinogaki's
+/// ([`KINOGAKI`]) follow.
+const MATERIALX: &[(&str, &str)] = &[
     (
         "stdlib_defs",
         include_str!("../libraries/stdlib/stdlib_defs.mtlx"),
@@ -135,6 +135,11 @@ const SOURCES: &[(&str, &str)] = &[
         "lights_defs",
         include_str!("../libraries/lights/lights_defs.mtlx"),
     ),
+];
+
+/// Kinogaki's documents (`kinogaki/`): what MaterialX has no home for, read
+/// after MaterialX's, and carried by a document using one.
+pub(crate) const KINOGAKI: &[(&str, &str)] = &[
     (
         "kinogaki_defs",
         include_str!("../kinogaki/kinogaki_defs.mtlx"),
@@ -149,7 +154,21 @@ const SOURCES: &[(&str, &str)] = &[
 /// use, once a process.
 pub fn library() -> &'static Library {
     static LIBRARY: OnceLock<Library> = OnceLock::new();
-    LIBRARY.get_or_init(|| Library::read(SOURCES).expect("the vendored libraries read"))
+    LIBRARY.get_or_init(|| Library::read(MATERIALX, KINOGAKI).expect("the vendored libraries read"))
+}
+
+/// The top-level elements of `documents` (each a name and a document's
+/// text), in order.
+fn top_elements(documents: &[(&str, &'static str)]) -> Result<Vec<Element>, String> {
+    let mut elements = Vec::new();
+    for (name, text) in documents {
+        let root = xml::parse_static(text).map_err(|why| format!("{name}: {why}"))?;
+        elements.extend(root.children.into_iter().filter_map(|c| match c {
+            xml::Child::Element(e) => Some(e),
+            _ => None,
+        }));
+    }
+    Ok(elements)
 }
 
 /// One input or output of a definition.
@@ -188,6 +207,9 @@ pub struct Port {
     pub soft_max: Option<Value>,
     /// The kind of unit its value is in (`distance`, `angle`), when it has one.
     pub unit_type: Option<String>,
+    /// The unit its value is in (`nanometer`, `degree`), when its definition
+    /// fixes one; a value of a unit type without one is in the scene's.
+    pub unit: Option<String>,
 }
 
 impl Port {
@@ -220,6 +242,7 @@ impl Port {
             soft_min: value("uisoftmin"),
             soft_max: value("uisoftmax"),
             unit_type: e.attr("unittype").map(str::to_owned),
+            unit: e.attr("unit").map(str::to_owned),
             ty,
         }
     }
@@ -320,6 +343,10 @@ pub struct Library {
     defs: Vec<Arc<NodeDef>>,
     by_name: HashMap<String, usize>,
     by_node: BTreeMap<String, Vec<usize>>,
+    /// Each definition's parent, the one it inherits.
+    parents: Vec<Option<usize>>,
+    /// Whether each definition is Kinogaki's.
+    kinogaki: Vec<bool>,
     /// The documents' elements, which graphs are read from.
     elements: Vec<Element>,
     /// Each definition's graph element, by its index in `elements`, when a
@@ -331,21 +358,21 @@ pub struct Library {
 }
 
 impl Library {
-    /// The library `sources` (each a name and a document's text) define.
-    pub(crate) fn read(sources: &[(&str, &'static str)]) -> Result<Library, String> {
-        let mut elements: Vec<Element> = Vec::new();
-        for (name, text) in sources {
-            let root = xml::parse_static(text).map_err(|why| format!("{name}: {why}"))?;
-            let children = root.children.into_iter().filter_map(|c| match c {
-                xml::Child::Element(e) => Some(e),
-                _ => None,
-            });
-            elements.extend(children);
-        }
+    /// The library MaterialX's documents `materialx` and Kinogaki's
+    /// `kinogaki` (each a name and a document's text) define.
+    pub(crate) fn read(
+        materialx: &[(&str, &'static str)],
+        kinogaki: &[(&str, &'static str)],
+    ) -> Result<Library, String> {
+        let mut elements = top_elements(materialx)?;
+        let kinogaki_from = elements.len();
+        elements.extend(top_elements(kinogaki)?);
         let mut library = Library {
             defs: Vec::new(),
             by_name: HashMap::new(),
             by_node: BTreeMap::new(),
+            parents: Vec::new(),
+            kinogaki: Vec::new(),
             elements: Vec::new(),
             sources: Vec::new(),
             graphs: Vec::new(),
@@ -369,6 +396,7 @@ impl Library {
                         .or_default()
                         .push(index);
                     parents.push(e.attr("inherit").map(str::to_owned));
+                    library.kinogaki.push(at >= kinogaki_from);
                     library.defs.push(Arc::new(def));
                 }
                 "nodegraph" => {
@@ -409,6 +437,7 @@ impl Library {
     /// Each inheriting definition given its parent's inputs and outputs
     /// first (parents before children, however deep).
     fn inherit(&mut self, parents: &[Option<String>]) -> Result<(), String> {
+        self.parents = vec![None; self.defs.len()];
         let mut done = vec![false; self.defs.len()];
         for at in 0..self.defs.len() {
             self.inherit_one(at, parents, &mut done, 0)?;
@@ -437,6 +466,7 @@ impl Library {
             return Err(format!("{name}'s inheritance loops"));
         }
         self.inherit_one(from, parents, done, depth + 1)?;
+        self.parents[at] = Some(from);
         let parent = self.defs[from].clone();
         let def = Arc::make_mut(&mut self.defs[at]);
         let mut inputs = parent.inputs.clone();
@@ -456,6 +486,41 @@ impl Library {
     /// Definition `name` (`ND_image_color3`).
     pub fn def(&self, name: &str) -> Option<&Arc<NodeDef>> {
         self.by_name.get(name).map(|&at| &self.defs[at])
+    }
+
+    /// The definition an application knowing MaterialX's libraries alone
+    /// knows a node of `def` by: `def` when they hold it; for one of
+    /// Kinogaki's, the MaterialX definition it inherits, its own inputs
+    /// beside (`ND_kinogaki_gltf_colorimage` is `ND_gltf_colorimage` with
+    /// glTF's minification filter); none for one inheriting none
+    /// (`ND_kinogaki_phong_surface_surfaceshader`).
+    pub fn in_materialx(&self, def: &NodeDef) -> Option<&Arc<NodeDef>> {
+        let mut at = *self.by_name.get(&def.name)?;
+        while self.kinogaki[at] {
+            at = self.parents[at]?;
+        }
+        Some(&self.defs[at])
+    }
+
+    /// The definition a node of `def` holding `inputs` is: `def` when it
+    /// declares every one, else the one of Kinogaki's that
+    /// [`in_materialx`](Self::in_materialx) gives as `def` and declares them
+    /// (a node written as MaterialX's, read back); none when no definition
+    /// declares them.
+    pub fn holding<'n>(
+        &self,
+        def: &Arc<NodeDef>,
+        inputs: impl IntoIterator<Item = &'n str> + Clone,
+    ) -> Option<&Arc<NodeDef>> {
+        let declares = |d: &NodeDef| inputs.clone().into_iter().all(|i| d.input(i).is_some());
+        let &at = self.by_name.get(&def.name)?;
+        if declares(def) {
+            return Some(&self.defs[at]);
+        }
+        (self.defs.iter().enumerate())
+            .filter(|(k, d)| self.kinogaki[*k] && declares(d))
+            .find(|(_, d)| self.in_materialx(d).is_some_and(|m| m.name == def.name))
+            .map(|(_, d)| d)
     }
 
     /// Node `node`'s definitions, in the order the library declares them.

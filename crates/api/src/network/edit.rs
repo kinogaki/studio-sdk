@@ -271,6 +271,104 @@ impl NetworkSeed {
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
+
+    /// Every length its MaterialX nodes hold (an input of a
+    /// [`Length`](crate::value::Unit::Length): glTF PBR's thickness, a
+    /// transmission depth) times `by`: a material read from or written to
+    /// a file of other units than the project's, converted as its geometry
+    /// is. A length a node drives is converted where its arithmetic scales
+    /// it: the factor of a glTF texture, or the value a `multiply` takes,
+    /// feeding it alone through the nodes that pick a channel (`extract`,
+    /// `convert`, `dot`). How many driven lengths it couldn't convert (a
+    /// texture of no factor drives one).
+    pub fn scale_lengths(&mut self, by: f64) -> usize {
+        use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
+        if by == 1.0 {
+            return 0;
+        }
+        let def_of = |node: &NewNode| match node.parameters.get(SIGNATURE) {
+            Some(Value::Choice(signature)) => def(signature),
+            _ => None,
+        };
+        for node in &mut self.nodes {
+            let Some(def) = def_of(node) else { continue };
+            for (name, value) in &mut node.parameters {
+                if is_length(&def, name) {
+                    scaled(value, by);
+                }
+            }
+        }
+        let driven: Vec<usize> = (self.wires.iter())
+            .filter(|w| def_of(&self.nodes[w.to]).is_some_and(|d| is_length(&d, &w.input)))
+            .map(|w| w.from)
+            .collect();
+        let mut unconverted = 0;
+        for from in driven {
+            match self.scale_of(from) {
+                Some((at, input)) => {
+                    let node = &mut self.nodes[at];
+                    let default = (def_of(node))
+                        .and_then(|d| Some(d.find_input(&input)?.value()?.value.clone()));
+                    if let Some(held) = node.parameters.get_mut(&input) {
+                        scaled(held, by);
+                    } else if let Some(mut held) = default {
+                        scaled(&mut held, by);
+                        node.parameters.insert(input, held);
+                    }
+                }
+                None => unconverted += 1,
+            }
+        }
+        unconverted
+    }
+
+    /// The node and input holding the constant that scales what node `at`
+    /// gives, as [`scale_lengths`](Self::scale_lengths) finds it.
+    fn scale_of(&self, mut at: usize) -> Option<(usize, String)> {
+        use kinogaki_render_api::material::mtlx::{SIGNATURE, def};
+        for _ in 0..self.nodes.len() {
+            if self.wires.iter().filter(|w| w.from == at).count() != 1 {
+                return None;
+            }
+            let Some(Value::Choice(signature)) = self.nodes[at].parameters.get(SIGNATURE) else {
+                return None;
+            };
+            let def = def(signature)?;
+            let wired = |input: &str| self.wires.iter().find(|w| w.to == at && w.input == input);
+            match def.mtlx()?.node.as_str() {
+                "extract" | "convert" | "dot" => at = wired("in")?.from,
+                "multiply" => {
+                    let constant = ["in1", "in2"].into_iter().find(|i| wired(i).is_none())?;
+                    return Some((at, constant.to_owned()));
+                }
+                _ => return def.find_input("factor").map(|_| (at, "factor".to_owned())),
+            }
+        }
+        None
+    }
+}
+
+/// Whether input `name` of `def` holds a length in the scene's units.
+fn is_length(def: &kinogaki_render_api::NodeDef, name: &str) -> bool {
+    use crate::value::{Unit, ValueKind};
+    match def
+        .find_input(name)
+        .and_then(|i| i.value())
+        .map(|p| &p.kind)
+    {
+        Some(ValueKind::Number(n) | ValueKind::Vector { number: n, .. }) => n.unit == Unit::Length,
+        _ => false,
+    }
+}
+
+/// `value`'s numbers times `by`.
+fn scaled(value: &mut Value, by: f64) {
+    match value {
+        Value::Number(n) => *n *= by,
+        Value::Numbers(n) => n.iter_mut().for_each(|n| *n *= by),
+        Value::Color(c) => c.iter_mut().for_each(|n| *n *= by),
+        _ => {}
+    }
 }
 
 impl From<&kinogaki_render_api::MaterialNetwork> for NetworkSeed {
@@ -463,6 +561,66 @@ mod tests {
         assert_eq!(signature(&made), signature(&seed.nodes[0]));
         assert_eq!(made.parameters.len(), 1, "its signature alone");
         assert!(NewNode::materialx("ND_nothing").is_none());
+    }
+
+    /// A material's lengths scale with a change of units, and nothing else
+    /// does.
+    #[test]
+    fn a_seeds_lengths_scale_and_nothing_else() {
+        let mut seed = NetworkSeed::default();
+        let surface = NewNode::materialx("ND_gltf_pbr_surfaceshader")
+            .unwrap()
+            .with("thickness", 2.0)
+            .with("attenuation_distance", 0.5)
+            .with("ior", 1.5);
+        seed.node(surface);
+        let tiled = NewNode::materialx("ND_tiledimage_color3")
+            .unwrap()
+            .with("realworldtilesize", crate::Value::Numbers(vec![1.0, 2.0]))
+            .with("uvtiling", crate::Value::Numbers(vec![3.0, 3.0]));
+        seed.node(tiled);
+        seed.node(NewNode::new(NodeTypeId::declared("acme.engine.surface")).with("depth", 4.0));
+        // Lengths textures drive: a glTF texture's factor through the
+        // channel it picks, a multiply's value, and a plain image's, which
+        // has none to scale.
+        let open_pbr = seed.node(NewNode::materialx("ND_open_pbr_surface_surfaceshader").unwrap());
+        let texture = seed.node(
+            NewNode::materialx("ND_gltf_image_color3_color3_1_0")
+                .unwrap()
+                .with("factor", crate::Value::Color([1.0, 0.5, 1.0])),
+        );
+        let pick = seed.node(NewNode::materialx("ND_extract_color3").unwrap());
+        seed.wire(texture, "out", pick, "in");
+        seed.wire(pick, "out", open_pbr, "transmission_depth");
+        let image = seed.node(NewNode::materialx("ND_image_float").unwrap());
+        let times = seed.node(NewNode::materialx("ND_multiply_float").unwrap());
+        seed.wire(image, "out", times, "in1");
+        seed.wire(times, "out", open_pbr, "subsurface_radius");
+        let bare = seed.node(NewNode::materialx("ND_image_float").unwrap());
+        seed.wire(bare, "out", 0, "thickness");
+        assert_eq!(seed.scale_lengths(10.0), 1, "the bare image's");
+        assert_eq!(
+            seed.nodes[texture].parameters["factor"],
+            crate::Value::Color([10.0, 5.0, 10.0])
+        );
+        assert_eq!(
+            seed.nodes[times].parameters["in2"],
+            crate::Value::Number(10.0)
+        );
+        let held = |at: usize, name: &str| seed.nodes[at].parameters[name].clone();
+        assert_eq!(held(0, "thickness"), crate::Value::Number(20.0));
+        assert_eq!(held(0, "attenuation_distance"), crate::Value::Number(5.0));
+        assert_eq!(held(0, "ior"), crate::Value::Number(1.5));
+        assert_eq!(
+            held(1, "realworldtilesize"),
+            crate::Value::Numbers(vec![10.0, 20.0])
+        );
+        assert_eq!(held(1, "uvtiling"), crate::Value::Numbers(vec![3.0, 3.0]));
+        assert_eq!(
+            held(2, "depth"),
+            crate::Value::Number(4.0),
+            "an engine's own"
+        );
     }
 
     /// What a material's seed starts reads back as that material; an
