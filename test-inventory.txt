@@ -499,6 +499,7 @@ kinogaki-studio-api/lib test format::files::tests::paths_are_relative_to_the_doc
 kinogaki-studio-api/lib test format::input::tests::a_file_is_read_as_it_is_asked_for_and_a_missing_one_says_so
 kinogaki-studio-api/lib test format::input::tests::a_kept_file_is_lent_and_held_without_a_copy
 kinogaki-studio-api/lib test format::input::tests::bytes_in_memory_are_lent_and_their_head_is_at_most_its_length
+kinogaki-studio-api/lib test format::input::tests::only_a_regular_file_is_read
 kinogaki-studio-api/lib test format::options::tests::a_node_holds_a_formats_options_in_rows_of_its_id
 kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values
 kinogaki-studio-api/lib test format::tests::a_writer_has_no_options_by_default_whatever_its_reading_has

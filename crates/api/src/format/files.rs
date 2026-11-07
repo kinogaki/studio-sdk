@@ -27,7 +27,46 @@ pub use named::Named;
 use crate::Error;
 use kinogaki_geometry::image::{EmbeddedFile, ImageFile};
 use std::collections::HashMap;
+use std::io::Read as _;
 use std::path::{Component, Path, PathBuf};
+
+/// The regular file at `path`, open, and its size then: looked at before
+/// it is opened (opening a pipe waits for a writer) and again once open. A
+/// device, a pipe or a folder is never read, whoever names it (a file being
+/// read, a project): one could block, or never end.
+///
+/// # Errors
+/// It isn't there ([`Missing`](crate::ErrorKind::Missing)), isn't a regular
+/// file, or can't be opened; the message names it.
+pub fn regular(path: &Path) -> Result<(std::fs::File, u64), Error> {
+    let failed = |e: std::io::Error| {
+        let why = format_args!("{}: {e}", path.display());
+        match e.kind() {
+            std::io::ErrorKind::NotFound => Error::missing(why),
+            _ => Error::invalid(why),
+        }
+    };
+    let regular = |meta: std::fs::Metadata| match meta.is_file() {
+        true => Ok(meta.len()),
+        false => Err(Error::invalid(format_args!(
+            "{}: not a regular file",
+            path.display()
+        ))),
+    };
+    regular(std::fs::metadata(path).map_err(failed)?)?;
+    let file = std::fs::File::open(path).map_err(failed)?;
+    let len = regular(file.metadata().map_err(failed)?)?;
+    Ok((file, len))
+}
+
+/// The `len` bytes of `file`, opened at `path` by [`regular`]: no more than
+/// it held when it was opened.
+pub(crate) fn whole(file: std::fs::File, len: u64, path: &Path) -> Result<Vec<u8>, Error> {
+    let mut bytes = Vec::with_capacity(usize::try_from(len).unwrap_or(0));
+    (file.take(len).read_to_end(&mut bytes))
+        .map_err(|e| Error::invalid(format_args!("{}: {e}", path.display())))?;
+    Ok(bytes)
+}
 
 /// Where the image files a document names go, as one write names them.
 #[derive(Debug)]

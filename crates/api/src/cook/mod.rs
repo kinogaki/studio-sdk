@@ -437,8 +437,8 @@ pub trait NodeType: Any + Send + Sync {
     /// recooks when it differs. Core doesn't ask it on every cook: it asks
     /// when the parameters or the project change, when the node is told to
     /// reload, and when the outside may have changed unseen (a project
-    /// opens, the window is focused again). `None` by default: nothing
-    /// outside.
+    /// opens, the window is focused again, the system reports a file the
+    /// project reads changed on disk). `None` by default: nothing outside.
     fn external(&self, parameters: &Parameters, project: Option<&Project<'_>>) -> Option<Stamp> {
         let _ = (parameters, project);
         None

@@ -6,7 +6,6 @@ use crate::format::{FormatOptions, Input, Reading};
 use crate::{Diagnostic, Error};
 use kinogaki_geometry::image::{EmbeddedFile, ImageFile};
 use std::collections::BTreeSet;
-use std::io::Read as _;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -150,20 +149,10 @@ impl Named {
     /// It can't be read, isn't a regular file, or is more than the budget
     /// has left; the message names it.
     pub fn read(&self, path: &Path) -> Result<Vec<u8>, Error> {
-        let failed =
-            |why: &dyn std::fmt::Display| Error::invalid(format_args!("{}: {why}", path.display()));
-        let regular = |meta: std::fs::Metadata| match meta.is_file() {
-            true => Ok(meta.len()),
-            false => Err(failed(&"not a regular file")),
-        };
-        // Looked at before it is opened: opening a pipe waits for a writer.
-        regular(std::fs::metadata(path).map_err(|e| failed(&e))?)?;
-        let file = std::fs::File::open(path).map_err(|e| failed(&e))?;
-        let len = regular(file.metadata().map_err(|e| failed(&e))?)?;
-        self.budget.take(len).map_err(|e| failed(&e))?;
-        let mut bytes = Vec::with_capacity(usize::try_from(len).unwrap_or(0));
-        (file.take(len).read_to_end(&mut bytes)).map_err(|e| failed(&e))?;
-        Ok(bytes)
+        let (file, len) = super::regular(path)?;
+        (self.budget.take(len))
+            .map_err(|e| Error::invalid(format_args!("{}: {e}", path.display())))?;
+        super::whole(file, len, path)
     }
 
     /// The picture `name` names relative to `from` (as

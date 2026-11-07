@@ -1,4 +1,5 @@
 //! [`Input`]: the file a format reads, on disk or held in memory.
+use super::files::{regular, whole};
 use crate::Error;
 use kinogaki_geometry::image::EmbeddedFile;
 use std::borrow::Cow;
@@ -99,20 +100,21 @@ impl<'a> Input<'a> {
             Source::Embedded(file) => file.bytes()[..file.bytes().len().min(HEAD)].to_vec(),
             Source::File(path) => {
                 let mut head = Vec::with_capacity(HEAD);
-                let read = std::fs::File::open(path)
-                    .and_then(|file| file.take(HEAD as u64).read_to_end(&mut head));
-                read.map_or_else(|_| Vec::new(), |_| head)
+                let read = (regular(path).ok())
+                    .and_then(|(file, _)| file.take(HEAD as u64).read_to_end(&mut head).ok());
+                read.map_or_else(Vec::new, |_| head)
             }
         })
     }
 
-    /// All of its bytes: read from disk each time they are asked for, or
-    /// lent from memory.
+    /// All of its bytes: read from disk each time they are asked for (a
+    /// regular file alone, to the size it had when opened: a pipe or a
+    /// device is never read, [`regular`]), or lent from memory.
     ///
     /// # Errors
     /// The file can't be read: [`Missing`](crate::ErrorKind::Missing) when
-    /// there is no such file, else [`Invalid`](crate::ErrorKind::Invalid);
-    /// the message names it.
+    /// there is no such file, else [`Invalid`](crate::ErrorKind::Invalid)
+    /// (one not a regular file among them); the message names it.
     pub fn bytes(&self) -> Result<Cow<'a, [u8]>, Error> {
         match self.source {
             Source::Memory(bytes) => Ok(Cow::Borrowed(bytes)),
@@ -137,15 +139,10 @@ impl<'a> Input<'a> {
     }
 }
 
-/// The file at `path`, read whole.
+/// The regular file at `path`, read whole.
 fn read(path: &Path) -> Result<Vec<u8>, Error> {
-    std::fs::read(path).map_err(|e| {
-        let why = format_args!("{}: {e}", path.display());
-        match e.kind() {
-            std::io::ErrorKind::NotFound => Error::missing(why),
-            _ => Error::invalid(why),
-        }
-    })
+    let (file, len) = regular(path)?;
+    whole(file, len, path)
 }
 
 /// What a message names it by: its path, else its name.
@@ -180,6 +177,21 @@ mod tests {
         let why = missing.bytes().unwrap_err();
         assert_eq!(why.kind, crate::ErrorKind::Missing);
         assert!(why.message().starts_with(&gone.display().to_string()));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A device or a folder is never read, however it is asked for: only a
+    /// regular file is (a pipe, which opening would wait on, alike).
+    #[test]
+    fn only_a_regular_file_is_read() {
+        let dir = std::env::temp_dir().join(format!("kinogaki-regular-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for path in [Path::new("/dev/null"), &dir] {
+            let input = Input::file(path);
+            let why = input.bytes().unwrap_err();
+            assert!(why.message().contains("not a regular file"), "{why:?}");
+            assert!(input.held().is_err() && input.head().is_empty());
+        }
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
