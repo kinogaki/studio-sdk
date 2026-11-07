@@ -64,8 +64,7 @@ pub enum NetworkKind {
 pub struct Adopted {
     /// The node type (`kinogaki.mesh.import`).
     pub node_type: NodeTypeId,
-    /// The heading Tab and the menus list it under in this context
-    /// ("Model").
+    /// The heading Tab lists it under in this context ("Model").
     pub section: String,
 }
 

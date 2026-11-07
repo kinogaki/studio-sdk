@@ -17,7 +17,7 @@ pub struct LevelSpec {
     pub id: String,
     /// What the row's tooltip calls it.
     pub label: String,
-    /// Its icon, by name (Studio's or a package's).
+    /// Its icon, by its name in Studio's icon set.
     pub icon: String,
     /// What it selects, and how a pick grows there (Mesh's Pieces: the
     /// Primitive domain, grown to connected pieces).

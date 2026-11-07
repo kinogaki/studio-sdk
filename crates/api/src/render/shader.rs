@@ -18,7 +18,7 @@ pub const SHADING: ContextId = ContextId::declared("kinogaki.core.shading");
 /// Core's Material node: what holds a shading network ([`SHADING`]).
 pub const MATERIAL: NodeTypeId = NodeTypeId::declared("kinogaki.core.material");
 
-/// A starting material an engine offers in Tab and the menus: a Material node
+/// A starting material an engine offers in Tab: a Material node
 /// labelled `label` with `inside` seeded in it, displayed, listed under
 /// `family` and found by `aliases`.
 pub fn material_creation(

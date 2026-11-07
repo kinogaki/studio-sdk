@@ -2,7 +2,7 @@
 
 This walkthrough builds a plugin that adds a Box node to Kinogaki Studio: a box data type that shows in the viewport, renders and saves; a Box node that makes one from its size and center, with a handle Studio drags; and the Boxes context and object kind that make the node reachable from Tab. It ends with the plugin built against Studio's plugin kit and installed.
 
-[`examples/box-node`](../examples/box-node) is the finished plugin, under the `example` vendor and with an icon of its own. Here it is `acme`'s. [ARCHITECTURE.md](ARCHITECTURE.md) explains each part in more depth.
+[`examples/box-node`](../examples/box-node) is the finished plugin, under the `example` vendor. Here it is `acme`'s. [ARCHITECTURE.md](ARCHITECTURE.md) explains each part in more depth.
 
 You need the Rust toolchain this repository pins (`rust-toolchain.toml`) and, for the last step, the plugin kit of the Studio release you install into.
 
@@ -346,7 +346,7 @@ impl ObjectCodec for BoxesKind {
 }
 ```
 
-`"cube"` is one of Studio's icons. A package can add its own (`Package::with_icon`), named under its id (`"acme.boxes/box"`); see [Icons](ARCHITECTURE.md#icons).
+`"cube"` is one of Studio's icons; see [Icons](ARCHITECTURE.md#icons).
 
 ### Loops
 

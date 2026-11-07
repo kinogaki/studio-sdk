@@ -42,8 +42,7 @@ pub trait ObjectKindSpec: Send + Sync {
     /// What the outliner and menus call it ("Mesh").
     fn label(&self) -> &str;
 
-    /// Its icon's name: Studio's (`"cube"`) or a package's
-    /// (`"acme.trees/leaf"`, [`icon`](crate::icon)).
+    /// Its icon's name in Studio's icon set (`"cube"`).
     fn icon(&self) -> &str;
 
     /// Whether its objects have a placement in the scene (Mesh and CAD

@@ -56,8 +56,8 @@ export_package!(package);
 
 - `id`, `label` and `extensions` say what Studio's file dialogs offer; `detects` (no by default) recognizes a file by its first bytes where the extension isn't enough.
 - `produces` lists the data types a read makes: the standard ones' ids are `const`, so the list is a constant. A read gives what `Reading::wants` names when it names one (a File node's type).
-- `options` gives every option with its default, by name, and `schema(chosen, purpose)` the rows of the Import dialog (`Purpose::Objects`) or of one value read (`Purpose::Value`: a File node's, which leaves out options that shape objects). `format::options` holds the rows most dialogs show (`scale`, `embed`: Embed Textures, `toggle`) and reads a typed option (`option`). The example has two: Scale, and Embed Textures.
-- `read` and `writer`, below. A format saves its options itself (`write_options`, `read_options`; by default one field per option).
+- `options` gives every option with its default, by name, and `schema(chosen, purpose)` its rows: File ▸ Import's (`Purpose::Objects`), which Studio shows on Settings ▸ Import (File ▸ Import opens no dialog of its own and reads with what is set there), or one value's (`Purpose::Value`: a File node's, which leaves out options that shape objects). `format::options` holds the rows most formats show (`scale`, `embed`: Embed Textures, `toggle`) and reads a typed option (`option`). The example has two: Scale, and Embed Textures.
+- `read` and `writer`, below. The host saves the options, one field per option (`format::options::write`, read back strictly by `format::options::read`), so a format holds no codec of its own for them.
 
 ## Reading
 
@@ -185,7 +185,7 @@ impl FormatWriter for Points {
 - `accepts` lists the data types it writes; other items' values are skipped, their groups kept. A writer of polygons alone asks the host for any other value as polygons (`Writing::meshed`, the installed mesher).
 - `write(path, items, writing, options)` writes `path` and nothing else it didn't make, whole or not at all: `format::files::replace` writes a new file beside and renames it over `path` once it is whole. The pictures a document names go through `format::files::Beside`: a file on disk by its path relative to the document, an embedded one written into `<stem>_textures/` beside it, once for equal bytes, never over a file of other bytes. Names a write makes unique (keys, files) are a `format::Unique`'s.
 - It places each item by its placement after its parents' (`FileItem::placement`, `parent`) into the file's space, converts lengths and colors out of the project's, calls `writing.check()`, and returns its warnings for what it wrote with loss or left out ("only polygons are written"), which Export shows; an `Err` is a write that failed.
-- Its own options and Export dialog are `FormatWriter::options` and `schema`; a writer never sees the format's reading options.
+- Its own options are `FormatWriter::options`, and `schema` their rows, which Studio shows on Settings ▸ Export; every file Studio writes with it (File ▸ Export, a final render's, a picture of the Canvas) is written with what is set there, else the defaults. A writer never sees the format's reading options.
 
 ## Image formats
 

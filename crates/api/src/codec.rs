@@ -32,8 +32,8 @@ pub trait DataCodec: Send + Sync {
     ///
     /// `base`, when given, is a value of the same type already written
     /// elsewhere in the project that `data` was derived from (a held base
-    /// of an edit): a codec may store only what differs, as a mesh that
-    /// only moved points stores no topology.
+    /// of an edit): a codec may store only what differs. The standard
+    /// codecs ignore it and write the whole value.
     fn write(
         &self,
         data: &Data,

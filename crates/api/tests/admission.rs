@@ -1,17 +1,14 @@
 //! Registry admission refuses a package naming what isn't there: a port's
 //! data type, a context a node type is offered in or an object kind holds,
-//! a node type adopted twice, a malformed or
-//! doubled icon, and a package icon no package carries.
+//! and a node type adopted twice.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
-use kinogaki_studio_api::icon::Icon;
 use kinogaki_studio_api::network::NetworkContext;
 use kinogaki_studio_api::*;
 use std::sync::Arc;
 
 const TREES: &str = "acme.trees.network";
 const WOOD: &str = "acme.trees.wood";
-const SQUARE: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11" fill="#fff"><rect x="3" y="3" width="5" height="5"/></svg>"##;
 
 fn trees() -> PackageId {
     PackageId::declared("acme.trees")
@@ -21,12 +18,10 @@ fn context(id: &'static str) -> NetworkContext {
     NetworkContext::new(ContextId::declared(id), "Trees", "trees")
 }
 
-/// A node type offered in `offered`, its one output of `data`, shown by
-/// icon `icon`.
+/// A node type offered in `offered`, its one output of `data`.
 struct Grow {
     offered: &'static str,
     data: &'static str,
-    icon: &'static str,
 }
 
 impl NodeType for Grow {
@@ -35,7 +30,6 @@ impl NodeType for Grow {
     }
     fn description(&self) -> Description {
         Description::new("Grow")
-            .icon(self.icon)
             .context(ContextId::declared(self.offered))
             .output(Port::new("out", "Out", DataTypeId::declared(self.data)))
     }
@@ -45,11 +39,7 @@ impl NodeType for Grow {
 }
 
 fn grow(offered: &'static str, data: &'static str) -> Grow {
-    Grow {
-        offered,
-        data,
-        icon: "",
-    }
+    Grow { offered, data }
 }
 
 /// A data type the toy packages register: no facets, never saved.
@@ -154,24 +144,18 @@ fn package(more: impl FnOnce(Package) -> Package) -> Package {
 #[test]
 fn a_well_formed_package_registers() {
     let whole = package(|p| {
-        p.with_node_type(Grow {
-            icon: "acme.trees/leaf",
-            ..grow(TREES, WOOD)
-        })
-        .with_object_kind(Grove {
+        p.with_node_type(grow(TREES, WOOD)).with_object_kind(Grove {
             holds: TREES,
             icon: "cube",
         })
-        .with_icon(Icon::new("leaf", SQUARE))
     });
     let mut registry = Registry::new();
     registry.register(whole).unwrap();
-    // A later package shows the trees' icon, holds their context and
-    // makes their data type.
+    // A later package holds their context and makes their data type.
     let moss =
         Package::new(PackageId::declared("acme.moss"), "Moss").with_object_kind(MossKind(Grove {
             holds: TREES,
-            icon: "acme.trees/leaf",
+            icon: "cube",
         }));
     registry.register(moss).unwrap();
 }
@@ -272,45 +256,4 @@ fn a_context_adopts_a_node_type_once() {
     assert_eq!(Registry::new().register(twice), refused);
     let once = Package::new(trees(), "Trees").with_context(context(TREES).adopts(import, "Model"));
     assert!(Registry::new().register(once).is_ok());
-}
-
-#[test]
-fn icons_are_well_formed_named_once_and_found() {
-    let bad = package(|p| p.with_icon(Icon::new("Leaf", SQUARE)));
-    assert_eq!(
-        Registry::new().register(bad),
-        Err(Error::refused(format_args!(
-            "{}'s icon: \"Leaf\" is not an icon name: a lowercase letter, then lowercase \
-             letters, digits and `-`, at most 64 bytes",
-            trees()
-        )))
-    );
-    let twice = package(|p| {
-        p.with_icon(Icon::new("leaf", SQUARE))
-            .with_icon(Icon::new("leaf", SQUARE))
-    });
-    assert_eq!(
-        Registry::new().register(twice),
-        Err(Error::refused(format_args!(
-            "{}'s icon: a second icon is named \"leaf\"",
-            trees()
-        )))
-    );
-    for missing in ["acme.trees/bark", "acme.moss/leaf"] {
-        let shown = package(|p| {
-            p.with_icon(Icon::new("leaf", SQUARE)).with_node_type(Grow {
-                icon: missing,
-                ..grow(TREES, WOOD)
-            })
-        });
-        assert_eq!(
-            Registry::new().register(shown),
-            Err(Error::refused(format_args!(
-                "{package}'s {by} shows icon {icon}, which no package carries",
-                package = trees(),
-                by = "acme.trees.grow",
-                icon = missing
-            )))
-        );
-    }
 }

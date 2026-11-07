@@ -240,9 +240,7 @@ impl Registry {
 
     /// Every context `package` names is declared, by it or before it
     /// (where its node types are offered, what its object kinds hold),
-    /// each of its contexts adopts a node type at most once, its icons are well formed ([`Icon::check`](crate::icon::Icon::check)) and named once,
-    /// and every package icon it names (`"acme.trees/leaf"`) is one it or
-    /// a registered package carries.
+    /// and each of its contexts adopts a node type at most once.
     fn check_names(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         let context = |by: &'static str, context: ContextId| {
@@ -272,42 +270,16 @@ impl Registry {
                 }
             }
         }
-        let mut names = BTreeSet::new();
-        for icon in &package.icons {
-            icon.check()
-                .map_err(|e| Error::refused(format_args!("{id}'s icon: {e}")))?;
-            if !names.insert(icon.name.as_str()) {
-                let name = &icon.name;
-                return Err(Error::refused(format_args!(
-                    "{id}'s icon: a second icon is named {name:?}"
-                )));
-            }
-        }
-        let icon = |by: &'static str, name: &str| match name.split_once('/') {
-            Some((p, n)) if p == id.as_str() && names.contains(n) => Ok(()),
-            Some((p, n)) if (self.icons.iter()).any(|(q, s)| q.as_str() == p && s.contains(n)) => {
-                Ok(())
-            }
-            Some(_) => Err(Error::refused(format!(
-                "{package}'s {by} shows icon {icon}, which no package carries",
-                package = id,
-                by = by,
-                icon = name.to_owned()
-            ))),
-            None => Ok(()),
-        };
         for n in &package.node_types {
             let d = n.description();
             for &c in &d.contexts {
                 context(n.id().as_str(), c)?;
             }
-            icon(n.id().as_str(), &d.icon)?;
         }
         for k in &package.object_kinds {
             if let Some(c) = k.context() {
                 context(k.id().as_str(), c)?;
             }
-            icon(k.id().as_str(), k.icon())?;
         }
         Ok(())
     }

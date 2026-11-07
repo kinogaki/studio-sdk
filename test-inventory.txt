@@ -9,7 +9,6 @@ example-box-node/lib test tests::the_node_binds_a_box_handle_to_its_center_and_s
 example-box-node/lib test tests::the_node_cooks_in_a_network
 example-box-node/lib test tests::the_node_is_listed_in_its_context
 example-box-node/lib test tests::the_node_makes_a_box_that_renders_as_twelve_triangles
-example-box-node/lib test tests::the_node_shows_by_the_package_icon
 example-box-node/lib test tests::the_package_registers
 example-flat-engine/lib gpu tests::flat_renders_what_a_host_sends
 example-pin-board/lib test tests::levels_choose_and_commands_are_undo_steps
@@ -431,7 +430,6 @@ kinogaki-studio-api/admission test a_node_type_is_offered_in_declared_contexts
 kinogaki-studio-api/admission test a_ports_data_type_is_registered
 kinogaki-studio-api/admission test a_well_formed_package_registers
 kinogaki-studio-api/admission test an_object_kind_holds_a_declared_context
-kinogaki-studio-api/admission test icons_are_well_formed_named_once_and_found
 kinogaki-studio-api/brep test a_broken_save_does_not_read
 kinogaki-studio-api/brep test a_display_request_carries_the_default_tolerances
 kinogaki-studio-api/brep test a_value_with_every_part_keeps_each_part
@@ -463,7 +461,6 @@ kinogaki-studio-api/doc test crates/api/src/format/input.rs - format::input::Inp
 kinogaki-studio-api/doc test crates/api/src/format/materialx/mod.rs - format::materialx::image_color
 kinogaki-studio-api/doc test crates/api/src/format/options.rs - format::options
 kinogaki-studio-api/doc test crates/api/src/format/unique.rs - format::unique::Unique
-kinogaki-studio-api/doc test crates/api/src/icon.rs - icon
 kinogaki-studio-api/doc test crates/api/src/kernel.rs - kernel
 kinogaki-studio-api/doc test crates/api/src/network/context.rs - network::context::NetworkContext
 kinogaki-studio-api/doc test crates/api/src/package.rs - package::Package
@@ -538,16 +535,13 @@ kinogaki-studio-api/lib test format::input::tests::only_a_regular_file_is_read
 kinogaki-studio-api/lib test format::materialx::tests::a_colorspace_of_no_conversion_reads_as_data_and_writes_as_none
 kinogaki-studio-api/lib test format::materialx::tests::a_documents_material_reads_and_writes_back_as_itself
 kinogaki-studio-api/lib test format::options::tests::a_node_holds_a_formats_options_in_rows_of_its_id
+kinogaki-studio-api/lib test format::options::tests::options_save_as_fields_and_read_back_strictly
 kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values
 kinogaki-studio-api/lib test format::tests::a_writer_has_no_options_by_default_whatever_its_reading_has
-kinogaki-studio-api/lib test format::tests::options_save_and_read_back_by_default
 kinogaki-studio-api/lib test format::tests::readings_poll_cancellation
 kinogaki-studio-api/lib test format::unique::tests::copies_are_numbered_per_base_name
 kinogaki-studio-api/lib test format::unique::tests::file_names_number_before_their_extension_and_ignore_case
 kinogaki-studio-api/lib test format::unique::tests::many_alike_take_linear_time
-kinogaki-studio-api/lib test icon::tests::a_well_formed_icon_checks_as_its_text
-kinogaki-studio-api/lib test icon::tests::documents_are_bounded_utf8_text
-kinogaki-studio-api/lib test icon::tests::names_are_lowercase_words_joined_by_dashes
 kinogaki-studio-api/lib test image_files::tests::an_image_node_reads_its_file_its_embedded_bytes_or_a_result
 kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_take
 kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup

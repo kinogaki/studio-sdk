@@ -1,9 +1,9 @@
 //! [`Registry`]: what every loaded package registered, by id.
 //!
-//! The environment registers packages in dependency order (the librarian
-//! resolves it: kernels before the packages that build on them), so a
-//! package may name data types that it or an earlier package registered,
-//! never a later one's. A package is checked whole before anything of it
+//! The environment registers packages in dependency order (its plugin
+//! loader resolves it from the plugins' manifests: a package after those
+//! it depends on, otherwise by id), so a package may name data types that
+//! it or an earlier package registered, never a later one's. A package is checked whole before anything of it
 //! is kept: a refused package leaves the registry as it was. A host
 //! admits every package through these checks ([`Registry::check`],
 //! [`Registry::register`]) and turns a refusal into a plugin it doesn't
@@ -24,7 +24,7 @@ use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::SessionSlot;
 use kinogaki_render_api::{EngineId, PrimTypeId, standard};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -87,8 +87,6 @@ pub struct Registry {
     /// The package declaring each engine's own prim type (the standard
     /// types are every engine's).
     prim_types: BTreeMap<PrimTypeId, PackageId>,
-    /// Each package's icons' names.
-    icons: BTreeMap<PackageId, BTreeSet<String>>,
 }
 
 impl Registry {
@@ -159,8 +157,6 @@ impl Registry {
                 self.prim_types.insert(ty.id, id);
             }
         }
-        let icons = package.icons.into_iter().map(|i| i.name).collect();
-        self.icons.insert(id, icons);
         self.packages.push((id, package.label));
         Ok(())
     }

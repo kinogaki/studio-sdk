@@ -46,8 +46,8 @@
 //! `ObjectKindSpec::creations`). A part a
 //! context leaves out is never another context's. In a context whose
 //! networks are core's, the host's own UI is there without a part: its
-//! network pane, Tab and menus listing the context's listed node types,
-//! and its node inspector. A part adds to them or replaces them: the
+//! network pane, Tab listing the context's listed node types, and its
+//! node inspector; its menus are its library's alone. A part adds to them or replaces them: the
 //! library's items come first and what it sets wins, the vocabulary runs
 //! the library's items, an inspector adds under the node sheet. Elsewhere a
 //! part left out is nothing there.

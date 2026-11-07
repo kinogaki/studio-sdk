@@ -99,20 +99,6 @@ fn the_node_cooks_in_a_network() {
 }
 
 #[test]
-fn the_node_shows_by_the_package_icon() {
-    let package = package();
-    let [icon] = package.icons() else {
-        panic!("one icon")
-    };
-    assert!(icon.check().is_ok());
-    // Others name it by its package: `example.boxes/<name>`.
-    assert_eq!(
-        BoxNode.description().icon,
-        format!("{}/{}", package.id(), icon.name)
-    );
-}
-
-#[test]
 fn the_node_makes_a_box_that_renders_as_twelve_triangles() {
     let registry = {
         let mut registry = Registry::new();

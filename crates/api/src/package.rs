@@ -4,7 +4,6 @@ use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
-use crate::icon::Icon;
 use crate::id::{ContextId, PackageId};
 use crate::kernel::Verb;
 use crate::mesher::Mesher;
@@ -22,7 +21,7 @@ use std::sync::Arc;
 /// types, held edits over them, B-rep meshers, the verbs it offers as a
 /// kernel (a kernel adds no data types: it is a package of verbs), node
 /// types' cooks, the network contexts its object kinds hold, object
-/// kinds, file formats, session slots, stored values and icons, the render
+/// kinds, file formats, session slots and stored values, the render
 /// engines it describes (made, with the `wgpu` feature, by their makers);
 /// and its UI, when it has one
 /// ([`PackageUi`], which the host UI interface makes).
@@ -53,12 +52,11 @@ pub struct Package {
     pub(crate) formats: Vec<Arc<dyn FileFormat>>,
     pub(crate) slots: Vec<SessionSlot>,
     pub(crate) stored: Vec<StoredValue>,
-    pub(crate) icons: Vec<Icon>,
     pub(crate) engines: Vec<Arc<EngineDescription>>,
     // A field behind a feature changes the struct's layout. That is
     // sound because a host and its plugins share one build of this crate
     // (one feature set, so one layout): a plugin built against another
-    // build is refused before it is loaded.
+    // build is refused before its entry is called.
     #[cfg(feature = "wgpu")]
     pub(crate) makers: Vec<Arc<dyn kinogaki_render_api::display::Engine>>,
     #[cfg(feature = "wgpu")]
@@ -141,12 +139,6 @@ impl Package {
     /// The values it keeps in projects.
     pub fn stored(&self) -> &[StoredValue] {
         &self.stored
-    }
-
-    /// The icons it adds to Studio's icon set, named under its id
-    /// ([`icon`](crate::icon)).
-    pub fn icons(&self) -> &[Icon] {
-        &self.icons
     }
 
     /// The render engines it brings, by their descriptions (headless):
@@ -239,7 +231,6 @@ impl Package {
             formats: Vec::new(),
             slots: Vec::new(),
             stored: Vec::new(),
-            icons: Vec::new(),
             engines: Vec::new(),
             #[cfg(feature = "wgpu")]
             makers: Vec::new(),
@@ -333,13 +324,6 @@ impl Package {
         self
     }
 
-    /// With icon `icon` too: others name it `"<package id>/<icon name>"`
-    /// (`icon::qualified`).
-    pub fn with_icon(mut self, icon: Icon) -> Self {
-        self.icons.push(icon);
-        self
-    }
-
     /// With UI `ui`, as the host UI interface made it: what
     /// `kinogaki-studio-ui-api`'s `WithUi::with_ui` calls, which is how a
     /// package adds its UI.
@@ -425,10 +409,6 @@ impl fmt::Debug for Package {
             .field(
                 "stored",
                 &self.stored.iter().map(|s| s.id()).collect::<Vec<_>>(),
-            )
-            .field(
-                "icons",
-                &self.icons.iter().map(|i| &i.name).collect::<Vec<_>>(),
             )
             .field(
                 "engines",

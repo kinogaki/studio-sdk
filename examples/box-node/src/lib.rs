@@ -13,9 +13,7 @@
 //!   binds a box handle to its parameters, so Studio draws the box in the
 //!   viewport and drags its faces and center with no code here;
 //! - the kind's creations: an empty Boxes object, and a Box (a Boxes
-//!   object already holding a Box node), in Create, Tab and the A menu;
-//! - one icon added to Studio's set, `example.boxes/box`, which the node
-//!   and the object kind show by.
+//!   object already holding a Box node), in Create, Tab and the A menu.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::geometry::Column;
@@ -211,10 +209,6 @@ impl DataCodec for BoxType {
     }
 }
 
-/// The package's icon, embedded: 11 × 11 icon pixels, white, as Studio's
-/// own icons are drawn (Studio tints it with the widget showing it).
-const BOX_ICON: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11" width="11" height="11" shape-rendering="crispEdges" fill="#fff"><rect x="2" y="3" width="7" height="2"/><rect x="2" y="5" width="2" height="2"/><rect x="7" y="5" width="2" height="2"/><rect x="2" y="7" width="7" height="1"/></svg>"##;
-
 /// The context of the networks inside Boxes objects.
 pub fn network() -> ContextId {
     ContextId::declared("example.boxes.network")
@@ -239,7 +233,7 @@ impl NodeType for BoxNode {
     fn description(&self) -> Description {
         let sides = Number::length().range(0.001, f64::INFINITY);
         Description::new("Box")
-            .icon("example.boxes/box")
+            .icon("cube")
             .context(network())
             .listed("Create", Category::Create, "Primitives", &["cube"])
             .output(Port::new("box", "Box", BOX.id()))
@@ -301,7 +295,7 @@ impl ObjectKindSpec for BoxesKind {
         "Boxes"
     }
     fn icon(&self) -> &str {
-        "example.boxes/box"
+        "cube"
     }
     fn placed(&self) -> bool {
         true
@@ -360,7 +354,6 @@ pub fn package() -> Package {
         .with_context(context)
         .with_object_kind(BoxesKind)
         .with_node_type(BoxNode)
-        .with_icon(Icon::new("box", BOX_ICON))
 }
 
 // The entry point Studio looks up in the plugin's library.

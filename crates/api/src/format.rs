@@ -11,13 +11,12 @@
 //!
 //! **Options.** A format's options are [`Parameters`] by name with
 //! defaults ([`FileFormat::options`]), shown by its [`Schema`]
-//! ([`FileFormat::schema`]) and saved by the format itself
-//! ([`FileFormat::write_options`]), so a File node's options and the
-//! application's import defaults keep the format's own spelling. A
-//! format's writer has options of its own ([`FormatWriter::options`],
-//! [`FormatWriter::schema`]): writing never gets the reading options. A
-//! node holding a reader's or a writer's options holds each as a row
-//! named by [`options::row`].
+//! ([`FileFormat::schema`]). A format's writer has options of its own
+//! ([`FormatWriter::options`], [`FormatWriter::schema`]): writing never
+//! gets the reading options. A node holding a reader's or a writer's
+//! options holds each as a row named by [`options::row`]; a host keeping
+//! them elsewhere (the application's settings) saves each as a field named
+//! as it ([`options::write`], [`options::read`]).
 //!
 //! **Images.** A format of pictures reads a file as one item holding one
 //! standard [`Image`](kinogaki_geometry::image::Image)
@@ -70,9 +69,8 @@ pub use unique::Unique;
 use crate::cancel::CancelToken;
 use crate::color::ColorService;
 use crate::data::Data;
-use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::id::{DataTypeId, FormatId};
-use crate::params::{Parameters, Schema, Value};
+use crate::params::{Parameters, Schema};
 use crate::{Diagnostic, Error};
 use kinogaki_geometry::{Units, Xform};
 use std::path::Path;
@@ -203,67 +201,14 @@ pub trait FileFormat: Send + Sync {
         FormatOptions::new()
     }
 
-    /// The options dialog for `options` when read for `purpose`: a
-    /// parameter per option that applies, named as the option and holding
-    /// its current value; empty (no dialog) by default.
+    /// The rows for `options` when read for `purpose` (Studio shows
+    /// [`Purpose::Objects`]' on Settings ▸ Import, and a File node shows
+    /// [`Purpose::Value`]'): a parameter per option that applies, named as
+    /// the option and holding its current value; empty (no rows) by
+    /// default.
     fn schema(&self, options: &FormatOptions, purpose: Purpose) -> Schema {
         let _ = (options, purpose);
         Schema::default()
-    }
-
-    /// Writes `options` into the element `out` fills. By default each
-    /// option is a field named as it: a number a real, an integer an
-    /// integer, a toggle a boolean, a choice its key, text as text, a
-    /// color, numbers and texts arrays (an option holds no ramp, tone
-    /// curves, object or data).
-    fn write_options(
-        &self,
-        options: &FormatOptions,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
-        for (name, value) in options {
-            let field = match value {
-                Value::Number(v) => Field::Float(*v),
-                Value::Numbers(v) => Field::F64s(v.clone()),
-                Value::Bool(v) => Field::Bool(*v),
-                Value::Integer(v) => Field::Int(*v),
-                Value::Color(c) => Field::F64s(c.to_vec()),
-                Value::Choice(v) => Field::Text(v.to_string()),
-                Value::Text(v) => Field::Text(v.clone()),
-                _ => {
-                    return Err(Error::invalid(format_args!(
-                        "option {name}: a format's options hold no ramps, curves, objects or data"
-                    )));
-                }
-            };
-            out.set(name, field)?;
-        }
-        Ok(())
-    }
-
-    /// Reads the options [`write_options`](Self::write_options) wrote into
-    /// `element`, strictly: every option, each of its default's type.
-    fn read_options(&self, element: &dyn ElementReader) -> Result<FormatOptions, Error> {
-        let mut options = self.options();
-        for (name, value) in &mut options {
-            let wrong = || {
-                Error::invalid(format_args!(
-                    "{}: option {name} is not of its type",
-                    element.location()
-                ))
-            };
-            *value = match (&*value, element.required(name)?) {
-                (Value::Number(_), FieldRef::Float(v)) => Value::Number(v),
-                (Value::Numbers(_), FieldRef::F64s(v)) => Value::Numbers(v.to_vec()),
-                (Value::Bool(_), FieldRef::Bool(v)) => Value::Bool(v),
-                (Value::Integer(_), FieldRef::Int(v)) => Value::Integer(v),
-                (Value::Color(_), FieldRef::F64s(&[r, g, b])) => Value::Color([r, g, b]),
-                (Value::Choice(_), FieldRef::Text(v)) => Value::Choice(v.into()),
-                (Value::Text(_), FieldRef::Text(v)) => Value::Text(v.to_owned()),
-                _ => return Err(wrong()),
-            };
-        }
-        Ok(options)
     }
 
     /// Reads `input` with `options`, as `reading` says. Called on a
@@ -294,9 +239,9 @@ pub trait FormatWriter: Send + Sync {
         FormatOptions::new()
     }
 
-    /// The Export dialog for `options`: a parameter per option, named as
-    /// the option and holding its current value; empty (no dialog) by
-    /// default.
+    /// The rows for `options` (Studio shows them on Settings ▸ Export): a
+    /// parameter per option, named as the option and holding its current
+    /// value; empty (no rows) by default.
     fn schema(&self, options: &FormatOptions) -> Schema {
         let _ = options;
         Schema::default()
@@ -363,7 +308,7 @@ impl<'a> Writing<'a> {
 mod tests {
     use super::*;
     use crate::color::ColorService;
-    use crate::element::MemoryElement;
+    use crate::params::Value;
     use kinogaki_geometry::UpAxis;
 
     /// A color service converting nothing (the readings here read no color).
@@ -415,22 +360,6 @@ mod tests {
             r.check()?;
             Ok(Imported::default())
         }
-    }
-
-    #[test]
-    fn options_save_and_read_back_by_default() {
-        let mut options = Plain.options();
-        options.insert("scale".into(), Value::Number(2.5));
-        options.insert("prims".into(), Value::Text("/World".into()));
-        let mut element = MemoryElement::new("plain");
-        element.write(|w| Plain.write_options(&options, w)).unwrap();
-        assert_eq!(element.read(|r| Plain.read_options(r)).unwrap(), options);
-        // Strict: a missing option, or one of another type, fails.
-        let mut short = MemoryElement::new("plain");
-        short
-            .write(|w| w.set("scale", Field::Text("2".into())))
-            .unwrap();
-        assert!(short.read(|r| Plain.read_options(r)).is_err());
     }
 
     #[test]

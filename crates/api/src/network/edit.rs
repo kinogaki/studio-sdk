@@ -465,7 +465,7 @@ impl TryFrom<&NetworkSeed> for kinogaki_render_api::MaterialNetwork {
     }
 }
 
-/// Another way Tab and the menus make a node: a node of `node.node_type`
+/// Another way Tab makes a node: a node of `node.node_type`
 /// with its parameters set, and its inside started with nodes (a Material
 /// of an engine's preset). A package declares it
 /// ([`Package::with_creation`](crate::Package::with_creation)) for any

@@ -39,8 +39,6 @@
 //!   step over many edits, held by their opener.
 //! - **Stored values** ([`Stored`], [`StoredValue`]): package-owned values
 //!   the project keeps, one for the project or one per view.
-//! - **Icons** ([`icon`]): the named icons a package adds to Studio's
-//!   icon set, under its own id.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
 //!   its UI included ([`PackageUi`]), and the environment's table of it
 //!   all, which admits a package only once its checks pass
@@ -79,7 +77,6 @@ pub mod entry;
 pub mod facets;
 pub mod format;
 pub mod held;
-pub mod icon;
 pub mod image_files;
 pub mod kernel;
 pub mod mesher;
@@ -135,7 +132,6 @@ pub use format::{
     FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Input, Purpose, Reading, Writing,
 };
 pub use held::HeldEdit;
-pub use icon::Icon;
 pub use id::{
     ContextId, CreationId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
     SlotId, StoredId, VerbId,

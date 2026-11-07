@@ -30,9 +30,8 @@ use kinogaki_value::Condition;
 pub struct Description {
     /// What node creation and a new node call it ("Extrude").
     pub label: String,
-    /// Its icon's name, where Studio shows a node by an icon (its row in
-    /// the outliner): Studio's (`"cube"`) or a package's
-    /// (`"acme.trees/leaf"`, [`icon`](crate::icon)); empty for none.
+    /// Its icon's name in Studio's icon set (`"cube"`), where Studio shows
+    /// a node by an icon; empty for none.
     pub icon: String,
     /// Its inputs, in port order.
     pub inputs: Vec<Port>,
@@ -200,10 +199,10 @@ impl Description {
     }
 }
 
-/// Where Tab, menus and shelves list a node type.
+/// Where Tab lists a node type, and its tile's color.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Listing {
-    /// Its heading in Tab and the menus ("Filter").
+    /// Its heading in Tab ("Filter").
     pub section: String,
     /// What it does, as its tile's color says.
     pub category: Category,

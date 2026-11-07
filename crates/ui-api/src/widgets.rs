@@ -10,7 +10,7 @@ use crate::id::Id;
 pub struct ButtonSpec<'a> {
     /// Its text; empty for an icon button.
     pub text: &'a str,
-    /// The name of an icon before the text (Studio's or a package's).
+    /// The name of an icon of Studio's before the text.
     pub icon: Option<&'a str>,
     /// Drawn lit (the active tool, a toggled option).
     pub selected: bool,
@@ -42,8 +42,7 @@ impl<'a> ButtonSpec<'a> {
         }
     }
 
-    /// An icon button: icon `name` (Studio's or a package's), with
-    /// `tooltip`.
+    /// An icon button: Studio's icon `name`, with `tooltip`.
     pub fn icon(name: &'a str, tooltip: &'a str) -> Self {
         ButtonSpec {
             icon: Some(name),
