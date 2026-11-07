@@ -6,7 +6,7 @@ use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
-use crate::image_files::image_node::{AUTO, DATA, SPACE};
+use crate::image_files::image_node::{AUTO, DATA};
 use crate::network::{NetworkSeed, NewNode, SeedWire};
 use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
 use kinogaki_value::{NodeTypeId, Parameters, Value};
@@ -167,13 +167,13 @@ fn write_image(image: &ImportedImage, out: &mut dyn ElementWriter) -> Result<(),
         ImageFile::Path(path) => out.set("file", Field::Text(path.to_string()))?,
         ImageFile::Embedded(file) => out.data("embedded", &embedded_file().wrap(file.clone()))?,
     }
-    let (color, space) = match image.source.color() {
-        ImageColor::Auto => (AUTO, ""),
-        ImageColor::Data => (DATA, ""),
-        ImageColor::Space(space) => (SPACE, &**space),
+    // As an Image node's Color holds it: Auto, Data or a space's name.
+    let color = match image.source.color() {
+        ImageColor::Auto => AUTO,
+        ImageColor::Data => DATA,
+        ImageColor::Space(space) => space,
     };
-    out.set("color", Field::Text(color.to_owned()))?;
-    out.set("space", Field::Text(space.to_owned()))
+    out.set("color", Field::Text(color.to_owned()))
 }
 
 fn read_image(e: &dyn ElementReader) -> Result<ImportedImage, Error> {
@@ -189,11 +189,11 @@ fn read_image(e: &dyn ElementReader) -> Result<ImportedImage, Error> {
         }
         _ => return Err(wrong("it reads no one file")),
     };
-    let color = match (e.text("color")?, e.text("space")?) {
-        (AUTO, "") => ImageColor::Auto,
-        (DATA, "") => ImageColor::Data,
-        (SPACE, space) if !space.is_empty() => ImageColor::Space(Arc::from(space)),
-        _ => return Err(wrong("its color is no Color")),
+    let color = match e.text("color")? {
+        AUTO => ImageColor::Auto,
+        DATA => ImageColor::Data,
+        "" => return Err(wrong("its color is no Color")),
+        space => ImageColor::Space(Arc::from(space)),
     };
     Ok(ImportedImage {
         key: e.text("key")?.to_owned(),

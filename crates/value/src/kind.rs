@@ -31,6 +31,14 @@ pub enum ValueKind {
         /// The entries, in the order shown.
         choices: Vec<Choice>,
     },
+    /// [`Value::Choice`]: one of `choices`, or a color space by its name in
+    /// the host's color configuration. The host offers `choices`, then its
+    /// spaces (an Image node's Color: Auto, Data, then every space); a name
+    /// the configuration lacks says so where it is read.
+    ColorSpace {
+        /// The entries before the spaces, in the order shown.
+        choices: Vec<Choice>,
+    },
     /// [`Value::Text`], one line, committed when the edit ends.
     Text,
     /// [`Value::Text`]: many lines in a code editor; its node type names the
@@ -154,8 +162,8 @@ impl ValueKind {
 
     /// Whether a value of this kind can be keyed over time unless its
     /// owner says otherwise: numbers, integers, vectors, colors, channels,
-    /// toggles, choices, ramps and tone curves (blended between keys of
-    /// different key counts) can; text of every kind and data can't.
+    /// toggles, choices, color spaces, ramps and tone curves (blended between
+    /// keys of different key counts) can; text of every kind and data can't.
     pub fn animatable(&self) -> bool {
         match self {
             Self::Number(_)
@@ -166,6 +174,7 @@ impl ValueKind {
             | Self::Channels(_)
             | Self::Toggle
             | Self::Choice { .. }
+            | Self::ColorSpace { .. }
             | Self::Ramp { .. }
             | Self::ToneCurves { .. } => true,
             Self::Text
@@ -192,6 +201,7 @@ impl ValueKind {
             (Self::Choice { choices, .. }, Value::Choice(key)) => {
                 choices.iter().any(|c| c.key == *key)
             }
+            (Self::ColorSpace { .. }, Value::Choice(key)) => !key.is_empty(),
             (
                 Self::Text
                 | Self::Code
@@ -446,6 +456,16 @@ mod tests {
             "a label is no key"
         );
         assert!(!kind.accepts(&Value::Text("a".into())));
+        let space = ValueKind::ColorSpace {
+            choices: vec![Choice::new("auto", "Auto")],
+        };
+        assert!(space.accepts(&Value::Choice("auto".into())));
+        assert!(
+            space.accepts(&Value::Choice("ACEScg".into())),
+            "any space by name"
+        );
+        assert!(!space.accepts(&Value::Choice("".into())), "a blank name");
+        assert!(!space.accepts(&Value::Text("ACEScg".into())));
     }
 
     #[test]

@@ -81,7 +81,8 @@ impl From<&ValueKind> for Kind {
                 Kind::Number(Number::plain().range(*min as f64, *max as f64))
             }
             ValueKind::Toggle => Kind::Toggle,
-            ValueKind::Choice { choices } => Kind::Choice {
+            // The host adds its configuration's spaces to a color space's.
+            ValueKind::Choice { choices } | ValueKind::ColorSpace { choices } => Kind::Choice {
                 choices: choices.clone(),
             },
             ValueKind::Text => Kind::Text,

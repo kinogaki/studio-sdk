@@ -111,10 +111,9 @@ pub mod image_node {
     /// [`Fits::Written`](crate::params::Fits::Written)): what a Result
     /// source reads.
     pub const RESULT: &str = "result";
-    /// How its colors read (a choice): [`AUTO`], [`DATA`] or [`SPACE`].
+    /// How its colors read (a [`ColorSpace`](kinogaki_value::ValueKind::ColorSpace)
+    /// choice): [`AUTO`], [`DATA`], or the name of the space they are in.
     pub const COLOR: &str = "color";
-    /// The space its colors are in while its Color is [`SPACE`].
-    pub const SPACE: &str = "space";
     /// A Color: as the file says.
     pub const AUTO: &str = "auto";
     /// A Color: the values as stored.
@@ -141,13 +140,12 @@ pub mod image_node {
                     Value::Data(super::embedded_file().wrap(file.clone())),
                 ),
         };
-        match source.color() {
-            ImageColor::Auto => node.with(COLOR, choice(AUTO)),
-            ImageColor::Data => node.with(COLOR, choice(DATA)),
-            ImageColor::Space(space) => node
-                .with(COLOR, choice(SPACE))
-                .with(SPACE, space.to_string()),
-        }
+        let color = match source.color() {
+            ImageColor::Auto => AUTO,
+            ImageColor::Data => DATA,
+            ImageColor::Space(space) => space,
+        };
+        node.with(COLOR, choice(color))
     }
 }
 
@@ -178,11 +176,10 @@ pub fn image_source(parameters: &Parameters) -> Result<Option<ImageSource>, Erro
             path => ImageFile::Path(Arc::from(path)),
         },
     };
-    let space = text(SPACE).trim();
     let color = match choice(COLOR) {
+        AUTO | "" => ImageColor::Auto,
         DATA => ImageColor::Data,
-        SPACE if !space.is_empty() => ImageColor::Space(Arc::from(space)),
-        _ => ImageColor::Auto,
+        space => ImageColor::Space(Arc::from(space)),
     };
     Ok(Some(ImageSource::new(file, color)))
 }
@@ -205,8 +202,7 @@ mod tests {
         let file = rows(&[
             (SOURCE, choice(FILE)),
             (FILE, Value::Text(" t/wood.png ".into())),
-            (COLOR, choice(SPACE)),
-            (SPACE, Value::Text("ACEScg".into())),
+            (COLOR, choice("ACEScg")),
         ]);
         let read = image_source(&file).unwrap().unwrap();
         assert_eq!(read.name(), "t/wood.png");
@@ -227,6 +223,7 @@ mod tests {
         for source in [
             read,
             ImageSource::new(ImageFile::Path(Arc::from("/a.exr")), space),
+            ImageSource::path("b.png"),
         ] {
             let made = reading(&source);
             assert_eq!(made.node_type, IMAGE_NODE);

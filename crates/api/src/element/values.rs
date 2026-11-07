@@ -125,7 +125,7 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
         Some(K::Number(_)) => Value::Number(number()?),
         Some(K::Integer { .. }) => Value::Integer(integer()?),
         Some(K::Toggle) => Value::Bool(boolean()?),
-        Some(K::Choice { .. }) => Value::Choice(text()?.into()),
+        Some(K::Choice { .. } | K::ColorSpace { .. }) => Value::Choice(text()?.into()),
         Some(
             K::Text
             | K::Code

@@ -57,6 +57,13 @@ pub struct Node {
 }
 
 impl Node {
+    /// The layer of its file its Image inputs read: its `layer` value
+    /// (MaterialX's `image` names one); none, or blank, reads the main layer.
+    pub fn layer(&self) -> Option<&str> {
+        let named = self.values.get("layer").and_then(Value::text);
+        named.map(str::trim).filter(|l| !l.is_empty())
+    }
+
     /// Whether Image input `input` reads its file's values as stored: its
     /// image says data, or the node gives no color (MaterialX converts color
     /// spaces for colors alone; a USD UV Texture's `rgb` is one, beside its
