@@ -54,9 +54,10 @@ pub(super) fn dome(description: &EngineDescription) -> Option<Prim> {
     let light = standard::Light {
         shape: standard::LightShape::Dome {
             image: None,
+            format: standard::DomeFormat::Automatic,
+            pole: standard::Pole::Scene,
             ground: None,
         },
-        camera: false,
         ..standard::Light::default()
     };
     Some(Prim::Declared(filled(light.declared(), description)))

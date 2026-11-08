@@ -75,12 +75,12 @@ fn finite(values: &Parameters) -> bool {
 fn aliases(ty: &PrimType) -> &'static [&'static str] {
     let prim = Declared::new(ty.id, ty.schema().values());
     match standard::Light::decode(&prim).map(|light| light.shape) {
-        Some(LightShape::Rect { .. } | LightShape::Disk { .. }) => {
-            &["usdlux", "lamp", "rect", "disk", "rectlight", "disklight"]
-        }
+        Some(LightShape::Rect { .. }) => &["usdlux", "area", "rectlight", "quad", "softbox"],
+        Some(LightShape::Disk { .. }) => &["usdlux", "area", "disklight"],
+        Some(LightShape::Sphere { .. }) => &["usdlux", "point", "spherelight", "omni", "bulb"],
+        Some(LightShape::Cylinder { .. }) => &["usdlux", "tube", "line", "cylinderlight"],
         Some(LightShape::Dome { .. }) => &["usdlux", "environment", "sky", "domelight", "hdri"],
         Some(LightShape::Distant { .. }) => &["usdlux", "sun", "directional", "distantlight"],
-        Some(LightShape::Spot { .. }) => &["usdlux", "spotlight", "sphere", "spherelight", "cone"],
         None if ty.role == Role::Atmosphere => &["mist", "haze", "atmosphere", "height fog"],
         None => &[],
     }
@@ -123,12 +123,27 @@ impl DeclaredKind {
     }
 
     /// The creation making an object of type `ty`: under the kind's own
-    /// prefix (`acme.ray.light` makes `acme.ray.area_light`), named by the
+    /// prefix (`acme.ray.light` makes `acme.ray.rect_light`), named by the
     /// type's last step.
     fn creation_of(&self, ty: &PrimType) -> Option<CreationId> {
+        self.creation_named(ty.id.name())
+    }
+
+    /// The creation `name` under the kind's own prefix.
+    fn creation_named(&self, name: &str) -> Option<CreationId> {
         let prefix = self.id.as_str().rsplit_once('.')?.0;
-        let name = ty.id.name();
         CreationId::parse(&format!("{prefix}.{name}"))
+    }
+
+    /// The standard presets whose type it has, each with that type (an
+    /// engine's schema of it).
+    fn presets(&self) -> Vec<(standard::Preset, &PrimType)> {
+        (standard::presets().into_iter())
+            .filter_map(|p| {
+                let ty = self.type_of(p.light.prim_type().id.as_str())?;
+                Some((p, ty))
+            })
+            .collect()
     }
 
     /// A body of `prim`, when it fits the kind: one of its types, every value
@@ -232,25 +247,45 @@ impl ObjectKindSpec for DeclaredKind {
         (self.prim(body)).map_or_else(Vec::new, light_view::handles)
     }
     fn creations(&self, _: &CreateCx<'_>) -> Vec<KindCreation> {
+        let order = if self.of_lights() {
+            LIGHTS_ORDER
+        } else {
+            ATMOSPHERE_ORDER
+        };
+        let made = |name: &str, label: &str, aliases: &[&str]| {
+            let mut made = KindCreation::new(self.creation_named(name)?, label);
+            made.family = self.family.clone();
+            made.aliases = aliases.iter().map(|&a| a.to_owned()).collect();
+            made.order = order;
+            Some(made)
+        };
+        // Each type, followed by the presets of it.
+        let presets = self.presets();
         (self.types.iter())
-            .filter_map(|ty| {
-                let mut made = KindCreation::new(self.creation_of(ty)?, &*ty.label);
-                made.family = self.family.clone();
-                made.aliases = aliases(ty).iter().map(|&a| a.to_owned()).collect();
-                made.order = if self.of_lights() {
-                    LIGHTS_ORDER
-                } else {
-                    ATMOSPHERE_ORDER
-                };
-                Some(made)
+            .flat_map(|ty| {
+                let own = (presets.iter()).filter(move |(_, of)| of.id == ty.id);
+                let presets = own.map(|(p, _)| made(p.name, p.label, p.aliases));
+                [made(ty.id.name(), &ty.label, aliases(ty))]
+                    .into_iter()
+                    .chain(presets)
             })
+            .flatten()
             .collect()
     }
     fn create(&self, id: CreationId, _: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
-        let ty = (self.types.iter())
-            .find(|ty| self.creation_of(ty) == Some(id))
-            .ok_or_else(|| Error::invalid(format_args!("{} makes no {id}", self.label)))?;
-        let prim = Declared::new(ty.id, ty.schema().values());
+        let refused = || Error::invalid(format_args!("{} makes no {id}", self.label));
+        let prim = match (self.types.iter()).find(|ty| self.creation_of(ty) == Some(id)) {
+            Some(ty) => Declared::new(ty.id, ty.schema().values()),
+            None => {
+                let (preset, ty) = (self.presets().into_iter())
+                    .find(|(p, _)| self.creation_named(p.name) == Some(id))
+                    .ok_or_else(refused)?;
+                // The type's own values (an engine's sections) beside the preset's.
+                let mut values = ty.schema().values();
+                values.extend(preset.light.declared().values);
+                Declared::new(ty.id, values)
+            }
+        };
         Ok(Arc::new(DeclaredBody {
             kind: self.id,
             prim,

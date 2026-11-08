@@ -411,7 +411,14 @@ kinogaki-render-api/lib test source::tests::plain_triangles_are_flat_and_default
 kinogaki-render-api/lib test standard::emission::tests::blackbodies_warm_below_white_and_cool_above
 kinogaki-render-api/lib test standard::emission::tests::every_illuminant_has_a_color_by_its_key
 kinogaki-render-api/lib test standard::emission::tests::the_flat_spectrum_is_white
-kinogaki-render-api/lib test standard::tests::a_light_keeps_its_motion_through_its_prim
+kinogaki-render-api/lib test standard::ies::tests::a_quarter_mirrors_into_a_whole_turn
+kinogaki-render-api/lib test standard::ies::tests::a_round_profile_reads_the_same_all_round
+kinogaki-render-api/lib test standard::ies::tests::directions_read_down_the_lights_axis_first
+kinogaki-render-api/lib test standard::ies::tests::multiplier_and_ballast_scale_the_candela
+kinogaki-render-api/lib test standard::ies::tests::power_is_the_mean_candela_over_its_sphere
+kinogaki-render-api/lib test standard::ies::tests::tilt_data_is_skipped_and_other_types_refused
+kinogaki-render-api/lib test standard::light::tests::a_light_keeps_its_motion_through_its_prim
+kinogaki-render-api/lib test standard::light::tests::keys_are_usds_tokens
 kinogaki-render-api/lib test tests::batches::a_change_to_an_added_prim_replaces_its_payload
 kinogaki-render-api/lib test tests::batches::a_primvar_reads_at_each_corner_by_one_rule
 kinogaki-render-api/lib test tests::batches::a_result_dropped_is_no_longer_wanted_and_a_preview_answers

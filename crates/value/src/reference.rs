@@ -32,7 +32,7 @@ pub enum ImageRef {
 impl ImageRef {
     /// Why it names nothing, when it doesn't: a blank path, a file of no
     /// name, a node path not from the root.
-    pub fn refusal(&self) -> Option<&'static str> {
+    pub(crate) fn refusal(&self) -> Option<&'static str> {
         match self {
             ImageRef::File(source) => match source.file() {
                 ImageFile::Path(path) if path.trim().is_empty() => Some("names no file"),

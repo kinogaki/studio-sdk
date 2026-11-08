@@ -5,14 +5,14 @@ use super::*;
 fn engines_declare_types() {
     let (wake, _) = counter();
     let d = RecordingEngine::new(wake).description().as_ref().clone();
-    assert!(d.prim_type(standard::AREA_LIGHT).is_some());
+    assert!(d.prim_type(standard::RECT_LIGHT).is_some());
     assert!(
         d.prim_type(PrimTypeId::declared("kinogaki.other.rim_light"))
             .is_none()
     );
-    let spot = d.prim_type(standard::SPOT_LIGHT).unwrap();
-    assert_eq!(spot.schema(), standard::spot_light().schema());
-    assert_eq!(spot.id.as_str(), "kinogaki.core.spot_light");
+    let sphere = d.prim_type(standard::SPHERE_LIGHT).unwrap();
+    assert_eq!(sphere.schema(), standard::sphere_light().schema());
+    assert_eq!(sphere.id.as_str(), "kinogaki.core.sphere_light");
     assert_eq!(
         Prim::Declared(standard::Light::default().declared()).kind(),
         PrimKind::Declared

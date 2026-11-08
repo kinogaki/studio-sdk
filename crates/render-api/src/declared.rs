@@ -10,7 +10,6 @@
 use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
-use crate::prim::Visibility;
 use crate::settings::Textures;
 use kinogaki_value::{Parameters, ParametersExt, PrimTypeId, Schema, Value};
 
@@ -28,9 +27,9 @@ pub enum Role {
 /// A prim type an engine declares.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PrimType {
-    /// Its id (`acme.ray.area_light`, `kinogaki.pixel.rim_light`).
+    /// Its id (`acme.ray.rect_light`, `kinogaki.pixel.rim_light`).
     pub id: PrimTypeId,
-    /// What a UI calls it (`Area Light`).
+    /// What a UI calls it (`Rect Light`).
     pub label: Arc<str>,
     /// Its role.
     pub role: Role,
@@ -67,7 +66,8 @@ impl PrimType {
     }
 }
 
-/// A placed prim of a declared type: its values by parameter name, where it sits and whether it shows.
+/// A placed prim of a declared type: its values by parameter name and where
+/// it sits. A host sends the prims that render: a hidden light is no prim.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Declared {
     /// Its type's id.
@@ -81,20 +81,16 @@ pub struct Declared {
     pub textures: Textures,
     /// Prim to world across the shutter (unused by atmospheres).
     pub xform: Sampled<Xform>,
-    /// Whether it is in the render, and whether the camera sees it itself (a
-    /// light lights the scene either way).
-    pub visibility: Visibility,
 }
 
 impl Declared {
-    /// A prim of type `type_id` holding `values`, at the origin, visible.
+    /// A prim of type `type_id` holding `values`, at the origin.
     pub fn new(type_id: PrimTypeId, values: Parameters) -> Declared {
         Declared {
             type_id,
             values,
             textures: Textures::new(),
             xform: Sampled::still(Xform::IDENTITY),
-            visibility: Visibility::SHOWN,
         }
     }
 

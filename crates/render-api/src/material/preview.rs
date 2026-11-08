@@ -105,6 +105,8 @@ fn lights(lighting: PreviewLighting) -> [standard::Light; 2] {
     let dome = standard::Light {
         shape: standard::LightShape::Dome {
             image: None,
+            format: standard::DomeFormat::Automatic,
+            pole: standard::Pole::Scene,
             ground: None,
         },
         intensity: 0.6,
@@ -116,6 +118,7 @@ fn lights(lighting: PreviewLighting) -> [standard::Light; 2] {
         shape: standard::LightShape::Rect {
             width: 2.0,
             height: 2.0,
+            texture: None,
         },
         color: [1.0, 0.95, 0.9],
         intensity: 4.0,

@@ -53,7 +53,7 @@ impl RenderedKind for LampPrims {
         let mut values = area_light().schema().values();
         values.insert("intensity".into(), Value::Number(lamp.intensity));
         vec![kinogaki_render_api::Declared::new(
-            standard::AREA_LIGHT,
+            standard::RECT_LIGHT,
             values,
         )]
     }
@@ -124,7 +124,7 @@ fn a_rendered_kind_says_what_its_objects_are_and_takes_edits() {
     let lamp = Lamp { intensity: 4.0 };
     let mut declared = rendered.declared(&lamp);
     assert_eq!(declared.len(), 1);
-    assert_eq!(declared[0].type_id, standard::AREA_LIGHT);
+    assert_eq!(declared[0].type_id, standard::RECT_LIGHT);
     assert_eq!(declared[0].value("intensity"), Some(&Value::Number(4.0)));
     // An edit comes back as a new body.
     declared[0]
@@ -159,7 +159,7 @@ impl ObjectCodec for Lamps {
             .ok_or_else(|| Error::invalid("not a lamp"))?;
         out.set(
             "type",
-            element::Field::Text(standard::AREA_LIGHT.to_string()),
+            element::Field::Text(standard::RECT_LIGHT.to_string()),
         )?;
         out.set("intensity", element::Field::Float(lamp.intensity))
     }
@@ -203,7 +203,7 @@ fn a_codec_reads_what_is_installed_and_says_what_isnt() {
             error,
             Error::missing(format!(
                 "light type {} isn't installed",
-                standard::AREA_LIGHT
+                standard::RECT_LIGHT
             ))
         );
     }
@@ -212,5 +212,5 @@ fn a_codec_reads_what_is_installed_and_says_what_isnt() {
 /// The standard area light's prim type.
 fn area_light() -> kinogaki_render_api::PrimType {
     let mut lights = standard::lights().into_iter();
-    lights.find(|t| t.id == standard::AREA_LIGHT).unwrap()
+    lights.find(|t| t.id == standard::RECT_LIGHT).unwrap()
 }

@@ -1,200 +1,85 @@
 //! Lights as a data type: a light shaped as UsdLux shapes one
 //! (render-api's standard [`Light`], unplaced: still at the identity).
 //! Where a light is belongs to what holds it (an object's placement, a
-//! file item's), never to the value. A dome's image is an
+//! file item's), never to the value. An image a light reads (a dome's, a
+//! rect's color map, an IES profile) is an
 //! [`ImageRef`](kinogaki_value::ImageRef) (a file, on disk or held, or an
-//! Image node), saved as an image element
-//! ([`write_image`](crate::element::write_image)); the Texture prim a host
-//! decodes it to belongs to one scene, never to a value.
+//! Image node); the Texture prim a host decodes it to belongs to one scene,
+//! never to a value.
+//!
+//! A value saves as its standard type and its prim's values by name, as an
+//! engine's light object saves its prim ([`element::write_values`]):
 //!
 //! ```text
-//! type (RectLight, DiskLight, DomeLight, DistantLight, SphereLight),
-//! width, height (RectLight), radius (DiskLight, SphereLight),
-//! groundColor, texture (DomeLight, each when it has one; texture an image
-//! element),
-//! angle (DistantLight),
-//! coneAngle, coneSoftness (SphereLight), emission, color, intensity,
-//! exposure, normalize, colorTemperature, visible
+//! type "kinogaki.core.sphere_light"
+//! def values "values" { radius, treatAsPoint, emission, color, … }
 //! ```
 use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::element::{ElementReader, ElementWriter, Field, read_image, write_image};
+use crate::element::{self, ElementReader, ElementWriter, Field};
 use crate::standard::light;
 use kinogaki_geometry::{Sampled, Xform};
-use kinogaki_render_api::standard::{Emission, Light, LightShape};
+use kinogaki_render_api::Declared;
+use kinogaki_render_api::standard::{self, Light};
 
-/// The largest size, intensity or temperature a light takes.
-const MAX_VALUE: f32 = 1e12;
+/// The element holding a light's values.
+const VALUES: &str = "values";
 
-/// `light` as a light value, when it is one: every number finite and
-/// within range, sizes and radii positive, an angle and intensity of at
-/// least 0, a color temperature above 0, a cone angle of 0 to 180 degrees
-/// and a softness of 0 to 1, colors finite (a component below 0 is a
-/// color outside the space's gamut, as a file in a narrower space than
-/// the scene's holds), and a dome's image one that names an image
-/// ([`ImageRef::refusal`](kinogaki_value::ImageRef::refusal)).
-/// Its transform is dropped: where a light is isn't the value's. The
-/// check of [`standard::light`](crate::standard::light), which wraps every
-/// light value, and of what [`LightCodec`] reads.
+/// `light` as a light value, when it is one: every value within its
+/// type's limits (sizes above 0, colors finite: a component below 0 is a
+/// color outside the space's gamut, as a file in a narrower space than the
+/// scene's holds; an image naming an image), shaping only on a shape that
+/// takes it, no Normalize on a dome. Its transform is dropped: where a
+/// light is isn't the value's. The check of
+/// [`standard::light`](crate::standard::light), which wraps every light
+/// value, and of what [`LightCodec`] reads.
 ///
 /// # Errors
-/// A value out of range.
+/// A value its type refuses, or one its type doesn't hold.
 pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
-    let within = |v: f32| v.is_finite() && v.abs() <= MAX_VALUE;
-    let positive = |v: f32| within(v) && v > 0.0;
-    let at_least_0 = |v: f32| within(v) && v >= 0.0;
-    let shape = match &light.shape {
-        LightShape::Rect { width, height } => positive(*width) && positive(*height),
-        LightShape::Disk { radius } => positive(*radius),
-        LightShape::Dome { image, ground } => {
-            ground.is_none_or(|g| g.into_iter().all(within))
-                && image.as_ref().is_none_or(|i| i.refusal().is_none())
-        }
-        LightShape::Distant { angle } => at_least_0(*angle) && *angle <= 180.0,
-        LightShape::Spot {
-            radius,
-            cone_angle,
-            cone_softness,
-        } => {
-            positive(*radius)
-                && (0.0..=180.0).contains(cone_angle)
-                && (0.0..=1.0).contains(cone_softness)
-        }
-    };
-    let ok = shape
-        && light.color.into_iter().all(within)
-        && at_least_0(light.intensity)
-        && within(light.exposure)
-        && positive(light.color_temperature);
-    if !ok {
-        return Err(Error::invalid("invalid light"));
-    }
-    Ok(Light {
+    let light = Light {
         xform: Sampled::still(Xform::IDENTITY),
         ..light
-    })
+    };
+    let prim = light.declared();
+    let fits = light.prim_type().schema().validate(&prim.values).is_ok();
+    if !fits || Light::decode(&prim).as_ref() != Some(&light) {
+        return Err(Error::invalid("invalid light"));
+    }
+    Ok(light)
 }
 
-/// The codec of light values: the light as UsdLux's fields.
+/// The codec of light values: the light's type and its values by name.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct LightCodec;
 
 impl LightCodec {
-    /// Writes `light` as fields.
+    /// Writes `light` as its type and values.
     ///
     /// # Errors
     /// The element refusing a field.
     pub(crate) fn write_light(light: &Light, out: &mut dyn ElementWriter) -> Result<(), Error> {
-        let float = |v: f32| Field::Float(f64::from(v));
-        let ty = match &light.shape {
-            LightShape::Rect { width, height } => {
-                out.set("width", float(*width))?;
-                out.set("height", float(*height))?;
-                "RectLight"
-            }
-            LightShape::Disk { radius } => {
-                out.set("radius", float(*radius))?;
-                "DiskLight"
-            }
-            LightShape::Dome { image, ground } => {
-                if let Some(g) = ground {
-                    out.set("groundColor", Field::F32s(g.to_vec()))?;
-                }
-                if let Some(image) = image {
-                    write_image(out, "texture", Some(image))?;
-                }
-                "DomeLight"
-            }
-            LightShape::Distant { angle } => {
-                out.set("angle", float(*angle))?;
-                "DistantLight"
-            }
-            LightShape::Spot {
-                radius,
-                cone_angle,
-                cone_softness,
-            } => {
-                out.set("radius", float(*radius))?;
-                out.set("coneAngle", float(*cone_angle))?;
-                out.set("coneSoftness", float(*cone_softness))?;
-                "SphereLight"
-            }
-        };
-        out.set("type", Field::Text(ty.into()))?;
-        out.set("emission", Field::Text(light.emission.key().into()))?;
-        out.set("color", Field::F32s(light.color.to_vec()))?;
-        out.set("intensity", float(light.intensity))?;
-        out.set("exposure", float(light.exposure))?;
-        out.set("normalize", Field::Bool(light.normalize))?;
-        out.set("colorTemperature", float(light.color_temperature))?;
-        out.set("visible", Field::Bool(light.camera))
+        let prim = light.declared();
+        out.set("type", Field::Text(prim.type_id.to_string()))?;
+        element::write_values(&mut *out.child(VALUES, VALUES)?, &prim.values)
     }
 
     /// Reads the light [`write_light`](Self::write_light) wrote, strictly:
-    /// every field its type has, a known type and emission, and a valid
-    /// light ([`light_value`]).
+    /// a standard type, every value it has, and a valid light
+    /// ([`light_value`]).
     ///
     /// # Errors
-    /// A field missing or of another kind, or an invalid light.
+    /// An unknown type, a value missing or out of range, or an invalid light.
     pub(crate) fn read_light(e: &dyn ElementReader) -> Result<Light, Error> {
         let at = || e.location();
-        let scalar = |name| e.float(name).map(|v| v as f32);
-        let color = |name| match e.f32s(name)? {
-            &[r, g, b] => Ok([r, g, b]),
-            _ => Err(Error::invalid(format_args!(
-                "{}: {name} isn't three numbers",
-                at()
-            ))),
-        };
-        let shape = match e.text("type")? {
-            "RectLight" => LightShape::Rect {
-                width: scalar("width")?,
-                height: scalar("height")?,
-            },
-            "DiskLight" => LightShape::Disk {
-                radius: scalar("radius")?,
-            },
-            "DomeLight" => LightShape::Dome {
-                image: match e.child("texture") {
-                    Some(_) => read_image(e, "texture")?,
-                    None => None,
-                },
-                ground: match e.field("groundColor") {
-                    Some(_) => Some(color("groundColor")?),
-                    None => None,
-                },
-            },
-            "DistantLight" => LightShape::Distant {
-                angle: scalar("angle")?,
-            },
-            "SphereLight" => LightShape::Spot {
-                radius: scalar("radius")?,
-                cone_angle: scalar("coneAngle")?,
-                cone_softness: scalar("coneSoftness")?,
-            },
-            other => {
-                return Err(Error::invalid(format_args!(
-                    "{}: unknown light type {other:?}",
-                    at()
-                )));
-            }
-        };
-        let emission = e.text("emission")?;
-        let emission = Emission::of_key(emission).ok_or_else(|| {
-            Error::invalid(format_args!("{}: unknown emission {emission:?}", at()))
-        })?;
-        let light = Light {
-            shape,
-            emission,
-            color: color("color")?,
-            intensity: scalar("intensity")?,
-            exposure: scalar("exposure")?,
-            normalize: e.bool("normalize")?,
-            color_temperature: scalar("colorTemperature")?,
-            xform: Sampled::still(Xform::IDENTITY),
-            camera: e.bool("visible")?,
-        };
+        let id = e.text("type")?;
+        let ty = (standard::lights().into_iter())
+            .find(|t| t.id.as_str() == id)
+            .ok_or_else(|| Error::invalid(format_args!("{}: unknown light type {id:?}", at())))?;
+        let values = element::read_values(&*e.required_child(VALUES)?, ty.schema().parameters())?;
+        let light = Light::decode(&Declared::new(ty.id, values))
+            .ok_or_else(|| Error::invalid(format_args!("{}: invalid light", at())))?;
         light_value(light).map_err(|_| Error::invalid(format_args!("{}: invalid light", at())))
     }
 }
@@ -218,8 +103,18 @@ mod tests {
     use crate::element::MemoryElement;
     use kinogaki_geometry::EmbeddedFile;
     use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
+    use kinogaki_render_api::standard::{DomeFormat, Emission, LightShape, Pole, Shadow, Shaping};
     use kinogaki_value::ImageRef;
     use std::sync::Arc;
+
+    fn dome(image: Option<ImageRef>, ground: Option<[f32; 3]>) -> LightShape {
+        LightShape::Dome {
+            image,
+            format: DomeFormat::LatLong,
+            pole: Pole::Z,
+            ground,
+        }
+    }
 
     /// One light of each shape, with values off their defaults.
     fn every_shape() -> Vec<Light> {
@@ -227,50 +122,66 @@ mod tests {
             LightShape::Rect {
                 width: 2.0,
                 height: 0.5,
+                texture: Some(ImageRef::File(ImageSource::path("panel.png"))),
             },
             LightShape::Disk { radius: 0.25 },
-            LightShape::Dome {
-                image: None,
-                ground: Some([0.2, 0.1, 0.05]),
+            LightShape::Sphere {
+                radius: 0.1,
+                point: true,
             },
-            LightShape::Dome {
-                image: Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
-                ground: None,
+            LightShape::Cylinder {
+                length: 0.8,
+                radius: 0.015,
+                line: false,
             },
-            LightShape::Dome {
-                image: Some(ImageRef::File(ImageSource::new(
+            dome(None, Some([0.2, 0.1, 0.05])),
+            dome(
+                Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
+                None,
+            ),
+            dome(
+                Some(ImageRef::File(ImageSource::new(
                     ImageFile::Embedded(EmbeddedFile::new("noon.exr", vec![1, 2, 3])),
                     ImageColor::Data,
                 ))),
-                ground: None,
-            },
-            LightShape::Dome {
-                image: Some(ImageRef::Node(Arc::from("/Library/Sky"))),
-                ground: None,
-            },
+                None,
+            ),
+            dome(Some(ImageRef::Node(Arc::from("/Library/Sky"))), None),
             LightShape::Distant { angle: 0.53 },
-            LightShape::Spot {
-                radius: 0.1,
-                cone_angle: 30.0,
-                cone_softness: 0.2,
-            },
         ];
         (shapes.into_iter().enumerate())
-            .map(|(i, shape)| Light {
-                shape,
-                emission: [
-                    Emission::Color,
-                    Emission::Temperature,
-                    Emission::Illuminant(Arc::from("D50")),
-                ][i % 3]
-                    .clone(),
-                color: [0.9, 0.5, 0.25],
-                intensity: 3.5,
-                exposure: -1.0,
-                normalize: i % 2 == 0,
-                color_temperature: 3200.0,
-                camera: i % 2 == 1,
-                ..Light::default()
+            .map(|(i, shape)| {
+                let mut light = Light {
+                    shape,
+                    emission: [
+                        Emission::Color,
+                        Emission::Temperature,
+                        Emission::Illuminant(Arc::from("D50")),
+                    ][i % 3]
+                        .clone(),
+                    color: [0.9, 0.5, 0.25],
+                    intensity: 3.5,
+                    exposure: -1.0,
+                    color_temperature: 3200.0,
+                    diffuse: 0.5,
+                    specular: 2.0,
+                    shadow: Shadow {
+                        color: [0.5, 0.0, 0.0],
+                        distance: 2.0,
+                        ..Shadow::default()
+                    },
+                    camera: i % 2 == 1,
+                    ..Light::default()
+                };
+                if light.shapes() {
+                    light.normalize = i % 2 == 0;
+                    light.shaping = Some(Shaping {
+                        cone_angle: 25.0,
+                        ies: Some(ImageRef::File(ImageSource::path("lamp.ies"))),
+                        ..Shaping::default()
+                    });
+                }
+                light
             })
             .collect()
     }
@@ -289,46 +200,53 @@ mod tests {
 
     #[test]
     fn only_lights_in_range_are_light_values() {
+        let rect = |width| LightShape::Rect {
+            width,
+            height: 1.0,
+            texture: None,
+        };
         let bad = [
-            LightShape::Rect {
-                width: 0.0,
-                height: 1.0,
-            },
+            rect(0.0),
             LightShape::Disk { radius: f32::NAN },
             LightShape::Distant { angle: -1.0 },
-            LightShape::Spot {
-                radius: 1.0,
-                cone_angle: 190.0,
-                cone_softness: 0.0,
+            LightShape::Cylinder {
+                length: 1.0,
+                radius: -0.5,
+                line: false,
             },
-            LightShape::Spot {
-                radius: 1.0,
-                cone_angle: 45.0,
-                cone_softness: 1.5,
-            },
-            LightShape::Dome {
-                image: None,
-                ground: Some([f32::NAN, 0.0, 0.0]),
-            },
-            LightShape::Dome {
-                image: Some(ImageRef::File(ImageSource::path(" "))),
-                ground: None,
-            },
-            LightShape::Dome {
-                image: Some(ImageRef::Node(Arc::from("Sky"))),
-                ground: None,
-            },
+            dome(None, Some([f32::NAN, 0.0, 0.0])),
+            dome(Some(ImageRef::File(ImageSource::path(" "))), None),
+            dome(Some(ImageRef::Node(Arc::from("Sky"))), None),
         ];
         for shape in bad {
-            assert!(
-                light()
-                    .wrap(Light {
-                        shape,
-                        ..Light::default()
-                    })
-                    .is_err()
-            );
+            let light = Light {
+                shape,
+                ..Light::default()
+            };
+            assert!(light_value(light).is_err());
         }
+        let cone = |cone_angle, cone_softness| Light {
+            shaping: Some(Shaping {
+                cone_angle,
+                cone_softness,
+                ..Shaping::default()
+            }),
+            ..Light::default()
+        };
+        assert!(light().wrap(cone(190.0, 0.0)).is_err());
+        assert!(light().wrap(cone(45.0, 1.5)).is_err());
+        assert!(light().wrap(cone(45.0, 0.5)).is_ok());
+        // Shaping a distant light, or normalizing a dome, is no light value.
+        let shaped_sun = Light {
+            shape: LightShape::Distant { angle: 0.53 },
+            ..cone(45.0, 0.0)
+        };
+        let normalized_sky = Light {
+            shape: dome(None, None),
+            normalize: true,
+            ..Light::default()
+        };
+        assert!(light().wrap(shaped_sun).is_err() && light().wrap(normalized_sky).is_err());
         let cold = Light {
             color_temperature: 0.0,
             ..Light::default()
@@ -348,10 +266,10 @@ mod tests {
 
     #[test]
     fn a_value_is_unplaced_and_keeps_its_image_file() {
-        let sky = LightShape::Dome {
-            image: Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
-            ground: None,
-        };
+        let sky = dome(
+            Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
+            None,
+        );
         let placed = Light {
             shape: sky.clone(),
             xform: Sampled::still(Xform::translation(kinogaki_geometry::Vec3::new(
@@ -368,22 +286,21 @@ mod tests {
 
     #[test]
     fn an_unknown_type_or_emission_is_refused() {
-        let mut e = MemoryElement::new("light");
-        e.write(|w| LightCodec::write_light(&Light::default(), w))
+        let written = |ty: &str, values: &crate::Parameters| {
+            let mut e = MemoryElement::new("light");
+            e.write(|w| {
+                w.set("type", Field::Text(ty.into()))?;
+                element::write_values(&mut *w.child(VALUES, VALUES)?, values)
+            })
             .unwrap();
-        e.write(|w| w.set("emission", Field::Text("candle".into())))
-            .unwrap();
-        let refused = e.read(|r| LightCodec.read(r)).unwrap_err();
-        assert!(
-            refused.to_string().contains("unknown emission"),
-            "{refused}"
-        );
-        e.write(|w| w.set("type", Field::Text("CylinderLight".into())))
-            .unwrap();
-        let refused = e.read(|r| LightCodec.read(r)).unwrap_err();
-        assert!(
-            refused.to_string().contains("unknown light type"),
-            "{refused}"
-        );
+            e.read(|r| LightCodec.read(r)).unwrap_err().to_string()
+        };
+        let mut prim = Light::default().declared();
+        prim.values
+            .insert("emission".into(), crate::Value::Choice("candle".into()));
+        let refused = written(prim.type_id.as_str(), &prim.values);
+        assert!(refused.contains("emission is out of range"), "{refused}");
+        let refused = written("kinogaki.core.spot_light", &prim.values);
+        assert!(refused.contains("unknown light type"), "{refused}");
     }
 }
