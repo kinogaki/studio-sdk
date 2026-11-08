@@ -298,16 +298,6 @@ pub enum Begun {
     Joined(GestureMark),
 }
 
-impl Begun {
-    /// The token, when this opened the gesture.
-    pub fn own(self) -> Option<GestureToken> {
-        match self {
-            Begun::Own(token) => Some(token),
-            Begun::Joined(_) => None,
-        }
-    }
-}
-
 /// A point inside an open gesture to go back to: its start
 /// ([`GestureToken::start`]), or where a drag joined it. Going back to a
 /// mark of a gesture that ended, or one a newer mark replaced, does

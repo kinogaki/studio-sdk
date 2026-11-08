@@ -18,6 +18,9 @@ pub struct KeyPress {
     pub browser: bool,
     /// The key chooses a transform tool (Q, W, E, R, T).
     pub tool_key: bool,
+    /// A release that is no release: the window lost focus with the key
+    /// down. What holding it did is put back, as a drag is then.
+    pub cancelled: bool,
 }
 
 /// What a live gesture keeps from the rest of the viewport.

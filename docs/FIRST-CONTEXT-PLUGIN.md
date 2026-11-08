@@ -438,10 +438,9 @@ The pin board changes its own body. A context over geometry (Studio's Mesh plugi
 **A live tool** is a context's `LiveTools` part: a tool that stays live after it starts, its card up, its rows adjustable, until Enter keeps it or Escape puts back what it did. Its shape is one gesture:
 
 ```rust
-// Starting the tool (a library item ran): one undo step from here on.
-// While another's gesture is open the tool joins that one instead
-// (Begun::Joined, a mark to go back to); this tool keeps only its own.
-live.gesture = cx.begin_gesture("Push").own();
+// Starting the tool (a library item ran): one undo step from here on,
+// or, while another's gesture is open, a part of that one (Begun::Joined).
+live.gesture = cx.begin_gesture("Push");
 let mut made = None;
 cx.edit_network(object, "Push", &mut |edit| {
     made = Some(edit.add_node_in(None, new_node.clone(), Insertion::Grow(Growth::Modify))?);
@@ -449,13 +448,13 @@ cx.edit_network(object, "Push", &mut |edit| {
 })?;
 // Each change of a row while it is live: inside the same gesture.
 cx.edit_network(object, "Push", &mut |edit| edit.set_parameter(node, "distance", Value::Number(d)))?;
-// Enter, or LiveTools::accept: keep it.
-if let Some(gesture) = live.gesture.take() {
-    cx.finish_gesture(gesture)?;
+// Enter, or LiveTools::accept: keep it (a gesture it joined stays its opener's).
+if let Some(live) = s.live.take() {
+    cx.keep(live.gesture)?;
 }
-// Or LiveTools::cancel(Ended::Escape | Ended::Undo): put it back.
-if let Some(gesture) = live.gesture.take() {
-    cx.cancel_gesture(gesture);
+// Or LiveTools::cancel(Ended::Escape | Ended::Undo): put it back (to where it joined).
+if let Some(live) = s.live.take() {
+    cx.put_back(live.gesture);
 }
 ```
 

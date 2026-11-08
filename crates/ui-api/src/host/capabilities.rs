@@ -28,7 +28,8 @@ use std::sync::Arc;
 /// undo step of its own, unless a gesture is open: then every change up
 /// to its finish is one step, named when the gesture began (a drag). The
 /// gesture is its opener's: [`begin_gesture`](HostUndo::begin_gesture)
-/// gives the [`GestureToken`] that alone finishes or cancels it.
+/// gives a [`Begun`], which [`keep`](HostUndo::keep) or
+/// [`put_back`](HostUndo::put_back) ends as its opener or its joiner.
 pub trait HostUndo {
     /// Opens a gesture named `label`: [`Begun::Own`] with its token, or,
     /// while a gesture is open already (a live tool's run),
@@ -53,6 +54,27 @@ pub trait HostUndo {
     fn back_to(&mut self, mark: GestureMark);
     /// Whether a gesture is open, anyone's.
     fn in_gesture(&self) -> bool;
+    /// Keeps what followed `begun`: a gesture it opened finishes as one
+    /// step ([`finish_gesture`](Self::finish_gesture)); one it joined stays
+    /// open, its opener's to end.
+    ///
+    /// # Errors
+    /// What the finished gesture made doesn't check: it is put back.
+    fn keep(&mut self, begun: Begun) -> Result<(), Error> {
+        match begun {
+            Begun::Own(token) => self.finish_gesture(token),
+            Begun::Joined(_) => Ok(()),
+        }
+    }
+    /// Puts back what followed `begun`: a gesture it opened is cancelled
+    /// ([`cancel_gesture`](Self::cancel_gesture)); one it joined goes back
+    /// to where it joined ([`back_to`](Self::back_to)) and stays open.
+    fn put_back(&mut self, begun: Begun) {
+        match begun {
+            Begun::Own(token) => self.cancel_gesture(token),
+            Begun::Joined(mark) => self.back_to(mark),
+        }
+    }
     /// Undoes the last step (live tools end first, after this call).
     fn undo(&mut self);
     /// Redoes the last undone step.
@@ -154,8 +176,9 @@ pub trait HostDoc {
     /// returns, as everything that could reach a package does: the open
     /// context's live tools keep what they hold first
     /// ([`LiveTools::accept`](crate::package::LiveTools::accept)), the
-    /// location still theirs. `Err` says why it can't (the object is
-    /// locked or gone), and nothing moves.
+    /// location still theirs. `Err` says why it can't now (the object is
+    /// locked or gone), and nothing moves; a place that can't be gone to
+    /// once the call returns is said on the status line.
     fn go_to(&mut self, place: Place) -> Result<(), Error>;
     /// Bumped by every change to a network: what a cook would see.
     fn revision(&self) -> u64;

@@ -50,7 +50,9 @@ fn host() -> FakeHost {
 #[test]
 fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
     let mut host = host();
-    let gesture = host.begin_gesture("Adjust").own().expect("none was open");
+    let kinogaki_studio_api::Begun::Own(gesture) = host.begin_gesture("Adjust") else {
+        panic!("none was open");
+    };
     host.edit_slot("step", |slot| *slot = Count(1));
     host.edit_slot("step", |slot| *slot = Count(2));
     host.back_to(gesture.start());
@@ -75,16 +77,17 @@ fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
 #[test]
 fn a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it() {
     let mut host = host();
-    let tool = host.begin_gesture("Tool").own().expect("none was open");
+    use kinogaki_studio_api::Begun;
+    let tool = host.begin_gesture("Tool");
+    assert!(matches!(tool, Begun::Own(_)), "none was open");
     host.edit_slot("step", |slot| *slot = Count(1));
-    let kinogaki_studio_api::Begun::Joined(joined) = host.begin_gesture("Drag") else {
-        panic!("the tool's is open");
-    };
+    let drag = host.begin_gesture("Drag");
+    assert!(matches!(drag, Begun::Joined(_)), "the tool's is open");
     host.edit_slot("step", |slot| *slot = Count(2));
-    host.back_to(joined);
+    host.put_back(drag);
     assert_eq!(host.slot::<Count>(), &Count(1), "back to where it joined");
     assert!(host.in_gesture(), "going back leaves the tool's open");
-    host.finish_gesture(tool).unwrap();
+    host.keep(tool).unwrap();
     assert_eq!(host.history(), ["Tool"]);
 }
 

@@ -47,8 +47,9 @@ part! {
         /// binding (see [`KeyPress`]): a live tool's own keys (Enter). A
         /// key whose press came here is the tools' until it comes up: its
         /// repeats and its release come here too, wherever the pointer is
-        /// and whatever has the keyboard then, and the window losing focus
-        /// releases it. Escape never comes here: it is
+        /// and whatever has the keyboard then. The window losing focus
+        /// first sends its release [`cancelled`](KeyPress::cancelled): what
+        /// holding it did is put back. Escape never comes here: it is
         /// [`cancel`](Self::cancel)'s. `true`: the tools took it, and
         /// nothing else sees it.
         fn key(&self, s: &mut S, cx: &mut dyn Cx, press: &KeyPress) -> bool {

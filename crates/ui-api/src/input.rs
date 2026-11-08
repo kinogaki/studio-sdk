@@ -17,11 +17,6 @@ pub struct UserInput {
     pub scroll: Vec2,
     /// Seconds since the host started.
     pub time: f64,
-    /// A text field or another widget has the keyboard: shortcuts should
-    /// leave the keys alone.
-    pub keyboard_taken: bool,
-    /// A popup or menu is open: viewport clicks should not act.
-    pub popup_open: bool,
 }
 
 impl UserInput {
