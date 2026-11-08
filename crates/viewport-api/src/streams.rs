@@ -34,9 +34,10 @@ impl Streams {
     /// alone in a wireframe view, and picked at an edge level. Without
     /// them a packet holds its other classes alone, with the same ids.
     pub const WIRES: Self = Self(1);
-    /// The vertex records' curvature ([`Vertex::curvature`](crate::Vertex),
-    /// [`SurfaceSource::curvature_range`](crate::SurfaceSource)), drawn
-    /// where a view shades by it; zero without it.
+    /// The curvature column ([`Column::Curvature`](crate::Column): two
+    /// measures a vertex record, [`SurfaceSource::curvature_range`](crate::SurfaceSource)),
+    /// drawn where a view shades by it; without it a packet holds none, and
+    /// a view shades it as zero.
     pub const CURVATURE: Self = Self(2);
     /// Every one.
     pub const ALL: Self = Self(3);

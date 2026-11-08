@@ -78,6 +78,9 @@ pub struct DrawUpdate {
     pub lines: BufferRanges,
     /// Point markers rewritten or added.
     pub points: BufferRanges,
+    /// Curvature values ([`Column::Curvature`](crate::Column)) changed or
+    /// added.
+    pub curvature: BufferRanges,
     /// The packet changes its parent's topology: streams may be of other
     /// lengths (ranges cover what is new or moved, in the new lengths; what
     /// a stream dropped goes by its count).
@@ -101,6 +104,8 @@ pub(crate) struct Ancestor {
     pub lines: BufferRanges,
     /// Point markers changed since it.
     pub points: BufferRanges,
+    /// Curvature values changed since it.
+    pub curvature: BufferRanges,
     /// Some packet since this one extended the topology.
     pub extends: bool,
 }
@@ -117,6 +122,8 @@ pub struct UpdateRanges<'a> {
     pub lines: &'a BufferRanges,
     /// Point markers.
     pub points: &'a BufferRanges,
+    /// Curvature values.
+    pub curvature: &'a BufferRanges,
     /// See [`DrawUpdate::extends`].
     pub extends: bool,
 }
@@ -124,9 +131,9 @@ impl DrawUpdate {
     /// Undisplayed packets bridged before a patch gives up (a full upload).
     pub(crate) const ANCESTORS: usize = 4;
     /// A new update with no ancestors. `streams` are the position, vertex,
-    /// index, line and point ranges.
-    pub fn new(parent: Arc<()>, streams: [BufferRanges; 5]) -> Self {
-        let [positions, vertices, indices, lines, points] = streams;
+    /// index, line, point and curvature ranges.
+    pub fn new(parent: Arc<()>, streams: [BufferRanges; 6]) -> Self {
+        let [positions, vertices, indices, lines, points, curvature] = streams;
         Self {
             parent,
             positions,
@@ -134,6 +141,7 @@ impl DrawUpdate {
             indices,
             lines,
             points,
+            curvature,
             extends: false,
             ancestors: Vec::new(),
         }
@@ -147,6 +155,7 @@ impl DrawUpdate {
                 indices: &self.indices,
                 lines: &self.lines,
                 points: &self.points,
+                curvature: &self.curvature,
                 extends: self.extends,
             });
         }
@@ -159,6 +168,7 @@ impl DrawUpdate {
                 indices: &a.indices,
                 lines: &a.lines,
                 points: &a.points,
+                curvature: &a.curvature,
                 extends: a.extends,
             })
     }
@@ -167,7 +177,7 @@ impl DrawUpdate {
     pub fn inherit(&mut self, previous: &DrawUpdate) {
         // Ranges are kept in this packet's lengths; an older packet's
         // ranges past them (a stream that shrank) are dropped.
-        let since = |identity: &Arc<()>, streams: [&BufferRanges; 5], extends: bool| {
+        let since = |identity: &Arc<()>, streams: [&BufferRanges; 6], extends: bool| {
             let mut ancestor = Ancestor {
                 identity: identity.clone(),
                 positions: self.positions.clone(),
@@ -175,6 +185,7 @@ impl DrawUpdate {
                 indices: self.indices.clone(),
                 lines: self.lines.clone(),
                 points: self.points.clone(),
+                curvature: self.curvature.clone(),
                 extends: extends || self.extends,
             };
             ancestor.positions.merge(streams[0]);
@@ -182,6 +193,7 @@ impl DrawUpdate {
             ancestor.indices.merge(streams[2]);
             ancestor.lines.merge(streams[3]);
             ancestor.points.merge(streams[4]);
+            ancestor.curvature.merge(streams[5]);
             ancestor
         };
         let mut ancestors = vec![since(
@@ -192,6 +204,7 @@ impl DrawUpdate {
                 &previous.indices,
                 &previous.lines,
                 &previous.points,
+                &previous.curvature,
             ],
             previous.extends,
         )];
@@ -203,7 +216,14 @@ impl DrawUpdate {
                 .map(|a| {
                     since(
                         &a.identity,
-                        [&a.positions, &a.vertices, &a.indices, &a.lines, &a.points],
+                        [
+                            &a.positions,
+                            &a.vertices,
+                            &a.indices,
+                            &a.lines,
+                            &a.points,
+                            &a.curvature,
+                        ],
                         a.extends,
                     )
                 }),
@@ -244,6 +264,7 @@ mod tests {
             parent.clone(),
             [
                 ranges(10_000, &[span]),
+                ranges(10_000, &[]),
                 ranges(10_000, &[]),
                 ranges(10_000, &[]),
                 ranges(10_000, &[]),

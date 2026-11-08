@@ -27,9 +27,6 @@ pub struct Vertex {
     pub normal: [f32; 3],
     /// The shaded (smoothed) normal, unit length.
     pub smooth_normal: [f32; 3],
-    /// The two curvature measures the analysis shadings show (see
-    /// [`SurfaceSource::curvature_range`]).
-    pub curvature: [f32; 2],
     /// The face it belongs to (face picks and highlights).
     pub face: u32,
     /// The point it sits on: an index into the positions column.
@@ -41,13 +38,12 @@ pub struct Vertex {
 impl Vertex {
     /// The record as a renderer uploads it: its fields in order, each in
     /// native byte order (what a byte cast of the `repr(C)` record gives).
-    pub fn bytes(&self) -> [u8; 44] {
-        let mut out = [0; 44];
+    pub fn bytes(&self) -> [u8; 36] {
+        let mut out = [0; 36];
         let words = self
             .normal
             .iter()
             .chain(&self.smooth_normal)
-            .chain(&self.curvature)
             .map(|f| f.to_ne_bytes())
             .chain([self.face, self.point, self.component].map(u32::to_ne_bytes));
         for (at, word) in out.as_chunks_mut::<4>().0.iter_mut().zip(words) {
@@ -74,6 +70,12 @@ pub enum Column {
     Positions,
     /// [`Vertex`] records, one per polygon vertex.
     Vertices,
+    /// `[f32; 2]` curvature measures, one a vertex record (the principal
+    /// curvatures, k1 ≥ k2, that the analysis shadings show; see
+    /// [`SurfaceSource::curvature_range`]): as many as the vertex records
+    /// in a packet holding [`Streams::CURVATURE`](crate::Streams), none in
+    /// one without.
+    Curvature,
 }
 impl Column {
     /// Bytes per element.
@@ -81,6 +83,7 @@ impl Column {
         match self {
             Self::Positions => 12,
             Self::Vertices => std::mem::size_of::<Vertex>(),
+            Self::Curvature => 8,
         }
     }
 }
@@ -385,6 +388,7 @@ pub trait SurfaceSource: Any + Send + Sync {
     fn upload_bytes(&self) -> usize {
         self.column_len(Column::Positions) * Column::Positions.element_size()
             + self.column_len(Column::Vertices) * Column::Vertices.element_size()
+            + self.column_len(Column::Curvature) * Column::Curvature.element_size()
             + self.indices().len() * 4
             + (self.lines().len() + self.points().len()) * std::mem::size_of::<OverlayVertex>()
     }
@@ -463,7 +467,6 @@ mod tests {
         let v = Vertex {
             normal: [1.0, 2.0, 3.0],
             smooth_normal: [4.0, 5.0, 6.0],
-            curvature: [7.0, 8.0],
             face: 9,
             point: 10,
             component: 11,
@@ -471,8 +474,9 @@ mod tests {
         let bytes = v.bytes();
         assert_eq!(bytes.len(), std::mem::size_of::<Vertex>());
         assert_eq!(bytes[..4], 1.0f32.to_ne_bytes());
-        assert_eq!(bytes[28..32], 8.0f32.to_ne_bytes());
-        assert_eq!(bytes[40..], 11u32.to_ne_bytes());
+        assert_eq!(bytes[20..24], 6.0f32.to_ne_bytes());
+        assert_eq!(bytes[24..28], 9u32.to_ne_bytes());
+        assert_eq!(bytes[32..], 11u32.to_ne_bytes());
         #[cfg(feature = "bytemuck")]
         assert_eq!(&bytes[..], bytemuck::bytes_of(&v));
         let set = ElementSet::new(ElementKind::Point, false, [3, 1, 3]);

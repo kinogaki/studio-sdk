@@ -295,6 +295,7 @@ impl Surface {
                 unchanged(self.triangles.len() * 3),
                 BufferRanges::new::<OverlayVertex>(self.lines.len()),
                 BufferRanges::new::<OverlayVertex>(0),
+                BufferRanges::new::<[f32; 2]>(0),
             ],
         );
         if let Some(held) = &self.update {
@@ -349,7 +350,6 @@ impl Surface {
         Vertex {
             normal: c.normal,
             smooth_normal: c.normal,
-            curvature: [0.0; 2],
             face: c.face,
             point: c.point,
             component: corner as u32,
@@ -375,10 +375,11 @@ impl SurfaceSource for Surface {
         match column {
             Column::Positions => self.points.len(),
             Column::Vertices => self.corners.len(),
+            Column::Curvature => 0,
         }
     }
 
-    /// Both columns go in pieces of a few thousand records, written as
+    /// Its columns go in pieces of a few thousand records, written as
     /// their bytes.
     fn column_bytes(
         &self,
@@ -399,6 +400,7 @@ impl SurfaceSource for Surface {
                         .flat_map(|c| c.to_ne_bytes()),
                 ),
                 Column::Vertices => piece.extend((start..end).flat_map(|c| self.vertex(c).bytes())),
+                Column::Curvature => {}
             }
             let at = (start - range.start) * size;
             write(at..at + piece.len(), &piece);
@@ -618,7 +620,8 @@ mod tests {
             bytes.extend_from_slice(b);
         });
         assert_eq!(bytes.len(), 3 * Column::Vertices.element_size());
-        assert_eq!(&bytes[..44], &surface.vertex(1).bytes());
+        let record = Column::Vertices.element_size();
+        assert_eq!(&bytes[..record], &surface.vertex(1).bytes());
         let mut positions = Vec::new();
         surface.column_bytes(Column::Positions, 1..3, &mut |_, b| {
             positions.extend_from_slice(b)
