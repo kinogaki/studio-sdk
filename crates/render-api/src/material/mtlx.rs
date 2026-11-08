@@ -6,6 +6,10 @@
 //!
 //! - a uniform input is a setting, any other value input one a wire may
 //!   drive;
+//! - an input naming an attribute of the geometry (a geometric property
+//!   value's `geomprop`, a USD Primvar Reader's `varname`: [`ATTRIBUTES`])
+//!   holds attribute names, which a network sends its shapes
+//!   ([`MaterialNetwork::primvars`](super::MaterialNetwork::primvars));
 //! - an input reading a geometric property while unwired (a texture
 //!   coordinate, the shading normal), a matrix and a closure are wires alone;
 //! - a `filename` input is an image wire alone: the host's
@@ -162,6 +166,7 @@ fn kind(node: &str, port: &Port) -> Option<ValueKind> {
             },
         },
         Type::String if !port.enumeration.is_empty() => ValueKind::choice(choices()),
+        Type::String if ATTRIBUTES.contains(&(node, port.name.as_str())) => ValueKind::attribute(),
         Type::String => ValueKind::Text,
         _ => return None,
     })
@@ -195,6 +200,15 @@ const LENGTHS: &[(&str, &str)] = &[
     ("standard_surface", "subsurface_scale"),
 ];
 
+/// The inputs naming an attribute of the geometry the node reads, which
+/// MaterialX's definitions hold as strings: a geometric property value's
+/// and a USD Primvar Reader's (the graphs defining those read it as one).
+pub const ATTRIBUTES: &[(&str, &str)] = &[
+    ("geompropvalue", "geomprop"),
+    ("geompropvalueuniform", "geomprop"),
+    ("UsdPrimvarReader", "varname"),
+];
+
 /// MaterialX value `v` as a value of `kind`, the kind a node's input holds
 /// it as, when it is one: what a format reads of a document's value.
 pub fn value(kind: &ValueKind, v: &kinogaki_mtlx::Value) -> Option<Value> {
@@ -208,7 +222,7 @@ pub fn value(kind: &ValueKind, v: &kinogaki_mtlx::Value) -> Option<Value> {
             Value::Numbers(n.clone())
         }
         (ValueKind::Choice { .. }, M::Text(t)) => Value::Choice(Arc::from(t.as_str())),
-        (ValueKind::Text, M::Text(t)) => Value::Text(t.clone()),
+        (ValueKind::Text | ValueKind::Attribute { .. }, M::Text(t)) => Value::Text(t.clone()),
         _ => return None,
     })
 }
@@ -242,7 +256,7 @@ fn zero(kind: &ValueKind) -> Value {
                 .first()
                 .map_or_else(|| Arc::from(""), |c| c.key.clone()),
         ),
-        ValueKind::Text => Value::Text(String::new()),
+        ValueKind::Text | ValueKind::Attribute { .. } => Value::Text(String::new()),
         _ => Value::Number(0.0),
     }
 }

@@ -237,8 +237,9 @@ fn bypass(work: &mut Work, at: NodeIndex) -> bool {
     let readers = work.out_of(at);
     match work.driver(at, &input).cloned() {
         Some(link) => {
-            // What its readers read stays of its type: a wire of another
-            // width keeps the node that converts it.
+            // What its readers read stays of its width: a wire of another
+            // width keeps the node that converts it (a vector and a color of
+            // one width are the same numbers).
             let carries = |at: NodeIndex, output: &str| {
                 let node = work.node(at)?;
                 let out = node.def.outputs.iter().find(|o| &*o.name == output)?;
@@ -247,7 +248,9 @@ fn bypass(work: &mut Work, at: NodeIndex) -> bool {
             let taken = work
                 .node(at)
                 .and_then(|n| n.def.find_input(&input)?.socket().cloned());
-            if carries(link.from, &link.output).is_none_or(|s| Some(s) != taken) {
+            let alike = |a: &Type, b: &Type| a == b || (a.width() > 0 && a.width() == b.width());
+            let same = carries(link.from, &link.output).zip(taken);
+            if !same.is_some_and(|(a, b)| alike(&a, &b)) {
                 return false;
             }
             for (_, reader, into) in readers {

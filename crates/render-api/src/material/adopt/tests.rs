@@ -307,6 +307,57 @@ fn an_image_wired_into_a_graph_defined_texture_reaches_the_image_inside() {
 }
 
 #[test]
+fn a_usd_primvar_reader_reads_its_primvar_through_its_expansion() {
+    // USD's Primvar Reader is a graph around a geometric property value: the
+    // engine reads `Cd` by name, its fallback where a shape lacks it, and
+    // the network names the primvar to send. Its vector into a color passes
+    // through no node (a vector and a color of one width are one).
+    let values = |pairs: &[(&str, Value)]| -> Parameters {
+        (pairs.iter())
+            .map(|(n, v)| ((*n).to_owned(), v.clone()))
+            .collect()
+    };
+    let mut built = MaterialNetwork::builder();
+    let reader = values(&[
+        ("varname", Value::Text("Cd".into())),
+        ("fallback", Value::Numbers(vec![0.5, 0.25, 0.125])),
+    ]);
+    let read = (built.node(&def("ND_UsdPrimvarReader_vector3").unwrap(), &reader)).unwrap();
+    let s = built
+        .node(
+            &def("ND_UsdPreviewSurface_surfaceshader").unwrap(),
+            &Parameters::new(),
+        )
+        .unwrap();
+    built.link(read, "out", s, "diffuseColor").unwrap();
+    let network = built.build(s).unwrap();
+    assert_eq!(network.primvars()[..], [Arc::from("Cd")]);
+    assert_eq!(network.named_attributes().len(), 1);
+    let renders = engine(
+        "toy.preview.engine",
+        &["UsdPreviewSurface", "ND_geompropvalue_vector3"],
+    );
+    let adopted = Engines::new(vec![renders.clone()]).adopt(&network, renders.id());
+    let property = (adopted.nodes().iter())
+        .find(|n| n.def.mtlx().is_some_and(|d| d.node == "geompropvalue"))
+        .expect("a geometric property value");
+    assert_eq!(property.values()["geomprop"], Value::Text("Cd".into()));
+    assert_eq!(
+        property.values()["default"],
+        Value::Numbers(vec![0.5, 0.25, 0.125])
+    );
+    assert_eq!(adopted.primvars()[..], [Arc::from("Cd")]);
+    // The standard form: the reader drives the base color with nothing
+    // between.
+    let standard = Engines::new(vec![renders]).standard(&network).unwrap();
+    let base = (standard.links().iter())
+        .find(|l| &*l.input == "base_color")
+        .expect("a driven base color");
+    let driver = standard.nodes()[base.from as usize].def.mtlx().unwrap();
+    assert_eq!(driver.node, "UsdPrimvarReader");
+}
+
+#[test]
 fn another_engines_material_goes_as_its_standard_form() {
     use crate::material::{NodeDef, NodeInput, NodeOutput};
     use crate::{MaterialRules, Parameter};

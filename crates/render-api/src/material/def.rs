@@ -187,6 +187,14 @@ impl NodeDef {
         self.mtlx.as_ref()
     }
 
+    /// Whether a node of it gives a color (a color3 or color4 output):
+    /// MaterialX converts the color space of an image such a node reads, and
+    /// of no other (a float or vector image, a roughness or normal map, reads
+    /// data).
+    pub fn gives_color(&self) -> bool {
+        (self.outputs.iter()).any(|o| matches!(o.socket, Type::Color3 | Type::Color4))
+    }
+
     /// Its input `name`.
     pub fn find_input(&self, name: &str) -> Option<&NodeInput> {
         self.inputs.iter().find(|i| i.name() == name)

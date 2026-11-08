@@ -7,7 +7,7 @@ use crate::image_files::image_node;
 use crate::network::{NetworkSeed, NewNode};
 use crate::standard::ImportedMaterial;
 use crate::{Diagnostic, Error};
-use kinogaki_geometry::image::ImageSource;
+use kinogaki_geometry::image::{ImageColor, ImageSource};
 use kinogaki_render_api::material::NodeInput as Port;
 use kinogaki_render_api::material::mtlx::{def, value};
 use kinogaki_render_api::materialx::{Bound, Document, Included, Material, Type, library};
@@ -150,7 +150,9 @@ impl Read<'_> {
                             if file.is_empty() {
                                 continue;
                             }
-                            let Some(source) = self.source(file, colorspace.as_deref()) else {
+                            let color = ports.as_ref().is_none_or(|d| d.gives_color());
+                            let read = image_color(colorspace.as_deref(), color);
+                            let Some(source) = self.source(file, read) else {
                                 continue;
                             };
                             let image = match images.iter().find(|(s, _)| *s == source) {
@@ -227,16 +229,15 @@ impl Read<'_> {
         }
     }
 
-    /// What file `file` (relative to the document's folder) in color space
-    /// `colorspace` reads; none for a file out of reach, which the read's
-    /// warnings list.
-    fn source(&mut self, file: &str, colorspace: Option<&str>) -> Option<ImageSource> {
+    /// What file `file` (relative to the document's folder) read as `color`
+    /// reads; none for a file out of reach, which the read's warnings list.
+    fn source(&mut self, file: &str, color: ImageColor) -> Option<ImageSource> {
         if file.contains("<UDIM>") || file.contains("<UVTILE>") {
             self.said
                 .push(format!("{file}: a tile set, read as the one file it names"));
         }
         let read = self.named.image(file, None)?;
-        Some(ImageSource::new(read, image_color(colorspace)))
+        Some(ImageSource::new(read, color))
     }
 
     /// `held`, a color in `space`, in the working space.

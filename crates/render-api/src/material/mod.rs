@@ -30,8 +30,8 @@ pub use display::{DisplayTexture, MaterialDisplay};
 
 use crate::id::Id;
 use crate::settings::Textures;
-use kinogaki_geometry::Error;
 use kinogaki_geometry::image::{ImageColor, ImageSource, TextureImage};
+use kinogaki_geometry::{Error, names};
 use kinogaki_mtlx::Type;
 use kinogaki_value::{Parameter, Parameters, Value, ValueKind};
 use std::collections::{BTreeMap, BTreeSet};
@@ -86,13 +86,12 @@ impl Node {
     }
 
     /// Whether Image input `input` reads its file's values as stored: its
-    /// image says data, or the node gives no color (MaterialX converts color
-    /// spaces for colors alone; a USD UV Texture's `rgb` is one, beside its
-    /// channels).
+    /// image says data, or the node gives no color
+    /// ([`NodeDef::gives_color`]; a USD UV Texture's `rgb` is one, beside
+    /// its channels).
     pub fn reads_data(&self, input: &str) -> bool {
-        let color =
-            (self.def.outputs.iter()).any(|o| matches!(o.socket, Type::Color3 | Type::Color4));
-        !color || (self.images.get(input)).is_some_and(|i| *i.color() == ImageColor::Data)
+        let data = (self.images.get(input)).is_some_and(|i| *i.color() == ImageColor::Data);
+        !self.def.gives_color() || data
     }
 
     /// `Ok` when `input` is one of its Image inputs.
@@ -200,11 +199,33 @@ impl MaterialNetwork {
         link.map(|l| l.from)
     }
 
-    /// The primvars its values name ([`ValueKind::Attribute`]): what a host
-    /// sends the shapes using it, beside the
-    /// [standard ones](crate::STANDARD_PRIMVARS).
+    /// The primvars its nodes read: the names its attribute values hold
+    /// ([`ValueKind::Attribute`]: an engine's Attribute node's, a geometric
+    /// property value's, a USD Primvar Reader's), a geometric color's `Cd`
+    /// (and `Alpha`, a color4's fourth), a texture coordinate set past the
+    /// first (`uv2`, `uv3`…). What a host sends the shapes using it, beside
+    /// the [standard ones](crate::STANDARD_PRIMVARS).
     pub fn primvars(&self) -> &Arc<[Arc<str>]> {
         &self.primvars
+    }
+
+    /// The attributes its nodes read by name and fall back from, each once:
+    /// what MaterialX's geometric property values and USD Primvar Readers
+    /// name ([`mtlx::ATTRIBUTES`]). Where a shape lacks one, the reader gives
+    /// its default, which a host says.
+    pub fn named_attributes(&self) -> BTreeSet<Arc<str>> {
+        let mut named = BTreeSet::new();
+        for node in &self.nodes {
+            let Some(def) = node.def.mtlx() else { continue };
+            for (_, input) in (mtlx::ATTRIBUTES.iter()).filter(|(n, _)| **n == *def.node) {
+                if let Some(Value::Text(name)) = node.values.get(*input)
+                    && !name.trim().is_empty()
+                {
+                    named.insert(Arc::from(name.trim()));
+                }
+            }
+        }
+        named
     }
 
     /// The MaterialX nodes adoption left out for the engine it was adopted
@@ -301,8 +322,8 @@ impl MaterialNetwork {
                 map(input, value);
                 (input.kind.check(value, &input.label))
                     .map_err(|why| Error::invalid(why.message))?;
-                primvars.extend(attributes(input, value));
             }
+            primvars.extend(primvars_read(&node.def, &values));
             mapped.push(values);
         }
         for (node, values) in self.nodes.iter_mut().zip(mapped) {
@@ -332,14 +353,45 @@ fn drives(output: &Type, input: &Type) -> bool {
     }
 }
 
-/// The primvars value `value` of input `input` names: an attribute
-/// input's names, none for any other.
-fn attributes(input: &Parameter, value: &Value) -> Vec<Arc<str>> {
-    match (&input.kind, value) {
-        (ValueKind::Attribute { .. }, Value::Text(names)) => {
-            names.split_whitespace().map(Arc::from).collect()
+/// The primvars a node of `def` holding `values` reads: the names its
+/// attribute inputs hold ([`ValueKind::Attribute`]: an engine's Attribute
+/// node's, a geometric property value's), and what MaterialX's geometric
+/// nodes read by themselves: a geometric color's `Cd` (and `Alpha`, a
+/// color4's fourth), a texture coordinate set past the first
+/// ([`texcoord_set`]).
+pub(crate) fn primvars_read(def: &NodeDef, values: &Parameters) -> Vec<Arc<str>> {
+    let mut read: Vec<Arc<str>> = Vec::new();
+    for input in def.inputs.iter().filter_map(NodeInput::value) {
+        if let (ValueKind::Attribute { .. }, Some(Value::Text(names))) =
+            (&input.kind, values.get(&input.name))
+        {
+            read.extend(names.split_whitespace().map(Arc::from));
         }
-        _ => Vec::new(),
+    }
+    match def.mtlx() {
+        Some(m) if m.node == "geomcolor" => {
+            read.push(Arc::from(names::CD));
+            if m.ty() == Type::Color4 {
+                read.push(Arc::from(names::ALPHA));
+            }
+        }
+        Some(m) if m.node == "texcoord" => {
+            let index = values.get("index").and_then(Value::integer).unwrap_or(0);
+            if index > 0 {
+                read.push(texcoord_set(index));
+            }
+        }
+        _ => {}
+    }
+    read
+}
+
+/// The attribute MaterialX's texture coordinate set `index` reads, as
+/// formats name sets: `uv` for the first, then `uv2`, `uv3`….
+pub(crate) fn texcoord_set(index: i64) -> Arc<str> {
+    match index {
+        ..=0 => Arc::from(names::UV),
+        n => Arc::from(format!("{}{}", names::UV, n + 1)),
     }
 }
 
@@ -370,9 +422,9 @@ impl NetworkBuilder {
                 .kind
                 .check(value, &descriptor.label)
                 .map_err(|why| Error::invalid(why.message))?;
-            self.primvars.extend(attributes(descriptor, value));
             held.insert(descriptor.name.to_string(), value.clone());
         }
+        self.primvars.extend(primvars_read(def, &held));
         self.network.nodes.push(Node {
             def: def.clone(),
             values: held,
@@ -672,6 +724,43 @@ mod tests {
         assert_eq!(network.nodes()[0].textures()["file"], texture);
         assert!(network.set_texture(i, "default", texture).is_err());
         assert!(network.set_texture(9, "file", texture).is_err());
+    }
+
+    #[test]
+    fn a_networks_primvars_are_what_its_nodes_read() {
+        // A geometric property's name, a geometric color's `Cd` (and its
+        // fourth's `Alpha`), a texture coordinate set past the first.
+        let none = Parameters::new();
+        let mut b = MaterialNetwork::builder();
+        let named = Parameters::from([("geomprop".to_owned(), Value::Text("wear".into()))]);
+        let property = mtlx::def("ND_geompropvalue_float").unwrap();
+        let p = b.node(&property, &named).unwrap();
+        let color = b
+            .node(&mtlx::def("ND_geomcolor_color4").unwrap(), &none)
+            .unwrap();
+        let third = Parameters::from([("index".to_owned(), Value::Integer(2))]);
+        let set = b
+            .node(&mtlx::def("ND_texcoord_vector2").unwrap(), &third)
+            .unwrap();
+        let surface = mtlx::def("ND_open_pbr_surface_surfaceshader").unwrap();
+        let s = b.node(&surface, &none).unwrap();
+        b.link(p, "out", s, "specular_roughness").unwrap();
+        b.link(color, "out", s, "base_color").unwrap();
+        b.link(set, "out", s, "geometry_tangent").unwrap();
+        let network = b.build(s).unwrap();
+        let names: Vec<&str> = network.primvars().iter().map(|n| &**n).collect();
+        assert_eq!(names, ["Alpha", "Cd", "uv3", "wear"]);
+        // Of those, the property is read by name and falls back.
+        let named: Vec<Arc<str>> = network.named_attributes().into_iter().collect();
+        assert_eq!(named, [Arc::from("wear")]);
+        // Its name is an attribute's, as a UI offers it.
+        let kind = &property
+            .find_input("geomprop")
+            .unwrap()
+            .value()
+            .unwrap()
+            .kind;
+        assert!(matches!(kind, ValueKind::Attribute { .. }), "{kind:?}");
     }
 
     #[test]

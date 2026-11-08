@@ -221,16 +221,8 @@ fn affine(network: &MaterialNetwork, at: NodeIndex) -> Option<Placed> {
     };
     match def.node.as_str() {
         "texcoord" => {
-            let index = node
-                .values
-                .get("index")
-                .and_then(Value::integer)
-                .unwrap_or(0);
-            let set = match index {
-                0 => kinogaki_geometry::names::UV.to_owned(),
-                n => format!("{}{}", kinogaki_geometry::names::UV, n + 1),
-            };
-            Some((IDENTITY, Arc::from(set)))
+            let index = node.values.get("index").and_then(Value::integer);
+            Some((IDENTITY, super::texcoord_set(index.unwrap_or(0))))
         }
         "geompropvalue" => Some((IDENTITY, Arc::from(node.values.get("geomprop")?.text()?))),
         "dot" => affine(network, into("in")?.from),

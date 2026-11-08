@@ -382,6 +382,7 @@ kinogaki-render-api/lib test material::adopt::tests::a_model_expands_for_an_engi
 kinogaki-render-api/lib test material::adopt::tests::a_network_translates_to_the_model_a_format_writes
 kinogaki-render-api/lib test material::adopt::tests::a_node_the_engine_implements_passes_as_it_is
 kinogaki-render-api/lib test material::adopt::tests::a_surface_with_no_way_renders_the_default
+kinogaki-render-api/lib test material::adopt::tests::a_usd_primvar_reader_reads_its_primvar_through_its_expansion
 kinogaki-render-api/lib test material::adopt::tests::an_image_wired_into_a_graph_defined_texture_reaches_the_image_inside
 kinogaki-render-api/lib test material::adopt::tests::an_unconnected_geometric_input_reads_its_property_through_an_expansion
 kinogaki-render-api/lib test material::adopt::tests::another_engines_material_goes_as_its_standard_form
@@ -403,6 +404,7 @@ kinogaki-render-api/lib test material::standard::tests::openpbr_translates_into_
 kinogaki-render-api/lib test material::tests::a_builder_refuses_what_isnt_whole
 kinogaki-render-api/lib test material::tests::a_network_is_whole_once_built
 kinogaki-render-api/lib test material::tests::a_networks_nodes_change_only_as_it_checks_them
+kinogaki-render-api/lib test material::tests::a_networks_primvars_are_what_its_nodes_read
 kinogaki-render-api/lib test material::tests::an_image_input_reads_a_source_as_color_or_data
 kinogaki-render-api/lib test material::tests::sockets_meet_by_kind
 kinogaki-render-api/lib test source::tests::plain_triangles_are_flat_and_default_material
@@ -553,6 +555,7 @@ kinogaki-studio-api/lib test format::input::tests::bytes_in_memory_are_lent_and_
 kinogaki-studio-api/lib test format::input::tests::only_a_regular_file_is_read
 kinogaki-studio-api/lib test format::materialx::tests::a_colorspace_of_no_conversion_reads_as_data_and_writes_as_none
 kinogaki-studio-api/lib test format::materialx::tests::a_documents_material_reads_and_writes_back_as_itself
+kinogaki-studio-api/lib test format::materialx::tests::an_image_giving_no_color_reads_as_data
 kinogaki-studio-api/lib test format::options::tests::a_node_holds_a_formats_options_in_rows_of_its_id
 kinogaki-studio-api/lib test format::options::tests::options_save_as_fields_and_read_back_strictly
 kinogaki-studio-api/lib test format::options::tests::rows_carry_their_names_and_values

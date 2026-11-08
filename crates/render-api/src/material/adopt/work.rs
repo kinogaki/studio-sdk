@@ -3,12 +3,12 @@
 //! simplifications edit it; [`Work::finish`] makes it a checked network again,
 //! keeping only what the shown node reads.
 use super::super::mtlx::{self, value};
-use super::super::{Link, MaterialNetwork, Node, NodeDef, NodeIndex};
+use super::super::{Link, MaterialNetwork, Node, NodeDef, NodeIndex, primvars_read};
 use crate::Id;
 use crate::geometry::image::{ImageSource, TextureImage};
 use crate::settings::Textures;
 use kinogaki_mtlx::{Binding, GeomProp, Graph, library};
-use kinogaki_value::{Parameters, Value, ValueKind};
+use kinogaki_value::{Parameters, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -345,16 +345,9 @@ impl Work {
             .filter(|(n, _)| read.contains(&(*n as NodeIndex)))
             .filter_map(|(_, node)| node)
             .collect();
-        let mut primvars = BTreeSet::new();
-        for node in &nodes {
-            for p in node.def.inputs.iter().filter_map(|i| i.value()) {
-                if let (ValueKind::Attribute { .. }, Some(Value::Text(names))) =
-                    (&p.kind, node.values.get(&p.name))
-                {
-                    primvars.extend(names.split_whitespace().map(Arc::from));
-                }
-            }
-        }
+        let primvars: BTreeSet<Arc<str>> = (nodes.iter())
+            .flat_map(|node| primvars_read(&node.def, &node.values))
+            .collect();
         MaterialNetwork {
             nodes,
             links,

@@ -13,7 +13,8 @@
 //!   per distinct file and color space in a material: its path relative to
 //!   the document's folder, found through the read's
 //!   [`Named`](super::files::Named) (embedded with Embed Textures), its
-//!   `colorspace` the Image node's Color ([`image_color`]). Includes are read
+//!   `colorspace` the Image node's Color, data for a node giving no color
+//!   ([`image_color`]). Includes are read
 //!   through it too, each document once. Written, an Image node reading a
 //!   file names its path relative to the document; one holding an embedded
 //!   file writes it beside the document ([`Beside`](super::files::Beside));
@@ -50,19 +51,27 @@ use kinogaki_geometry::image::ImageColor;
 /// what Studio writes them in.
 pub const SPACE: &str = "lin_rec709";
 
-/// How a texture whose `filename` says `colorspace` reads: as the file
-/// says when nothing is said; data for `raw`, `none` or `data` (whatever
-/// their case); else that space.
+/// How a texture whose `filename` says `colorspace` reads on a node that
+/// gives a color (`color`: a color3 or color4 image,
+/// [`NodeDef::gives_color`]): as the file says when nothing is said; data
+/// for `raw`, `none` or `data` (whatever their case); else that space. On a
+/// node giving none (a float or vector image: a roughness, metallic or
+/// normal map) it is data whatever it says, as MaterialX converts colors
+/// alone.
 ///
 /// ```
 /// use kinogaki_studio_api::format::materialx::image_color;
 /// use kinogaki_studio_api::geometry::image::ImageColor;
-/// assert_eq!(image_color(None), ImageColor::Auto);
-/// assert_eq!(image_color(Some("none")), ImageColor::Data);
-/// assert_eq!(image_color(Some("srgb_texture")), ImageColor::space("srgb_texture").unwrap());
+/// assert_eq!(image_color(None, true), ImageColor::Auto);
+/// assert_eq!(image_color(Some("none"), true), ImageColor::Data);
+/// assert_eq!(image_color(Some("srgb_texture"), true), ImageColor::space("srgb_texture").unwrap());
+/// assert_eq!(image_color(None, false), ImageColor::Data);
 /// ```
-pub fn image_color(colorspace: Option<&str>) -> ImageColor {
+///
+/// [`NodeDef::gives_color`]: kinogaki_render_api::NodeDef::gives_color
+pub fn image_color(colorspace: Option<&str>, color: bool) -> ImageColor {
     match colorspace {
+        _ if !color => ImageColor::Data,
         None => ImageColor::Auto,
         Some(raw)
             if ["raw", "none", "data"]
