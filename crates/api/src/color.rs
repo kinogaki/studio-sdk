@@ -30,7 +30,7 @@
 //! maps them at its boundary.
 
 use crate::{Diagnostic, Error};
-use kinogaki_geometry::image::{Convert, Decoding, Encoding};
+use kinogaki_geometry::image::{Codes, Convert, Decoding, Encoding, Format};
 use std::fmt::Debug;
 
 /// Linear Rec.709 (sRGB's primaries, linear light) by its interop name
@@ -170,14 +170,16 @@ pub trait ColorService: Send + Sync + Debug {
     }
 }
 
-/// What reading a layer encoded `from` into space `to` makes of each run of
-/// its pixels, as [`Image::converted`] reads them: colors made straight
+/// What reading a layer of format `from` into space `to` makes of each run
+/// of its pixels, as [`Image::converted`] reads them: colors made straight
 /// when premultiplied, converted through `colors` (by its
-/// [`decoding`](ColorService::decoding) where it has one, in single floats),
-/// and premultiplied when `premultiply`; data left as stored. The one
-/// conversion a reader taking an image into its own form runs, a tile at a
-/// time. A layer already in `to` only has its alpha applied or taken out
-/// where `premultiply` asks another form, and nothing done to it otherwise.
+/// [`decoding`](ColorService::decoding) where it has one, in single floats;
+/// a straight 8- or 16-bit layer's curve looked up at each code, the curve's
+/// [`Codes`]), and premultiplied when `premultiply`; data left as stored.
+/// The one conversion a reader taking an image into its own form runs, a
+/// tile at a time. A layer already in `to` only has its alpha applied or
+/// taken out where `premultiply` asks another form, and nothing done to it
+/// otherwise.
 ///
 /// # Errors
 /// A color layer whose tag names no space of the configuration (the host
@@ -187,18 +189,19 @@ pub trait ColorService: Send + Sync + Debug {
 /// [`Image::converted`]: kinogaki_geometry::image::Image::converted
 pub fn converting<'a>(
     colors: &'a dyn ColorService,
-    from: &'a Encoding,
+    from: &'a Format,
     to: &'a str,
     premultiply: bool,
 ) -> Result<Box<Convert<'a>>, Error> {
-    let space = match from {
+    let encoding = &from.encoding;
+    let space = match encoding {
         Encoding::Raw => return Ok(Box::new(|_| Ok(()))),
-        _ => from.space().ok_or_else(|| {
+        _ => encoding.space().ok_or_else(|| {
             Error::invalid("an image's colors name no space of the configuration")
         })?,
     };
     colors.convert(space, to, &mut [])?;
-    let premultiplied = from.premultiplied();
+    let premultiplied = encoding.premultiplied();
     let decoding = colors.decoding(space, to);
     if decoding == Some(Decoding::IDENTITY) {
         return Ok(match (premultiplied, premultiply) {
@@ -221,14 +224,23 @@ pub fn converting<'a>(
         true => alpha_applied(p),
         false => p,
     };
+    // A straight layer's stored values are codes (made straight they would
+    // fall between them).
+    let codes = (decoding.as_ref())
+        .filter(|_| !premultiplied)
+        .and_then(|d| Codes::of(d.transfer, from.sample));
     Ok(Box::new(move |run: &mut [[f32; 4]]| -> Result<(), Error> {
-        match &decoding {
-            Some(decoding) => run.iter_mut().for_each(|p| {
+        match (&decoding, &codes) {
+            (Some(decoding), Some(codes)) => run.iter_mut().for_each(|p| {
+                let [r, g, b] = decoding.apply_codes([p[0], p[1], p[2]], codes);
+                *p = finished([r, g, b, p[3]]);
+            }),
+            (Some(decoding), None) => run.iter_mut().for_each(|p| {
                 let [r, g, b, a] = unmultiplied(*p);
                 let [r, g, b] = decoding.apply([r, g, b]);
                 *p = finished([r, g, b, a]);
             }),
-            None => {
+            (None, _) => {
                 let mut rgb: Vec<[f32; 3]> = (run.iter())
                     .map(|p| {
                         let [r, g, b, _] = unmultiplied(*p);
@@ -260,10 +272,12 @@ fn alpha_applied([r, g, b, a]: [f32; 4]) -> [f32; 4] {
 
 #[cfg(test)]
 mod tests {
-    use super::{ColorService, Decoding, Encoding, Error, converting, settled};
+    use super::{ColorService, Decoding, Encoding, Error, Format, converting, settled};
+    use kinogaki_geometry::image::{Sample, Transfer};
 
     /// Spaces "a" and "b": b's light is half a's, by a decoding from a to b
-    /// ("by matrix") or by conversion alone ("by conversion").
+    /// ("by matrix") or by conversion alone ("by conversion"); "srgb" into
+    /// "a" by [`SRGB_TO_A`].
     #[derive(Debug)]
     struct Halves;
 
@@ -276,6 +290,11 @@ mod tests {
             let by = match (from, to) {
                 (f, t) if f == t => 1.0,
                 ("a", "by matrix" | "by conversion") => 0.5,
+                ("srgb", "a") => {
+                    let decoded = |c: &[f64; 3]| SRGB_TO_A.apply(c.map(|v| v as f32));
+                    rgb.iter_mut().for_each(|c| *c = decoded(c).map(f64::from));
+                    return Ok(());
+                }
                 _ => return Err(Error::invalid("no such conversion")),
             };
             rgb.iter_mut().for_each(|c| *c = c.map(|v| v * by));
@@ -290,6 +309,7 @@ mod tests {
                     matrix: half,
                     ..Decoding::IDENTITY
                 }),
+                ("srgb", "a") => Some(SRGB_TO_A),
                 _ => None,
             }
         }
@@ -299,9 +319,21 @@ mod tests {
         }
     }
 
+    /// sRGB's curve and a matrix into "a".
+    const SRGB_TO_A: Decoding = Decoding {
+        transfer: Transfer::SRGB,
+        matrix: [[0.6, 0.3, 0.1], [0.2, 0.7, 0.1], [0.0, 0.1, 0.9]],
+    };
+
+    /// A layer of floats encoded `encoding`.
+    fn floats(encoding: &Encoding) -> Format {
+        Format::rgba(Sample::F32, encoding.clone())
+    }
+
     /// `pixel`, encoded `from`, through the conversion into `to`.
     fn run(from: &Encoding, to: &str, premultiply: bool, pixel: [f32; 4]) -> [f32; 4] {
-        let convert = converting(&Halves, from, to, premultiply).expect("a conversion");
+        let format = floats(from);
+        let convert = converting(&Halves, &format, to, premultiply).expect("a conversion");
         let mut run = [pixel];
         convert(&mut run).expect("converted");
         run[0]
@@ -336,7 +368,42 @@ mod tests {
             pixel,
             "data as stored"
         );
-        assert!(converting(&Halves, &straight, "nowhere", false).is_err());
+        assert!(converting(&Halves, &floats(&straight), "nowhere", false).is_err());
+    }
+
+    /// Every code of a straight 8- and 16-bit sRGB layer converts, through
+    /// the curve's table, to what its decoding gives for the value read,
+    /// bit for bit, and a premultiplied one's (made straight between codes)
+    /// through the curve itself.
+    #[test]
+    fn an_integer_layers_curve_is_looked_up_at_each_code() {
+        let straight = Encoding::color("srgb", false);
+        let premultiplied = Encoding::color("srgb", true);
+        for (sample, top) in [(Sample::U8, 255u32), (Sample::U16, 65_535)] {
+            let format = Format::rgba(sample, straight.clone());
+            let convert = converting(&Halves, &format, "a", false).expect("a conversion");
+            let read = |code: u32| match sample {
+                Sample::U8 => sample.read(&[code as u8]),
+                _ => sample.read(&(code as u16).to_ne_bytes()),
+            };
+            let mut run: Vec<[f32; 4]> = (0..=top)
+                .map(|c| [read(c), read(top - c), read(c / 2), read(c)])
+                .collect();
+            let stored = run.clone();
+            convert(&mut run).expect("converted");
+            for (p, s) in run.iter().zip(&stored) {
+                let [r, g, b] = SRGB_TO_A.apply([s[0], s[1], s[2]]);
+                assert_eq!([r, g, b, s[3]].map(f32::to_bits), p.map(f32::to_bits));
+            }
+            let format = Format::rgba(sample, premultiplied.clone());
+            let convert = converting(&Halves, &format, "a", true).expect("a conversion");
+            let mut half = [[read(top / 4), read(top / 8), 0.0, read(top / 2)]];
+            let [r, g, b] =
+                SRGB_TO_A.apply(half[0].map(|v| v / half[0][3])[..3].try_into().unwrap());
+            convert(&mut half).expect("converted");
+            let a = read(top / 2);
+            assert_eq!(half[0], [r * a, g * a, b * a, a]);
+        }
     }
 
     #[test]

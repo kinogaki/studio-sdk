@@ -168,6 +168,7 @@ kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry
 kinogaki-geometry/doc test crates/geometry/src/geometry.rs - geometry::Geometry::with_moved
 kinogaki-geometry/doc test crates/geometry/src/image/convert.rs - image::convert::Image::converted
 kinogaki-geometry/doc test crates/geometry/src/image/convert.rs - image::convert::reduction
+kinogaki-geometry/doc test crates/geometry/src/image/decoding.rs - image::decoding::Codes
 kinogaki-geometry/doc test crates/geometry/src/image/decoding.rs - image::decoding::Decoding
 kinogaki-geometry/doc test crates/geometry/src/image/decoding.rs - image::decoding::TextureImage::texel
 kinogaki-geometry/doc test crates/geometry/src/image/mod.rs - image
@@ -237,6 +238,7 @@ kinogaki-geometry/lib test error::tests::an_error_is_its_diagnostic_and_its_kind
 kinogaki-geometry/lib test image::convert::tests::a_conversion_that_fails_fails_the_layer
 kinogaki-geometry/lib test image::convert::tests::a_layer_converts_a_tile_at_a_time_where_its_pixels_are
 kinogaki-geometry/lib test image::convert::tests::a_reduced_layer_holds_each_boxs_mean
+kinogaki-geometry/lib test image::decoding::tests::a_curves_codes_are_its_values_at_every_code
 kinogaki-geometry/lib test image::decoding::tests::a_decoding_runs_its_curve_then_its_matrix
 kinogaki-geometry/lib test image::decoding::tests::a_texel_spreads_its_channels_decodes_and_is_made_straight
 kinogaki-geometry/lib test image::decoding::tests::srgbs_curve_is_iecs_within_a_hundredth_of_an_8_bit_step
@@ -502,6 +504,7 @@ kinogaki-studio-api/instances test realized_copies_name_the_materials_their_inst
 kinogaki-studio-api/instances test the_instances_kept_take_their_attributes_and_groups_and_the_rest_go
 kinogaki-studio-api/lib test color::tests::a_converted_color_settles_where_a_conversion_left_its_last_bits
 kinogaki-studio-api/lib test color::tests::a_layer_converts_straight_and_comes_out_as_asked
+kinogaki-studio-api/lib test color::tests::an_integer_layers_curve_is_looked_up_at_each_code
 kinogaki-studio-api/lib test components::tests::a_selection_reads_back_only_as_its_own_representation
 kinogaki-studio-api/lib test cook::binding::tests::a_component_reads_and_writes_one_number_of_a_vector
 kinogaki-studio-api/lib test cook::binding::tests::mixed_vectors_write_only_their_parameters

@@ -66,7 +66,7 @@ mod source;
 mod tests;
 
 pub use convert::{Convert, reduction};
-pub use decoding::{Decoding, TextureImage, Transfer};
+pub use decoding::{Codes, Decoding, TextureImage, Transfer};
 pub use encoding::{ColorTag, Encoding};
 pub use held::HeldPixels;
 pub use pyramid::Pyramid;

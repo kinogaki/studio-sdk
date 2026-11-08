@@ -1,7 +1,9 @@
 //! [`Decoding`]: how a color layer's values become linear light in another
-//! space, as a GPU runs it after fetching texels; and [`TextureImage`], an
-//! image with the decoding its reader applies.
-use super::Image;
+//! space, as a GPU runs it after fetching texels; [`Codes`], a curve's value
+//! at every code of an 8- or 16-bit sample; and [`TextureImage`], an image
+//! with the decoding its reader applies.
+use super::{Image, Sample};
+use std::sync::{Arc, Mutex};
 
 /// A transfer function on each channel, from a layer's stored values to
 /// linear light.
@@ -60,6 +62,68 @@ impl Transfer {
         };
         linear * sign
     }
+
+    /// The curve as bits, telling curves apart exactly.
+    fn bits(self) -> [u32; 3] {
+        match self {
+            Transfer::Linear => [0, 0, 0],
+            Transfer::Exponent { gamma, offset } => [1, gamma.to_bits(), offset.to_bits()],
+            Transfer::Power(gamma) => [2, gamma.to_bits(), 0],
+        }
+    }
+}
+
+/// A transfer function's value at every code of an 8- or 16-bit sample:
+/// [`Transfer::decode`] of each code over the largest code (the value
+/// [`Sample::read`] gives for it), so a converter looks a stored value up
+/// rather than computing the curve, a power, for each one. Made once a
+/// process for each curve and width, and shared.
+///
+/// ```
+/// use kinogaki_geometry::image::{Codes, Sample, Transfer};
+/// let codes = Codes::of(Transfer::SRGB, Sample::U8).unwrap();
+/// let stored = Sample::U8.read(&[187]);
+/// assert_eq!(codes.decode(stored), Transfer::SRGB.decode(stored));
+/// assert!(Codes::of(Transfer::SRGB, Sample::F16).is_none());
+/// ```
+#[derive(Clone, Debug)]
+pub struct Codes(Arc<[f32]>);
+
+impl Codes {
+    /// `transfer`'s table for values of `sample`, an 8- or 16-bit one's;
+    /// none for the others (their values are no codes) and for a linear
+    /// curve (nothing to look up).
+    pub fn of(transfer: Transfer, sample: Sample) -> Option<Codes> {
+        let top = match sample {
+            Sample::U8 => u32::from(u8::MAX),
+            Sample::U16 => u32::from(u16::MAX),
+            _ => return None,
+        };
+        if transfer == Transfer::Linear {
+            return None;
+        }
+        // The tables made so far, by curve and largest code: a process
+        // reads through a few curves.
+        type Key = ([u32; 3], u32);
+        static MADE: Mutex<Vec<(Key, Codes)>> = Mutex::new(Vec::new());
+        let key = (transfer.bits(), top);
+        let mut made = MADE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((_, codes)) = made.iter().find(|(k, _)| *k == key) {
+            return Some(codes.clone());
+        }
+        let values = (0..=top).map(|code| transfer.decode(code as f32 / top as f32));
+        let codes = Codes(values.collect());
+        made.push((key, codes.clone()));
+        Some(codes)
+    }
+
+    /// `v`, a value of its sample (a code over the largest), as linear
+    /// light: what the curve gives for it, bit for bit. A value between
+    /// codes takes the nearest code's.
+    pub fn decode(&self, v: f32) -> f32 {
+        let last = self.0.len() - 1;
+        self.0[((v * last as f32).round() as usize).min(last)]
+    }
 }
 
 /// How a color layer's values become linear light in a space its reader
@@ -91,7 +155,18 @@ impl Decoding {
 
     /// `rgb`, stored values, as linear light in the reader's space.
     pub fn apply(&self, rgb: [f32; 3]) -> [f32; 3] {
-        let c = rgb.map(|v| self.transfer.decode(v));
+        self.mixed(rgb.map(|v| self.transfer.decode(v)))
+    }
+
+    /// [`apply`](Self::apply) of `rgb`, values of an 8- or 16-bit sample,
+    /// its curve looked up in `codes` (the curve's table for that sample):
+    /// the same values, bit for bit, with no power computed.
+    pub fn apply_codes(&self, rgb: [f32; 3], codes: &Codes) -> [f32; 3] {
+        self.mixed(rgb.map(|v| codes.decode(v)))
+    }
+
+    /// Linear values `c` through the matrix.
+    fn mixed(&self, c: [f32; 3]) -> [f32; 3] {
         self.matrix
             .map(|row| row[0] * c[0] + row[1] * c[1] + row[2] * c[2])
     }
@@ -177,6 +252,46 @@ mod tests {
         assert_eq!(Transfer::SRGB.decode(-0.5), -Transfer::SRGB.decode(0.5));
         assert_eq!(Transfer::Power(2.2).decode(0.5), 0.5f32.powf(2.2));
         assert_eq!(Transfer::Linear.decode(-3.0), -3.0);
+    }
+
+    /// Each curve's table holds, at every code of an 8- and a 16-bit
+    /// sample, what the curve gives for the value read, bit for bit; one
+    /// table a curve and width is made, and shared.
+    #[test]
+    fn a_curves_codes_are_its_values_at_every_code() {
+        let curves = [
+            Transfer::SRGB,
+            Transfer::Power(2.2),
+            Transfer::Exponent {
+                gamma: 1.0 / 0.45,
+                offset: 0.099,
+            },
+        ];
+        for curve in curves {
+            let eight = Codes::of(curve, Sample::U8).expect("8 bits");
+            for code in 0..=u8::MAX {
+                let v = Sample::U8.read(&[code]);
+                assert_eq!(eight.decode(v).to_bits(), curve.decode(v).to_bits());
+            }
+            let sixteen = Codes::of(curve, Sample::U16).expect("16 bits");
+            for code in 0..=u16::MAX {
+                let v = Sample::U16.read(&code.to_ne_bytes());
+                assert_eq!(sixteen.decode(v).to_bits(), curve.decode(v).to_bits());
+            }
+            let again = Codes::of(curve, Sample::U16).expect("16 bits");
+            assert!(Arc::ptr_eq(&sixteen.0, &again.0), "made once");
+            assert!(!Arc::ptr_eq(&eight.0, &sixteen.0));
+        }
+        assert!(Codes::of(Transfer::Linear, Sample::U8).is_none());
+        assert!(Codes::of(Transfer::SRGB, Sample::F32).is_none());
+        assert!(Codes::of(Transfer::SRGB, Sample::U32).is_none());
+        let decoding = Decoding {
+            transfer: Transfer::SRGB,
+            matrix: [[0.6, 0.3, 0.1], [0.2, 0.7, 0.1], [0.0, 0.1, 0.9]],
+        };
+        let codes = Codes::of(Transfer::SRGB, Sample::U8).expect("8 bits");
+        let rgb = [17u8, 128, 250].map(|c| Sample::U8.read(&[c]));
+        assert_eq!(decoding.apply_codes(rgb, &codes), decoding.apply(rgb));
     }
 
     #[test]
