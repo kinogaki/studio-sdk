@@ -6,13 +6,13 @@ use super::{Band, Field, FileDialog, Item, Kind, Number, NumberLook, Sheet};
 use kinogaki_studio_api::params::{self, SchemaRow, ValueKind};
 
 /// The sheet of a parameter schema, its rows in the schema's order
-/// ([`params::Schema::placed`]): each section a top-level band over its rows
-/// (none over a section holding none), open as it says of the schema's
-/// values; each parameter a field keyed by its name, with its help as the
-/// tooltip and its keywords for search, greyed in its place while it doesn't
-/// apply to the schema's values, its tooltip then saying why; each button a
-/// button field. A data parameter has no field: its node's schema adds rows
-/// of its own.
+/// ([`params::Schema::placed`]): each section a top-level band over the rows
+/// it shows (none over none), open as it says of the schema's values; each
+/// parameter that applies to the schema's values a field keyed by its name,
+/// with its help as the tooltip and its keywords for search (one that
+/// doesn't apply has none: hidden, the rows after it closing up); each
+/// button a button field. A data parameter has no field: its node's schema
+/// adds rows of its own.
 impl From<&params::Schema> for Sheet<String> {
     fn from(schema: &params::Schema) -> Self {
         let values = schema.values();
@@ -21,7 +21,10 @@ impl From<&params::Schema> for Sheet<String> {
         for (section, row) in schema.placed() {
             let item = match row {
                 SchemaRow::Parameter(p) if matches!(p.kind, ValueKind::Data(_)) => continue,
-                SchemaRow::Parameter(p) => Item::Field(field(&p.clone().resolved(&values))),
+                SchemaRow::Parameter(p) => match p.clone().resolved(&values) {
+                    Some(p) => Item::Field(field(&p)),
+                    None => continue,
+                },
                 SchemaRow::Button(b) => {
                     let mut field = Field::new(
                         b.name.clone(),
@@ -256,10 +259,10 @@ mod tests {
     }
 
     /// The sheet follows the schema's one order: rows in no section first,
-    /// then each section's band over its rows, opening as its condition
-    /// says; a section holding no row has no band.
+    /// then each section's band over the rows it shows, opening as its
+    /// condition says; a section showing no row has no band.
     #[test]
-    fn rows_show_in_the_schemas_order_with_a_band_over_each_section_holding_rows() {
+    fn rows_show_in_the_schemas_order_with_bands_over_shown_rows_alone() {
         use kinogaki_studio_api::params::Section;
         use kinogaki_studio_api::value::Condition;
         let toggle = |name: &str, group: &str| Parameter::toggle(name, name, false).group(group);
@@ -268,9 +271,7 @@ mod tests {
             .section(Section::new("empty", "Empty", true))
             .section(Section::new("later", "Later", true))
             .parameter(toggle("on", "look").help("Shows the look"))
-            .parameter(
-                toggle("ghost", "later").requires(Condition::when("on", true), "Used with on"),
-            )
+            .parameter(toggle("ghost", "later").requires(Condition::when("on", true)))
             .parameter(Parameter::toggle("first", "First", true))
             .button(params::Button::new("go", "Go").group("look"));
         let sheet = Sheet::<String>::from(&schema);
@@ -281,10 +282,7 @@ mod tests {
                 Item::Heading(h) => format!("{h:?}"),
             })
             .collect();
-        assert_eq!(
-            listed,
-            ["first", "[Look closed]", "on", "go", "[Later]", "ghost"]
-        );
+        assert_eq!(listed, ["first", "[Look closed]", "on", "go"]);
         let mut on = schema.clone();
         on.parameters_mut().find(|p| p.name == "on").unwrap().value = Value::Bool(true);
         let sheet = Sheet::<String>::from(&on);
@@ -389,48 +387,25 @@ mod tests {
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
     }
 
-    /// A row that doesn't apply to the rows' values shows greyed in its
-    /// place, its tooltip saying why; applying, it takes input again.
+    /// A row that doesn't apply to the rows' values is left out, the rows
+    /// after it closing up; applying, it shows again in its place.
     #[test]
-    fn a_row_that_does_not_apply_shows_greyed_in_its_place_saying_why() {
+    fn a_row_that_does_not_apply_is_hidden() {
         use kinogaki_studio_api::value::Condition;
         let rows = |flat: bool| {
             params::Schema::default()
                 .parameter(Parameter::toggle("flat", "Flat", flat))
                 .parameter(
                     Parameter::toggle("tint", "Tint", false)
-                        .help("Tints the light")
-                        .requires(Condition::when("flat", false), "Flat shows no tint"),
+                        .requires(Condition::when("flat", false)),
                 )
                 .parameter(Parameter::toggle("glow", "Glow", false))
         };
-        let shown = |sheet: &Sheet<String>| -> Vec<(String, bool, Option<String>)> {
-            (sheet.fields())
-                .map(|f| {
-                    (
-                        f.key.clone(),
-                        f.enabled,
-                        f.tooltip.as_ref().map(|t| t.to_string()),
-                    )
-                })
-                .collect()
+        let keys = |flat: bool| -> Vec<String> {
+            let sheet = Sheet::<String>::from(&rows(flat));
+            sheet.fields().map(|f| f.key.clone()).collect()
         };
-        let tip = |t: &str| Some(t.to_owned());
-        assert_eq!(
-            shown(&Sheet::<String>::from(&rows(true))),
-            [
-                ("flat".to_owned(), true, None),
-                ("tint".to_owned(), false, tip("Flat shows no tint")),
-                ("glow".to_owned(), true, None),
-            ]
-        );
-        assert_eq!(
-            shown(&Sheet::<String>::from(&rows(false))),
-            [
-                ("flat".to_owned(), true, None),
-                ("tint".to_owned(), true, tip("Tints the light")),
-                ("glow".to_owned(), true, None),
-            ]
-        );
+        assert_eq!(keys(true), ["flat", "glow"]);
+        assert_eq!(keys(false), ["flat", "tint", "glow"]);
     }
 }

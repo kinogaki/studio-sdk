@@ -101,6 +101,16 @@ impl Schema {
         self.rows.retain(keep);
     }
 
+    /// It without the rows `which` names with `false`: those a node type's
+    /// code finds don't apply to its values, hidden as an unmet
+    /// [`Parameter::requires`] hides a row (the values stay the node's). Rows
+    /// it doesn't name stay.
+    pub fn shown(mut self, which: &[(&str, bool)]) -> Self {
+        let hidden = |row: &SchemaRow| which.iter().any(|(n, on)| !on && *n == row.name());
+        self.rows.retain(|row| !hidden(row));
+        self
+    }
+
     /// Every parameter's value by name: its default, in a description.
     pub fn values(&self) -> Parameters {
         (self.parameters())
@@ -441,5 +451,17 @@ mod tests {
         let rows: Vec<&str> = schema.rows().iter().map(SchemaRow::name).collect();
         assert_eq!(rows, ["a", "c"]);
         assert_eq!(schema.parameters().next().unwrap().label, "A");
+    }
+
+    /// `shown` leaves out the rows it names with false and keeps the rest.
+    #[test]
+    fn shown_leaves_out_the_rows_named_off() {
+        let schema = Schema::default()
+            .parameter(number("a"))
+            .parameter(number("b"))
+            .parameter(number("c"))
+            .shown(&[("a", true), ("b", false)]);
+        let rows: Vec<&str> = schema.rows().iter().map(SchemaRow::name).collect();
+        assert_eq!(rows, ["a", "c"]);
     }
 }

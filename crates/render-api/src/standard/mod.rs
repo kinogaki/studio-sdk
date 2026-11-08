@@ -73,7 +73,7 @@ pub fn emission_params(intensity: f64) -> Vec<Parameter> {
         .group(LIGHT_GROUP),
         Parameter::new("color", "Color", ValueKind::Color, [1.0; 3])
             .group(LIGHT_GROUP)
-            .requires(emission("color"), "Used by the Color emission"),
+            .requires(emission("color")),
         Parameter::new(
             "colorTemperature",
             "Temperature",
@@ -82,10 +82,7 @@ pub fn emission_params(intensity: f64) -> Vec<Parameter> {
         )
         .group(LIGHT_GROUP)
         .look(look(10.0, 0))
-        .requires(
-            emission("temperature"),
-            "Used by the Color Temperature emission",
-        ),
+        .requires(emission("temperature")),
         Parameter::new(
             "intensity",
             "Intensity",
@@ -168,11 +165,9 @@ pub(crate) fn area_light() -> PrimType {
         "Area Light",
         vec![
             shape,
-            size("width", "Width", 1.0)
-                .requires(shaped("rectangle"), "Used by the Rectangle shape"),
-            size("height", "Height", 1.0)
-                .requires(shaped("rectangle"), "Used by the Rectangle shape"),
-            size("radius", "Radius", 0.5).requires(shaped("disk"), "Used by the Disk shape"),
+            size("width", "Width", 1.0).requires(shaped("rectangle")),
+            size("height", "Height", 1.0).requires(shaped("rectangle")),
+            size("radius", "Radius", 0.5).requires(shaped("disk")),
         ],
         1.0,
         false,
@@ -184,7 +179,7 @@ pub(crate) fn area_light() -> PrimType {
 /// image whose center looks down the light's -Z, its top +Y (`texture`: an
 /// [`ImageRef`], a file or an Image node, which the host sends decoded);
 /// without an image, below the horizon it may shine `groundColor` instead
-/// (`ground`: a hemisphere gradient; the image doesn't apply while it is
+/// (`ground`: a hemisphere gradient, the image's row hidden while it is
 /// on).
 pub(crate) fn dome_light() -> PrimType {
     let ground = |on: bool| Condition::when("ground", on);
@@ -203,10 +198,10 @@ pub(crate) fn dome_light() -> PrimType {
                 [0.1, 0.09, 0.07],
             )
             .group(LIGHT_GROUP)
-            .requires(ground(true), "Used with Ground on"),
+            .requires(ground(true)),
             Parameter::new("texture", "Image", ValueKind::Image, Value::Image(None))
                 .group(LIGHT_GROUP)
-                .requires(ground(false), "Used with Ground off"),
+                .requires(ground(false)),
         ],
     )
 }
@@ -272,10 +267,7 @@ pub fn fog() -> PrimType {
         Parameter::toggle("inscatter", "In-scatter", false).group(GROUP),
         Parameter::slider("anisotropy", "Anisotropy", (-0.9, 0.9), (-0.9, 0.9), 3, 0.3)
             .group(GROUP)
-            .requires(
-                Condition::when("inscatter", true),
-                "Used with In-scatter on",
-            ),
+            .requires(Condition::when("inscatter", true)),
     ];
     let schema = Schema::default().section(Section::new(GROUP, "Fog", true));
     PrimType::new(

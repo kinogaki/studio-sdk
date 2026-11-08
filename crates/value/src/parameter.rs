@@ -45,10 +45,10 @@ pub struct Parameter {
     /// The [`Section`](crate::Section) of its [`Schema`](crate::Schema) it
     /// sits in, by name; empty for none.
     pub group: String,
-    /// When it applies, and why it doesn't otherwise; none: always. A
-    /// host shows a row that doesn't apply greyed in its place, saying why:
-    /// rows never hide, so none moves when a value changes.
-    requires: Option<(Condition, String)>,
+    /// When it applies; none: always. A host hides a row that doesn't
+    /// apply (it takes no space) and keeps its value for when it applies
+    /// again.
+    requires: Option<Condition>,
 }
 
 impl Parameter {
@@ -224,29 +224,24 @@ impl Parameter {
         self
     }
 
-    /// Applying while `when` holds of the values beside it, else disabled,
-    /// saying `reason` ("Used with Ground on").
-    pub fn requires(mut self, when: Condition, reason: &str) -> Self {
-        self.requires = Some((when, reason.to_owned()));
+    /// Applying, and so shown, while `when` holds of the values beside it.
+    pub fn requires(mut self, when: Condition) -> Self {
+        self.requires = Some(when);
         self
     }
 
     /// Whether it applies while the parameters beside it hold `values`.
     pub fn applies(&self, values: &Parameters) -> bool {
-        self.requires.as_ref().is_none_or(|(c, _)| c.met(values))
+        self.requires.as_ref().is_none_or(|c| c.met(values))
     }
 
-    /// It as its row shows while the parameters beside it hold `values`:
-    /// disabled, its help saying why, while it doesn't apply; its condition
-    /// spent either way.
-    pub fn resolved(mut self, values: &Parameters) -> Self {
-        if let Some((when, reason)) = self.requires.take()
-            && !when.met(values)
-        {
-            self.enabled = false;
-            self.help = reason;
-        }
-        self
+    /// It as its row shows while the parameters beside it hold `values`,
+    /// its condition spent; none while it doesn't apply (hidden).
+    pub fn resolved(mut self, values: &Parameters) -> Option<Self> {
+        self.applies(values).then(|| {
+            self.requires = None;
+            self
+        })
     }
 
     /// Whether `value` is one it takes: of its kind and within its limits.

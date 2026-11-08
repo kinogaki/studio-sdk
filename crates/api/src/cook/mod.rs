@@ -330,9 +330,9 @@ pub trait NodeType: Any + Send + Sync {
 
     /// The rows a node with `parameters` shows, shaped from `rows` (its
     /// description's parameters and its spares, at their values) by what
-    /// `cx` says: rows enabled or disabled (with the reason) by what is
-    /// wired, choices filled from what an input held (its attributes, its
-    /// groups). Where they show is `cx.purpose()`: a tool's card
+    /// `cx` says: rows left out where they don't apply to `parameters`
+    /// (hidden, their values kept), choices filled from what an input held
+    /// (its attributes, its groups). Where they show is `cx.purpose()`: a tool's card
     /// ([`RowsFor::Card`]) may leave out the rows its run isn't adjusted
     /// by, and offers More while it shows fewer than the inspector does.
     /// It shapes rows only: it never changes a parameter, and the same

@@ -161,11 +161,10 @@ fn rows_apply_by_the_values_beside_them() {
     assert!(applies(&values, "width") && !applies(&values, "radius"));
     values.insert("shape".into(), standard::choice("disk"));
     assert!(!applies(&values, "width") && applies(&values, "radius"));
-    // A row that doesn't apply says why.
-    let width = param(&area, "width").unwrap().clone().resolved(&values);
+    // A row that doesn't apply is hidden.
     assert_eq!(
-        (width.enabled, &*width.help),
-        (false, "Used by the Rectangle shape")
+        param(&area, "width").unwrap().clone().resolved(&values),
+        None
     );
     // Color applies to the color emission, Temperature to its own.
     assert!(applies(&values, "color") && !applies(&values, "colorTemperature"));

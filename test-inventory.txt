@@ -689,10 +689,10 @@ kinogaki-studio-ui-api/lib test projection::test_camera::the_inverse_undoes_the_
 kinogaki-studio-ui-api/lib test projection::tests::points_behind_the_eye_do_not_project
 kinogaki-studio-ui-api/lib test projection::tests::the_target_projects_to_the_middle_and_rays_pass_through_it
 kinogaki-studio-ui-api/lib test sheet::edits::tests::edits_read_and_map
-kinogaki-studio-ui-api/lib test sheet::from_params::tests::a_row_that_does_not_apply_shows_greyed_in_its_place_saying_why
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::a_row_that_does_not_apply_is_hidden
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::curves_channels_and_texts_become_their_fields
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::parameters_become_fields_keyed_by_name
-kinogaki-studio-ui-api/lib test sheet::from_params::tests::rows_show_in_the_schemas_order_with_a_band_over_each_section_holding_rows
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::rows_show_in_the_schemas_order_with_bands_over_shown_rows_alone
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::shaped_rows_show_their_menus_and_buttons
 kinogaki-studio-ui-api/lib test sheet::items::tests::keys_map_and_filter
 kinogaki-studio-ui-api/lib test sheet::items::tests::values_read_by_key
@@ -745,6 +745,7 @@ kinogaki-value/lib test schema::tests::a_check_refuses_a_name_twice_an_undeclare
 kinogaki-value/lib test schema::tests::a_merge_adds_the_sections_and_rows_not_held_after_its_own
 kinogaki-value/lib test schema::tests::rows_change_in_place_and_go_by_retain
 kinogaki-value/lib test schema::tests::rows_show_loose_first_then_by_section_in_the_order_added
+kinogaki-value/lib test schema::tests::shown_leaves_out_the_rows_named_off
 kinogaki-value/lib test schema::tests::values_fit_and_validate_against_its_parameters
 kinogaki-value/lib test tone_curve::tests::a_curve_runs_through_its_keys_and_straight_past_its_ends
 kinogaki-value/lib test value::tests::integers_are_exact
