@@ -471,6 +471,7 @@ kinogaki-studio-api/doc test crates/api/src/standard/geometry.rs - standard::geo
 kinogaki-studio-api/doc test crates/api/src/standard/image.rs - standard::image::ImageCodec
 kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances
 kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances::gathered
+kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::Instances::kept
 kinogaki-studio-api/doc test crates/api/src/standard/instances.rs - standard::instances::material_map
 kinogaki-studio-api/doc test crates/api/src/standard/materials.rs - standard::materials::MaterialsCodec
 kinogaki-studio-api/doc test crates/api/src/standard/mod.rs - standard
@@ -485,6 +486,7 @@ kinogaki-studio-api/instances test a_move_shares_the_prototypes_and_attributes
 kinogaki-studio-api/instances test instances_refuse_what_they_cant_place
 kinogaki-studio-api/instances test instances_round_trip_with_each_prototype_written_once
 kinogaki-studio-api/instances test realized_copies_name_the_materials_their_instances_render
+kinogaki-studio-api/instances test the_instances_kept_take_their_attributes_and_groups_and_the_rest_go
 kinogaki-studio-api/lib test color::tests::a_converted_color_settles_where_a_conversion_left_its_last_bits
 kinogaki-studio-api/lib test components::tests::a_selection_reads_back_only_as_its_own_representation
 kinogaki-studio-api/lib test cook::binding::tests::a_component_reads_and_writes_one_number_of_a_vector

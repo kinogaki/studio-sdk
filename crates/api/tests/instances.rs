@@ -193,3 +193,37 @@ fn realized_copies_name_the_materials_their_instances_render() {
             .is_none()
     );
 }
+
+#[test]
+fn the_instances_kept_take_their_attributes_and_groups_and_the_rest_go() {
+    use kinogaki_studio_api::geometry::Elements;
+    let (a, b) = (prototype(), prototype());
+    let which = Some(vec![0, 1, 0, 1].into());
+    let ids = Attribute::tuples(vec![10_i64, 11, 12, 13], Meaning::None).unwrap();
+    let detail = Attribute::tuples(vec![7_i64], Meaning::None).unwrap();
+    let odd = Elements::from_indices(4, [1, 3]).unwrap();
+    let table = Attributes::new()
+        .with(Domain::Instance, names::ID, ids)
+        .and_then(|t| t.with(Domain::Detail, "seed", detail))
+        .and_then(|t| t.with_group(Domain::Instance, "odd", odd))
+        .unwrap();
+    let copies = Instances::new(vec![a, b], along(4).into(), which, table).unwrap();
+    let left = copies.kept(&[3, 2]).unwrap();
+    assert_eq!(left.len(), 2);
+    assert_eq!(left.xforms().to_vec(), [along(4)[3], along(4)[2]]);
+    assert_eq!(left.prototype_index(0), 0);
+    assert!(left.prototypes()[0].ptr_eq(&copies.prototypes()[1]));
+    assert!(left.prototypes()[1].ptr_eq(&copies.prototypes()[0]));
+    let ids = left.attributes().tuples::<i64>(Domain::Instance, names::ID);
+    assert_eq!(ids, Some(&[13_i64, 12][..]));
+    let seed = left.attributes().tuples::<i64>(Domain::Detail, "seed");
+    assert_eq!(seed, Some(&[7_i64][..]));
+    let odd = left.attributes().group(Domain::Instance, "odd").unwrap();
+    assert_eq!(odd.iter().collect::<Vec<_>>(), [0]);
+    // All of one prototype's gone: so is it.
+    let evens = copies.kept(&[0, 2]).unwrap();
+    assert_eq!(evens.prototypes().len(), 1);
+    assert!(evens.prototype_indices().is_none());
+    assert_eq!(copies.kept(&[]).unwrap().len(), 0);
+    assert!(copies.kept(&[4]).is_err(), "past the instances");
+}

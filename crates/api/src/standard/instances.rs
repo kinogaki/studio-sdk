@@ -6,9 +6,9 @@ use crate::codec::DataCodec;
 use crate::components::Components;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field};
-use kinogaki_edit::editor::{Placed, gather, gather_table, spread};
+use kinogaki_edit::editor::{Placed, gather, gather_table, picked, spread};
 use kinogaki_geometry::{
-    Attribute, Attributes, Column, Domain, Geometry, Meaning, Text, Values, Xform, names,
+    Attribute, Attributes, Column, Domain, Elements, Geometry, Meaning, Text, Values, Xform, names,
 };
 use std::sync::Arc;
 
@@ -239,6 +239,69 @@ impl Instances {
             attributes: Arc::new(attributes),
             ..self.clone()
         })
+    }
+
+    /// The instances `kept` names, in its order, each with its placement and
+    /// its Instance attributes and groups; the prototypes they place, each
+    /// still held once (one no kept instance places goes), and the Detail
+    /// as it was. What a Delete of the others leaves.
+    ///
+    /// ```
+    /// use kinogaki_studio_api::geometry::{Attributes, Geometry, Vec3, Xform};
+    /// use kinogaki_studio_api::standard::{self, Instances};
+    ///
+    /// let (a, b) = (Geometry::empty(), Geometry::empty());
+    /// let two = vec![standard::geometry().wrap(a), standard::geometry().wrap(b)];
+    /// let at = (0..3).map(|i| Xform::translation(Vec3::new(i as f64, 0.0, 0.0))).collect();
+    /// let copies = Instances::new(two, at, Some(vec![0, 1, 0].into()), Attributes::new()).unwrap();
+    /// let left = copies.kept(&[2, 0]).unwrap();
+    /// assert_eq!((left.len(), left.prototypes().len()), (2, 1));
+    /// assert_eq!(left.xforms()[0], copies.xforms()[2]);
+    /// assert!(left.prototypes()[0].ptr_eq(&copies.prototypes()[0]));
+    /// ```
+    ///
+    /// # Errors
+    /// An index past the instances.
+    pub fn kept(&self, kept: &[u32]) -> Result<Self, Error> {
+        if let Some(&i) = kept.iter().find(|&&i| i as usize >= self.len()) {
+            return Err(Error::invalid(format_args!(
+                "instance {i} of {}",
+                self.len()
+            )));
+        }
+        // The prototypes the kept instances place, in their order, renumbered.
+        let mut number = vec![u32::MAX; self.prototypes.len()];
+        let mut prototypes = Vec::new();
+        let mut which = Vec::with_capacity(kept.len());
+        for &i in kept {
+            let k = self.prototype_index(i as usize);
+            if number[k] == u32::MAX {
+                number[k] = prototypes.len() as u32;
+                prototypes.push(self.prototypes[k].clone());
+            }
+            which.push(number[k]);
+        }
+        let xforms = kept.iter().map(|&i| self.xforms[i as usize]).collect();
+        let mut table = Attributes::new();
+        for (domain, name, a) in self.attributes.iter() {
+            let a = match domain {
+                Domain::Instance => picked(a, kept)?,
+                _ => a.clone(),
+            };
+            table.set(domain, name, a)?;
+        }
+        for (domain, name, group) in self.attributes.groups() {
+            let group = match domain {
+                Domain::Instance => {
+                    let held = (kept.iter().enumerate()).filter(|&(_, &i)| group.contains(i));
+                    Elements::from_indices(kept.len(), held.map(|(j, _)| j as u32))?
+                }
+                _ => group.clone(),
+            };
+            table.set_group(domain, name, group)?;
+        }
+        let which = (prototypes.len() > 1).then(|| which.into());
+        Self::new(prototypes, xforms, which, table)
     }
 
     /// `values` as one value: each of Instances as it is, and the rest (each
