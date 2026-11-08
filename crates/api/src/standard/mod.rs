@@ -21,7 +21,8 @@
 //! [`LightCodec`](crate::render::lights::LightCodec))
 //! are the ones core registers,
 //! and they also save the standard [`Selection`]s a kept result carries.
-//! Project files save only frozen and held results, never cooked ones.
+//! Project files save only frozen results and held edits' deltas, never
+//! cooked values.
 //! [`ColorConfiguration`], [`DisplayOutput`],
 //! [`Tolerances`](crate::geometry::Tolerances) and
 //! [`DisplayQuality`](crate::geometry::DisplayQuality) are project values

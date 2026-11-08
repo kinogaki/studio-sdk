@@ -20,6 +20,7 @@ example-points-format/lib test tests::every_fixtures_points_survive_a_round_trip
 example-points-format/lib test tests::materials_and_faces_write_back_as_they_read
 example-points-format/lib test tests::materials_read_first_their_colors_in_the_working_space_and_pictures_as_image_nodes
 kinogaki-edit/doc test crates/edit/src/deform.rs - deform
+kinogaki-edit/doc test crates/edit/src/deform.rs - deform::Move::from_parts
 kinogaki-edit/doc test crates/edit/src/editor/carry.rs - editor::carry::rule
 kinogaki-edit/doc test crates/edit/src/editor/finish.rs - editor::finish::place
 kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::gather
@@ -27,7 +28,7 @@ kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::gather
 kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::picked
 kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::spread
 kinogaki-edit/doc test crates/edit/src/editor/mod.rs - editor
-kinogaki-edit/doc test crates/edit/src/ids.rs - ids::elements
+kinogaki-edit/doc test crates/edit/src/ids.rs - ids::every
 kinogaki-edit/doc test crates/edit/src/ids.rs - ids::fresh
 kinogaki-edit/doc test crates/edit/src/ids.rs - ids::id_of
 kinogaki-edit/doc test crates/edit/src/ids.rs - ids::numbered
@@ -633,7 +634,7 @@ kinogaki-studio-ui-api-testing/lib test painter::tests::a_reserved_place_holds_m
 kinogaki-studio-ui-api-testing/lib test painter::tests::draws_are_recorded_in_order_with_their_clip
 kinogaki-studio-ui-api/capabilities test a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step
 kinogaki-studio-ui-api/capabilities test a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it
-kinogaki-studio-ui-api/capabilities test a_held_node_takes_a_new_base_and_reports_its_result
+kinogaki-studio-ui-api/capabilities test a_held_node_applies_its_delta_to_its_input_as_it_is_and_reports_its_result
 kinogaki-studio-ui-api/capabilities test a_library_without_a_viewport_spec_gets_cores_scene_view
 kinogaki-studio-ui-api/capabilities test row_actions_and_typing_reach_the_contexts_parts
 kinogaki-studio-ui-api/capabilities test the_newest_ask_of_a_kind_wins_lands_once_and_an_ask_again_runs_nothing

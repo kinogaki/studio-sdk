@@ -144,9 +144,9 @@ impl Symmetry {
 
 /// A translation, then a rotation and a scale about a pivot
 /// (`p ↦ pivot + translate + rotation · (scale ⊙ (p − pivot))`, the scale
-/// along the move's axes): the move a weight of 1 makes. Built only
-/// through [`new`](Self::new), so its rotation is always a unit axis and
-/// an angle in `[-π, π]`.
+/// along the move's axes): the move a weight of 1 makes. Built through
+/// [`new`](Self::new), or [`from_parts`](Self::from_parts) for one read
+/// back, so its rotation is always a unit axis and an angle in `[-π, π]`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Move {
     translate: Vec3,
@@ -183,6 +183,49 @@ impl Move {
             scale,
             pivot,
             axes: [0.0, 0.0, 0.0, 1.0],
+        })
+    }
+
+    /// The move whose [`translate`](Self::translate), [`axis`](Self::axis),
+    /// [`angle`](Self::angle), [`scale`](Self::scale), [`pivot`](Self::pivot)
+    /// and [`axes`](Self::axes) are these, taken as they are: a stored move
+    /// read back is the move written, bit for bit (a quaternion through
+    /// [`new`](Self::new) isn't). `None` when any isn't finite, the axis or
+    /// the axes aren't of unit length, or the angle is past π.
+    ///
+    /// ```
+    /// use kinogaki_edit::deform::Move;
+    /// use kinogaki_geometry::Vec3;
+    ///
+    /// let turn = [0.1, 0.7, 0.2, 0.6];
+    /// let m = Move::new(Vec3::X, turn, Vec3::new(1.0, 2.0, 1.0), Vec3::Y).unwrap();
+    /// let (axis, angle) = (m.axis(), m.angle());
+    /// let back = Move::from_parts(m.translate(), axis, angle, m.scale(), m.pivot(), m.axes());
+    /// assert_eq!(back, Some(m));
+    /// assert_eq!(Move::from_parts(m.translate(), axis * 2.0, angle, m.scale(), m.pivot(), m.axes()), None);
+    /// ```
+    pub fn from_parts(
+        translate: Vec3,
+        axis: Vec3,
+        angle: f64,
+        scale: Vec3,
+        pivot: Vec3,
+        axes: [f64; 4],
+    ) -> Option<Self> {
+        let unit = |length: f64| (length - 1.0).abs() < 1e-9;
+        let finite = [translate, axis, scale, pivot]
+            .iter()
+            .all(|v| v.is_finite())
+            && angle.is_finite()
+            && axes.iter().all(|c| c.is_finite());
+        let units = unit(axis.dot(axis)) && unit(axes.iter().map(|c| c * c).sum());
+        (finite && units && angle.abs() <= std::f64::consts::PI).then_some(Self {
+            translate,
+            axis,
+            angle,
+            scale,
+            pivot,
+            axes,
         })
     }
 

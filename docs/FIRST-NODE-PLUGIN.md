@@ -209,12 +209,12 @@ impl Renderable for BoxType {
 
 ```rust
 impl DataCodec for BoxType {
-    fn write(&self, data: &Data, _: Option<&Data>, out: &mut dyn ElementWriter) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let shape = box_of(data)?;
         out.set("size", Field::F64s(shape.size.to_vec()))?;
         out.set("center", Field::F64s(shape.center.to_vec()))
     }
-    fn read(&self, element: &dyn ElementReader, _: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         let three = |name: &str| -> Result<[f64; 3], Error> {
             element
                 .f64s(name)?

@@ -72,9 +72,9 @@ pub struct NodeInfo<'a> {
     /// [`NetworkEdit::set_delta`](super::NetworkEdit::set_delta)).
     pub delta: Option<&'a Data>,
     /// Its first output from the node's last cook, while the node's stamp
-    /// (its parameters and what it reads) is still the one it cooked at
-    /// (a held edit's result, for baking it into its base); `None` when it
-    /// hasn't cooked at that stamp, or when the cache budget dropped it.
+    /// (its parameters and what it reads) is still the one it cooked at;
+    /// `None` when it hasn't cooked at that stamp, or when the cache budget
+    /// dropped it.
     pub result: Option<Data>,
     /// The selection that output carries downstream
     /// ([`Outputs::selection`](crate::Outputs::selection)) from the node's

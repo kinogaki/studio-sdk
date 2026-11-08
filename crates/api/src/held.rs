@@ -1,15 +1,18 @@
 //! Held edits: a node holding an authored delta over its input (Edit Mesh,
-//! Edit CAD). Core owns the mechanism: it captures the node's input once
-//! as the delta's base (later cooks never read upstream again until the
-//! node is reloaded), keeps one result per held state that every copy of
-//! the state shares (undo snapshots show the same value again), applies
-//! the delta anew when it changes, and undoes. A package supplies only how
-//! a delta applies to its data type.
+//! Edit CAD). Core owns the mechanism: the node reads its input as any
+//! node does and the delta applies to what it gives now, so what shows is
+//! what a reopened project makes. Core keeps one result per held state and
+//! input that every copy of the state shares (undo snapshots show the same
+//! value again), applies the delta anew when it or the input changes, and
+//! undoes. A project saves the delta alone. A package supplies only how a
+//! delta applies to its data type.
 //!
 //! A delta is itself [`Data`] of a type the package registers, so it
-//! saves, stamps and counts memory through that type. How a delta is
-//! authored (the interactive tools that record moves, inserts and
-//! deletions) is the package's UI, through the host UI interface.
+//! saves, stamps and counts memory through that type. It holds what the
+//! user did (the elements an edit names, its move or its rows), never a
+//! copy of what it applies to. How a delta is authored (the interactive
+//! tools that record moves, inserts and deletions) is the package's UI,
+//! through the host UI interface.
 use crate::Error;
 use crate::cook::SchemaCx;
 use crate::cook::{CookCx, Outputs};
@@ -19,30 +22,32 @@ use crate::params::{Parameters, Schema};
 
 /// How authored deltas apply to values of one data type.
 pub trait HeldEdit: Send + Sync {
-    /// The data type the edits apply to (`kinogaki.mesh.geometry`).
+    /// The data type the edits apply to (`kinogaki.core.geometry`): with
+    /// nothing wired into the node's first input, they apply to its empty
+    /// value.
     fn base(&self) -> DataTypeId;
 
-    /// The data type of its deltas (`kinogaki.mesh.action`), registered by
+    /// The data type of its deltas (`kinogaki.mesh.steps`), registered by
     /// the same package or an earlier one.
     fn delta(&self) -> DataTypeId;
 
     /// Whether applying `delta` reads the node's input `port` (1 and up)
-    /// besides the captured base: what it projects onto, say. Port 0 is
-    /// the base, which core captures once and never reads again. None by
+    /// besides its first, the base: what it projects onto, say. None by
     /// default.
     fn reads_input(&self, delta: &Data, port: usize) -> bool {
         let _ = (delta, port);
         false
     }
 
-    /// `base` with `delta` applied: the held node's outputs. `inputs[i]`
-    /// is the value wired into port `i + 1` when
-    /// [`reads_input`](Self::reads_input) asked for it, else `None`. A
-    /// delta authored against an earlier version of the input applies as
-    /// far as it still can (moves of points that still exist); it fails
-    /// only when nothing applies. The scratch slot of `cx` keeps what
-    /// speeds the next application (adjusting the latest edit), as for any
-    /// cook.
+    /// `base`, the node's input now, with `delta` applied: the held node's
+    /// outputs. `inputs[i]` is the value wired into port `i + 1` when
+    /// [`reads_input`](Self::reads_input) asked for it, else `None`. The
+    /// same base and delta give the same outputs, bit for bit: a reopened
+    /// project shows what was saved. An edit naming an element `base`
+    /// doesn't have (its input changed since the edit) fails the node with
+    /// an error saying so, never a panic. The scratch slot of `cx` keeps
+    /// what speeds the next application (adjusting the latest edit, keyed
+    /// by the base it applied to), as for any cook.
     fn apply(
         &self,
         cx: &mut CookCx<'_>,
@@ -60,8 +65,8 @@ pub trait HeldEdit: Send + Sync {
     }
 
     /// The rows `delta` shows in the inspector of the node holding it (an
-    /// Edit Mesh's latest action's), at their values; `cx.input(0)` is
-    /// the node's held result, and `cx.purpose()` where they show (a
+    /// Edit Mesh's latest step's), at their values; `cx` says which of
+    /// the node's ports are wired, and `cx.purpose()` where they show (a
     /// tool's card may show fewer). `None`: the delta shows no rows. Like
     /// [`NodeType::schema`](crate::NodeType::schema), it must be quick.
     fn rows(&self, delta: &Data, cx: &SchemaCx<'_>) -> Option<Schema> {

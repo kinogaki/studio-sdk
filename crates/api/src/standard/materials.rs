@@ -89,20 +89,15 @@ pub struct ImportedImage {
 /// let held = Materials { materials: vec![red], images: vec![sky] };
 /// let data = standard::materials().wrap(held.clone());
 /// let mut saved = MemoryElement::new("result");
-/// saved.write(|w| MaterialsCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| MaterialsCodec.read(r, None)).unwrap();
+/// saved.write(|w| MaterialsCodec.write(&data, w)).unwrap();
+/// let read = saved.read(|r| MaterialsCodec.read(r)).unwrap();
 /// assert_eq!(standard::materials().get(&read), Some(&held));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MaterialsCodec;
 
 impl DataCodec for MaterialsCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let held = materials()
             .get(data)
             .ok_or_else(|| Error::invalid("not imported materials"))?;
@@ -117,7 +112,7 @@ impl DataCodec for MaterialsCodec {
         Ok(())
     }
 
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         let materials_held = (0..count(element, "count")?)
             .map(|at| read_material(&*element.required_child(&format!("m{at}"))?))
             .collect::<Result<Vec<_>, Error>>()?;
@@ -405,10 +400,8 @@ mod tests {
         };
         let data = materials().wrap(held.clone());
         let mut saved = MemoryElement::new("result");
-        saved
-            .write(|w| MaterialsCodec.write(&data, None, w))
-            .unwrap();
-        let read = saved.read(|r| MaterialsCodec.read(r, None)).unwrap();
+        saved.write(|w| MaterialsCodec.write(&data, w)).unwrap();
+        let read = saved.read(|r| MaterialsCodec.read(r)).unwrap();
         assert_eq!(materials().get(&read), Some(&held));
     }
 }

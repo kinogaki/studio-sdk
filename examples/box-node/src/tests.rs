@@ -166,8 +166,8 @@ fn a_box_saves_and_reads_back() {
     let codec = BoxType;
     let codec = codec.codec();
     let mut element = MemoryElement::new("box");
-    element.write(|out| codec.write(&data, None, out)).unwrap();
-    let read = element.read(|reader| codec.read(reader, None)).unwrap();
+    element.write(|out| codec.write(&data, out)).unwrap();
+    let read = element.read(|reader| codec.read(reader)).unwrap();
     assert_eq!(BOX.get(&read), BOX.get(&data));
     assert_eq!(codec_stamp(&read), codec_stamp(&data));
 }

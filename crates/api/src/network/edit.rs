@@ -76,15 +76,8 @@ pub trait NetworkEdit: NetworkRead {
 
     /// Makes `node` hold `delta` over its input: its type must be a held
     /// edit ([`NodeType::held`](crate::NodeType::held)) of `delta`'s data
-    /// type. The base it applies to is captured by the next cook; a node
-    /// holding a delta already applies the new one to the same base.
+    /// type. The delta applies to what its input gives.
     fn set_delta(&mut self, node: NodeRef, delta: Data) -> Result<(), Error>;
-    /// Makes `base` the value held node `node` applies its delta to, in
-    /// place of the base it captured, keeping the delta: Bake (the node's
-    /// result becomes its base, with an emptied delta set after) and
-    /// re-keying a base after the input's topology changed. `base` is of
-    /// the data type the node edits; `Err` when `node` is no held edit.
-    fn rebase_held(&mut self, node: NodeRef, base: Data) -> Result<(), Error>;
     /// Edits the network node `node` holds inside it
     /// ([`Description::inside`](crate::cook::Description::inside)), within
     /// this edit (one undo step); `Err` when its type holds none.

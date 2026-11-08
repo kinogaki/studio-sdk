@@ -61,9 +61,9 @@ pub fn id_of(value: &Geometry, domain: Domain, element: u32) -> i64 {
         .map_or(i64::from(element), |ids| ids[element as usize])
 }
 
-/// The elements of `domain` in `value` with these ids, in their order;
-/// those gone left out. On a value without ids there, an id is the
-/// element's number ([`id_of`]).
+/// The elements of `domain` in `value` with these ids, in their order:
+/// what a stored edit names, every one of them there. On a value without
+/// ids there, an id is the element's number ([`id_of`]).
 ///
 /// ```
 /// use kinogaki_edit::ids;
@@ -71,13 +71,29 @@ pub fn id_of(value: &Geometry, domain: Domain, element: u32) -> i64 {
 ///
 /// let t = Primitives::of_polygons(3, vec![0, 3].into(), vec![0, 1, 2].into()).unwrap();
 /// let bare = Geometry::new(vec![[0.0; 3]; 3].into(), t, Attributes::new()).unwrap();
-/// assert_eq!(ids::elements(&bare, Domain::Point, &[2, 7, 0]), [2, 0]);
+/// assert_eq!(ids::every(&bare, Domain::Point, &[2, 0]).unwrap(), [2, 0]);
 /// let numbered = ids::numbered(&bare).unwrap();
-/// assert_eq!(ids::elements(&numbered, Domain::Point, &[2, 7, 0]), [2, 0]);
+/// assert_eq!(ids::every(&numbered, Domain::Point, &[2, 0]).unwrap(), [2, 0]);
+/// let error = ids::every(&bare, Domain::Point, &[2, 7]).unwrap_err();
+/// assert!(error.to_string().contains("no point 7"));
 /// ```
-pub fn elements(value: &Geometry, domain: Domain, ids: &[i64]) -> Vec<u32> {
+///
+/// # Errors
+/// An id no element of `value` holds ([`gone`]).
+pub fn every(value: &Geometry, domain: Domain, ids: &[i64]) -> Result<Vec<u32>, Error> {
     let find = element_of(value, domain);
-    ids.iter().filter_map(|&id| find(id)).collect()
+    (ids.iter())
+        .map(|&id| find(id).ok_or_else(|| gone(domain, id)))
+        .collect()
+}
+
+/// What a stored edit naming `what` of `domain` fails with when its input
+/// has none: the input changed since the edit was made.
+pub fn gone(domain: Domain, what: impl std::fmt::Display) -> Error {
+    Error::invalid(format!(
+        "the input has no {} {what}: it changed since the edit was made",
+        domain.name()
+    ))
 }
 
 /// A lookup of `domain`'s elements in `value` by stable id ([`id_of`]'s
@@ -234,11 +250,18 @@ mod tests {
         // Numbered, then a point gone: ascending with a gap.
         let ascending = with(vec![0, 1, 3, 4, 9]);
         assert_eq!(
-            elements(&ascending, Domain::Point, &[9, 2, 0, 3, -1, 10]),
+            every(&ascending, Domain::Point, &[9, 0, 3]).unwrap(),
             [4, 0, 2]
         );
+        for gone in [2, -1, 10] {
+            assert!(every(&ascending, Domain::Point, &[9, gone]).is_err());
+        }
         let shuffled = with(vec![7, 3, 9, 0, 4]);
-        assert_eq!(elements(&shuffled, Domain::Point, &[0, 9, 1, 7]), [3, 2, 0]);
+        assert_eq!(
+            every(&shuffled, Domain::Point, &[0, 9, 7]).unwrap(),
+            [3, 2, 0]
+        );
+        assert!(every(&shuffled, Domain::Point, &[0, 1]).is_err());
         for (k, &id) in [7, 3, 9, 0, 4].iter().enumerate() {
             assert_eq!(element_of(&shuffled, Domain::Point)(id), Some(k as u32));
         }

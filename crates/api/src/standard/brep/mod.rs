@@ -45,8 +45,8 @@ use kinogaki_geometry::{Frame, Vec3};
 ///
 /// let data = standard::brep().wrap(Brep::empty());
 /// let mut saved = MemoryElement::new("result");
-/// saved.write(|w| BrepCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| BrepCodec.read(r, None)).unwrap();
+/// saved.write(|w| BrepCodec.write(&data, w)).unwrap();
+/// let read = saved.read(|r| BrepCodec.read(r)).unwrap();
 /// assert_eq!(standard::brep().get(&read), Some(&Brep::empty()));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
@@ -56,12 +56,7 @@ pub struct BrepCodec;
 const NONE: u32 = u32::MAX;
 
 impl DataCodec for BrepCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let value = brep()
             .get(data)
             .ok_or_else(|| Error::invalid("not a B-rep"))?;
@@ -76,7 +71,7 @@ impl DataCodec for BrepCodec {
         names.finish(out)
     }
 
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         let at = element.location();
         let names = names::Table::read(element)?;
         let mut bodies = Vec::new();

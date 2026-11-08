@@ -133,10 +133,8 @@ fn instances_round_trip_with_each_prototype_written_once() {
     .unwrap();
     let data = standard::instances().wrap(outer);
     let mut saved = MemoryElement::new("result");
-    saved
-        .write(|w| InstancesCodec.write(&data, None, w))
-        .unwrap();
-    let read = saved.read(|r| InstancesCodec.read(r, None)).unwrap();
+    saved.write(|w| InstancesCodec.write(&data, w)).unwrap();
+    let read = saved.read(|r| InstancesCodec.read(r)).unwrap();
     let read = standard::instances().get(&read).unwrap();
     assert_eq!(read.xforms().as_slice(), along(2).as_slice());
     assert_eq!(read.prototype_indices().unwrap().as_slice(), &[0, 1]);

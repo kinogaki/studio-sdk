@@ -1,7 +1,8 @@
 //! The fake host's answers to the capabilities a context's tools lean on:
 //! restarting a gesture, render views, Console records, the clipboard,
 //! latest-wins jobs, the inspector's row hooks, the vocabulary's node
-//! edit, a held node's base and result, and a library's viewport chrome.
+//! edit, a held node's result over its input, and a library's viewport
+//! chrome.
 use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire};
 use kinogaki_studio_api::{
@@ -293,52 +294,48 @@ impl HeldEdit for AddOffset {
 }
 
 #[test]
-fn a_held_node_takes_a_new_base_and_reports_its_result() {
+fn a_held_node_applies_its_delta_to_its_input_as_it_is_and_reports_its_result() {
     let package = Package::new(PackageId::declared("acme.counts"), "Counts")
         .with_context(NetworkContext::new(context(), "Counts", "counts"))
         .with_node_type(One)
         .with_node_type(Edit)
         .with_held_edit(AddOffset);
     let mut net = FakeNetwork::new(context(), &[&package]).unwrap();
-    let one = net
-        .add_node(
-            NewNode::new(NodeTypeId::declared("acme.counts.one")),
-            [0.0, 0.0],
+    let add = |net: &mut FakeNetwork, id: &'static str, y: f32| {
+        net.add_node(NewNode::new(NodeTypeId::declared(id)), [0.0, y])
+            .unwrap()
+    };
+    let one = add(&mut net, "acme.counts.one", 0.0);
+    let first = add(&mut net, "acme.counts.edit", 1.0);
+    let edit = add(&mut net, "acme.counts.edit", 2.0);
+    for (from, to) in [(one, first), (first, edit)] {
+        net.connect(
+            Wire {
+                node: from,
+                output: 0,
+            },
+            to,
+            0,
         )
         .unwrap();
-    let edit = net
-        .add_node(
-            NewNode::new(NodeTypeId::declared("acme.counts.edit")),
-            [0.0, 1.0],
-        )
-        .unwrap();
-    net.connect(
-        Wire {
-            node: one,
-            output: 0,
-        },
-        edit,
-        0,
-    )
-    .unwrap();
+    }
+    net.set_delta(first, OFFSET.wrap(2.0)).unwrap();
     net.set_delta(edit, OFFSET.wrap(0.5)).unwrap();
     let result = |net: &FakeNetwork| {
         *NUMBER
             .get(net.node(edit).unwrap().result.as_ref().unwrap())
             .unwrap()
     };
-    assert_eq!(result(&net), 1.5);
-    // Bake: the result becomes the base, the delta empties.
-    let baked = net.node(edit).unwrap().result.unwrap();
-    net.rebase_held(edit, baked).unwrap();
-    net.set_delta(edit, OFFSET.wrap(0.0)).unwrap();
-    assert_eq!(result(&net), 1.5);
+    assert_eq!(result(&net), 3.5);
+    // An edit upstream reaches it: its delta applies to the input as it is.
+    net.set_delta(first, OFFSET.wrap(10.0)).unwrap();
+    assert_eq!(result(&net), 11.5);
     assert!(
-        net.rebase_held(edit, OFFSET.wrap(1.0)).is_err(),
-        "a base of another type"
+        net.set_delta(edit, NUMBER.wrap(1.0)).is_err(),
+        "a delta of another type"
     );
     assert!(
-        net.rebase_held(one, NUMBER.wrap(1.0)).is_err(),
+        net.set_delta(one, OFFSET.wrap(1.0)).is_err(),
         "not a held edit"
     );
 }

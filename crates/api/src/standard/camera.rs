@@ -150,19 +150,14 @@ impl CameraCodec {
 }
 
 impl DataCodec for CameraCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let c = camera()
             .get(data)
             .ok_or_else(|| Error::invalid("not a camera"))?;
         Self::write_lens(c, out)
     }
 
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         camera().wrap(Self::read_lens(element)?)
     }
 }
@@ -186,9 +181,9 @@ mod tests {
             })
             .unwrap();
         let mut e = MemoryElement::new("camera");
-        e.write(|w| CameraCodec.write(&camera().wrap(lens.clone()).unwrap(), None, w))
+        e.write(|w| CameraCodec.write(&camera().wrap(lens.clone()).unwrap(), w))
             .unwrap();
-        let back = e.read(|r| CameraCodec.read(r, None)).unwrap();
+        let back = e.read(|r| CameraCodec.read(r)).unwrap();
         assert_eq!(camera().get(&back), Some(&lens));
     }
 

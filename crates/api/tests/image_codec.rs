@@ -14,8 +14,8 @@ use std::sync::Arc;
 fn round_trip(image: &Image) -> Image {
     let data = standard::image().wrap(image.clone());
     let mut saved = MemoryElement::new("result");
-    saved.write(|w| ImageCodec.write(&data, None, w)).unwrap();
-    let read = saved.read(|r| ImageCodec.read(r, None)).unwrap();
+    saved.write(|w| ImageCodec.write(&data, w)).unwrap();
+    let read = saved.read(|r| ImageCodec.read(r)).unwrap();
     standard::image().get(&read).unwrap().clone()
 }
 
@@ -107,7 +107,7 @@ fn reading_is_strict() {
                 layer.set("pixels", Field::U8s(pixels))
             })
             .unwrap();
-        saved.read(|r| ImageCodec.read(r, None))
+        saved.read(|r| ImageCodec.read(r))
     };
     assert!(write(vec![1; 4096], "u8").is_ok());
     assert!(write(vec![1; 3], "u8").is_err(), "not a tile's bytes");
@@ -145,6 +145,6 @@ fn a_live_layer_saves_its_result_and_held_pixels_are_refused() {
         .unwrap();
     let data = standard::image().wrap(image);
     let mut saved = MemoryElement::new("result");
-    let wrote = saved.write(|w| ImageCodec.write(&data, None, w));
+    let wrote = saved.write(|w| ImageCodec.write(&data, w));
     assert!(wrote.is_err_and(|e| e.to_string().contains("read it back")));
 }

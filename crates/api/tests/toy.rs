@@ -15,19 +15,14 @@ const COUNT: Typed<usize> = Typed::new(DataTypeId::declared("toy.points.count"))
 
 struct CloudCodec;
 impl DataCodec for CloudCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let cloud = CLOUD
             .get(data)
             .ok_or_else(|| Error::invalid("not a cloud"))?;
         let flat: Vec<f64> = cloud.0.iter().flatten().copied().collect();
         out.set_rows("points", 3, Field::F64s(flat))
     }
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         let flat = element.f64s("points")?;
         Ok(CLOUD.wrap(Cloud(flat.as_chunks::<3>().0.to_vec())))
     }
@@ -147,14 +142,14 @@ impl ObjectCodec for CloudBodyCodec {
         let body = body
             .downcast_ref::<CloudBody>()
             .ok_or_else(|| Error::invalid("not a Cloud object"))?;
-        CloudCodec.write(&body.0, None, &mut *out.child("cloud", "cloud")?)
+        CloudCodec.write(&body.0, &mut *out.child("cloud", "cloud")?)
     }
     fn read(
         &self,
         element: &dyn ElementReader,
         _cx: &ReadCx<'_>,
     ) -> Result<Arc<dyn ObjectBody>, Error> {
-        let cloud = CloudCodec.read(&*element.required_child("cloud")?, None)?;
+        let cloud = CloudCodec.read(&*element.required_child("cloud")?)?;
         Ok(Arc::new(CloudBody(cloud)))
     }
 }
@@ -321,12 +316,12 @@ fn data_saves_into_a_project_and_reads_back() {
     let data = cloud(&[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
     let mut element = MemoryElement::new(CLOUD.id().as_str());
     element
-        .write(|out| CloudType.codec().write(&data, None, out))
+        .write(|out| CloudType.codec().write(&data, out))
         .unwrap();
-    let back = element.read(|r| CloudType.codec().read(r, None)).unwrap();
+    let back = element.read(|r| CloudType.codec().read(r)).unwrap();
     assert_eq!(CLOUD.get(&back), CLOUD.get(&data));
     let empty = MemoryElement::new(CLOUD.id().as_str());
-    let missing = empty.read(|r| CloudType.codec().read(r, None)).unwrap_err();
+    let missing = empty.read(|r| CloudType.codec().read(r)).unwrap_err();
     assert!(missing.kind == ErrorKind::Invalid && missing.message().contains("points"));
 }
 

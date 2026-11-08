@@ -18,7 +18,7 @@ fn fixture(name: &str) -> Brep {
 
 fn save(data: &Data) -> MemoryElement {
     let mut saved = MemoryElement::new("result");
-    saved.write(|w| BrepCodec.write(data, None, w)).unwrap();
+    saved.write(|w| BrepCodec.write(data, w)).unwrap();
     saved
 }
 
@@ -27,7 +27,7 @@ fn every_fixture_reads_back_equal_with_its_ids() {
     for (name, value) in Fixtures::default().breps() {
         let data = standard::brep().wrap(value.clone());
         let saved = save(&data);
-        let read = saved.read(|r| BrepCodec.read(r, None)).unwrap();
+        let read = saved.read(|r| BrepCodec.read(r)).unwrap();
         let back = standard::brep().get(&read).unwrap();
         assert_eq!(back, &value, "{name}");
         // Saved again, the same save: nothing is reordered on the way.
@@ -44,7 +44,7 @@ fn every_fixture_reads_back_equal_with_its_ids() {
 fn a_value_with_every_part_keeps_each_part() {
     let value = fixture("every part");
     let data = standard::brep().wrap(value.clone());
-    let read = save(&data).read(|r| BrepCodec.read(r, None)).unwrap();
+    let read = save(&data).read(|r| BrepCodec.read(r)).unwrap();
     let back = standard::brep().get(&read).unwrap();
     assert_eq!(back.datums(), value.datums());
     assert_eq!(back.curves(), value.curves());
@@ -61,13 +61,11 @@ fn a_broken_save_does_not_read() {
     let broken = |field: &str, value: Field| {
         let mut bad = MemoryElement::new("result");
         bad.write(|w| {
-            BrepCodec.write(&data, None, w)?;
+            BrepCodec.write(&data, w)?;
             w.set(field, value)
         })
         .unwrap();
-        bad.read(|r| BrepCodec.read(r, None))
-            .unwrap_err()
-            .to_string()
+        bad.read(|r| BrepCodec.read(r)).unwrap_err().to_string()
     };
     assert!(broken("nameTags", Field::U8s(vec![9])).contains("no name kind 9"));
     assert!(broken("datumKinds", Field::U8s(vec![0, 1, 7])).contains("no datum kind 7"));

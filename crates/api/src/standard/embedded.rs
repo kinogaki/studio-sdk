@@ -21,20 +21,15 @@ use kinogaki_geometry::EmbeddedFile;
 /// let file = EmbeddedFile::new("wood.png", vec![0x89, b'P', b'N', b'G']);
 /// let data = standard::embedded_file().wrap(file.clone());
 /// let mut saved = MemoryElement::new("embedded");
-/// saved.write(|w| EmbeddedFileCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| EmbeddedFileCodec.read(r, None)).unwrap();
+/// saved.write(|w| EmbeddedFileCodec.write(&data, w)).unwrap();
+/// let read = saved.read(|r| EmbeddedFileCodec.read(r)).unwrap();
 /// assert_eq!(standard::embedded_file().get(&read), Some(&file));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EmbeddedFileCodec;
 
 impl DataCodec for EmbeddedFileCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let file =
             (embedded_file().get(data)).ok_or_else(|| Error::invalid("not an embedded file"))?;
         out.set("name", Field::Text(file.name().to_owned()))?;
@@ -45,7 +40,7 @@ impl DataCodec for EmbeddedFileCodec {
         })
     }
 
-    fn read(&self, from: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, from: &dyn ElementReader) -> Result<Data, Error> {
         let name = from.text("name")?;
         let bytes = from.read_shared("bytes", |b| {
             Ok(EmbeddedFile::new("", attributes::u8s(b, "bytes")?.to_vec()))

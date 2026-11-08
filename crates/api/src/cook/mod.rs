@@ -416,9 +416,9 @@ pub trait NodeType: Any + Send + Sync {
     }
 
     /// The data type of the delta it holds when it is a held edit (an Edit
-    /// Mesh holds `kinogaki.mesh.action`); `None` otherwise. Core applies
-    /// the delta through the [`HeldEdit`](crate::HeldEdit) registered for
-    /// that type, over the input it captured once.
+    /// Mesh holds `kinogaki.mesh.steps`); `None` otherwise. Core applies
+    /// the delta to its input through the [`HeldEdit`](crate::HeldEdit)
+    /// registered for that type.
     fn held(&self) -> Option<DataTypeId> {
         None
     }

@@ -68,17 +68,13 @@ fn values_sharing_a_topology_share_it_once_read() {
     let mut saved = MemoryElement::new("results");
     saved
         .write(|w| {
-            GeometryCodec.write(&a, None, &mut *w.child("a", "result")?)?;
-            GeometryCodec.write(&b, None, &mut *w.child("b", "result")?)
+            GeometryCodec.write(&a, &mut *w.child("a", "result")?)?;
+            GeometryCodec.write(&b, &mut *w.child("b", "result")?)
         })
         .unwrap();
     let (ra, rb) = saved
         .read(|r| {
-            let read = |n| {
-                GeometryCodec
-                    .read(&*r.required_child(n).unwrap(), None)
-                    .unwrap()
-            };
+            let read = |n| GeometryCodec.read(&*r.required_child(n).unwrap()).unwrap();
             Ok((read("a"), read("b")))
         })
         .unwrap();
@@ -94,19 +90,17 @@ fn values_sharing_a_topology_share_it_once_read() {
 fn a_saved_value_breaking_a_rule_does_not_read() {
     let data = standard::geometry().wrap(grid());
     let mut saved = MemoryElement::new("result");
-    saved
-        .write(|w| GeometryCodec.write(&data, None, w))
-        .unwrap();
+    saved.write(|w| GeometryCodec.write(&data, w)).unwrap();
     // Point 0 of the saved positions made infinite.
     let mut bad = MemoryElement::new("result");
     bad.write(|w| {
-        GeometryCodec.write(&data, None, w)?;
+        GeometryCodec.write(&data, w)?;
         let mut p: Vec<f64> = vec![0.0; 75];
         p[0] = f64::INFINITY;
         w.set_rows("positions", 3, Field::F64s(p))
     })
     .unwrap();
-    let error = bad.read(|r| GeometryCodec.read(r, None)).unwrap_err();
+    let error = bad.read(|r| GeometryCodec.read(r)).unwrap_err();
     assert!(
         error.to_string().contains("point 0 is not finite"),
         "{error}"
@@ -187,7 +181,7 @@ fn equal_texts_save_alike_whatever_their_tables() {
     };
     let save = |data: &Data| {
         let mut saved = MemoryElement::new("result");
-        saved.write(|w| GeometryCodec.write(data, None, w)).unwrap();
+        saved.write(|w| GeometryCodec.write(data, w)).unwrap();
         saved
     };
     // A gather keeping a larger, reordered table, and its compact twin.
@@ -212,7 +206,7 @@ fn read_quad_with(fields: &[(&str, Field)]) -> Result<Geometry, String> {
     let mut saved = MemoryElement::new("result");
     saved
         .write(|w| {
-            GeometryCodec.write(&data, None, w)?;
+            GeometryCodec.write(&data, w)?;
             let mut a = w.child("a0", "attribute")?;
             for (name, field) in fields {
                 a.set(name, field.clone())?;
@@ -220,7 +214,7 @@ fn read_quad_with(fields: &[(&str, Field)]) -> Result<Geometry, String> {
             Ok(())
         })
         .unwrap();
-    let read = saved.read(|r| GeometryCodec.read(r, None));
+    let read = saved.read(|r| GeometryCodec.read(r));
     let read = read.map_err(|e| e.to_string())?;
     Ok(standard::geometry().get(&read).unwrap().clone())
 }
@@ -341,7 +335,7 @@ fn read_line_with(kinds: Vec<u8>, degrees: Option<Vec<u8>>) -> Result<Geometry, 
             Ok(())
         })
         .unwrap();
-    let read = saved.read(|r| GeometryCodec.read(r, None));
+    let read = saved.read(|r| GeometryCodec.read(r));
     let read = read.map_err(|e| e.to_string())?;
     Ok(standard::geometry().get(&read).unwrap().clone())
 }

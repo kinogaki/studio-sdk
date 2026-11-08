@@ -29,10 +29,10 @@ impl Consumer for Codecs {
             };
         let mut saved = MemoryElement::new("result");
         saved
-            .write(|w| codec.write(data, None, w))
+            .write(|w| codec.write(data, w))
             .map_err(|e| format!("write: {e}"))?;
         let read = saved
-            .read(|r| codec.read(r, None))
+            .read(|r| codec.read(r))
             .map_err(|e| format!("read: {e}"))?;
         if !same_bits(data, &read) {
             return Err("the value read back differs".into());
@@ -61,8 +61,8 @@ impl Consumer for Codecs {
 /// keeps values as they are).
 fn instances_round_trip(value: &Instances, data: &Data) -> Result<(), String> {
     let mut saved = MemoryElement::new("result");
-    (saved.write(|w| InstancesCodec.write(data, None, w))).map_err(|e| format!("write: {e}"))?;
-    let read = (saved.read(|r| InstancesCodec.read(r, None))).map_err(|e| format!("read: {e}"))?;
+    (saved.write(|w| InstancesCodec.write(data, w))).map_err(|e| format!("write: {e}"))?;
+    let read = (saved.read(|r| InstancesCodec.read(r))).map_err(|e| format!("read: {e}"))?;
     let back = standard::instances()
         .get(&read)
         .ok_or("read back as another type")?;
@@ -125,7 +125,7 @@ fn same_bits(a: &Data, b: &Data) -> bool {
 /// What the B-rep codec writes of `data`.
 fn saved(data: &Data) -> Option<MemoryElement> {
     let mut out = MemoryElement::new("result");
-    out.write(|w| BrepCodec.write(data, None, w)).ok()?;
+    out.write(|w| BrepCodec.write(data, w)).ok()?;
     Some(out)
 }
 

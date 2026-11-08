@@ -29,21 +29,10 @@ use std::sync::Arc;
 pub trait DataCodec: Send + Sync {
     /// Writes `data` into the element `out` fills (its fields and
     /// children).
-    ///
-    /// `base`, when given, is a value of the same type already written
-    /// elsewhere in the project that `data` was derived from (a held base
-    /// of an edit): a codec may store only what differs. The standard
-    /// codecs ignore it and write the whole value.
-    fn write(
-        &self,
-        data: &Data,
-        base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error>;
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error>;
 
-    /// Reads the value [`write`](Self::write) wrote into `element`; `base`
-    /// is the value read for the base it was written against.
-    fn read(&self, element: &dyn ElementReader, base: Option<&Data>) -> Result<Data, Error>;
+    /// Reads the value [`write`](Self::write) wrote into `element`.
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error>;
 
     /// Writes `components` (a selection of `data`'s components, in this
     /// type's representation) into `out`: what a kept result carries

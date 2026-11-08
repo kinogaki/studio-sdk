@@ -37,9 +37,6 @@ struct Node {
     level: Option<NodeRef>,
     position: [f32; 2],
     delta: Option<Data>,
-    /// The base a held node applies its delta to, once rebased
-    /// ([`NetworkEdit::rebase_held`]); `None`: its input as it is.
-    base: Option<Data>,
     kept: Option<Outputs>,
 }
 
@@ -60,8 +57,7 @@ struct Node {
 ///
 /// It is a test double, not Studio's core: it cooks every node anew (no
 /// cache, no incremental plans, no time or selection reads), a held node
-/// applies its delta to its input as it is now (core captures the base
-/// once) until [`NetworkEdit::rebase_held`] gives it a base, a node's
+/// applies its delta to its input as it is now (as core does), a node's
 /// [`NodeInfo::result`] is cooked as it is read, and [`Insertion::Grow`] puts a node after the displayed one
 /// ([`Growth::Modify`]) or unwired ([`Growth::Create`], with no Merge),
 /// displayed either way.
@@ -246,13 +242,12 @@ impl FakeNetwork {
                 let (input, rest) = inputs.split_first().ok_or_else(|| {
                     Error::invalid(format!("{} holds an edit of nothing", at.name))
                 })?;
-                let base = at.base.as_ref().unwrap_or(input);
                 let rest: Vec<Option<Data>> = rest
                     .iter()
                     .enumerate()
                     .map(|(i, d)| held.reads_input(delta, i + 1).then(|| d.clone()))
                     .collect();
-                held.apply(&mut cx, base, delta, &rest)
+                held.apply(&mut cx, input, delta, &rest)
             }
             _ => {
                 let mut outputs = code.cook(&mut cx, &inputs)?;
@@ -465,7 +460,6 @@ impl NetworkEdit for FakeNetwork {
                 level: subnet,
                 position,
                 delta: None,
-                base: None,
                 kept: None,
             },
         );
@@ -668,24 +662,6 @@ impl NetworkEdit for FakeNetwork {
         let n = self.node_mut(node)?;
         n.delta = Some(delta);
         n.held = true;
-        self.changed();
-        Ok(())
-    }
-    fn rebase_held(&mut self, node: NodeRef, base: Data) -> Result<(), Error> {
-        let n = self.known(node)?;
-        let (code, description) = &self.types.nodes[&n.node_type];
-        let edits = code
-            .held()
-            .and_then(|delta| self.types.held.get(&delta))
-            .map(|held| held.base());
-        if edits != Some(base.ty()) {
-            return Err(Error::invalid(format_args!(
-                "{} holds no edits of {}",
-                description.label,
-                base.ty()
-            )));
-        }
-        self.node_mut(node)?.base = Some(base);
         self.changed();
         Ok(())
     }

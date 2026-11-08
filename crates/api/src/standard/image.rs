@@ -38,8 +38,8 @@ use std::sync::Arc;
 ///     .unwrap();
 /// let data = standard::image().wrap(picture.clone());
 /// let mut saved = MemoryElement::new("result");
-/// saved.write(|w| ImageCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| ImageCodec.read(r, None)).unwrap();
+/// saved.write(|w| ImageCodec.write(&data, w)).unwrap();
+/// let read = saved.read(|r| ImageCodec.read(r)).unwrap();
 /// assert_eq!(standard::image().get(&read), Some(&picture));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
@@ -65,12 +65,7 @@ fn read_window(from: &dyn ElementReader, name: &str) -> Result<Rect, Error> {
 }
 
 impl DataCodec for ImageCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let value = image()
             .get(data)
             .ok_or_else(|| Error::invalid("not an image"))?;
@@ -119,7 +114,7 @@ impl DataCodec for ImageCodec {
         Ok(())
     }
 
-    fn read(&self, from: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, from: &dyn ElementReader) -> Result<Data, Error> {
         let data = read_window(from, "data")?;
         let mut builder: ImageBuilder = Image::framed(read_window(from, "display")?, data)
             .aspect(from.float("aspect")?)

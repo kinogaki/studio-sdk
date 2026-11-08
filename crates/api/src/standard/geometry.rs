@@ -30,27 +30,22 @@ use std::sync::Arc;
 /// let triangle = Geometry::new(vec![[0.0; 3], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]].into(), t, Attributes::new()).unwrap();
 /// let data = standard::geometry().wrap(triangle.clone());
 /// let mut saved = MemoryElement::new("result");
-/// saved.write(|w| GeometryCodec.write(&data, None, w)).unwrap();
-/// let read = saved.read(|r| GeometryCodec.read(r, None)).unwrap();
+/// saved.write(|w| GeometryCodec.write(&data, w)).unwrap();
+/// let read = saved.read(|r| GeometryCodec.read(r)).unwrap();
 /// assert_eq!(standard::geometry().get(&read), Some(&triangle));
 /// ```
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GeometryCodec;
 
 impl DataCodec for GeometryCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let value = geometry()
             .get(data)
             .ok_or_else(|| Error::invalid("not geometry"))?;
         write_geometry(value, out)
     }
 
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         Ok(geometry().wrap(read_geometry(element)?))
     }
 

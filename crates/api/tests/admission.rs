@@ -46,10 +46,10 @@ fn grow(offered: &'static str, data: &'static str) -> Grow {
 struct Wood;
 struct Unsaved;
 impl DataCodec for Unsaved {
-    fn write(&self, _: &Data, _: Option<&Data>, _: &mut dyn ElementWriter) -> Result<(), Error> {
+    fn write(&self, _: &Data, _: &mut dyn ElementWriter) -> Result<(), Error> {
         Err(Error::invalid("not saved"))
     }
-    fn read(&self, _: &dyn ElementReader, _: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, _: &dyn ElementReader) -> Result<Data, Error> {
         Err(Error::invalid("not saved"))
     }
 }

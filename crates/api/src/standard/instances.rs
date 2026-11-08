@@ -543,12 +543,7 @@ fn check(
 pub struct InstancesCodec;
 
 impl DataCodec for InstancesCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let value = (instances().get(data)).ok_or_else(|| Error::invalid("not instances"))?;
         let rows = value
             .xforms
@@ -564,7 +559,7 @@ impl DataCodec for InstancesCodec {
         attributes::write(&value.attributes, out)
     }
 
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         let at = element.location();
         let (rows, rest) = element.f64s("xforms")?.as_chunks::<12>();
         if !rest.is_empty() {

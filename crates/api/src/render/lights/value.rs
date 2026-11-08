@@ -196,19 +196,14 @@ impl LightCodec {
 }
 
 impl DataCodec for LightCodec {
-    fn write(
-        &self,
-        data: &Data,
-        _base: Option<&Data>,
-        out: &mut dyn ElementWriter,
-    ) -> Result<(), Error> {
+    fn write(&self, data: &Data, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let l = light()
             .get(data)
             .ok_or_else(|| Error::invalid("not a light"))?;
         Self::write_light(l, out)
     }
 
-    fn read(&self, element: &dyn ElementReader, _base: Option<&Data>) -> Result<Data, Error> {
+    fn read(&self, element: &dyn ElementReader) -> Result<Data, Error> {
         light().wrap(Self::read_light(element)?)
     }
 }
@@ -267,9 +262,9 @@ mod tests {
         for l in every_shape() {
             let l = light().check(l).unwrap();
             let mut e = MemoryElement::new("light");
-            e.write(|w| LightCodec.write(&light().wrap(l.clone()).unwrap(), None, w))
+            e.write(|w| LightCodec.write(&light().wrap(l.clone()).unwrap(), w))
                 .unwrap();
-            let back = e.read(|r| LightCodec.read(r, None)).unwrap();
+            let back = e.read(|r| LightCodec.read(r)).unwrap();
             assert_eq!(light().get(&back), Some(&l));
         }
     }
@@ -356,14 +351,14 @@ mod tests {
             .unwrap();
         e.write(|w| w.set("emission", Field::Text("candle".into())))
             .unwrap();
-        let refused = e.read(|r| LightCodec.read(r, None)).unwrap_err();
+        let refused = e.read(|r| LightCodec.read(r)).unwrap_err();
         assert!(
             refused.to_string().contains("unknown emission"),
             "{refused}"
         );
         e.write(|w| w.set("type", Field::Text("CylinderLight".into())))
             .unwrap();
-        let refused = e.read(|r| LightCodec.read(r, None)).unwrap_err();
+        let refused = e.read(|r| LightCodec.read(r)).unwrap_err();
         assert!(
             refused.to_string().contains("unknown light type"),
             "{refused}"
