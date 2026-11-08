@@ -35,15 +35,20 @@ part! {
         /// ([`Ended`], with the order Escape is taken in).
         fn cancel(&self, s: &mut S, cx: &mut dyn Cx, why: Ended);
         /// Keeps what a live tool did, as Enter does, and leaves nothing live:
-        /// its gesture one undo step. The host asks when the user goes on to
-        /// something else: the location leaves the context, or a node is picked
-        /// or edited in the network. It asks with the location still on the
-        /// context when it can; with nothing live this does nothing.
+        /// its gesture one undo step. The host asks before the user goes on
+        /// to something else, always with the location still on the
+        /// context: before the location leaves it (by any route, a
+        /// package's own `go_to` included), and before a node is picked,
+        /// added or edited in the network or the outliner. With nothing
+        /// live this does nothing.
         fn accept(&self, s: &mut S, cx: &mut dyn Cx);
-        /// A key or typed text over the viewport, before any binding (see
-        /// [`KeyPress`]): a live tool's own keys (Enter), a focused value
-        /// field's typing ([`HostShell::keyboard_taken`](crate::host::HostShell::keyboard_taken)
-        /// says a field has the keys). Escape never comes here: it is
+        /// A key or typed text over the viewport while the panes have the
+        /// keyboard (no field, menu, dialog or drag has it), before any
+        /// binding (see [`KeyPress`]): a live tool's own keys (Enter). A
+        /// key whose press came here is the tools' until it comes up: its
+        /// repeats and its release come here too, wherever the pointer is
+        /// and whatever has the keyboard then, and the window losing focus
+        /// releases it. Escape never comes here: it is
         /// [`cancel`](Self::cancel)'s. `true`: the tools took it, and
         /// nothing else sees it.
         fn key(&self, s: &mut S, cx: &mut dyn Cx, press: &KeyPress) -> bool {

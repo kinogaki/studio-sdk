@@ -13,10 +13,10 @@
 //! value copies it only while a snapshot still shares it.
 //!
 //! A gesture (a drag, a live tool's run) makes every edit until it ends
-//! one undo step. Whoever opens one holds its [`GestureToken`] and alone
-//! finishes or cancels it; an edit or a drag begun while another's
-//! gesture is open is part of that one ([`GestureMark`] goes back to
-//! where it joined).
+//! one undo step. Opening one gives a [`Begun`]: whoever opened it holds
+//! its [`GestureToken`] and alone finishes or cancels it; an edit or a
+//! drag begun while another's gesture is open is part of that one, and
+//! its [`GestureMark`] goes back to where it joined.
 //!
 //! [`Package::with_slot`]: crate::Package::with_slot
 use crate::id::{ContextId, SlotId};
@@ -260,7 +260,8 @@ impl fmt::Debug for SessionSlots {
 /// The open gesture, held by whoever opened it: only its holder finishes
 /// or cancels it. Not `Clone`: a gesture ends once. A host makes these
 /// (its gesture number); a package gets one from the host's
-/// `begin_gesture`, which gives none when another's gesture is open.
+/// `begin_gesture` ([`Begun::Own`]), which marks a join instead while
+/// another's gesture is open.
 #[must_use = "only the gesture's opener finishes or cancels it"]
 #[derive(Debug, PartialEq, Eq)]
 pub struct GestureToken(u64);
@@ -281,6 +282,29 @@ impl GestureToken {
     /// one step).
     pub fn start(&self) -> GestureMark {
         GestureMark::new(self.0, 0)
+    }
+}
+
+/// What opening a gesture gave: the gesture itself, or, while another's
+/// is open (a live tool's run), the place in it where what follows joined.
+/// Either way every edit up to the gesture's finish is one undo step.
+#[must_use = "a gesture's opener alone finishes or cancels it; a join goes back to its mark"]
+#[derive(Debug, PartialEq, Eq)]
+pub enum Begun {
+    /// No gesture was open: this one is the opener's, to finish or cancel.
+    Own(GestureToken),
+    /// Another's gesture is open: what follows is part of it, which its
+    /// opener ends; going back to the mark puts back only what followed.
+    Joined(GestureMark),
+}
+
+impl Begun {
+    /// The token, when this opened the gesture.
+    pub fn own(self) -> Option<GestureToken> {
+        match self {
+            Begun::Own(token) => Some(token),
+            Begun::Joined(_) => None,
+        }
     }
 }
 

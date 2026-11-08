@@ -479,7 +479,7 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
     let mut trees = hosted(&host);
     host.edit_slot("Pick", |slot| *slot = Picked(vec![1, 2]));
     // A level change inside a gesture rides along with it.
-    let level = host.begin_gesture("Change Level").unwrap();
+    let level = host.begin_gesture("Change Level").own().unwrap();
     trees.with(|p, s| {
         p.contexts[0]
             .levels
@@ -490,7 +490,7 @@ fn a_gesture_is_one_step_and_a_cancelled_one_none() {
     host.finish_gesture(level).unwrap();
     assert_eq!(host.history(), ["Pick", "Change Level"]);
     assert_eq!(trees.state::<Forest>().level, 1);
-    let drag = host.begin_gesture("Drag").unwrap();
+    let drag = host.begin_gesture("Drag").own().unwrap();
     host.edit_slot("Drag", |p: &mut Picked| p.0.push(9));
     host.cancel_gesture(drag);
     assert_eq!(host.slot::<Picked>(), &Picked::default());

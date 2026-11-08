@@ -119,11 +119,13 @@ pub enum GizmoUse {
 
 /// Why a live gesture ends ([`LiveTools::cancel`](super::LiveTools::cancel)).
 ///
-/// Escape is taken by the first of: a handle drag under way (it puts back
-/// the drag alone; the live tool stays), the host's open popup, popover,
-/// menu or Tab browser (it closes), the transform tool's Pick (it ends),
-/// and then the live tool, which is told [`Ended::Escape`]. The tools' own
-/// [`key`](super::LiveTools::key) never sees Escape.
+/// Escape is the keyboard's owner's alone, the topmost of what is open: a
+/// dialog, a field, a window, a marking menu, a popup, popover, stacked
+/// list or Tab browser (it closes), a drag in the views (it puts back the
+/// drag alone; the live tool stays), the transform tool's Pick (it ends),
+/// and only with none of them the live tool over the views, which is told
+/// [`Ended::Escape`]. The tools' own [`key`](super::LiveTools::key) never
+/// sees Escape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ended {
     /// The user pressed Escape over the views.

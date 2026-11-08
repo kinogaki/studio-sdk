@@ -3,9 +3,9 @@
 use crate::Event;
 
 /// A key or typed text over the viewport, as live tools'
-/// [`key`](super::LiveTools::key) see it: before any binding runs,
-/// after the host's own modal state (a dialog, a menu, the document's
-/// commands such as Save and Undo) had it.
+/// [`key`](super::LiveTools::key) see it: before any binding runs, while
+/// nothing over the panes has the keyboard, the document's commands (Save,
+/// Undo) left to the host. A repeat or a release comes as its press came.
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyPress {
     /// The event: a key ([`Event::Key`], pressed, released or repeated) or

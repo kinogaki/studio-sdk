@@ -439,8 +439,9 @@ The pin board changes its own body. A context over geometry (Studio's Mesh plugi
 
 ```rust
 // Starting the tool (a library item ran): one undo step from here on.
-// None while another's gesture is open: the tool then joins that one.
-live.gesture = cx.begin_gesture("Push");
+// While another's gesture is open the tool joins that one instead
+// (Begun::Joined, a mark to go back to); this tool keeps only its own.
+live.gesture = cx.begin_gesture("Push").own();
 let mut made = None;
 cx.edit_network(object, "Push", &mut |edit| {
     made = Some(edit.add_node_in(None, new_node.clone(), Insertion::Grow(Growth::Modify))?);
@@ -458,7 +459,7 @@ if let Some(gesture) = live.gesture.take() {
 }
 ```
 
-- `tools` reads a view's input each frame and says what it `Takes` (core's picks, gizmo, handles and wheel stay off while it does); `key` takes Enter; `cancel` ends it for the reason `Ended` gives; `accept` keeps it when the user goes elsewhere (another context, another node), as Enter does. `live_node` names the node while its card is up, and `Panels` draws that card with `Cx::node_rows`.
+- `tools` reads a view's input each frame and says what it `Takes` (core's picks, gizmo, handles and wheel stay off while it does); `key` takes Enter; `cancel` ends it for the reason `Ended` gives; `accept` keeps it when the user goes elsewhere (another context, another node), as Enter does, always asked before the location leaves the context. `live_node` names the node while its card is up, and `Panels` draws that card with `Cx::node_rows`.
 - The host calls none of these from inside a host method, so a tool's state is always the package's to change.
 - Where the context keeps its edits in one node (an Edit node holding a list of steps as its held delta, `HeldEdit`), the tool adds a step to that delta with `NetworkEdit::set_delta` instead of adding a node: the same gesture, the same undo.
 

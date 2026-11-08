@@ -16,8 +16,8 @@ use kinogaki_studio_api::id::StoredId;
 use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
-    Bounds, Components, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId, ObjectBody,
-    ObjectKindId, Parameters, SlotId, Time, Vec3,
+    Begun, Bounds, Components, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId,
+    ObjectBody, ObjectKindId, Parameters, SlotId, Time, Vec3,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -30,10 +30,12 @@ use std::sync::Arc;
 /// gesture is its opener's: [`begin_gesture`](HostUndo::begin_gesture)
 /// gives the [`GestureToken`] that alone finishes or cancels it.
 pub trait HostUndo {
-    /// Opens a gesture named `label` and gives its token; `None` when a
-    /// gesture is open already (a live tool's): what follows is part of
-    /// that one, which its opener ends.
-    fn begin_gesture(&mut self, label: &str) -> Option<GestureToken>;
+    /// Opens a gesture named `label`: [`Begun::Own`] with its token, or,
+    /// while a gesture is open already (a live tool's run),
+    /// [`Begun::Joined`]: what follows is part of that one, which its
+    /// opener ends, and [`back_to`](Self::back_to) the mark puts back only
+    /// what followed.
+    fn begin_gesture(&mut self, label: &str) -> Begun;
     /// Closes `gesture` as one step (nothing when nothing changed, or
     /// when it already ended: an undo cancels it). A result that doesn't
     /// check is put back, and the error says why.
@@ -148,8 +150,12 @@ pub trait HostSelection {
 pub trait HostDoc {
     /// Where the user is.
     fn place(&self) -> Place;
-    /// Shows `place` (navigation, not an undo step); `Err` says why it
-    /// can't (the object is locked or gone).
+    /// Shows `place` (navigation, not an undo step) after the current call
+    /// returns, as everything that could reach a package does: the open
+    /// context's live tools keep what they hold first
+    /// ([`LiveTools::accept`](crate::package::LiveTools::accept)), the
+    /// location still theirs. `Err` says why it can't (the object is
+    /// locked or gone), and nothing moves.
     fn go_to(&mut self, place: Place) -> Result<(), Error>;
     /// Bumped by every change to a network: what a cook would see.
     fn revision(&self) -> u64;
@@ -271,7 +277,9 @@ pub trait HostShell {
     /// Runs item `item` of vocabulary `vocabulary` (a menu entry's action),
     /// after the current call returns.
     fn run_action(&mut self, vocabulary: &str, item: &str);
-    /// Whether a text field has the keyboard (keys are not commands now).
+    /// Whether something other than the panes has the keyboard (a text
+    /// field, a menu, a dialog, a drag in the views): keys are not
+    /// commands now.
     fn keyboard_taken(&self) -> bool;
     /// Puts `text` on the system clipboard (a copied value or selection).
     fn copy_text(&mut self, text: &str);

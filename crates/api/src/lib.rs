@@ -35,8 +35,8 @@
 //!   which core owns ([`NetworkRead`], [`NetworkEdit`]).
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
-//!   state of an editing session; gestures ([`GestureToken`]), one undo
-//!   step over many edits, held by their opener.
+//!   state of an editing session; gestures ([`Begun`]), one undo step
+//!   over many edits, held by their opener.
 //! - **Stored values** ([`Stored`], [`StoredValue`]): package-owned values
 //!   the project keeps, one for the project or one per view.
 //! - **Packages** ([`Package`], [`Registry`]): what a package registers,
@@ -146,6 +146,6 @@ pub use params::{Parameters, ParametersExt, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, ShapeSource};
-pub use session::{GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
+pub use session::{Begun, GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
 pub use viewport::{ElementKind, ElementSet, Hit, Streams, Surface, SurfaceSource};

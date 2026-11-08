@@ -11,8 +11,8 @@ use kinogaki_studio_api::network::{NetworkEdit, NetworkRead};
 use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
-    Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, ObjectBody, ObjectKindId,
-    Package, RowsFor, SessionSlot, SessionSlots, SlotId, StoredId, Time,
+    Begun, Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, ObjectBody,
+    ObjectKindId, Package, RowsFor, SessionSlot, SessionSlots, SlotId, StoredId, Time,
 };
 use kinogaki_studio_api::{CancelToken, Components};
 use std::any::Any;
@@ -161,6 +161,11 @@ pub struct FakeHost {
     gesture: Option<(u64, String, Kept)>,
     /// The gestures opened so far.
     gestures: u64,
+    /// The newest join inside the open gesture: its mark's number and the
+    /// state then.
+    joined: Option<(u64, Kept)>,
+    /// The marks set so far.
+    marks: u64,
 }
 
 impl FakeHost {
@@ -209,6 +214,8 @@ impl FakeHost {
             redo: Vec::new(),
             gesture: None,
             gestures: 0,
+            joined: None,
+            marks: 0,
         }
     }
 
@@ -287,14 +294,18 @@ impl SlotDoc for Here {
 }
 
 impl HostUndo for FakeHost {
-    fn begin_gesture(&mut self, label: &str) -> Option<GestureToken> {
+    fn begin_gesture(&mut self, label: &str) -> Begun {
         self.calls.push(HostCall::BeginGesture(label.into()));
-        if self.gesture.is_some() {
-            return None;
+        if let Some((id, ..)) = &self.gesture {
+            let id = *id;
+            self.marks += 1;
+            self.joined = Some((self.marks, self.kept()));
+            return Begun::Joined(GestureMark::new(id, self.marks));
         }
         self.gestures += 1;
         self.gesture = Some((self.gestures, label.into(), self.kept()));
-        Some(GestureToken::new(self.gestures))
+        self.joined = None;
+        Begun::Own(GestureToken::new(self.gestures))
     }
     fn finish_gesture(&mut self, gesture: GestureToken) -> Result<(), Error> {
         self.calls.push(HostCall::FinishGesture);
@@ -309,14 +320,18 @@ impl HostUndo for FakeHost {
             self.restore(before);
         }
     }
-    /// A fake host marks only gestures' starts.
     fn back_to(&mut self, mark: GestureMark) {
-        if let Some((_, _, before)) = &self.gesture
-            && mark == GestureMark::new(self.gestures, 0)
-        {
-            let before = before.clone();
-            self.restore(before);
-        }
+        let Some((id, _, before)) = &self.gesture else {
+            return;
+        };
+        let to = match (mark.mark(), &self.joined) {
+            _ if mark.gesture() != *id => return,
+            (0, _) => before,
+            (n, Some((at, kept))) if n == *at => kept,
+            _ => return,
+        };
+        let to = to.clone();
+        self.restore(to);
     }
     fn in_gesture(&self) -> bool {
         self.gesture.is_some()
