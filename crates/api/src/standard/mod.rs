@@ -54,7 +54,7 @@ pub use image::ImageCodec;
 pub use instances::{
     Instances, InstancesCodec, MAX_DEPTH, instance_materials, material_map, materials_mapped,
 };
-pub use materials::{ImportedImage, ImportedMaterial, Materials, MaterialsCodec};
+pub use materials::{ImportedMaterial, Materials, MaterialsCodec};
 pub use output::{BackgroundSpace, DisplayOutput};
 
 use crate::Error;
@@ -69,8 +69,8 @@ use kinogaki_geometry::{Domain, Elements, Geometry, Selection};
 /// The id of [`Geometry`] values: polygons, polylines and curves.
 pub(crate) const GEOMETRY: &str = "kinogaki.core.geometry";
 
-/// The id of a file's materials and images as a format reads them beside
-/// its geometry ([`materials`](fn@materials)).
+/// The id of a file's materials as a format reads them beside its geometry
+/// ([`materials`](fn@materials)).
 pub(crate) const MATERIALS: &str = "kinogaki.core.materials";
 
 /// The handle on [`Geometry`] values (`GEOMETRY`).
@@ -148,10 +148,9 @@ pub const fn brep() -> Typed<Brep> {
     Typed::new(DataTypeId::declared("kinogaki.core.brep"))
 }
 
-/// The handle on a file's materials and the images its lights name, as a
-/// format reads them beside its geometry (`kinogaki.core.materials`): each
-/// material keyed by what the file's polygons' `material` values name it
-/// by, each image by what its lights name it by ([`Materials`]).
+/// The handle on a file's materials, as a format reads them beside its
+/// geometry (`kinogaki.core.materials`): each material keyed by what the
+/// file's polygons' `material` values name it by ([`Materials`]).
 pub const fn materials() -> Typed<Materials> {
     Typed::new(DataTypeId::declared(MATERIALS))
 }

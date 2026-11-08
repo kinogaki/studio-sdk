@@ -240,7 +240,7 @@ impl<K> Field<K> {
         Self::new(
             key,
             label,
-            Kind::path(dialog),
+            Kind::Path { dialog },
             Some(Value::Text(path.into())),
         )
     }

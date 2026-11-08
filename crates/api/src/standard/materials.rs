@@ -1,26 +1,20 @@
-//! [`Materials`]: the materials a file brings and the images its lights
-//! name ([`ImportedMaterial`], [`ImportedImage`]), and [`MaterialsCodec`],
+//! [`Materials`]: the materials a file brings ([`ImportedMaterial`]), and
+//! [`MaterialsCodec`],
 //! how they save.
-use super::{attributes, embedded_file, materials};
+use super::{attributes, materials};
 use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
 use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::network::{NetworkSeed, NewNode, SeedWire};
-use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
 use kinogaki_value::{NodeTypeId, Parameters, Value};
-use std::sync::Arc;
 
 /// What a file's materials item holds ([`materials`](fn@materials)): its
-/// materials, and the images its lights name. Keys are one namespace: no
-/// image shares a material's key.
+/// materials.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Materials {
     /// The file's materials, each keyed by what its polygons name it by.
     pub materials: Vec<ImportedMaterial>,
-    /// The images the file's lights name (a dome's), each keyed by what
-    /// they name it by after [`OP`](crate::image_files::OP).
-    pub images: Vec<ImportedImage>,
 }
 
 /// A material a file brings, as the file records it.
@@ -47,26 +41,9 @@ pub struct ImportedMaterial {
     pub double_sided: bool,
 }
 
-/// An image a file's lights name, which the host makes an Image node of.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ImportedImage {
-    /// What the lights name it by, after [`OP`](crate::image_files::OP).
-    pub key: String,
-    /// The name its Image node takes.
-    pub name: String,
-    /// What it reads: a file on disk by its path, or the file's bytes with
-    /// its name (packed in the file read, or embedded on
-    /// [`options::EMBED`](crate::format::options::EMBED)), and how its
-    /// colors read (a file's color space, as data).
-    pub source: ImageSource,
-}
-
 /// Saves a file's materials as imported: `count`, then one `material` child
 /// `m<i>` each holding its `key`, `name`, `doubleSided`, its `inside` and,
-/// when it has one, its `standard` (each a `network`); then `images` and
-/// one `image` child `i<k>` each holding its `key`, `name` and source
-/// (`file`, a path, or an `embedded` file through its type's codec, once a
-/// save for equal bytes; `color`, `space`). A network holds `nodes`, one
+/// when it has one, its `standard` (each a `network`). A network holds `nodes`, one
 /// `node` child `n<k>` each (`type`, a `name` when it has one, `display`,
 /// its values `valueNames`, `valueKinds` and `v<j>`, and an `inside`
 /// network when it holds one) and its wires (`from`, `output`, `to`,
@@ -77,16 +54,14 @@ pub struct ImportedImage {
 /// ```
 /// use kinogaki_studio_api::DataCodec;
 /// use kinogaki_studio_api::element::MemoryElement;
-/// use kinogaki_studio_api::geometry::image::ImageSource;
 /// use kinogaki_studio_api::network::{NetworkSeed, NewNode};
-/// use kinogaki_studio_api::standard::{self, ImportedImage, ImportedMaterial, Materials, MaterialsCodec};
+/// use kinogaki_studio_api::standard::{self, ImportedMaterial, Materials, MaterialsCodec};
 /// use kinogaki_studio_api::NodeTypeId;
 ///
 /// let mut inside = NetworkSeed::default();
 /// inside.node(NewNode::new(NodeTypeId::declared("acme.obj.surface")).with("red", 0.8).displayed());
 /// let red = ImportedMaterial { key: "red".into(), name: "Red".into(), inside, standard: None, double_sided: true };
-/// let sky = ImportedImage { key: "sky".into(), name: "Sky".into(), source: ImageSource::path("/hdr/sky.exr") };
-/// let held = Materials { materials: vec![red], images: vec![sky] };
+/// let held = Materials { materials: vec![red] };
 /// let data = standard::materials().wrap(held.clone());
 /// let mut saved = MemoryElement::new("result");
 /// saved.write(|w| MaterialsCodec.write(&data, w)).unwrap();
@@ -105,10 +80,6 @@ impl DataCodec for MaterialsCodec {
         for (at, m) in held.materials.iter().enumerate() {
             write_material(m, &mut *out.child(&format!("m{at}"), "material")?)?;
         }
-        out.set("images", Field::Int(held.images.len() as i64))?;
-        for (at, image) in held.images.iter().enumerate() {
-            write_image(image, &mut *out.child(&format!("i{at}"), "image")?)?;
-        }
         Ok(())
     }
 
@@ -116,12 +87,8 @@ impl DataCodec for MaterialsCodec {
         let materials_held = (0..count(element, "count")?)
             .map(|at| read_material(&*element.required_child(&format!("m{at}"))?))
             .collect::<Result<Vec<_>, Error>>()?;
-        let images = (0..count(element, "images")?)
-            .map(|at| read_image(&*element.required_child(&format!("i{at}"))?))
-            .collect::<Result<Vec<_>, Error>>()?;
         Ok(materials().wrap(Materials {
             materials: materials_held,
-            images,
         }))
     }
 }
@@ -151,41 +118,6 @@ fn read_material(e: &dyn ElementReader) -> Result<ImportedMaterial, Error> {
         inside: read_network(&*e.required_child("inside")?)?,
         standard,
         double_sided: e.bool("doubleSided")?,
-    })
-}
-
-fn write_image(image: &ImportedImage, out: &mut dyn ElementWriter) -> Result<(), Error> {
-    out.set("key", Field::Text(image.key.clone()))?;
-    out.set("name", Field::Text(image.name.clone()))?;
-    match image.source.file() {
-        ImageFile::Path(path) => out.set("file", Field::Text(path.to_string()))?,
-        ImageFile::Embedded(file) => out.data("embedded", &embedded_file().wrap(file.clone()))?,
-    }
-    // As an Image node's Color holds it: Auto, Data or a space's name.
-    out.set("color", Field::Text(image.source.color().key().to_owned()))
-}
-
-fn read_image(e: &dyn ElementReader) -> Result<ImportedImage, Error> {
-    let wrong = |what: &str| Error::invalid(format_args!("{}: {what}", e.location()));
-    let file = match (e.field("file"), e.data("embedded")) {
-        (Some(FieldRef::Text(path)), None) => ImageFile::Path(Arc::from(path)),
-        (None, Some(data)) => {
-            let data = data?;
-            let file = embedded_file()
-                .get(&data)
-                .ok_or_else(|| wrong("not a file"))?;
-            ImageFile::Embedded(file.clone())
-        }
-        _ => return Err(wrong("it reads no one file")),
-    };
-    let color = match e.text("color")? {
-        "" => return Err(wrong("its color is no Color")),
-        key => ImageColor::of_key(key),
-    };
-    Ok(ImportedImage {
-        key: e.text("key")?.to_owned(),
-        name: e.text("name")?.to_owned(),
-        source: ImageSource::new(file, color),
     })
 }
 
@@ -342,9 +274,10 @@ mod tests {
     use crate::element::MemoryElement;
     use crate::image_files::image_node;
     use kinogaki_geometry::EmbeddedFile;
+    use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
 
     #[test]
-    fn every_value_wire_inside_standard_form_and_image_round_trips() {
+    fn every_value_wire_inside_standard_form_and_embedded_file_round_trips() {
         let wood = EmbeddedFile::new("wood.png", vec![0x89, b'P', b'N', b'G']);
         let embedded = ImageSource::new(ImageFile::Embedded(wood.clone()), ImageColor::Data);
         let mut inside = NetworkSeed::default();
@@ -384,19 +317,8 @@ mod tests {
             standard: None,
             double_sided: true,
         };
-        let sky = |source| ImportedImage {
-            key: "sky".into(),
-            name: "Sky".into(),
-            source,
-        };
-        let space = ImageColor::Space(Arc::from("ACEScg"));
         let held = Materials {
             materials: vec![full, bare],
-            images: vec![
-                sky(ImageSource::path("/hdr/sky.exr")),
-                sky(ImageSource::new(ImageFile::Embedded(wood), space)),
-                sky(embedded),
-            ],
         };
         let data = materials().wrap(held.clone());
         let mut saved = MemoryElement::new("result");

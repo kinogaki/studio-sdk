@@ -27,8 +27,9 @@ impl Registry {
     /// (its UI's contexts too, and its creations' names: its kinds' with
     /// no engine installed, and its node creations', each well formed)
     /// are new and under its vendor, no node type
-    /// declares a parameter named as spares are ([`SPARE`]) or holding an
-    /// object ([`ValueKind::Object`]), each compiler
+    /// declares a parameter named as spares are ([`SPARE`]), holding an
+    /// object ([`ValueKind::Object`]) or an image ([`ValueKind::Image`]),
+    /// each compiler
     /// and runner it brings serves a compiled context (its own or a
     /// registered package's) that has no other, every data type
     /// it names is registered (by it or an earlier package), and each
@@ -227,6 +228,14 @@ impl Registry {
             if let Some(p) = description.parameters.parameters().find(object) {
                 return Err(Error::refused(format!(
                     "{id}'s node type {} declares parameter {}, an object row: a node names what it reads by a Reference path",
+                    n.id(),
+                    p.name
+                )));
+            }
+            let image = |p: &&crate::params::Parameter| p.kind == ValueKind::Image;
+            if let Some(p) = description.parameters.parameters().find(image) {
+                return Err(Error::refused(format!(
+                    "{id}'s node type {} declares parameter {}, an image row: a node reads an image by a wire from an Image node",
                     n.id(),
                     p.name
                 )));

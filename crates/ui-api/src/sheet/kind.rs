@@ -83,14 +83,30 @@ pub enum Kind {
     /// button. The button opens the host's file dialog as `dialog` says;
     /// the chosen file is written into the field as an edit of its own (one
     /// undo step), stored relative to the project's folder when it lies
-    /// inside it. With `nodes`, a picker beside it offers the scene's nodes
-    /// it may name instead, each written as its absolute path (an image row
-    /// naming an Image node, `op:/Images/Sky`).
+    /// inside it.
     Path {
         /// The folder button's dialog.
         dialog: FileDialog,
-        /// The nodes the picker offers; none: no picker.
+    },
+    /// `Value::Image`: an image a row reads where no wire reaches it
+    /// ([`ImageRef`](kinogaki_studio_api::value::ImageRef)), in one row: a
+    /// file's path, typed or chosen with the folder button (the host's file
+    /// dialog as `dialog` says, the answer an edit of its own, stored
+    /// relative to the project's folder when it lies inside it); one of
+    /// `nodes`, the host's Image nodes, chosen in the picker beside it; or
+    /// a file held embedded, its name shown read-only. Beside them, how a
+    /// file's colors read, one of `spaces` (an Image node's Color entries:
+    /// Auto, Data and the configuration's spaces), the entry its value's
+    /// [`ImageColor::key`](kinogaki_studio_api::geometry::image::ImageColor::key)
+    /// names. A host gives the row a trailing icon embedding its file or
+    /// writing a held one out ([`Action::Trailing`](super::Action::Trailing)).
+    Image {
+        /// The folder button's dialog.
+        dialog: FileDialog,
+        /// The Image nodes the picker offers; none: no picker.
         nodes: Vec<PathChoice>,
+        /// How a file's colors may read.
+        spaces: Vec<Choice>,
     },
     /// `Value::Text`: a free path in the scene's tree with a picker of
     /// `choices` (a [`Reference`](Kind::Reference) when only some things
@@ -160,17 +176,6 @@ pub enum Kind {
         /// The channels, in curve order: each one's tab.
         channels: Vec<CurveChannel>,
     },
-}
-
-impl Kind {
-    /// A file's path asking with `dialog`, offering no node
-    /// ([`Kind::Path`]).
-    pub fn path(dialog: FileDialog) -> Self {
-        Kind::Path {
-            dialog,
-            nodes: Vec::new(),
-        }
-    }
 }
 
 /// Whether a choice of `choices` shows as segments: three at most, 18

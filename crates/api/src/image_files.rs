@@ -19,15 +19,15 @@
 //! made by [`image_node::reading`].
 //!
 //! **Images named where no wire reaches.** A row of an object's kind that
-//! reads an image (a dome's) holds a file's path, or [`OP`] and the
-//! absolute path of an Image node (`op:/Library/Sky`): the host reads what
-//! that node reads, follows it through renames and moves, and refuses one
-//! reading a render, which renders the light reading it. A format's light
-//! names an image of its file's materials item by `op:` and the image's key
-//! ([`Materials::images`]), which Import points at the Image node it makes.
+//! reads an image (a dome's) holds an [`ImageRef`](kinogaki_value::ImageRef):
+//! a file (on disk, or held embedded, with how its colors read), or an Image
+//! node by its path from the root (`/Library/Sky`), whose reading the host
+//! reads, following the node through renames and moves and refusing one
+//! reading a render (which renders the light reading it). A format's dome
+//! carries its file; File ▸ Export hands a writer the file a node's dome
+//! reads.
 //!
 //! [`NetworkSeed`]: crate::network::NetworkSeed
-//! [`Materials::images`]: crate::standard::Materials::images
 use crate::standard::embedded_file;
 use kinogaki_geometry::Error;
 use kinogaki_geometry::image::{Image, ImageColor, ImageFile, ImageSource};
@@ -76,10 +76,6 @@ impl ImageFiles for NoFiles {
 
 /// Core's Image node: its source, then its rows ([`image_node`]).
 pub const IMAGE_NODE: NodeTypeId = NodeTypeId::declared("kinogaki.core.image");
-
-/// What an image row holding an Image node's path starts with (`op:`,
-/// Houdini's spelling): see the module docs.
-pub const OP: &str = "op:";
 
 /// The rows of core's Image node ([`IMAGE_NODE`]), by name, its output, and
 /// a node reading a source ([`reading`](image_node::reading)).

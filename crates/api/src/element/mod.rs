@@ -27,12 +27,13 @@
 //! and a package's round-trip test finds one that doesn't.
 //!
 //! **Values.** A parameter's or setting's [`Value`](crate::Value) has one
-//! encoding as a field: [`field_of`] and [`value_of`].
+//! encoding as a field ([`field_of`], [`value_of`]); an image is an element
+//! of its own ([`write_image`], [`read_image`]).
 mod memory;
 mod values;
 
 pub use memory::MemoryElement;
-pub use values::{field_of, read_values, value_of, write_values};
+pub use values::{field_of, read_image, read_values, value_of, write_image, write_values};
 
 use crate::Error;
 use crate::data::Data;

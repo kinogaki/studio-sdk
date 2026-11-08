@@ -10,13 +10,14 @@
 //!
 //! [`Schema`]: kinogaki_value::Schema
 //!
-//! Values are authored [`Value`](kinogaki_value::Value)s by name ([`Parameters`](kinogaki_value::Parameters)). An image value
-//! of a declared prim ([`ValueKind::File`](kinogaki_value::ValueKind::File)) is authored as its
-//! file's path, or `op:` and the path of the host's Image node it reads, and a material node's
-//! image is the host's Image node wired
-//! into it (a `filename` input); an engine receives the
-//! Texture prim the host read either to, in the prim's or node's `textures`,
-//! by the value's or input's name.
+//! Values are authored [`Value`](kinogaki_value::Value)s by name
+//! ([`Parameters`](kinogaki_value::Parameters)). An image value of a declared
+//! prim ([`ValueKind::Image`](kinogaki_value::ValueKind::Image)) is an
+//! [`ImageRef`](kinogaki_value::ImageRef): a file, or the host's Image node
+//! it reads; a material node's image is the host's Image node wired into it
+//! (a `filename` input). An engine receives the Texture prim the host read
+//! either to, in the prim's or node's `textures`, by the value's or input's
+//! name.
 
 use kinogaki_geometry::{Rate, Units};
 use std::collections::BTreeMap;

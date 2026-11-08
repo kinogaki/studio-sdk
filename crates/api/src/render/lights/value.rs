@@ -1,14 +1,17 @@
 //! Lights as a data type: a light shaped as UsdLux shapes one
 //! (render-api's standard [`Light`], unplaced: still at the identity).
 //! Where a light is belongs to what holds it (an object's placement, a
-//! file item's), never to the value. A dome's image is its file (an
-//! asset path, as typed); the Texture prim a host decodes it to belongs
-//! to one scene, never to a value.
+//! file item's), never to the value. A dome's image is an
+//! [`ImageRef`](kinogaki_value::ImageRef) (a file, on disk or held, or an
+//! Image node), saved as an image element
+//! ([`write_image`](crate::element::write_image)); the Texture prim a host
+//! decodes it to belongs to one scene, never to a value.
 //!
 //! ```text
 //! type (RectLight, DiskLight, DomeLight, DistantLight, SphereLight),
 //! width, height (RectLight), radius (DiskLight, SphereLight),
-//! groundColor, texture (DomeLight, each when it has one),
+//! groundColor, texture (DomeLight, each when it has one; texture an image
+//! element),
 //! angle (DistantLight),
 //! coneAngle, coneSoftness (SphereLight), emission, color, intensity,
 //! exposure, normalize, colorTemperature, visible
@@ -16,7 +19,7 @@
 use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::element::{ElementReader, ElementWriter, Field};
+use crate::element::{ElementReader, ElementWriter, Field, read_image, write_image};
 use crate::standard::light;
 use kinogaki_geometry::{Sampled, Xform};
 use kinogaki_render_api::standard::{Emission, Light, LightShape};
@@ -29,7 +32,8 @@ const MAX_VALUE: f32 = 1e12;
 /// least 0, a color temperature above 0, a cone angle of 0 to 180 degrees
 /// and a softness of 0 to 1, colors finite (a component below 0 is a
 /// color outside the space's gamut, as a file in a narrower space than
-/// the scene's holds), and a dome's image a file whose path isn't blank.
+/// the scene's holds), and a dome's image one that names an image
+/// ([`ImageRef::refusal`](kinogaki_value::ImageRef::refusal)).
 /// Its transform is dropped: where a light is isn't the value's. The
 /// check of [`standard::light`](crate::standard::light), which wraps every
 /// light value, and of what [`LightCodec`] reads.
@@ -45,7 +49,7 @@ pub(crate) fn light_value(light: Light) -> Result<Light, Error> {
         LightShape::Disk { radius } => positive(*radius),
         LightShape::Dome { image, ground } => {
             ground.is_none_or(|g| g.into_iter().all(within))
-                && image.as_ref().is_none_or(|path| !path.trim().is_empty())
+                && image.as_ref().is_none_or(|i| i.refusal().is_none())
         }
         LightShape::Distant { angle } => at_least_0(*angle) && *angle <= 180.0,
         LightShape::Spot {
@@ -97,8 +101,8 @@ impl LightCodec {
                 if let Some(g) = ground {
                     out.set("groundColor", Field::F32s(g.to_vec()))?;
                 }
-                if let Some(path) = image {
-                    out.set("texture", Field::Text(path.to_string()))?;
+                if let Some(image) = image {
+                    write_image(out, "texture", Some(image))?;
                 }
                 "DomeLight"
             }
@@ -152,8 +156,8 @@ impl LightCodec {
                 radius: scalar("radius")?,
             },
             "DomeLight" => LightShape::Dome {
-                image: match e.field("texture") {
-                    Some(_) => Some(e.text("texture")?.into()),
+                image: match e.child("texture") {
+                    Some(_) => read_image(e, "texture")?,
                     None => None,
                 },
                 ground: match e.field("groundColor") {
@@ -212,6 +216,9 @@ impl DataCodec for LightCodec {
 mod tests {
     use super::*;
     use crate::element::MemoryElement;
+    use kinogaki_geometry::EmbeddedFile;
+    use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
+    use kinogaki_value::ImageRef;
     use std::sync::Arc;
 
     /// One light of each shape, with values off their defaults.
@@ -227,7 +234,18 @@ mod tests {
                 ground: Some([0.2, 0.1, 0.05]),
             },
             LightShape::Dome {
-                image: Some(Arc::from("sky/noon.exr")),
+                image: Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
+                ground: None,
+            },
+            LightShape::Dome {
+                image: Some(ImageRef::File(ImageSource::new(
+                    ImageFile::Embedded(EmbeddedFile::new("noon.exr", vec![1, 2, 3])),
+                    ImageColor::Data,
+                ))),
+                ground: None,
+            },
+            LightShape::Dome {
+                image: Some(ImageRef::Node(Arc::from("/Library/Sky"))),
                 ground: None,
             },
             LightShape::Distant { angle: 0.53 },
@@ -293,7 +311,11 @@ mod tests {
                 ground: Some([f32::NAN, 0.0, 0.0]),
             },
             LightShape::Dome {
-                image: Some(Arc::from(" ")),
+                image: Some(ImageRef::File(ImageSource::path(" "))),
+                ground: None,
+            },
+            LightShape::Dome {
+                image: Some(ImageRef::Node(Arc::from("Sky"))),
                 ground: None,
             },
         ];
@@ -327,7 +349,7 @@ mod tests {
     #[test]
     fn a_value_is_unplaced_and_keeps_its_image_file() {
         let sky = LightShape::Dome {
-            image: Some(Arc::from("sky/noon.exr")),
+            image: Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
             ground: None,
         };
         let placed = Light {

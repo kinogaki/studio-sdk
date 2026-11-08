@@ -44,6 +44,8 @@ pub enum Value {
     /// tools author (a sketch). Equal by type and allocation ([`Data`]'s
     /// rule).
     Data(Data),
+    /// An image a row reads where no wire reaches it (none: no image).
+    Image(Option<crate::ImageRef>),
 }
 
 impl Value {
@@ -51,6 +53,14 @@ impl Value {
     pub fn number(&self) -> Option<f64> {
         match self {
             Self::Number(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// The image named, when it is an image value naming one.
+    pub fn image(&self) -> Option<&crate::ImageRef> {
+        match self {
+            Self::Image(image) => image.as_ref(),
             _ => None,
         }
     }

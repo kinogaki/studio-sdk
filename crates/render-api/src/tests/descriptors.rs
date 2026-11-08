@@ -1,7 +1,9 @@
 //! Settings and the standard prims.
 use super::*;
+use crate::geometry::EmbeddedFile;
+use crate::geometry::image::{ImageColor, ImageFile, ImageSource};
 use kinogaki_value::ramp::{Interpolation, Key, Ramp};
-use kinogaki_value::{Condition, Parameters, Schema, Value, ValueKind};
+use kinogaki_value::{Condition, ImageRef, Parameters, Schema, Value, ValueKind};
 
 /// Values by name, from pairs.
 fn values<const N: usize>(pairs: [(&str, Value); N]) -> Parameters {
@@ -84,10 +86,27 @@ fn standard_lights_and_fog_round_trip_through_their_prims() {
             emission: standard::Emission::of_key("D65").unwrap(),
             ..standard::Light::default()
         },
-        // A dome's image: its file in a value.
+        // A dome's image: a file, a file held embedded, or an Image node.
         standard::Light {
             shape: standard::LightShape::Dome {
-                image: Some(Arc::from("sky/noon.exr")),
+                image: Some(ImageRef::File(ImageSource::path("sky/noon.exr"))),
+                ground: None,
+            },
+            ..standard::Light::default()
+        },
+        standard::Light {
+            shape: standard::LightShape::Dome {
+                image: Some(ImageRef::File(ImageSource::new(
+                    ImageFile::Embedded(EmbeddedFile::new("noon.exr", vec![1, 2, 3])),
+                    ImageColor::Data,
+                ))),
+                ground: None,
+            },
+            ..standard::Light::default()
+        },
+        standard::Light {
+            shape: standard::LightShape::Dome {
+                image: Some(ImageRef::Node("/Library/Sky".into())),
                 ground: None,
             },
             ..standard::Light::default()
@@ -147,12 +166,19 @@ fn rows_show_and_apply_by_the_values_beside_them() {
     assert!(shown(&values, "color") && !temperature.applies(&values));
     values.insert("emission".into(), standard::choice("temperature"));
     assert!(!shown(&values, "color") && temperature.applies(&values));
-    // A dome's image shows while it has no ground; an empty file is none.
+    // A dome's image shows while it has no ground; it starts at none, and
+    // takes a file or an Image node from the root, never a blank one.
     let dome = standard::dome_light();
     let mut sky = dome.schema().values();
     let image = param(&dome, "texture").unwrap();
     assert!(image.is_shown(&sky));
-    assert_eq!(sky.get("texture"), Some(&Value::from("")));
+    assert_eq!(sky.get("texture"), Some(&Value::Image(None)));
+    let take = |r: ImageRef| image.check(&Value::Image(Some(r))).is_ok();
+    assert!(take(ImageRef::File(ImageSource::path("sky.exr"))));
+    assert!(take(ImageRef::Node("/Library/Sky".into())));
+    assert!(!take(ImageRef::File(ImageSource::path(" "))));
+    assert!(!take(ImageRef::Node("Library/Sky".into())));
+    assert!(!image.accepts(&Value::from("sky.exr")));
     let imageless = standard::LightShape::Dome {
         image: None,
         ground: None,

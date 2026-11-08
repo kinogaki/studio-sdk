@@ -44,11 +44,13 @@ pub enum ValueKind {
     /// [`Value::Text`]: many lines in a code editor; its node type names the
     /// language, plain text by default.
     Code,
-    /// [`Value::Text`]: a file's path, as typed (empty: none). An image a
-    /// render reads is sent as its texture, never as the path; a row of an
-    /// object's kind reading one (a dome's) may instead hold `op:` and an
-    /// Image node's absolute path, read as that node reads.
+    /// [`Value::Text`]: a file's path, as typed (empty: none).
     File,
+    /// [`Value::Image`]: an image a row reads where no wire reaches it (a
+    /// dome's: an [`ImageRef`](crate::ImageRef), a file or an Image node),
+    /// or none. A render receives its texture, never the reference; a node
+    /// reads an image by a wire from an Image node instead.
+    Image,
     /// [`Value::Text`]: the path of a file to write, as typed (empty: none):
     /// the panel asks for a new name.
     SaveFile,
@@ -180,6 +182,7 @@ impl ValueKind {
             Self::Text
             | Self::Code
             | Self::File
+            | Self::Image
             | Self::SaveFile
             | Self::Path
             | Self::Reference(_)
@@ -219,6 +222,7 @@ impl ValueKind {
             (Self::Ramp { color, .. }, Value::Ramp(r)) => r.color == *color,
             (Self::ToneCurves { channels }, Value::ToneCurves(c)) => c.len() == channels.len(),
             (Self::Object(_), Value::Object(_)) => true,
+            (Self::Image, Value::Image(_)) => true,
             (Self::Data(ty), Value::Data(data)) => data.ty() == *ty,
             _ => false,
         }
@@ -272,6 +276,10 @@ impl ValueKind {
                     false => Err("must have keys ascending in 0 to 1, values finite".to_owned()),
                 }
             }
+            (Self::Image, Value::Image(Some(image))) => match image.refusal() {
+                Some(why) => Err(why.to_owned()),
+                None => Ok(()),
+            },
             (Self::ToneCurves { .. }, Value::ToneCurves(curves)) => {
                 match curves.iter().all(|c| c.is_valid()) {
                     true => Ok(()),

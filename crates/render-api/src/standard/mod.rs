@@ -27,7 +27,9 @@ pub use emission::{Emission, ILLUMINANTS, blackbody, illuminant};
 
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
-use kinogaki_value::{Choice, Condition, Number, NumberLook, PrimTypeId, Unit, Value, ValueKind};
+use kinogaki_value::{
+    Choice, Condition, ImageRef, Number, NumberLook, PrimTypeId, Unit, Value, ValueKind,
+};
 use kinogaki_value::{Parameter, Schema, Section};
 
 /// The area light's id.
@@ -177,10 +179,11 @@ pub(crate) fn area_light() -> PrimType {
 }
 
 /// UsdLux's DomeLight: light from every direction, optionally a lat-long
-/// image whose center looks down the light's -Z, its top +Y (`texture`:
-/// its file, which the host sends decoded); without an image, below the
-/// horizon it may shine `groundColor` instead (`ground`: a hemisphere
-/// gradient, the image's row hidden while it is on).
+/// image whose center looks down the light's -Z, its top +Y (`texture`: an
+/// [`ImageRef`], a file or an Image node, which the host sends decoded);
+/// without an image, below the horizon it may shine `groundColor` instead
+/// (`ground`: a hemisphere gradient, the image's row hidden while it is
+/// on).
 pub(crate) fn dome_light() -> PrimType {
     let ground = |on: bool| Condition::when("ground", on);
     light_type(
@@ -199,7 +202,7 @@ pub(crate) fn dome_light() -> PrimType {
             )
             .group(LIGHT_GROUP)
             .requires(ground(true), "Used with Ground on"),
-            Parameter::new("texture", "Image", ValueKind::File, "")
+            Parameter::new("texture", "Image", ValueKind::Image, Value::Image(None))
                 .group(LIGHT_GROUP)
                 .shown_when(ground(false)),
         ],
@@ -334,10 +337,10 @@ pub enum LightShape {
     },
     /// A DomeLight.
     Dome {
-        /// The image's file, as typed (none: its color, evenly); an engine
-        /// reads the Texture prim the host decoded it to from its prim's
-        /// [`textures`](Declared::textures).
-        image: Option<Arc<str>>,
+        /// Its image (none: its color, evenly): a file or the host's Image
+        /// node; an engine reads the Texture prim the host decoded it to
+        /// from its prim's [`textures`](Declared::textures).
+        image: Option<ImageRef>,
         /// An imageless dome's hemisphere gradient: below the horizon it
         /// shines this color, linear ACEScg, times its intensity and
         /// exposure; above it, its emission. None: one color all round.
@@ -417,9 +420,7 @@ impl Light {
                 height: prim.float("height"),
             },
             DOME_LIGHT => LightShape::Dome {
-                image: (prim.value("texture").and_then(Value::text))
-                    .filter(|path| !path.trim().is_empty())
-                    .map(Arc::from),
+                image: prim.value("texture").and_then(Value::image).cloned(),
                 ground: prim.bool("ground").then(|| prim.color("groundColor")),
             },
             DISTANT_LIGHT => LightShape::Distant {
@@ -484,7 +485,7 @@ impl Light {
                 set("radius", float(*radius));
             }
             LightShape::Dome { image, ground } => {
-                set("texture", Value::from(image.as_deref().unwrap_or("")));
+                set("texture", Value::Image(image.clone()));
                 set("ground", Value::Bool(ground.is_some()));
                 if let Some(g) = ground {
                     set("groundColor", color(*g));

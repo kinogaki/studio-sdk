@@ -13,11 +13,11 @@
 //! | [`schema`] | [`Schema`]: every set of parameters as a host draws it, [`Section`]s and the rows ([`SchemaRow`]: parameters, [`Button`]s) placed in them by group, in one order |
 //! | [`condition`] | [`Condition`]: when something applies, as values holding values |
 //! | [`ramp`], [`tone_curve`] | the structured values: [`Ramp`] and [`ToneCurve`] |
-//! | [`reference`](mod@reference) | [`RefFilter`]: what a reference may name; [`ObjectRef`]: an object, by the host's id |
+//! | [`reference`](mod@reference) | [`RefFilter`]: what a reference may name; [`ObjectRef`]: an object, by the host's id; [`ImageRef`]: an image a row reads where no wire reaches (a file or an Image node) |
 //!
 //! Integers are exact (`i64`), numbers `f64` wherever they are held; a
 //! choice is held and saved by its key; a unit's suffix is owned text; an
-//! image is authored as its path and reaches an engine as its texture.
+//! image a row reads is an [`ImageRef`] and reaches an engine as its texture.
 //! How a value is presented (segments or a menu, a remembered tool
 //! setting, a read-only row) is the UI layer's; a number's look travels
 //! beside its kind, never in it.
@@ -45,7 +45,7 @@ pub use look::{NumberLook, NumberStyle};
 pub use parameter::Parameter;
 pub use ramp::Ramp;
 pub use reads::ParametersExt;
-pub use reference::{Fits, ObjectRef, RefFilter};
+pub use reference::{Fits, ImageRef, ObjectRef, RefFilter};
 pub use schema::{Button, Schema, SchemaRow, Section};
 pub use tone_curve::ToneCurve;
 pub use value::{Parameters, Value};

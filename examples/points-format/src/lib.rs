@@ -255,10 +255,7 @@ impl File {
                 "no material {name}; its faces show none"
             )));
         }
-        Ok(Materials {
-            materials,
-            images: Vec::new(),
-        })
+        Ok(Materials { materials })
     }
 
     /// Its points and faces as the standard Geometry, each face's

@@ -578,7 +578,7 @@ kinogaki-studio-api/lib test render::lights::view::tests::glyphs_follow_the_ligh
 kinogaki-studio-api/lib test render::lights::view::tests::handles_bind_to_the_light_shape
 kinogaki-studio-api/lib test standard::camera::tests::a_lens_saves_and_reads_back
 kinogaki-studio-api/lib test standard::camera::tests::only_lenses_are_cameras
-kinogaki-studio-api/lib test standard::materials::tests::every_value_wire_inside_standard_form_and_image_round_trips
+kinogaki-studio-api/lib test standard::materials::tests::every_value_wire_inside_standard_form_and_embedded_file_round_trips
 kinogaki-studio-api/lib test viewport::tests::a_drag_patches_only_the_moved_points_even_over_skipped_frames
 kinogaki-studio-api/lib test viewport::tests::a_faces_triangles_are_its_own_contiguous_run
 kinogaki-studio-api/lib test viewport::tests::a_surface_is_a_packet_over_its_own_arrays

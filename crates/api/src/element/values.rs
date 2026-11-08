@@ -13,27 +13,97 @@
 //! | Ramp | [`F64s`](Field::F64s): a key after another, each its position, its value (one channel, or three) and its interpolation's place in `Interpolation::ALL` |
 //! | ToneCurves | [`F64s`](Field::F64s): a curve after another, its interpolation (0 monotone, 1 linear), its key count, then its keys' x, y |
 //!
+//! An image ([`Value::Image`]) is no field: it is a child element of kind
+//! `image` ([`write_image`], [`read_image`]): empty for none; else `file` (a
+//! path), `embedded` (the file, through its type's codec, written once a save
+//! for equal bytes) or `node` (an Image node's path from the root), and with a
+//! file its `color` (an [`ImageColor`]'s key, as an Image node's Color holds
+//! it).
+//!
 //! A value reads back by its declared kind; one no descriptor declares reads
-//! back by its field's type alone, and writes back the same. A body holding
-//! values by their descriptors' names (a light's, a render output's engine
-//! settings) saves them as one element's fields ([`write_values`],
-//! [`read_values`]).
+//! back by its field's type alone (an image by its element's kind), and
+//! writes back the same. A body holding values by their descriptors' names
+//! (a light's, a render output's engine settings) saves them as one
+//! element's fields and image elements ([`write_values`], [`read_values`]).
 use super::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::params::ramp::{Interpolation, Key, Ramp};
 use crate::params::tone_curve::{self, ToneCurve};
 use crate::params::{Value, ValueKind};
+use crate::standard::embedded_file;
 use crate::{Error, Parameters};
+use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
 use kinogaki_render_api::Parameter;
+use kinogaki_value::ImageRef;
 use std::collections::btree_map::Entry;
+use std::sync::Arc;
 
 /// `values` as fields of `out`, each under its name.
 ///
 /// # Errors
 /// A value no field holds ([`field_of`]).
 pub fn write_values(out: &mut dyn ElementWriter, values: &Parameters) -> Result<(), Error> {
-    values
-        .iter()
-        .try_for_each(|(name, value)| out.set(name, field_of(name, value)?))
+    values.iter().try_for_each(|(name, value)| match value {
+        Value::Image(image) => write_image(out, name, image.as_ref()),
+        value => out.set(name, field_of(name, value)?),
+    })
+}
+
+/// What an image element is.
+const IMAGE: &str = "image";
+
+/// `image` as child `name` of `out` (see the module docs).
+///
+/// # Errors
+/// The element refusing the child or a field.
+pub fn write_image(
+    out: &mut dyn ElementWriter,
+    name: &str,
+    image: Option<&ImageRef>,
+) -> Result<(), Error> {
+    let out = &mut *out.child(name, IMAGE)?;
+    match image {
+        None => Ok(()),
+        Some(ImageRef::Node(path)) => out.set("node", Field::Text(path.to_string())),
+        Some(ImageRef::File(source)) => {
+            match source.file() {
+                ImageFile::Path(path) => out.set("file", Field::Text(path.to_string()))?,
+                ImageFile::Embedded(file) => {
+                    out.data("embedded", &embedded_file().wrap(file.clone()))?
+                }
+            }
+            out.set("color", Field::Text(source.color().key().to_owned()))
+        }
+    }
+}
+
+/// The image child `name` of `e` holds (see the module docs).
+///
+/// # Errors
+/// No such child, or one holding something else.
+pub fn read_image(e: &dyn ElementReader, name: &str) -> Result<Option<ImageRef>, Error> {
+    let at = e.required_child(name)?;
+    let wrong = |what: &str| Error::invalid(format_args!("{}: {what}", at.location()));
+    if at.kind() != IMAGE {
+        return Err(wrong("is no image"));
+    }
+    let color = || match at.text("color")? {
+        "" => Err(wrong("its color is no Color")),
+        key => Ok(ImageColor::of_key(key)),
+    };
+    let file = |file| Ok(Some(ImageRef::File(ImageSource::new(file, color()?))));
+    match (at.field("file"), at.data("embedded"), at.field("node")) {
+        (None, None, None) => Ok(None),
+        (Some(FieldRef::Text(path)), None, None) => file(ImageFile::Path(Arc::from(path))),
+        (None, Some(data), None) => {
+            let data = data?;
+            let held = embedded_file()
+                .get(&data)
+                .ok_or_else(|| wrong("not a file"))?;
+            file(ImageFile::Embedded(held.clone()))
+        }
+        (None, None, Some(FieldRef::Text(path))) => Ok(Some(ImageRef::Node(Arc::from(path)))),
+        _ => Err(wrong("it names no one image")),
+    }
 }
 
 /// The values `e`'s fields hold: each of `settings` by its descriptor (of
@@ -50,10 +120,15 @@ pub fn read_values<'d>(
         |name: &str, why: String| Error::invalid(format_args!("{}: {name} {why}", e.location()));
     let mut values = Parameters::new();
     for d in settings {
-        let field = e
-            .field(&d.name)
-            .ok_or_else(|| bad(&d.name, "is missing".into()))?;
-        let value = value_of(field, Some(&d.kind)).map_err(|why| bad(&d.name, why))?;
+        let value = match d.kind {
+            ValueKind::Image => Value::Image(read_image(e, &d.name)?),
+            _ => {
+                let field = e
+                    .field(&d.name)
+                    .ok_or_else(|| bad(&d.name, "is missing".into()))?;
+                value_of(field, Some(&d.kind)).map_err(|why| bad(&d.name, why))?
+            }
+        };
         if !d.accepts(&value) {
             return Err(bad(&d.name, "is out of range".into()));
         }
@@ -64,6 +139,12 @@ pub fn read_values<'d>(
             let value =
                 value_of(e.required(held.key())?, None).map_err(|why| bad(held.key(), why))?;
             held.insert(value);
+        }
+    }
+    for name in e.children() {
+        if let Entry::Vacant(held) = values.entry(name) {
+            let image = read_image(e, held.key())?;
+            held.insert(Value::Image(image));
         }
     }
     Ok(values)
@@ -89,6 +170,7 @@ pub fn field_of(name: &str, value: &Value) -> Result<Field, Error> {
         Value::Ramp(r) => Field::F64s(ramp_numbers(r)),
         Value::ToneCurves(curves) => Field::F64s(curve_numbers(curves)),
         Value::Data(_) => return Err(refused("data saves as a data element, not a field")),
+        Value::Image(_) => return Err(refused("an image saves as an image element, not a field")),
         _ => return Err(refused("a value of a kind no field holds")),
     })
 }
@@ -149,6 +231,7 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
         Some(K::Vector { .. } | K::Channels(_)) => Value::Numbers(numbers()?.to_vec()),
         Some(K::Object(_)) => return Err(wrong("a node's or a tool's value")),
         Some(K::Data(_)) => return Err(wrong("a data element")),
+        Some(K::Image) => return Err(wrong("an image element")),
         Some(_) => return Err(wrong("a kind no field holds")),
         None => match field {
             FieldRef::Float(x) => Value::Number(x),

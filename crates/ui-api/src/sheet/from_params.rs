@@ -100,8 +100,19 @@ impl From<&ValueKind> for Kind {
                 fill: false,
                 lines: None,
             },
-            ValueKind::File => Kind::path(FileDialog::open()),
-            ValueKind::SaveFile => Kind::path(FileDialog::save()),
+            ValueKind::File => Kind::Path {
+                dialog: FileDialog::open(),
+            },
+            // The host fills the picker with its Image nodes and the Color
+            // entries with its configuration's spaces.
+            ValueKind::Image => Kind::Image {
+                dialog: FileDialog::open(),
+                nodes: Vec::new(),
+                spaces: Vec::new(),
+            },
+            ValueKind::SaveFile => Kind::Path {
+                dialog: FileDialog::save(),
+            },
             // The host fills the pickers and menus from the scene and the
             // node's input.
             ValueKind::Reference(filter) | ValueKind::Object(filter) => {

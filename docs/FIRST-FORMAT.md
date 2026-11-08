@@ -94,19 +94,18 @@ A file may come from anywhere, and a hostile one costs nothing to make. A read r
 
 Each hostile file a format met becomes a test of its own: the file made by code where it can be, read through `kinogaki_studio_api_testing::read_hostile` (as Import reads, on a 2 MiB stack) within small `ReadLimits`, asserting a clean error or warning within a time bound.
 
-## Materials, images and lights
+## Materials and lights
 
-A 3D format brings its materials, the images its lights read, its lights and its cameras as standard values beside its geometry. The contract, both ways:
+A 3D format brings its materials, its lights (a dome with its image) and its cameras as standard values beside its geometry. The contract, both ways:
 
 | | A read returns | Export hands a writer |
 |---|---|---|
-| Materials and images | one item of `standard::materials()`, **first** among the items: `Materials { materials, images }` | the same item, first |
+| Materials | one item of `standard::materials()`, **first** among the items: `Materials { materials }` | the same item, first |
 | A material | `ImportedMaterial { key, name, inside, standard, double_sided }`: `key` what the polygons name it by, `inside` its whole Shading network as the file records it, `standard` its OpenPBR Surface form, which a host takes when it lacks a node type `inside` holds (none when `inside` is MaterialX's nodes alone), `double_sided` the Material's Double Sided | every Material the items name, `key` the path naming it, `inside` its whole network as authored, `standard` its OpenPBR form, as its engine approximates it, `double_sided` its Double Sided |
 | A texture | an Image node in `inside` (`image_files::image_node::reading(&source)`) wired from its `image` output into the texture node's `file` input, one per distinct file and color space in a material | the same; a path absolute |
-| An image a light names | `ImportedImage { key, name, source }` in `images` | each Image node a dome names, keyed by the node's path |
 | Which material a face shows | the primitive `material` text of polygons (the file's key) | the Material's path |
 | A material bound per placement | a mesh used once: its primitives' `material`; a mesh several placements share: one prototype of a `standard::instances()` item, each instance's `material` (Instance domain) naming its binding | the same |
-| A light | `standard::light().wrap(light)?`: render-api's standard `Light`, checked as it is wrapped (an `Error` for one out of range); a dome's image is a path, or `op:` and an image's key (`image_files::OP`) | the same; a dome naming an Image node holds `op:` and its key in `images` |
+| A light | `standard::light().wrap(light)?`: render-api's standard `Light`, checked as it is wrapped (an `Error` for one out of range); a dome's image is an `ImageRef::File(source)`: a file on disk or the file's bytes, and how its colors read | the same; a dome naming an Image node reads, as `ImageRef::File`, what that node reads at the frame exported, a path absolute |
 | A camera | `standard::camera().wrap(camera)?`: render-api's `Camera`, checked as it is wrapped | the same |
 | Shared meshes | `standard::instances()` items, each prototype one `Data` however many instances and items place it | the same: a value several items hold, written once |
 
@@ -128,7 +127,7 @@ if let Some(file) = picture.as_deref().and_then(|p| named.image(p, None)) {
 
 and its faces name their material in the primitive `material` text.
 
-A file that packs its pictures and lights its scene with a dome brings both through the same item. Say a glTF PBR material reading a picture packed in the file, and a dome lit by an HDR beside it:
+A file that packs its pictures and lights its scene with a dome: say a glTF PBR material reading a picture packed in the file, and a dome lit by an HDR beside it:
 
 ```rust
 let held = input.held()?; // the file's bytes, shared
@@ -142,16 +141,16 @@ let wood = inside.node(image_node::reading(&ImageSource::new(packed, ImageColor:
 inside.wire(wood, image_node::IMAGE, base, "file");
 let red = ImportedMaterial { key: "0".into(), name: "Red".into(), inside, standard: None, double_sided: false };
 let hdr = named.image("sky.exr", None).unwrap(); // found beside the file
-let sky = ImportedImage { key: "sky".into(), name: "Sky".into(), source: ImageSource::new(hdr, ImageColor::Auto) };
-let dome = Light { shape: LightShape::Dome { image: Some(format!("{OP}sky").into()), ground: None }, ..Light::default() };
+let sky = ImageRef::File(ImageSource::new(hdr, ImageColor::Auto));
+let dome = Light { shape: LightShape::Dome { image: Some(sky), ground: None }, ..Light::default() };
 let items = vec![
-    FileItem::top("Materials", standard::materials().wrap(Materials { materials: vec![red], images: vec![sky] })),
+    FileItem::top("Materials", standard::materials().wrap(Materials { materials: vec![red] })),
     FileItem::top("Chair", standard::geometry().wrap(chair)), // its primitives' `material` is "0"
     FileItem::top("Sky", standard::light().wrap(dome)?), // checked: an out-of-range light is an error
 ];
 ```
 
-Imported, it is a Material Library holding Red (its glTF PBR, texture and Image node as made) and an Image node Sky; Chair's faces name `/Materials/Red`, and the dome reads `op:/Materials/Sky`.
+Imported, it is a Material Library holding Red (its glTF PBR, texture and Image node as made); Chair's faces name `/Materials/Red`, and the dome reads the HDR itself (embedded with Embed Textures, as a texture is).
 
 **Sources.** An `ImageSource` is a file and how its colors read:
 - **The file.** `ImageFile::Path`, absolute, or `ImageFile::Embedded`, an `EmbeddedFile` with its name: what the file packs is embedded; a file on disk it names is `Named::image`'s answer.
@@ -162,7 +161,7 @@ Imported, it is a Material Library holding Red (its glTF PBR, texture and Image 
 
 **Lengths.** A material input that is a length in the scene's units (its kind a `Length`: glTF PBR's thickness and attenuation distance, OpenPBR's and Standard Surface's transmission depth and scattering distance, a MaterialX `distance` of no fixed unit) is in the project's units, as geometry is: a format reading a file of other units converts it as it converts the file's points (`NetworkSeed::scale_lengths`), and back when it writes. A length a file says no unit of stays as read.
 
-**What Import does.** It adopts the materials item as a Material Library (named as the item), each Material double sided as `double_sided` says and holding `inside` when every node type in it is installed, else `standard`, else nothing, with one warning a package missing; each image as an Image node of the library. The keys then become paths in the items after it: the polygons' and instances' `material`, instances' `material_map` pairs and a dome's `op:`. Keys are one namespace. Lights become the default engine's lights, cameras Cameras, and polygons and instances objects of the kind adopting them (Mesh's), each network showing its value from a Stash.
+**What Import does.** It adopts the materials item as a Material Library (named as the item), each Material double sided as `double_sided` says and holding `inside` when every node type in it is installed, else `standard`, else nothing, with one warning a package missing. The keys then become paths in the items after it: the polygons' and instances' `material` and instances' `material_map` pairs. Lights become the default engine's lights, cameras Cameras, and polygons and instances objects of the kind adopting them (Mesh's), each network showing its value from a Stash.
 
 **What Export does, and writing a material's model.** A writer resolves nothing and calls no engine: a network is data. A format of one shading model reads a material as a network (`MaterialNetwork::try_from(&inside)`: its MaterialX nodes and their images; refused for an engine's own, whose `standard` it reads instead) and takes it to its model with `MaterialNetwork::translated` (`open_pbr_surface`, `standard_surface`, `gltf_pbr`, `UsdPreviewSurface`): the chain of translation graphs, folded, the textures as they are. The example writes each material's OpenPBR base color, out of the working space into linear Rec.709 (`color::settled` keeps a color read and written back the number it was), or the picture its base color reads. A format of MaterialX documents, or of a file holding them, converts between a document's materials and Studio's with `format::materialx::{read, write}` (values, colors in MaterialX's working space `format::materialx::SPACE`, files through `Named` and `Beside`, lengths and their units, the shown node, Double Sided, an engine's material by its standard form), `kinogaki-mtlx` reading and writing the document itself.
 
