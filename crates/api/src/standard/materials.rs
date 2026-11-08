@@ -9,8 +9,9 @@ use crate::element::{ElementReader, ElementWriter, Field, FieldRef};
 use crate::network::{NetworkSeed, NewNode, SeedWire};
 use kinogaki_value::{NodeTypeId, Parameters, Value};
 
-/// What a file's materials item holds ([`materials`](fn@materials)): its
-/// materials.
+/// What a file's materials item holds ([`materials`](fn@materials)): the
+/// materials of one library (a file holds one item a library, each under
+/// the group holding it).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Materials {
     /// The file's materials, each keyed by what its polygons name it by.
