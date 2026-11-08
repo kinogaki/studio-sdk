@@ -278,8 +278,9 @@ pub enum Event {
     Copy,
     /// The cut shortcut.
     Cut,
-    /// The paste shortcut, with the clipboard's text.
-    Paste(String),
+    /// The paste shortcut, with the clipboard's text, shared: copying the
+    /// frame's input copies none of it.
+    Paste(std::sync::Arc<str>),
     /// The pointer moved to here.
     PointerMoved(Pos),
     /// A pointer button went down or came up.
