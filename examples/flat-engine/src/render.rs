@@ -5,10 +5,10 @@
 //! wakes the host once, and answers the reads waiting for it.
 use super::paint::Paint;
 use kinogaki_render_api::geometry::{Diagnostic, Error, Vec3, Xform};
-use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, Published, Reading};
+use kinogaki_render_api::thread::{EngineThread, Mailbox, Message, PREVIEW, Published, Reading};
 use kinogaki_render_api::{
-    Camera, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, Topology,
-    ViewCamera, ViewDesc, ViewId, ViewMode, ViewPass, Wake, aov, f32_to_half,
+    Camera, PreviewScene, Prim, PrimId, Projection, RenderStats, SceneSettings, SceneUpdate,
+    Topology, ViewCamera, ViewDesc, ViewId, ViewMode, ViewPass, Wake, aov, f32_to_half,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -132,36 +132,45 @@ impl Scene {
     /// Takes `message`; `false` once the handle went.
     fn take(&mut self, message: Message<()>) -> bool {
         match message {
-            Message::Update(update) => {
-                self.settings = update.settings.unwrap_or_else(|| self.settings.clone());
-                for id in &update.removed {
-                    self.prims.remove(id);
-                }
-                self.prims.extend(update.added);
-                self.prims
-                    .extend(update.changed.into_iter().map(|c| (c.id, c.prim)));
-                self.stale.extend(self.views.keys());
-            }
-            Message::View(id, desc, drops) => {
-                self.views.insert(
-                    id,
-                    View {
-                        desc,
-                        drops,
-                        generation: 0,
-                        pixels: None,
-                    },
-                );
-                self.stale.insert(id);
-            }
+            Message::Update(update) => self.update(update),
+            Message::View(id, desc, drops) => self.view(id, desc, drops),
             Message::Drop(id) => {
                 self.views.remove(&id);
             }
             Message::Read(id, reading) => self.reads.push((id, reading)),
+            Message::Preview(update, desc, reading) => {
+                self.update(update);
+                self.view(PREVIEW, desc, 0);
+                self.reads.push((PREVIEW, reading));
+            }
             Message::Stop => return false,
             Message::Pause(..) | Message::Focus(_) | Message::Freed | Message::Engine(()) => {}
         }
         true
+    }
+
+    /// Takes `update`: every view renders again.
+    fn update(&mut self, update: SceneUpdate) {
+        self.settings = update.settings.unwrap_or_else(|| self.settings.clone());
+        for id in &update.removed {
+            self.prims.remove(id);
+        }
+        self.prims.extend(update.added);
+        self.prims
+            .extend(update.changed.into_iter().map(|c| (c.id, c.prim)));
+        self.stale.extend(self.views.keys());
+    }
+
+    /// View `id` as `desc`, given while the host had dropped it `drops` times.
+    fn view(&mut self, id: ViewId, desc: ViewDesc, drops: u64) {
+        let view = View {
+            desc,
+            drops,
+            generation: 0,
+            pixels: None,
+        };
+        self.views.insert(id, view);
+        self.stale.insert(id);
     }
 
     /// Answers the reads whose view rendered; a read of a view that went,

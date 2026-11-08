@@ -17,6 +17,8 @@
 //! - **Previews** render as a view of their own ([`PREVIEW`]): a request's
 //!   scene replaces the last request's prims ([`PreviewScene::replacing`]),
 //!   seen as the engine's `preview_view` says, read once its frame is in.
+//!   The scene, the view and the reading arrive as one message
+//!   ([`Message::Preview`]), so an engine takes them in one step.
 //! - An engine's own messages travel as [`Message::Engine`], and what its
 //!   handle offers besides (statistics, a helper) is its `extra`.
 use std::collections::BTreeMap;
@@ -132,6 +134,10 @@ pub enum Message<E> {
     Focus(ViewId),
     /// Read the view once its frame of its newest desc is in.
     Read(ViewId, Reading),
+    /// [`RenderEngine::preview`]: the update replacing the last request's
+    /// prims with this one's, the [`PREVIEW`] view seeing them (its drops
+    /// always 0: the host never drops it), and the reading of its picture.
+    Preview(SceneUpdate, ViewDesc, Reading),
     /// A host let go of a display image: a view waiting for one may take it.
     Freed,
     /// The engine's own.
@@ -362,9 +368,8 @@ impl<E: Send + 'static, X: Send> RenderEngine for EngineThread<E, X> {
         let (deliver, result) = pending(self.wake.clone());
         let scene = request.scene().replacing(&mut self.previewed);
         let view = (self.preview_view)(&scene, request.side);
-        self.send(Message::Update(scene.update));
-        self.send(Message::View(PREVIEW, view, 0));
-        self.send(Message::Read(PREVIEW, Reading(Read::Preview(deliver))));
+        let reading = Reading(Read::Preview(deliver));
+        self.send(Message::Preview(scene.update, view, reading));
         result
     }
 }
@@ -468,5 +473,52 @@ mod tests {
         let shown = engine.latest(view).expect("the second view's frame");
         assert_eq!(shown.desc.width, 16, "the dropped view's frame showed");
         drop(taken);
+    }
+
+    /// A preview reaches the thread as one message, its scene, its view and
+    /// its reading together: the thread never holds one without the others.
+    #[test]
+    fn a_preview_reaches_the_thread_as_one_message() {
+        let (took, taken) = std::sync::mpsc::channel::<String>();
+        let description =
+            EngineDescription::builder(EngineId::declared("toy.preview.engine"), "Toy");
+        let run = move |mailbox: Mailbox<()>| {
+            while let Ok(message) = mailbox.receiver.recv() {
+                let what = match message {
+                    Message::Preview(update, view, reading) => {
+                        reading.fail(Error::invalid("a toy renders nothing"));
+                        format!("{} prims, {} across", update.added.len(), view.width)
+                    }
+                    Message::Stop => return,
+                    _ => "another message".into(),
+                };
+                let _ = took.send(what);
+            }
+        };
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let woken = wakes.clone();
+        let wake: Wake = Arc::new(move || {
+            woken.fetch_add(1, Ordering::SeqCst);
+        });
+        let start = (description.build(), |_| ());
+        let mut engine = EngineThread::start("toy", start, wake, unseen, run).expect("its thread");
+        let request = PreviewRequest {
+            network: Arc::default(),
+            textures: Vec::new(),
+            shape: crate::PreviewShape::Sphere,
+            lighting: crate::PreviewLighting::Studio,
+            side: 8,
+        };
+        let added = request.scene().update.added.len();
+        let pending = engine.preview(request);
+        let first = taken.recv().expect("a message");
+        assert_eq!(first, format!("{added} prims, 8 across"));
+        while wakes.load(Ordering::SeqCst) == 0 {
+            std::thread::yield_now();
+        }
+        let failed = pending.take().expect("answered").expect_err("failed");
+        assert_eq!(failed.message(), "a toy renders nothing");
+        drop(engine);
+        assert_eq!(taken.try_recv().ok(), None, "nothing besides");
     }
 }

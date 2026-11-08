@@ -447,6 +447,7 @@ kinogaki-render-api/lib test tests::descriptors::colors_and_color_ramps_fit_thei
 kinogaki-render-api/lib test tests::descriptors::rows_apply_by_the_values_beside_them
 kinogaki-render-api/lib test tests::descriptors::settings_fit_their_descriptors
 kinogaki-render-api/lib test tests::descriptors::standard_lights_and_fog_round_trip_through_their_prims
+kinogaki-render-api/lib test thread::tests::a_preview_reaches_the_thread_as_one_message
 kinogaki-render-api/lib test thread::tests::a_view_dropped_before_its_thread_takes_it_publishes_nothing
 kinogaki-render-api/lib test thread::tests::what_an_engine_says_reaches_the_host_once
 kinogaki-studio-api-testing/doc test crates/api-testing/src/format.rs - format::Scratch
