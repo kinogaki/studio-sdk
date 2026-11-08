@@ -1,14 +1,16 @@
 //! Settings: what every view shares ([`SceneSettings`]) and the
-//! values an engine describes itself ([`Parameter`]s in [`Section`]s, kept
-//! by name). The same parameters describe the values of the prim types an
-//! engine declares ([`crate::PrimType`]): a light's size, a fog's density.
+//! values an engine describes itself (a [`Schema`] of parameters, kept by
+//! name). A schema describes the values of the prim types an engine
+//! declares too ([`crate::PrimType`]): a light's size, a fog's density.
 //! A parameter says what a value holds ([`ValueKind`](kinogaki_value::ValueKind),
 //! the SDK's one value model), and when it is shown or applies, so a host
-//! draws any engine's rows without knowing it.
+//! draws any engine's rows without knowing it; the schema's
+//! [`fit`](kinogaki_value::Schema::fit) and [`validate`](kinogaki_value::Schema::validate) take values to
+//! it.
 //!
-//! [`Section`]: kinogaki_value::Section
+//! [`Schema`]: kinogaki_value::Schema
 //!
-//! Values are authored [`Value`](kinogaki_value::Value)s by name ([`Parameters`]). An image value
+//! Values are authored [`Value`](kinogaki_value::Value)s by name ([`Parameters`](kinogaki_value::Parameters)). An image value
 //! of a declared prim ([`ValueKind::File`](kinogaki_value::ValueKind::File)) is authored as its
 //! file's path, or `op:` and the path of the host's Image node it reads, and a material node's
 //! image is the host's Image node wired
@@ -16,8 +18,7 @@
 //! Texture prim the host read either to, in the prim's or node's `textures`,
 //! by the value's or input's name.
 
-use kinogaki_geometry::{Error, Rate, Units};
-use kinogaki_value::{Parameter, Parameters};
+use kinogaki_geometry::{Rate, Units};
 use std::collections::BTreeMap;
 
 use crate::geometry::image::TextureImage;
@@ -60,39 +61,3 @@ impl Default for SceneSettings {
 /// samples. An engine names none of its settings so (the registry refuses
 /// one that does).
 pub const OUTPUT_SETTINGS: [&str; 4] = ["resolution", "camera", "output", "motionSamples"];
-
-/// Every setting's default.
-pub fn defaults(settings: &[Parameter]) -> Parameters {
-    (settings.iter())
-        .map(|d| (d.name.clone(), d.value.clone()))
-        .collect()
-}
-
-/// `values` made to fit `settings`: each setting's value from `values` when
-/// it takes it, else its default. Values no setting names are dropped.
-pub fn fit(settings: &[Parameter], values: &Parameters) -> Parameters {
-    (settings.iter())
-        .map(|d| {
-            let v = (values.get(&d.name))
-                .filter(|v| d.accepts(v))
-                .unwrap_or(&d.value);
-            (d.name.clone(), v.clone())
-        })
-        .collect()
-}
-
-/// Check `values` against `settings`: each names one and fits it.
-pub fn validate(settings: &[Parameter], values: &Parameters) -> Result<(), Error> {
-    for (name, value) in values {
-        let d = (settings.iter())
-            .find(|d| d.name == *name)
-            .ok_or_else(|| Error::invalid(format_args!("unknown setting {name:?}")))?;
-        if !d.accepts(value) {
-            let name = &d.name;
-            return Err(Error::invalid(format_args!(
-                "setting {name:?} is out of range"
-            )));
-        }
-    }
-    Ok(())
-}

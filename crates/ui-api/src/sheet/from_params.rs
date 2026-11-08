@@ -1,31 +1,30 @@
-//! A node's or format's parameter [`params::Schema`] as a sheet, keyed by
-//! parameter name: what the host shows for a node's parameters. A field
-//! holds its parameter's value as it is, so an edit is the parameter's new
-//! value.
+//! A parameter [`params::Schema`] as a sheet, keyed by parameter name: what
+//! the host shows of a node's parameters, a format's options, an engine's
+//! settings or a prim's values. A field holds its parameter's value as it
+//! is, so an edit is the parameter's new value.
 use super::{Band, Field, FileDialog, Item, Kind, Number, NumberLook, Sheet};
-use kinogaki_studio_api::params::{self, SchemaItem, ValueKind};
+use kinogaki_studio_api::params::{self, SchemaRow, ValueKind};
 
-/// The sheet of a parameter schema: its sections as top-level sections,
-/// each parameter a field keyed by its name, with its help as the tooltip
-/// and its keywords for search, shown and enabled as its conditions say of
-/// the schema's values. A data parameter has no field: its node's schema
-/// adds rows of its own.
+/// The sheet of a parameter schema, its rows in the schema's order
+/// ([`params::Schema::placed`]): each section a top-level band over the rows
+/// it shows (none over none), open as it says of the schema's values; each
+/// parameter a field keyed by its name, with its help as the tooltip and
+/// its keywords for search, shown and enabled as its conditions say of the
+/// schema's values; each button a button field. A data parameter has no
+/// field: its node's schema adds rows of its own.
 impl From<&params::Schema> for Sheet<String> {
     fn from(schema: &params::Schema) -> Self {
         let values = schema.values();
-        let items = (schema.items.iter())
-            .filter_map(|item| match item {
-                SchemaItem::Section(s) => Some(Item::Band(Band {
-                    key: s.name.clone().into(),
-                    label: s.label.clone().into(),
-                    open: s.open,
-                    sub: false,
-                })),
-                SchemaItem::Parameter(p) if matches!(p.kind, ValueKind::Data(_)) => None,
-                SchemaItem::Parameter(p) => {
-                    p.clone().resolved(&values).map(|p| Item::Field(field(&p)))
-                }
-                SchemaItem::Button(b) => {
+        let mut items = Vec::new();
+        let mut banded: Option<&str> = None;
+        for (section, row) in schema.placed() {
+            let item = match row {
+                SchemaRow::Parameter(p) if matches!(p.kind, ValueKind::Data(_)) => continue,
+                SchemaRow::Parameter(p) => match p.clone().resolved(&values) {
+                    Some(p) => Item::Field(field(&p)),
+                    None => continue,
+                },
+                SchemaRow::Button(b) => {
                     let mut field = Field::new(
                         b.name.clone(),
                         "",
@@ -37,10 +36,20 @@ impl From<&params::Schema> for Sheet<String> {
                     );
                     field.enabled = b.enabled;
                     field.tooltip = (!b.help.is_empty()).then(|| b.help.clone().into());
-                    Some(Item::Field(field))
+                    Item::Field(field)
                 }
-            })
-            .collect();
+            };
+            if let Some(s) = section.filter(|s| banded != Some(s.name.as_str())) {
+                banded = Some(&s.name);
+                items.push(Item::Band(Band {
+                    key: s.name.clone().into(),
+                    label: s.label.clone().into(),
+                    open: s.is_open(&values),
+                    sub: false,
+                }));
+            }
+            items.push(item);
+        }
         Sheet { items }
     }
 }
@@ -146,8 +155,8 @@ mod tests {
 
     #[test]
     fn parameters_become_fields_keyed_by_name() {
-        let schema = params::Schema::default()
-            .section("shape", "Shape", true)
+        let mut schema = params::Schema::default()
+            .section(params::Section::new("shape", "Shape", true))
             .parameter(
                 Parameter::new(
                     "distance",
@@ -195,6 +204,9 @@ mod tests {
                 ))
                 .wrap(0.0),
             ));
+        for p in schema.parameters_mut() {
+            p.group = "shape".into();
+        }
         let sheet = Sheet::<String>::from(&schema);
         // A data parameter has no row.
         assert!(sheet.field(&"sketch".to_owned()).is_none());
@@ -234,6 +246,42 @@ mod tests {
         );
     }
 
+    /// The sheet follows the schema's one order: rows in no section first,
+    /// then each section's band over the rows it shows, opening as its
+    /// condition says; a section showing no row has no band.
+    #[test]
+    fn rows_show_in_the_schemas_order_with_bands_over_shown_rows_alone() {
+        use kinogaki_studio_api::params::Section;
+        use kinogaki_studio_api::value::Condition;
+        let toggle = |name: &str, group: &str| Parameter::toggle(name, name, false).group(group);
+        let schema = params::Schema::default()
+            .section(Section::new("look", "Look", false).open_when(Condition::when("on", true)))
+            .section(Section::new("hidden", "Hidden", true))
+            .parameter(toggle("on", "look").help("Shows the look"))
+            .parameter(toggle("ghost", "hidden").shown_when(Condition::when("on", true)))
+            .parameter(Parameter::toggle("first", "First", true))
+            .button(params::Button::new("go", "Go").group("look"));
+        let sheet = Sheet::<String>::from(&schema);
+        let listed: Vec<String> = (sheet.items.iter())
+            .map(|item| match item {
+                Item::Band(b) => format!("[{}{}]", b.label, if b.open { "" } else { " closed" }),
+                Item::Field(f) => f.key.clone(),
+                Item::Heading(h) => format!("{h:?}"),
+            })
+            .collect();
+        assert_eq!(listed, ["first", "[Look closed]", "on", "go"]);
+        let mut on = schema.clone();
+        on.parameters_mut().find(|p| p.name == "on").unwrap().value = Value::Bool(true);
+        let sheet = Sheet::<String>::from(&on);
+        let bands: Vec<(&str, bool)> = (sheet.items.iter())
+            .filter_map(|item| match item {
+                Item::Band(b) => Some((&*b.label, b.open)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(bands, [("Look", true), ("Hidden", true)]);
+    }
+
     #[test]
     fn curves_channels_and_texts_become_their_fields() {
         use kinogaki_studio_api::params::{CurveChannel as Channel, tone_curve};
@@ -261,10 +309,7 @@ mod tests {
                 ValueKind::Channels(params::Number::plain().range(0.0, 4.0)),
                 vec![1.0; 4],
             ));
-        for item in &schema.items {
-            let SchemaItem::Parameter(p) = item else {
-                continue;
-            };
+        for p in schema.parameters() {
             assert!(p.kind.accepts(&p.value), "{}", p.name);
         }
         let sheet = Sheet::<String>::from(&schema);

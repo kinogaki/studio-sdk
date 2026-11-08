@@ -6,8 +6,8 @@ use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use crate::network::Evaluation;
 use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
-use crate::params::{Parameter, ValueKind};
-use kinogaki_render_api::{Engines, NodeInput, aov};
+use crate::params::{Schema, ValueKind};
+use kinogaki_render_api::{Engines, aov};
 use std::collections::BTreeSet;
 
 /// Id `text` `package` declares as an id's text, when well formed (a
@@ -34,7 +34,9 @@ impl Registry {
     /// it names is registered (by it or an earlier package), and each
     /// engine's own prim types are new and under its vendor (the standard
     /// types are any engine's) and the standard outputs it declares are the
-    /// standard ones. Changes nothing.
+    /// standard ones, and every schema it declares (its node types'
+    /// parameters, its engines' settings, prim types and material nodes) is
+    /// whole ([`Schema::check`]). Changes nothing.
     pub fn check(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         if self.packages.iter().any(|(p, _)| *p == id) {
@@ -153,7 +155,7 @@ impl Registry {
                 }
             }
             let own = kinogaki_render_api::settings::OUTPUT_SETTINGS;
-            if let Some(d) = (e.settings().iter()).find(|d| own.contains(&&*d.name)) {
+            if let Some(d) = (e.settings().parameters()).find(|d| own.contains(&&*d.name)) {
                 return Err(Error::refused(format_args!(
                     "{id}: render engine {} has a setting named {}, as a render output's own",
                     e.id(),
@@ -170,14 +172,12 @@ impl Registry {
                     e.id()
                 )));
             }
-            let what = format!("render engine {}", e.id());
-            defaults(id, &what, e.settings())?;
-            for ty in (e.capabilities().types.iter()).filter(|t| !standard_type(t.id)) {
-                defaults(id, &format!("prim type {}", ty.id), &ty.params)?;
+            schema(id, &format!("render engine {}", e.id()), e.settings())?;
+            for ty in &e.capabilities().types {
+                schema(id, &format!("prim type {}", ty.id), ty.schema())?;
             }
             for def in e.node_defs() {
-                let inputs = def.inputs.iter().filter_map(NodeInput::value);
-                defaults(id, &format!("material node {}", def.id), inputs)?;
+                schema(id, &format!("material node {}", def.id), &def.schema())?;
             }
         }
         for f in &package.formats {
@@ -218,10 +218,10 @@ impl Registry {
                     parameter = p.name.clone()
                 )));
             }
-            defaults(
+            schema(
                 id,
                 &format!("node type {}", n.id()),
-                description.parameters.parameters(),
+                &description.parameters,
             )?;
             let object = |p: &&crate::params::Parameter| matches!(p.kind, ValueKind::Object(_));
             if let Some(p) = description.parameters.parameters().find(object) {
@@ -489,22 +489,9 @@ fn route(
     None
 }
 
-/// `Ok` when every one of `parameters`, `what`'s of package `id`, holds a
-/// default its own kind takes; a default refused there would fail every
-/// node, material or render made of it, far from the package at fault.
-fn defaults<'p>(
-    id: PackageId,
-    what: &str,
-    parameters: impl IntoIterator<Item = &'p Parameter>,
-) -> Result<(), Error> {
-    for p in parameters {
-        if let Err(why) = p.check(&p.value) {
-            return Err(Error::refused(format_args!(
-                "{id}: {what}'s parameter {} defaults to a value it refuses: {}",
-                p.name,
-                why.message()
-            )));
-        }
-    }
-    Ok(())
+/// Whether `schema`, of `what` `id` declares, is whole ([`Schema::check`]).
+fn schema(id: PackageId, what: &str, schema: &Schema) -> Result<(), Error> {
+    schema
+        .check()
+        .map_err(|why| Error::refused(format_args!("{id}: {what}: {}", why.message())))
 }

@@ -150,7 +150,7 @@ mod tests {
     use kinogaki_render_api::PrimType;
 
     fn light(ty: &PrimType, values: &[(&str, Value)]) -> DeclaredBody {
-        let mut held = ty.defaults();
+        let mut held = ty.schema().values();
         held.extend(
             values
                 .iter()

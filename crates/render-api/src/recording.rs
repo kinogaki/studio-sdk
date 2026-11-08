@@ -84,7 +84,7 @@ impl RecordingEngine {
 }
 
 /// The recording engine's id.
-const ID: EngineId = EngineId::declared("kinogaki.render.recording");
+const ID: EngineId = EngineId::declared("kinogaki.core.recording");
 
 /// The recording engine's description: every structural prim, the
 /// standard types, the beauty, no settings and no vocabulary of its own.

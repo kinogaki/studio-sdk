@@ -10,12 +10,9 @@ fn engines_declare_types() {
         d.prim_type(PrimTypeId::declared("kinogaki.other.rim_light"))
             .is_none()
     );
-    let (_, params) = d.schema(standard::SPOT_LIGHT).unwrap();
-    assert_eq!(params, d.prim_type(standard::SPOT_LIGHT).unwrap().params);
-    assert!(
-        d.schema(PrimTypeId::declared("kinogaki.other.rim_light"))
-            .is_none()
-    );
+    let spot = d.prim_type(standard::SPOT_LIGHT).unwrap();
+    assert_eq!(spot.schema(), standard::spot_light().schema());
+    assert_eq!(spot.id.as_str(), "kinogaki.core.spot_light");
     assert_eq!(
         Prim::Declared(standard::Light::default().declared()).kind(),
         PrimKind::Declared

@@ -6,10 +6,8 @@
 //! inspector and stores [`Value`]s in projects; a package never sees the
 //! host's UI types.
 pub mod code;
-mod schema;
 
 pub use kinogaki_value::{
-    Choice, CurveChannel, Fits, Number, NumberLook, NumberStyle, Parameter, Parameters,
-    ParametersExt, RefFilter, Section, Unit, Value, ValueKind, ramp, tone_curve,
+    Button, Choice, CurveChannel, Fits, Number, NumberLook, NumberStyle, Parameter, Parameters,
+    ParametersExt, RefFilter, Schema, SchemaRow, Section, Unit, Value, ValueKind, ramp, tone_curve,
 };
-pub use schema::{Button, Schema, SchemaItem};

@@ -1,7 +1,7 @@
 //! Prim types an engine declares: lights and atmospheres a host places in
-//! its scene, each a parameter schema of [`Parameter`]s. A host
-//! keeps such a prim's values by name and draws its rows from the schema,
-//! without knowing the type; only engines that declare a type render it.
+//! its scene, each a [`Schema`] of parameters. A host keeps such a prim's
+//! values by name and draws its rows from the schema, without knowing the
+//! type; only engines that declare a type render it.
 //!
 //! The standard types ([`crate::standard`]: UsdLux's lights and fog) are
 //! declared alike by every engine that renders them, so they keep their id
@@ -11,9 +11,8 @@ use kinogaki_geometry::{Sampled, Xform};
 use std::sync::Arc;
 
 use crate::prim::Visibility;
-use crate::settings::{Textures, defaults};
-use kinogaki_value::{Parameter, Section};
-use kinogaki_value::{Parameters, ParametersExt, PrimTypeId, Value};
+use crate::settings::Textures;
+use kinogaki_value::{Parameters, ParametersExt, PrimTypeId, Schema, Value};
 
 /// What a declared type is to a host: where it sits and how a viewport
 /// shows it.
@@ -35,38 +34,36 @@ pub struct PrimType {
     pub label: Arc<str>,
     /// Its role.
     pub role: Role,
-    /// Its parameters' groups, in order.
-    pub(crate) groups: Vec<Section>,
-    /// Its parameters, in the order a UI lists them.
-    pub params: Vec<Parameter>,
+    /// Its values.
+    schema: Schema,
 }
 
 impl PrimType {
     /// Type `id` (under the declaring package's vendor: the registry
     /// refuses another's, and an own type two packages declare) that a UI
-    /// calls `label`, of `role`, with no parameter yet: an engine's own type
+    /// calls `label`, of `role`, its values `schema`'s: an engine's own type
     /// (a rim light).
-    pub fn new(id: PrimTypeId, label: &str, role: Role) -> PrimType {
+    pub fn new(id: PrimTypeId, label: &str, role: Role, schema: Schema) -> PrimType {
         PrimType {
             id,
             label: Arc::from(label),
             role,
-            groups: Vec::new(),
-            params: Vec::new(),
+            schema,
         }
     }
 
-    /// It with `group` and its parameters `params` after what it has: an
-    /// engine's own section on a standard type (a gobo on a spot light).
-    pub fn group(mut self, group: Section, params: Vec<Parameter>) -> PrimType {
-        self.groups.push(group);
-        self.params.extend(params);
-        self
+    /// Its values' schema: what a prim of it holds by name, in the sections a
+    /// UI shows them in.
+    pub fn schema(&self) -> &Schema {
+        &self.schema
     }
 
-    /// Every parameter's default.
-    pub fn defaults(&self) -> Parameters {
-        defaults(&self.params)
+    /// It with `more`'s sections and values after its own
+    /// ([`Schema::merged`]): an engine's own section on a standard type (a
+    /// gobo on a spot light).
+    pub fn merged(mut self, more: Schema) -> PrimType {
+        self.schema = self.schema.merged(more);
+        self
     }
 }
 

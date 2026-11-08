@@ -6,10 +6,9 @@ use crate::cook::{Category, Description, Port};
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
 use crate::network::{NewNode, NodeCreation};
-use crate::params::Schema;
 use crate::{CookCx, Error, NodeType, Outputs};
+use kinogaki_render_api::NodeDef;
 use kinogaki_render_api::materialx::Type;
-use kinogaki_render_api::{NodeDef, NodeInput};
 use std::sync::Arc;
 
 /// Inside a Material node: its shading network.
@@ -90,27 +89,10 @@ impl NodeType for ShaderNode {
             let port = Port::new(&*output.name, &*output.label, wire_type(&output.socket));
             description = description.output(port);
         }
-        description.parameters(parameters(def))
+        description.parameters(def.schema())
     }
 
     fn cook(&self, _: &mut CookCx<'_>, _: &[Data]) -> Result<Outputs, Error> {
         Err(Error::invalid("a shading node compiles with its Material"))
     }
-}
-
-/// `def`'s values as rows: its groups' in their order, each as a section, then
-/// the rest.
-fn parameters(def: &NodeDef) -> Schema {
-    let values = || def.inputs.iter().filter_map(NodeInput::value);
-    let mut schema = Schema::default();
-    for d in values().filter(|d| !def.groups.iter().any(|g| g.name == d.group)) {
-        schema = schema.parameter(d.clone());
-    }
-    for group in &def.groups {
-        schema = schema.section(&*group.name, &*group.label, group.open);
-        for d in values().filter(|d| d.group == group.name) {
-            schema = schema.parameter(d.clone());
-        }
-    }
-    schema
 }

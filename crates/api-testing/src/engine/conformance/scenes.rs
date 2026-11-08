@@ -123,7 +123,7 @@ pub(super) fn scenes(description: &EngineDescription) -> Vec<Scene> {
         if description.prim_type(ty.id).is_none() || ty.id == standard::DOME_LIGHT {
             continue;
         }
-        let mut light = filled(Declared::new(ty.id, ty.defaults()), description);
+        let mut light = filled(Declared::new(ty.id, ty.schema().values()), description);
         let above = Vec3::new(0.0, 0.0, 3.0);
         light.xform = Sampled::still(Xform::from_axes(Vec3::X, Vec3::Y, Vec3::Z, above));
         add(
@@ -285,10 +285,10 @@ fn materialx(description: &EngineDescription, first: usize, model: Model) -> Vec
 /// `prim` with every value `description`'s schema of its type names: the
 /// prim's, or the default (as a host sends it).
 fn filled(prim: Declared, description: &EngineDescription) -> Declared {
-    let Some((_, params)) = description.schema(prim.type_id) else {
+    let Some(ty) = description.prim_type(prim.type_id) else {
         return prim;
     };
-    let values = (params.iter())
+    let values = (ty.schema().parameters())
         .map(|d| {
             let value = prim.value(&d.name).unwrap_or(&d.value);
             (d.name.to_string(), value.clone())

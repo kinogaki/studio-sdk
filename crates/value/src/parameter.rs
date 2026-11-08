@@ -1,8 +1,9 @@
-//! [`Parameter`]: one value a person sets, described as data, and the
-//! [`Section`]s parameters sit in. The same description serves a node's
-//! parameters, a format's options, an engine's settings, the values of a
-//! prim type it declares (a light's size) and a material node's inputs, so
-//! a host draws any of them as rows without knowing whose they are.
+//! [`Parameter`]: one value a person sets, described as data. The same
+//! description serves a node's parameters, a format's options, an engine's
+//! settings, the values of a prim type it declares (a light's size) and a
+//! material node's inputs, so a host draws any of them as rows without
+//! knowing whose they are; a [`Schema`](crate::Schema) holds them, in
+//! sections.
 use crate::condition::Condition;
 use crate::data::Data;
 use crate::kind::{Choice, Number, ValueKind};
@@ -41,9 +42,8 @@ pub struct Parameter {
     /// ports or spares, or whose change should be one deliberate edit (a
     /// sample cap).
     pub animatable: bool,
-    /// The [`Section`] it sits in, by name, where parameters are listed
-    /// with their sections apart (an engine's settings, a prim type's
-    /// values, a material node's inputs); empty for none.
+    /// The [`Section`](crate::Section) of its [`Schema`](crate::Schema) it
+    /// sits in, by name; empty for none.
     pub group: String,
     /// When it applies, and why it doesn't otherwise (a host shows it
     /// disabled, saying so); none: always.
@@ -280,40 +280,45 @@ impl Parameter {
     }
 }
 
-/// A collapsible section band parameters sit in.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Section {
-    /// Its name: what [`Parameter::group`] names, and what remembers
-    /// whether the band is open.
-    pub name: String,
-    /// The band's text.
-    pub label: String,
-    /// Whether it starts open.
-    pub open: bool,
-    /// Open whatever `open` says while this holds (a gobo's section while
-    /// its toggle is on).
-    open_when: Option<Condition>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::kind::ValueKind;
 
-impl Section {
-    /// Section `name` titled `label`, open when `open`.
-    pub fn new(name: impl Into<String>, label: impl Into<String>, open: bool) -> Self {
-        Self {
-            name: name.into(),
-            label: label.into(),
-            open,
-            open_when: None,
-        }
+    /// A data parameter takes values of its data type alone, starts at the
+    /// empty value it was declared with and is never animated.
+    #[test]
+    fn a_data_parameter_takes_values_of_its_type_alone() {
+        let sketch = crate::Typed::<Vec<f64>>::new(crate::DataTypeId::declared("acme.cad.sketch"));
+        let other = crate::Typed::<Vec<f64>>::new(crate::DataTypeId::declared("acme.cad.other"));
+        let p = Parameter::data("sketch", "Sketch", sketch.wrap(Vec::new()));
+        assert_eq!(p.kind, ValueKind::Data(sketch.id()));
+        assert!(!p.animatable && !p.kind.animatable());
+        assert!(p.check(&p.value).is_ok());
+        assert!(p.check(&Value::Data(sketch.wrap(vec![1.0]))).is_ok());
+        assert!(p.check(&Value::Data(other.wrap(Vec::new()))).is_err());
+        assert!(p.check(&Value::Number(1.0)).is_err());
+        assert!(!ValueKind::Text.accepts(&p.value));
     }
 
-    /// Open, whatever [`open`](Self::open) says, while `when` holds.
-    pub fn open_when(mut self, when: Condition) -> Self {
-        self.open_when = Some(when);
-        self
-    }
-
-    /// Whether it starts open, its parameters holding `values`.
-    pub fn is_open(&self, values: &Parameters) -> bool {
-        self.open || self.open_when.as_ref().is_some_and(|c| c.met(values))
+    #[test]
+    fn a_parameter_check_names_it_by_its_label() {
+        let length = Parameter::new(
+            "distance",
+            "Distance",
+            ValueKind::Number(Number::length().range(0.0, 10.0)),
+            1.0,
+        );
+        assert!(length.check(&Value::Number(10.0)).is_ok());
+        assert_eq!(
+            length.check(&Value::Number(-1.0)).unwrap_err().message(),
+            "Distance must be a number from 0 to 10"
+        );
+        let count = Parameter::new("count", "Count", ValueKind::integer(1, i64::MAX), 2_i64);
+        assert!(count.check(&Value::Integer(1 << 60)).is_ok());
+        assert_eq!(
+            count.check(&Value::Number(2.0)).unwrap_err().message(),
+            "Count doesn't take that value"
+        );
     }
 }

@@ -1,6 +1,6 @@
 use super::*;
 use crate::element::MemoryElement;
-use crate::params::ValueKind;
+use crate::params::{Schema, ValueKind};
 use kinogaki_render_api::{Engines, Parameter, PrimTypeId, Section};
 
 const LIGHTS: ObjectKindId = ObjectKindId::declared("acme.ray.light");
@@ -8,17 +8,20 @@ const FOG: ObjectKindId = ObjectKindId::declared("acme.ray.fog");
 
 /// The standard lights, and one of the engine's own (a glow, no shape).
 fn lights() -> DeclaredKind {
-    let glow = PrimType::new(PrimTypeId::declared("acme.ray.glow"), "Glow", Role::Light).group(
-        Section::new("glow", "Glow", true),
-        vec![
-            Parameter::new(
-                "strength",
-                "Strength",
-                ValueKind::Number(crate::params::Number::plain()),
-                1.0,
-            )
-            .group("glow"),
-        ],
+    let strength = Parameter::new(
+        "strength",
+        "Strength",
+        ValueKind::Number(crate::params::Number::plain()),
+        1.0,
+    );
+    let schema = (Schema::default())
+        .section(Section::new("glow", "Glow", true))
+        .parameter(strength.group("glow"));
+    let glow = PrimType::new(
+        PrimTypeId::declared("acme.ray.glow"),
+        "Glow",
+        Role::Light,
+        schema,
     );
     let types = [standard::lights(), vec![standard::fog(), glow]].concat();
     DeclaredKind::lights(LIGHTS, "Ray Lights", types)
@@ -48,7 +51,7 @@ fn a_new_light_is_its_first_type_and_edits_take_one_prim_of_its_types() {
             .is_none()
     );
     assert!(kind.with_declared(&*body, &[]).is_none());
-    let fog = Declared::new(standard::FOG, standard::fog().defaults());
+    let fog = Declared::new(standard::FOG, standard::fog().schema().values());
     assert!(kind.with_declared(&*body, &[fog]).is_none());
     let rim = Declared::new(
         PrimTypeId::declared("acme.other.rim_light"),

@@ -16,7 +16,7 @@
 //! engine receives ([`crate::RENDER_SPACE`]).
 use kinogaki_mtlx::Type;
 use kinogaki_value::NodeTypeId;
-use kinogaki_value::{Parameter, Section};
+use kinogaki_value::{Parameter, Schema, Section};
 use std::sync::Arc;
 
 /// One input of a node.
@@ -119,8 +119,8 @@ pub struct NodeDef {
     pub family: Arc<str>,
     /// Words search accepts for it.
     pub aliases: Vec<Arc<str>>,
-    /// Its values' groups, in order.
-    pub groups: Vec<Section>,
+    /// The sections its values sit in, by their groups.
+    sections: Vec<Section>,
     /// Its inputs, in the order a UI lists them.
     pub inputs: Vec<NodeInput>,
     /// Its outputs, in slot order.
@@ -137,7 +137,7 @@ impl NodeDef {
             label: Arc::from(label),
             family: Arc::from(family),
             aliases: Vec::new(),
-            groups: Vec::new(),
+            sections: Vec::new(),
             inputs: Vec::new(),
             outputs: Vec::new(),
             mtlx: None,
@@ -154,6 +154,25 @@ impl NodeDef {
     pub fn output(mut self, output: NodeOutput) -> NodeDef {
         self.outputs.push(output);
         self
+    }
+
+    /// With `section` after its sections: what its values' groups name.
+    /// One named as a section it has is left out.
+    pub fn section(mut self, section: Section) -> NodeDef {
+        if !self.sections.iter().any(|s| s.name == section.name) {
+            self.sections.push(section);
+        }
+        self
+    }
+
+    /// Its values as rows: its sections, and each input holding a value, in
+    /// input order.
+    pub fn schema(&self) -> Schema {
+        let schema = (self.sections.iter().cloned()).fold(Schema::default(), Schema::section);
+        (self.inputs.iter())
+            .filter_map(NodeInput::value)
+            .cloned()
+            .fold(schema, Schema::parameter)
     }
 
     /// As the node type of MaterialX definition `def`.

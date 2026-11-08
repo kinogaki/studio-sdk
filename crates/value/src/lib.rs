@@ -9,7 +9,8 @@
 //! | [`reads`] | [`ParametersExt`]: a value of [`Parameters`] read by name as its variant, or an error naming it |
 //! | [`kind`] | [`ValueKind`]: what a value holds, its limits and the options its kind takes ([`Number`], [`Unit`], [`Choice`]) |
 //! | [`look`] | [`NumberLook`]: how a row of numbers shows and moves, carried beside a kind by what has a row |
-//! | [`parameter`] | [`Parameter`]: one value a person sets, described (a node's parameter, a format's option, an engine's setting, a declared prim's value, a material input), and the [`Section`]s parameters sit in |
+//! | [`parameter`] | [`Parameter`]: one value a person sets, described (a node's parameter, a format's option, an engine's setting, a declared prim's value, a material input) |
+//! | [`schema`] | [`Schema`]: every set of parameters as a host draws it, [`Section`]s and the rows ([`SchemaRow`]: parameters, [`Button`]s) placed in them by group, in one order |
 //! | [`condition`] | [`Condition`]: when something applies, as values holding values |
 //! | [`ramp`], [`tone_curve`] | the structured values: [`Ramp`] and [`ToneCurve`] |
 //! | [`reference`](mod@reference) | [`RefFilter`]: what a reference may name; [`ObjectRef`]: an object, by the host's id |
@@ -29,6 +30,7 @@ pub mod parameter;
 pub mod ramp;
 pub mod reads;
 pub mod reference;
+pub mod schema;
 pub mod tone_curve;
 pub mod value;
 
@@ -40,9 +42,10 @@ pub use id::{
 };
 pub use kind::{Choice, CurveChannel, Number, Unit, ValueKind};
 pub use look::{NumberLook, NumberStyle};
-pub use parameter::{Parameter, Section};
+pub use parameter::Parameter;
 pub use ramp::Ramp;
 pub use reads::ParametersExt;
 pub use reference::{Fits, ObjectRef, RefFilter};
+pub use schema::{Button, Schema, SchemaRow, Section};
 pub use tone_curve::ToneCurve;
 pub use value::{Parameters, Value};

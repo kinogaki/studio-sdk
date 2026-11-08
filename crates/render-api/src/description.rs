@@ -21,8 +21,8 @@ use crate::declared::PrimType;
 use crate::material::{MaterialDisplay, MaterialNetwork, NodeDef, standard};
 use crate::prim::PrimKind;
 use kinogaki_value::NodeTypeId;
+use kinogaki_value::Schema;
 use kinogaki_value::{EngineId, PrimTypeId};
-use kinogaki_value::{Parameter, Section};
 
 /// What an engine's materials are to a host: the rules only its code knows.
 pub trait MaterialRules: Send + Sync {
@@ -113,8 +113,7 @@ pub struct EngineDescription {
     id: EngineId,
     label: Arc<str>,
     capabilities: Capabilities,
-    setting_groups: Vec<Section>,
-    settings: Vec<Parameter>,
+    settings: Schema,
     node_defs: Vec<Arc<NodeDef>>,
     material_rules: Arc<dyn MaterialRules>,
 }
@@ -143,10 +142,8 @@ impl EngineBuilder {
         self
     }
 
-    /// Its settings ([`crate::ViewDesc::values`]), and their
-    /// groups in order.
-    pub fn settings(mut self, groups: Vec<Section>, settings: Vec<Parameter>) -> Self {
-        self.0.setting_groups = groups;
+    /// Its settings ([`crate::ViewDesc::values`]), in their sections.
+    pub fn settings(mut self, settings: Schema) -> Self {
         self.0.settings = settings;
         self
     }
@@ -178,8 +175,7 @@ impl EngineDescription {
             id,
             label: Arc::from(label),
             capabilities: Capabilities::default(),
-            setting_groups: Vec::new(),
-            settings: Vec::new(),
+            settings: Schema::default(),
             node_defs: Vec::new(),
             material_rules: Arc::new(NoMaterials),
         })
@@ -205,13 +201,8 @@ impl EngineDescription {
         &self.capabilities
     }
 
-    /// Its settings' groups, in order.
-    pub fn setting_groups(&self) -> &[Section] {
-        &self.setting_groups
-    }
-
-    /// Its settings ([`crate::ViewDesc::values`]).
-    pub fn settings(&self) -> &[Parameter] {
+    /// Its settings ([`crate::ViewDesc::values`]), in their sections.
+    pub fn settings(&self) -> &Schema {
         &self.settings
     }
 
@@ -234,13 +225,6 @@ impl EngineDescription {
     /// Its prim type `id`, when it declares it.
     pub fn prim_type(&self, id: PrimTypeId) -> Option<&PrimType> {
         self.capabilities.types.iter().find(|t| t.id == id)
-    }
-
-    /// Type `id`'s groups and parameters as it renders them (none when it
-    /// does not declare the type).
-    pub fn schema(&self, id: PrimTypeId) -> Option<(Vec<Section>, Vec<Parameter>)> {
-        let ty = self.prim_type(id)?;
-        Some((ty.groups.clone(), ty.params.clone()))
     }
 
     /// What the shaded viewport shows of `network`, one of its materials.

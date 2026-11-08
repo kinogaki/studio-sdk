@@ -50,7 +50,7 @@ impl RenderedKind for LampPrims {
         let Some(lamp) = body.downcast_ref::<Lamp>() else {
             return Vec::new();
         };
-        let mut values = area_light().defaults();
+        let mut values = area_light().schema().values();
         values.insert("intensity".into(), Value::Number(lamp.intensity));
         vec![kinogaki_render_api::Declared::new(
             standard::AREA_LIGHT,

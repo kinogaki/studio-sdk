@@ -49,11 +49,13 @@ fn make(source: Arc<kinogaki_mtlx::NodeDef>) -> Option<NodeDef> {
         &family(&source.group),
     );
     def.aliases = vec![Arc::from(source.node.as_str())];
+    // The first folder's section starts open.
+    let mut first = true;
     for port in &source.inputs {
         let folder = port.folder.as_deref().unwrap_or("");
-        if !folder.is_empty() && !def.groups.iter().any(|g| g.name == folder) {
-            let first = def.groups.is_empty();
-            def.groups.push(Section::new(folder, folder, first));
+        if !folder.is_empty() {
+            def = def.section(Section::new(folder, folder, first));
+            first = false;
         }
         def = def.input(input(&source.node, port));
     }

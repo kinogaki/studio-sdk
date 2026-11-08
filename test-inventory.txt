@@ -563,9 +563,6 @@ kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_
 kinogaki-studio-api/lib test network::edit::tests::a_compiled_material_seeds_its_nodes_and_an_image_node_an_image
 kinogaki-studio-api/lib test network::edit::tests::a_seed_makes_the_material_it_starts
 kinogaki-studio-api/lib test network::edit::tests::a_seeds_lengths_scale_and_nothing_else
-kinogaki-studio-api/lib test params::schema::tests::a_data_parameter_takes_values_of_its_type_alone
-kinogaki-studio-api/lib test params::schema::tests::a_parameter_check_names_it_by_its_label
-kinogaki-studio-api/lib test params::schema::tests::a_schema_lists_its_parameters_and_values
 kinogaki-studio-api/lib test render::lights::kind::tests::a_new_light_is_its_first_type_and_edits_take_one_prim_of_its_types
 kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_light_is_a_light_value_and_one_is_adopted
 kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_lights_rows_take_only_what_its_codec_reads
@@ -599,7 +596,7 @@ kinogaki-studio-api/network test a_runner_runs_a_compiled_context_its_package_de
 kinogaki-studio-api/network test an_engine_id_is_declared_once_under_its_vendor
 kinogaki-studio-api/network test an_engine_setting_is_never_named_as_a_render_outputs_own
 kinogaki-studio-api/network test an_engines_own_prim_type_is_declared_once_under_its_vendor_and_its_outputs_are_standard
-kinogaki-studio-api/network test an_engines_standard_nodes_and_every_default_are_checked_at_admission
+kinogaki-studio-api/network test an_engines_standard_nodes_and_every_schema_are_checked_at_admission
 kinogaki-studio-api/network test nodes_hold_networks_of_declared_contexts_without_loops
 kinogaki-studio-api/render test a_drag_is_a_points_update_of_the_same_topology
 kinogaki-studio-api/render test an_item_names_its_part_and_says_what_it_is
@@ -691,6 +688,7 @@ kinogaki-studio-ui-api/lib test sheet::edits::tests::edits_read_and_map
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::conditions_hide_and_disable_rows
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::curves_channels_and_texts_become_their_fields
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::parameters_become_fields_keyed_by_name
+kinogaki-studio-ui-api/lib test sheet::from_params::tests::rows_show_in_the_schemas_order_with_bands_over_shown_rows_alone
 kinogaki-studio-ui-api/lib test sheet::from_params::tests::shaped_rows_show_their_menus_and_buttons
 kinogaki-studio-ui-api/lib test sheet::items::tests::keys_map_and_filter
 kinogaki-studio-ui-api/lib test sheet::items::tests::values_read_by_key
@@ -731,12 +729,19 @@ kinogaki-value/lib test kind::tests::colors_ramps_and_curves_check_their_structu
 kinogaki-value/lib test kind::tests::integers_are_exact_and_within_their_limits
 kinogaki-value/lib test kind::tests::kinds_give_the_animatable_default
 kinogaki-value/lib test kind::tests::numbers_take_finite_values_within_their_limits
+kinogaki-value/lib test parameter::tests::a_data_parameter_takes_values_of_its_type_alone
+kinogaki-value/lib test parameter::tests::a_parameter_check_names_it_by_its_label
 kinogaki-value/lib test ramp::tests::color_ramps_interpolate_each_channel
 kinogaki-value/lib test ramp::tests::each_interpolation_takes_its_exact_values
 kinogaki-value/lib test ramp::tests::interpolations_meet_the_keys_and_hold_past_the_ends
 kinogaki-value/lib test ramp::tests::keys_insert_and_remove_in_order
 kinogaki-value/lib test ramp::tests::steps_single_keys_and_strange_places
 kinogaki-value/lib test reads::tests::a_value_reads_as_its_variant_or_names_itself
+kinogaki-value/lib test schema::tests::a_check_refuses_a_name_twice_an_undeclared_section_and_a_refused_default
+kinogaki-value/lib test schema::tests::a_merge_adds_the_sections_and_rows_not_held_after_its_own
+kinogaki-value/lib test schema::tests::rows_change_in_place_and_go_by_retain
+kinogaki-value/lib test schema::tests::rows_show_loose_first_then_by_section_in_the_order_added
+kinogaki-value/lib test schema::tests::values_fit_and_validate_against_its_parameters
 kinogaki-value/lib test tone_curve::tests::a_curve_runs_through_its_keys_and_straight_past_its_ends
 kinogaki-value/lib test value::tests::integers_are_exact
 kinogaki-value/lib test value::tests::values_read_back_only_as_their_variant

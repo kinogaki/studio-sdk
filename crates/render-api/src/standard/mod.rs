@@ -28,18 +28,18 @@ pub use emission::{Emission, ILLUMINANTS, blackbody, illuminant};
 use crate::declared::{Declared, PrimType, Role};
 use crate::prim::Visibility;
 use kinogaki_value::{Choice, Condition, Number, NumberLook, PrimTypeId, Unit, Value, ValueKind};
-use kinogaki_value::{Parameter, Section};
+use kinogaki_value::{Parameter, Schema, Section};
 
 /// The area light's id.
-pub const AREA_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.area_light");
+pub const AREA_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.core.area_light");
 /// The dome light's id.
-pub const DOME_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.dome_light");
+pub const DOME_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.core.dome_light");
 /// The distant light's id.
-pub const DISTANT_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.distant_light");
+pub const DISTANT_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.core.distant_light");
 /// The spot light's id.
-pub const SPOT_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.render.spot_light");
+pub const SPOT_LIGHT: PrimTypeId = PrimTypeId::declared("kinogaki.core.spot_light");
 /// The fog's id.
-pub const FOG: PrimTypeId = PrimTypeId::declared("kinogaki.render.fog");
+pub const FOG: PrimTypeId = PrimTypeId::declared("kinogaki.core.fog");
 
 /// The parameter saying where an emitter's spectrum comes from.
 pub const EMISSION: &str = "emission";
@@ -127,17 +127,18 @@ fn light_type(
     normalize: bool,
     after: Vec<Parameter>,
 ) -> PrimType {
-    let mut params = shape;
-    params.extend(emission_params(intensity));
-    params.push(Parameter::toggle("normalize", "Normalize", normalize).group(LIGHT_GROUP));
-    params.extend(after);
-    PrimType {
+    let normalize = Parameter::toggle("normalize", "Normalize", normalize).group(LIGHT_GROUP);
+    let params = (shape.into_iter())
+        .chain(emission_params(intensity))
+        .chain([normalize])
+        .chain(after);
+    let schema = Schema::default().section(Section::new(LIGHT_GROUP, "Light", true));
+    PrimType::new(
         id,
-        label: Arc::from(label),
-        role: Role::Light,
-        groups: vec![Section::new(LIGHT_GROUP, "Light", true)],
-        params,
-    }
+        label,
+        Role::Light,
+        params.fold(schema, Schema::parameter),
+    )
 }
 
 /// UsdLux's RectLight and DiskLight: a rectangle (`width` × `height`) or
@@ -257,26 +258,27 @@ pub fn lights() -> Vec<PrimType> {
 /// has at most one.
 pub fn fog() -> PrimType {
     const GROUP: &str = "fog";
-    PrimType {
-        id: FOG,
-        label: Arc::from("Fog"),
-        role: Role::Atmosphere,
-        groups: vec![Section::new(GROUP, "Fog", true)],
-        params: vec![
-            Parameter::slider("density", "Density", (0.0, 1e6), (0.0, 1.0), 3, 0.1).group(GROUP),
-            Parameter::new("color", "Color", ValueKind::Color, [0.3, 0.34, 0.42]).group(GROUP),
-            Parameter::length("start", "Start", (0.0, 1e6), None, 3, 0.0).group(GROUP),
-            Parameter::length("height", "Height", (-1e6, 1e6), None, 3, 0.0).group(GROUP),
-            Parameter::slider("falloff", "Falloff", (0.0, 1e6), (0.0, 4.0), 3, 0.5).group(GROUP),
-            Parameter::toggle("inscatter", "In-scatter", false).group(GROUP),
-            Parameter::slider("anisotropy", "Anisotropy", (-0.9, 0.9), (-0.9, 0.9), 3, 0.3)
-                .group(GROUP)
-                .requires(
-                    Condition::when("inscatter", true),
-                    "Used with In-scatter on",
-                ),
-        ],
-    }
+    let params = [
+        Parameter::slider("density", "Density", (0.0, 1e6), (0.0, 1.0), 3, 0.1).group(GROUP),
+        Parameter::new("color", "Color", ValueKind::Color, [0.3, 0.34, 0.42]).group(GROUP),
+        Parameter::length("start", "Start", (0.0, 1e6), None, 3, 0.0).group(GROUP),
+        Parameter::length("height", "Height", (-1e6, 1e6), None, 3, 0.0).group(GROUP),
+        Parameter::slider("falloff", "Falloff", (0.0, 1e6), (0.0, 4.0), 3, 0.5).group(GROUP),
+        Parameter::toggle("inscatter", "In-scatter", false).group(GROUP),
+        Parameter::slider("anisotropy", "Anisotropy", (-0.9, 0.9), (-0.9, 0.9), 3, 0.3)
+            .group(GROUP)
+            .requires(
+                Condition::when("inscatter", true),
+                "Used with In-scatter on",
+            ),
+    ];
+    let schema = Schema::default().section(Section::new(GROUP, "Fog", true));
+    PrimType::new(
+        FOG,
+        "Fog",
+        Role::Atmosphere,
+        params.into_iter().fold(schema, Schema::parameter),
+    )
 }
 
 /// A standard fog ([`FOG`]) as a typed value: exponential height fog, its
@@ -467,7 +469,7 @@ impl Light {
     /// It as a prim: its type's defaults, with its own values.
     pub fn declared(&self) -> Declared {
         let ty = self.prim_type();
-        let mut values = ty.defaults();
+        let mut values = ty.schema().values();
         let mut set = |name: &str, v: Value| _ = values.insert(name.to_owned(), v);
         let float = |v: f32| Value::Number(f64::from(v));
         let color = |c: [f32; 3]| Value::Color(c.map(f64::from));

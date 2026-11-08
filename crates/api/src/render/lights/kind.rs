@@ -73,7 +73,7 @@ fn finite(values: &Parameters) -> bool {
 
 /// Words other applications use for a light of a standard shape.
 fn aliases(ty: &PrimType) -> &'static [&'static str] {
-    let prim = Declared::new(ty.id, ty.defaults());
+    let prim = Declared::new(ty.id, ty.schema().values());
     match standard::Light::decode(&prim).map(|light| light.shape) {
         Some(LightShape::Rect { .. } | LightShape::Disk { .. }) => {
             &["usdlux", "lamp", "rect", "disk", "rectlight", "disklight"]
@@ -135,8 +135,8 @@ impl DeclaredKind {
     /// its type declares within its limits, every number finite.
     fn body(&self, prim: &Declared) -> Option<Arc<dyn ObjectBody>> {
         let ty = self.type_of(prim.type_id.as_str())?;
-        let fits =
-            (ty.params.iter()).all(|d| prim.value(&d.name).is_none_or(|value| d.accepts(value)));
+        let fits = (ty.schema().parameters())
+            .all(|d| prim.value(&d.name).is_none_or(|value| d.accepts(value)));
         (fits && finite(&prim.values)).then(|| {
             let prim = Declared::new(ty.id, prim.values.clone());
             Arc::new(DeclaredBody {
@@ -180,7 +180,7 @@ impl ObjectKindSpec for DeclaredKind {
     }
     fn new_body(&self) -> Arc<dyn ObjectBody> {
         let prim = match self.types.first() {
-            Some(ty) => Declared::new(ty.id, ty.defaults()),
+            Some(ty) => Declared::new(ty.id, ty.schema().values()),
             None => standard::Light::default().declared(),
         };
         Arc::new(DeclaredBody {
@@ -210,8 +210,9 @@ impl ObjectKindSpec for DeclaredKind {
         let prim = self.prim(body).filter(|_| self.of_lights())?;
         let value = data::light().wrap(standard::Light::decode(prim)?).ok()?;
         let types = standard::lights();
-        let own =
-            |name: &String| (types.iter()).all(|t| t.params.iter().all(|d| *d.name != **name));
+        let own = |name: &String| {
+            (types.iter()).all(|t| t.schema().parameters().all(|d| *d.name != **name))
+        };
         let warnings = (prim.values.keys().filter(|name| own(name)))
             .map(|name| Diagnostic::warning(format!("{name} isn't a standard light's; left out")))
             .collect();
@@ -249,7 +250,7 @@ impl ObjectKindSpec for DeclaredKind {
         let ty = (self.types.iter())
             .find(|ty| self.creation_of(ty) == Some(id))
             .ok_or_else(|| Error::invalid(format_args!("{} makes no {id}", self.label)))?;
-        let prim = Declared::new(ty.id, ty.defaults());
+        let prim = Declared::new(ty.id, ty.schema().values());
         Ok(Arc::new(DeclaredBody {
             kind: self.id,
             prim,
@@ -294,7 +295,7 @@ impl ObjectCodec for DeclaredKind {
                 self.label
             ))
         })?;
-        let values = element::read_values(&*at.required_child(VALUES)?, &ty.params)?;
+        let values = element::read_values(&*at.required_child(VALUES)?, ty.schema().parameters())?;
         self.body(&Declared::new(ty.id, values)).ok_or_else(|| {
             Error::invalid(format_args!(
                 "{}: a value doesn't fit its type",

@@ -21,7 +21,6 @@ use kinogaki_render_api::aov::standard as aovs;
 use kinogaki_render_api::display::{Display, Made};
 use kinogaki_render_api::geometry::image::Image;
 use kinogaki_render_api::geometry::{Diagnostic, Error};
-use kinogaki_render_api::settings::defaults;
 use kinogaki_render_api::{
     AovDesc, AovFormat, EngineDescription, Prim, PrimId, RenderEngine, SceneSettings, SceneUpdate,
     ViewCamera, ViewDesc, ViewId, ViewMode, Wake,
@@ -115,7 +114,7 @@ impl Session {
             width,
             height,
             mode: ViewMode::Final,
-            values: Arc::new(defaults(self.description.settings())),
+            values: Arc::new(self.description.settings().values()),
         };
         self.engine.view(VIEW, desc);
         let asked = [AovDesc {
