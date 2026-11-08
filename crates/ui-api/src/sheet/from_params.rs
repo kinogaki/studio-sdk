@@ -6,12 +6,13 @@ use super::{Band, Field, FileDialog, Item, Kind, Number, NumberLook, Sheet};
 use kinogaki_studio_api::params::{self, SchemaRow, ValueKind};
 
 /// The sheet of a parameter schema, its rows in the schema's order
-/// ([`params::Schema::placed`]): each section a top-level band over the rows
-/// it shows (none over none), open as it says of the schema's values; each
-/// parameter a field keyed by its name, with its help as the tooltip and
-/// its keywords for search, shown and enabled as its conditions say of the
-/// schema's values; each button a button field. A data parameter has no
-/// field: its node's schema adds rows of its own.
+/// ([`params::Schema::placed`]): each section a top-level band over its rows
+/// (none over a section holding none), open as it says of the schema's
+/// values; each parameter a field keyed by its name, with its help as the
+/// tooltip and its keywords for search, greyed in its place while it doesn't
+/// apply to the schema's values, its tooltip then saying why; each button a
+/// button field. A data parameter has no field: its node's schema adds rows
+/// of its own.
 impl From<&params::Schema> for Sheet<String> {
     fn from(schema: &params::Schema) -> Self {
         let values = schema.values();
@@ -20,10 +21,7 @@ impl From<&params::Schema> for Sheet<String> {
         for (section, row) in schema.placed() {
             let item = match row {
                 SchemaRow::Parameter(p) if matches!(p.kind, ValueKind::Data(_)) => continue,
-                SchemaRow::Parameter(p) => match p.clone().resolved(&values) {
-                    Some(p) => Item::Field(field(&p)),
-                    None => continue,
-                },
+                SchemaRow::Parameter(p) => Item::Field(field(&p.clone().resolved(&values))),
                 SchemaRow::Button(b) => {
                     let mut field = Field::new(
                         b.name.clone(),
@@ -258,18 +256,21 @@ mod tests {
     }
 
     /// The sheet follows the schema's one order: rows in no section first,
-    /// then each section's band over the rows it shows, opening as its
-    /// condition says; a section showing no row has no band.
+    /// then each section's band over its rows, opening as its condition
+    /// says; a section holding no row has no band.
     #[test]
-    fn rows_show_in_the_schemas_order_with_bands_over_shown_rows_alone() {
+    fn rows_show_in_the_schemas_order_with_a_band_over_each_section_holding_rows() {
         use kinogaki_studio_api::params::Section;
         use kinogaki_studio_api::value::Condition;
         let toggle = |name: &str, group: &str| Parameter::toggle(name, name, false).group(group);
         let schema = params::Schema::default()
             .section(Section::new("look", "Look", false).open_when(Condition::when("on", true)))
-            .section(Section::new("hidden", "Hidden", true))
+            .section(Section::new("empty", "Empty", true))
+            .section(Section::new("later", "Later", true))
             .parameter(toggle("on", "look").help("Shows the look"))
-            .parameter(toggle("ghost", "hidden").shown_when(Condition::when("on", true)))
+            .parameter(
+                toggle("ghost", "later").requires(Condition::when("on", true), "Used with on"),
+            )
             .parameter(Parameter::toggle("first", "First", true))
             .button(params::Button::new("go", "Go").group("look"));
         let sheet = Sheet::<String>::from(&schema);
@@ -280,7 +281,10 @@ mod tests {
                 Item::Heading(h) => format!("{h:?}"),
             })
             .collect();
-        assert_eq!(listed, ["first", "[Look closed]", "on", "go"]);
+        assert_eq!(
+            listed,
+            ["first", "[Look closed]", "on", "go", "[Later]", "ghost"]
+        );
         let mut on = schema.clone();
         on.parameters_mut().find(|p| p.name == "on").unwrap().value = Value::Bool(true);
         let sheet = Sheet::<String>::from(&on);
@@ -290,7 +294,7 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(bands, [("Look", true), ("Hidden", true)]);
+        assert_eq!(bands, [("Look", true), ("Later", true)]);
     }
 
     #[test]
@@ -385,27 +389,48 @@ mod tests {
         assert!(matches!(&field("fit").kind, Kind::Button { .. }) && !field("fit").enabled);
     }
 
-    /// A row shows and applies as its conditions say of the rows' values.
+    /// A row that doesn't apply to the rows' values shows greyed in its
+    /// place, its tooltip saying why; applying, it takes input again.
     #[test]
-    fn conditions_hide_and_disable_rows() {
+    fn a_row_that_does_not_apply_shows_greyed_in_its_place_saying_why() {
         use kinogaki_studio_api::value::Condition;
         let rows = |flat: bool| {
             params::Schema::default()
                 .parameter(Parameter::toggle("flat", "Flat", flat))
                 .parameter(
-                    Parameter::toggle("glow", "Glow", false)
-                        .shown_when(Condition::default().except("flat", true)),
-                )
-                .parameter(
                     Parameter::toggle("tint", "Tint", false)
+                        .help("Tints the light")
                         .requires(Condition::when("flat", false), "Flat shows no tint"),
                 )
+                .parameter(Parameter::toggle("glow", "Glow", false))
         };
-        let sheet = Sheet::<String>::from(&rows(true));
-        assert!(sheet.field(&"glow".to_owned()).is_none());
-        assert!(!sheet.field(&"tint".to_owned()).unwrap().enabled);
-        let sheet = Sheet::<String>::from(&rows(false));
-        assert!(sheet.field(&"glow".to_owned()).is_some());
-        assert!(sheet.field(&"tint".to_owned()).unwrap().enabled);
+        let shown = |sheet: &Sheet<String>| -> Vec<(String, bool, Option<String>)> {
+            (sheet.fields())
+                .map(|f| {
+                    (
+                        f.key.clone(),
+                        f.enabled,
+                        f.tooltip.as_ref().map(|t| t.to_string()),
+                    )
+                })
+                .collect()
+        };
+        let tip = |t: &str| Some(t.to_owned());
+        assert_eq!(
+            shown(&Sheet::<String>::from(&rows(true))),
+            [
+                ("flat".to_owned(), true, None),
+                ("tint".to_owned(), false, tip("Flat shows no tint")),
+                ("glow".to_owned(), true, None),
+            ]
+        );
+        assert_eq!(
+            shown(&Sheet::<String>::from(&rows(false))),
+            [
+                ("flat".to_owned(), true, None),
+                ("tint".to_owned(), true, tip("Tints the light")),
+                ("glow".to_owned(), true, None),
+            ]
+        );
     }
 }

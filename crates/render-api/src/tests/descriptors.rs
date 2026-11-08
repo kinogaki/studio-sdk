@@ -154,24 +154,29 @@ fn standard_lights_and_fog_round_trip_through_their_prims() {
 }
 
 #[test]
-fn rows_show_and_apply_by_the_values_beside_them() {
+fn rows_apply_by_the_values_beside_them() {
     let area = standard::area_light();
     let mut values = area.schema().values();
-    let shown = |values: &Parameters, name: &str| param(&area, name).unwrap().is_shown(values);
-    assert!(shown(&values, "width") && !shown(&values, "radius"));
+    let applies = |values: &Parameters, name: &str| param(&area, name).unwrap().applies(values);
+    assert!(applies(&values, "width") && !applies(&values, "radius"));
     values.insert("shape".into(), standard::choice("disk"));
-    assert!(!shown(&values, "width") && shown(&values, "radius"));
-    // Color shows for the color emission; Temperature applies to its own.
-    let temperature = param(&area, "colorTemperature").unwrap();
-    assert!(shown(&values, "color") && !temperature.applies(&values));
+    assert!(!applies(&values, "width") && applies(&values, "radius"));
+    // A row that doesn't apply says why.
+    let width = param(&area, "width").unwrap().clone().resolved(&values);
+    assert_eq!(
+        (width.enabled, &*width.help),
+        (false, "Used by the Rectangle shape")
+    );
+    // Color applies to the color emission, Temperature to its own.
+    assert!(applies(&values, "color") && !applies(&values, "colorTemperature"));
     values.insert("emission".into(), standard::choice("temperature"));
-    assert!(!shown(&values, "color") && temperature.applies(&values));
-    // A dome's image shows while it has no ground; it starts at none, and
+    assert!(!applies(&values, "color") && applies(&values, "colorTemperature"));
+    // A dome's image applies while it has no ground; it starts at none, and
     // takes a file or an Image node from the root, never a blank one.
     let dome = standard::dome_light();
     let mut sky = dome.schema().values();
     let image = param(&dome, "texture").unwrap();
-    assert!(image.is_shown(&sky));
+    assert!(image.applies(&sky));
     assert_eq!(sky.get("texture"), Some(&Value::Image(None)));
     let take = |r: ImageRef| image.check(&Value::Image(Some(r))).is_ok();
     assert!(take(ImageRef::File(ImageSource::path("sky.exr"))));
@@ -189,7 +194,7 @@ fn rows_show_and_apply_by_the_values_beside_them() {
         Some(imageless)
     );
     sky.insert("ground".into(), Value::Bool(true));
-    assert!(!image.is_shown(&sky));
+    assert!(!image.applies(&sky));
     // Fitting keeps what fits by name, defaults the rest, drops strangers.
     let spot = standard::spot_light();
     let from_area = spot.schema().fit(&values);

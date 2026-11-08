@@ -45,16 +45,15 @@ pub struct Parameter {
     /// The [`Section`](crate::Section) of its [`Schema`](crate::Schema) it
     /// sits in, by name; empty for none.
     pub group: String,
-    /// When it applies, and why it doesn't otherwise (a host shows it
-    /// disabled, saying so); none: always.
+    /// When it applies, and why it doesn't otherwise; none: always. A
+    /// host shows a row that doesn't apply greyed in its place, saying why:
+    /// rows never hide, so none moves when a value changes.
     requires: Option<(Condition, String)>,
-    /// When its row is shown; none: always.
-    shown_when: Option<Condition>,
 }
 
 impl Parameter {
     /// Parameter `name` labelled `label`, of `kind`, at `value`: enabled,
-    /// in no section, always shown and applying, with no help.
+    /// in no section, always applying, with no help.
     pub fn new(
         name: impl Into<String>,
         label: impl Into<String>,
@@ -74,7 +73,6 @@ impl Parameter {
             animatable,
             group: String::new(),
             requires: None,
-            shown_when: None,
         }
     }
 
@@ -227,21 +225,10 @@ impl Parameter {
     }
 
     /// Applying while `when` holds of the values beside it, else disabled,
-    /// saying `reason`.
+    /// saying `reason` ("Used with Ground on").
     pub fn requires(mut self, when: Condition, reason: &str) -> Self {
         self.requires = Some((when, reason.to_owned()));
         self
-    }
-
-    /// Shown while `when` holds of the values beside it.
-    pub fn shown_when(mut self, when: Condition) -> Self {
-        self.shown_when = Some(when);
-        self
-    }
-
-    /// Whether its row shows while the parameters beside it hold `values`.
-    pub fn is_shown(&self, values: &Parameters) -> bool {
-        self.shown_when.as_ref().is_none_or(|c| c.met(values))
     }
 
     /// Whether it applies while the parameters beside it hold `values`.
@@ -250,20 +237,16 @@ impl Parameter {
     }
 
     /// It as its row shows while the parameters beside it hold `values`:
-    /// none while hidden; disabled, its help saying why, while it doesn't
-    /// apply; its conditions spent either way.
-    pub fn resolved(mut self, values: &Parameters) -> Option<Self> {
-        if !self.is_shown(values) {
-            return None;
-        }
+    /// disabled, its help saying why, while it doesn't apply; its condition
+    /// spent either way.
+    pub fn resolved(mut self, values: &Parameters) -> Self {
         if let Some((when, reason)) = self.requires.take()
             && !when.met(values)
         {
             self.enabled = false;
             self.help = reason;
         }
-        self.shown_when = None;
-        Some(self)
+        self
     }
 
     /// Whether `value` is one it takes: of its kind and within its limits.

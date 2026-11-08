@@ -73,7 +73,7 @@ pub fn emission_params(intensity: f64) -> Vec<Parameter> {
         .group(LIGHT_GROUP),
         Parameter::new("color", "Color", ValueKind::Color, [1.0; 3])
             .group(LIGHT_GROUP)
-            .shown_when(emission("color")),
+            .requires(emission("color"), "Used by the Color emission"),
         Parameter::new(
             "colorTemperature",
             "Temperature",
@@ -168,9 +168,11 @@ pub(crate) fn area_light() -> PrimType {
         "Area Light",
         vec![
             shape,
-            size("width", "Width", 1.0).shown_when(shaped("rectangle")),
-            size("height", "Height", 1.0).shown_when(shaped("rectangle")),
-            size("radius", "Radius", 0.5).shown_when(shaped("disk")),
+            size("width", "Width", 1.0)
+                .requires(shaped("rectangle"), "Used by the Rectangle shape"),
+            size("height", "Height", 1.0)
+                .requires(shaped("rectangle"), "Used by the Rectangle shape"),
+            size("radius", "Radius", 0.5).requires(shaped("disk"), "Used by the Disk shape"),
         ],
         1.0,
         false,
@@ -182,7 +184,7 @@ pub(crate) fn area_light() -> PrimType {
 /// image whose center looks down the light's -Z, its top +Y (`texture`: an
 /// [`ImageRef`], a file or an Image node, which the host sends decoded);
 /// without an image, below the horizon it may shine `groundColor` instead
-/// (`ground`: a hemisphere gradient, the image's row hidden while it is
+/// (`ground`: a hemisphere gradient; the image doesn't apply while it is
 /// on).
 pub(crate) fn dome_light() -> PrimType {
     let ground = |on: bool| Condition::when("ground", on);
@@ -204,7 +206,7 @@ pub(crate) fn dome_light() -> PrimType {
             .requires(ground(true), "Used with Ground on"),
             Parameter::new("texture", "Image", ValueKind::Image, Value::Image(None))
                 .group(LIGHT_GROUP)
-                .shown_when(ground(false)),
+                .requires(ground(false), "Used with Ground off"),
         ],
     )
 }
