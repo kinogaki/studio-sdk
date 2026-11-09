@@ -135,6 +135,11 @@ pub struct Imported {
     /// format's writer takes back ([`Writing::metadata`]) when it writes the
     /// document read from the file again. Empty when there is none.
     pub metadata: FormatOptions,
+    /// Whether the items flatten what other files gave this one (a USD
+    /// layer's references, payloads and sublayers to files outside it): a
+    /// write over the file would put their content in it, so Studio saves
+    /// a document read from it elsewhere.
+    pub flattened: bool,
 }
 
 /// What the host makes of a read.
