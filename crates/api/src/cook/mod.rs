@@ -322,7 +322,10 @@ pub trait NodeType: Any + Send + Sync {
     /// value for yet starts at it, and a reset (a promoted row's too)
     /// returns to it. The inspector shows them after the declared ones,
     /// and their values live in the node's parameters under their own
-    /// names. Core asks again whenever the node's parameters change.
+    /// names, which hold no `.` past a group's `<group>/` (files spell a
+    /// component's channel `<row>.<letter>`: Studio refuses a node whose
+    /// spares name one). Core asks again whenever the node's parameters
+    /// change.
     fn spares(&self, parameters: &Parameters) -> Option<Schema> {
         let _ = parameters;
         None

@@ -51,7 +51,13 @@ pub trait NetworkEdit: NetworkRead {
 
     /// Replaces every parameter of `node`: `parameters` hold each one its
     /// type declares. An animated row it changes is its key at the current
-    /// time, as [`set_parameter`](Self::set_parameter) sets it.
+    /// time, as [`set_parameter`](Self::set_parameter) sets it; one it
+    /// holds at its static value (as [`NodeInfo::parameters`] reads it) or
+    /// at its value at the current time ([`NetworkRead::value_at`]) is
+    /// unchanged, its keys as they were. So writing back what was read,
+    /// one row changed, keys that row alone.
+    ///
+    /// [`NodeInfo::parameters`]: super::NodeInfo::parameters
     fn set_parameters(&mut self, node: NodeRef, parameters: Parameters) -> Result<(), Error>;
 
     /// Wires `from` into input `port` of `node`: after its wires on a
