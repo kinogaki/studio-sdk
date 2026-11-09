@@ -18,13 +18,15 @@ use std::sync::Arc;
 /// **The output** ([`Refined::polygons`]), in the cage's own space: the
 /// cage's polygons refined `subdivision.level` times by its scheme, shaped
 /// by every edge's and point's [`CREASE`](kinogaki_geometry::names::CREASE)
-/// and the border as `subdivision.boundary` says; the faces of the
+/// and the border as `subdivision.boundary` says, with their points on the
+/// limit surface (at level 0, the cage's points); the faces of the
 /// [`SUBDIVISION_HOLE`](kinogaki_geometry::names::SUBDIVISION_HOLE) group
 /// (and, with no boundary, those touching the border) left out; attributes
 /// following as an edit carries them, with no `N` (a subdivision surface
-/// shades by its shape) and the edges a crease keeps sharp through every
-/// level in the [`SHARP`](kinogaki_geometry::names::SHARP) group. Curves and
-/// polylines pass through unchanged. What it can't honour of the setting (a
+/// shades by its shape) and the edges a crease keeps sharp past the last
+/// level, sharp in the limit, in the
+/// [`SHARP`](kinogaki_geometry::names::SHARP) group. Curves and polylines
+/// pass through unchanged. What it can't honour of the setting (a
 /// face-varying rule other than linear, smooth triangles) its documentation
 /// states.
 ///
