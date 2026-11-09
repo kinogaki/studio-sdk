@@ -253,13 +253,16 @@ pub trait RenderEngine: Send {
     fn description(&self) -> &Arc<EngineDescription>;
     /// Queue a batch of scene edits; never blocks.
     fn update(&mut self, update: SceneUpdate);
-    /// Add or change a view (its camera, size or mode).
+    /// Add or change a view (its camera, size or mode). A view added starts
+    /// unpaused; a view changed stays paused or not, as it was.
     fn view(&mut self, view: ViewId, desc: ViewDesc);
     /// Remove a view.
     fn drop_view(&mut self, view: ViewId);
     /// The view's last whole pass.
     fn latest(&self, view: ViewId) -> Option<Arc<ViewPass>>;
-    /// Pause or resume a view's refinement.
+    /// Pause or resume a view's refinement, until told otherwise or the view
+    /// is dropped: a new desc ([`view`](Self::view)) keeps it. A view not
+    /// added yet is left alone (the host pauses it once added).
     fn pause(&mut self, view: ViewId, paused: bool);
     /// Name the view the user works with: after a restart it takes the
     /// first turn. Restarts nothing.
