@@ -545,6 +545,16 @@ impl Library {
         self.by_node.keys().map(String::as_str)
     }
 
+    /// Every node the library defines, by name, in the order it declares
+    /// each one's first definition (stdlib's first).
+    pub fn declared(&self) -> Vec<&str> {
+        let mut nodes: Vec<(usize, &str)> = (self.by_node.iter())
+            .filter_map(|(node, at)| Some((*at.first()?, node.as_str())))
+            .collect();
+        nodes.sort_unstable();
+        nodes.into_iter().map(|(_, node)| node).collect()
+    }
+
     /// Unit `name` (`millimeter`, `degree`): its unit type (`distance`,
     /// `angle`) and its scale against the type's base unit (metres for a
     /// distance, degrees for an angle).

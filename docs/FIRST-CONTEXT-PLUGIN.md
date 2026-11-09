@@ -38,6 +38,7 @@ The pins are **session state**: a `Slot` the package registers. Studio keeps eve
 //! Acme's Pins plugin: a Pin Board object opening into a context with its
 //! own levels, commands, inspector row and Create entry.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
+use kinogaki_studio_api::menu::{Home, Topic, TopicId, topics};
 use kinogaki_studio_api::*;
 use std::sync::Arc;
 use studio_ui_api::host::{Cx, HostSlotsExt, InspectorCx, Waker};
@@ -80,7 +81,7 @@ impl Slot for Pins {
 
 ## 3. The object kind
 
-A context is entered by opening an object whose kind names it. The Pin Board kind is placed in the scene and opens into the pinning context. Its body, the kind's own state, holds nothing here, and saves nothing but its kind. The kind also says how an object level makes its objects (`creations`): Studio lists each in Create, Tab and the A menu by its id, and a new Pin Board opens, ready for pinning. A creation may name a `start`, a node the new object's network holds from the outset (a Mesh object holding a Sphere); a kind lists only what can be made now.
+A context is entered by opening an object whose kind names it. The Pin Board kind is placed in the scene and opens into the pinning context. Its body, the kind's own state, holds nothing here, and saves nothing but its kind. The kind also says how an object level makes its objects (`creations`): Studio lists each in Create, Tab and the A menu by its id at its home (here the object levels' Utility topic), and a new Pin Board opens, ready for pinning. A creation may name a `start`, a node the new object's network holds from the outset (a Mesh object holding a Sphere); a kind lists only what can be made now.
 
 ```rust
 /// A Pin Board's body.
@@ -122,15 +123,16 @@ impl ObjectKindSpec for BoardKind {
         &BoardCodec
     }
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
-        let mut board = KindCreation::new(board().as_str(), "Pin Board");
+        let id = CreationId::declared("example.pins.board");
+        let mut board = KindCreation::new(id, "Pin Board", Home::topic(topics::objects::UTILITY));
         board.aliases = vec!["corkboard".into()];
         board.opens = true;
         vec![board]
     }
-    fn create(&self, id: &str, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
-        (id == board().as_str())
+    fn create(&self, made: &KindCreation, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+        (made.id.as_str() == board().as_str())
             .then(|| self.new_body())
-            .ok_or_else(|| Error::invalid(format_args!("{id} isn't a Pin Board")))
+            .ok_or_else(|| Error::invalid(format_args!("{} isn't a Pin Board", made.id)))
     }
 }
 
@@ -188,16 +190,18 @@ impl UiPackage for PinsUi {
 
 ## 5. The library and the vocabulary
 
-**The library** is what the context offers Studio's menus, as data read once when the package registers: its items (each command, tool or node by its stored name, with its label, family, search words, Tab section and the surfaces that offer it), its keys, its marking menus and shelves, its right-click menu and menu bar entries, how Tab lists its items, and the viewport chrome it takes. Everything has a default; here, two commands in Tab and on right-click.
+**The library** is what the context offers Studio's menus, as data read once when the package registers: its items (each command, tool or node by its stored name, with its label, its home, search words and the surfaces that offer it), its keys, its marking menus and shelves, its right-click menu and menu bar entries, how Tab lists its items, and the viewport chrome it takes. An item of a node type takes the node type's home (`home: None`); any other names one of its context's topics or its package's family. Every surface lists an item on that one path, and a menu entry may hold a whole home as a submenu (`MenuEntry::Home`). Everything has a default; here, two commands in Tab under Pins, and on right-click.
 
 ```rust
-/// Pin and Clear: in Tab, and on right-click.
+/// Pinning networks' one topic: what pins.
+const PINS: TopicId = TopicId::declared("pins");
+
+/// Pin and Clear: in Tab under Pins, and on right-click.
 fn library() -> Library {
     let item = |name: &str, label: &str| VocabularyItem {
         name: name.into(),
         label: label.into(),
-        family: "Pins".into(),
-        section: "Pins".into(),
+        home: Some(Home::topic(PINS)),
         places: Places { nodes: true, menus: true, tools: false, repeatable: false, objects: false },
         ..VocabularyItem::default()
     };
@@ -208,8 +212,6 @@ fn library() -> Library {
                 when: Default::default(),
                 title: "Pins".into(),
                 entries: vec![MenuEntry::Item(PIN.into()), MenuEntry::Item(CLEAR.into())],
-                select: Vec::new(),
-                plain_select: false,
                 browse: "Add…  Tab".into(),
             }],
             bar: Vec::new(),
@@ -322,7 +324,7 @@ The UI is part of the package it belongs to: `with_ui` adds it, and the plugin e
 /// slot and the context's UI.
 pub fn package() -> Package {
     Package::new(PackageId::declared("acme.pins"), "Pins")
-        .with_context(NetworkContext::new(pinning(), "Pins", "pins"))
+        .with_context(NetworkContext::new(pinning(), "Pins", "pins").topics([Topic::new(PINS, "Pins")]))
         .with_object_kind(BoardKind)
         .with_slot::<Pins>()
         .with_ui(PinsUi)

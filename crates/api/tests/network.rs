@@ -74,12 +74,13 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
     let mut registry = Registry::new();
     // Another package's type, which Studio lists the creations with.
     let grow = NodeTypeId::declared("acme.trees.grow");
+    let broadleaf = kinogaki_studio_api::menu::Home::family().group("Broadleaf");
     let oak = NodeCreation::new(
         CreationId::declared("acme.forest.oak"),
         "Oak",
+        broadleaf,
         NewNode::new(grow).named("oak").with("rate", 2.0),
     )
-    .family("Broadleaf")
     .aliases(["quercus"])
     .inside(NewNode::new(grow).displayed());
     let forest = Package::new(PackageId::declared("acme.forest"), "Forest")
@@ -87,6 +88,7 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
         .with_creation(NodeCreation::new(
             CreationId::declared("acme.forest.pine"),
             "Pine",
+            kinogaki_studio_api::menu::Home::family(),
             NewNode::new(grow),
         ));
     registry.register(forest).unwrap();
@@ -94,7 +96,7 @@ fn a_package_adds_ways_to_make_another_packages_nodes() {
     assert_eq!(made[0], &oak);
     assert_eq!(made[1].id.as_str(), "acme.forest.pine");
     assert_eq!(made[1].node.name, None);
-    assert!(made[1].family.is_empty() && made[1].inside.is_empty());
+    assert!(made[1].home.groups.is_empty() && made[1].inside.is_empty());
     assert_eq!(oak.node.name.as_deref(), Some("oak"));
     assert_eq!(oak.node.parameters["rate"], Value::Number(2.0));
     assert!(oak.inside.nodes[0].display);
@@ -419,7 +421,7 @@ fn an_engine_setting_is_never_named_as_a_render_outputs_own() {
     let package =
         Package::new(PackageId::declared("acme.lights"), "Lights").with_engine_description(d);
     assert_refused(
-        Registry::new().register(package),
+        kinogaki_studio_api_testing::core::registry().register(package),
         &["a render output's own"],
     );
 }
@@ -437,12 +439,16 @@ fn an_engines_standard_nodes_and_every_schema_are_checked_at_admission() {
         .map(Into::into)
         .into();
     let fine = base().rebuilt().capabilities(capabilities.clone()).build();
-    assert!(Registry::new().register(package(fine)).is_ok());
+    assert!(
+        kinogaki_studio_api_testing::core::registry()
+            .register(package(fine))
+            .is_ok()
+    );
     // A typo would send every material through translation.
     capabilities.standard_nodes.push("open_pbr_surfce".into());
     let typo = base().rebuilt().capabilities(capabilities).build();
     assert_refused(
-        Registry::new().register(package(typo)),
+        kinogaki_studio_api_testing::core::registry().register(package(typo)),
         &["MaterialX node open_pbr_surfce", "doesn't define"],
     );
     // A default its own kind refuses: a setting, a prim type's value, a
@@ -452,7 +458,7 @@ fn an_engines_standard_nodes_and_every_schema_are_checked_at_admission() {
     let main = || Schema::default().section(Section::new("main", "Main", true));
     let setting = base().rebuilt().settings(main().parameter(wrong())).build();
     assert_refused(
-        Registry::new().register(package(setting)),
+        kinogaki_studio_api_testing::core::registry().register(package(setting)),
         &["render engine acme.lights.engine: gain defaults to a value it refuses"],
     );
     // A row in a section its schema doesn't declare.
@@ -463,7 +469,7 @@ fn an_engines_standard_nodes_and_every_schema_are_checked_at_admission() {
         .settings(Schema::default().parameter(stray))
         .build();
     assert_refused(
-        Registry::new().register(package(setting)),
+        kinogaki_studio_api_testing::core::registry().register(package(setting)),
         &["render engine acme.lights.engine: gain sits in section main, which isn't declared"],
     );
     let mut capabilities = base().capabilities().clone();
@@ -476,7 +482,7 @@ fn an_engines_standard_nodes_and_every_schema_are_checked_at_admission() {
     capabilities.types.push(glow);
     let prim = base().rebuilt().capabilities(capabilities).build();
     assert_refused(
-        Registry::new().register(package(prim)),
+        kinogaki_studio_api_testing::core::registry().register(package(prim)),
         &["prim type acme.lights.glow: gain defaults"],
     );
     let node = NodeDef::new(NodeTypeId::declared("acme.lights.tint"), "Tint", "Color")
@@ -488,7 +494,7 @@ fn an_engines_standard_nodes_and_every_schema_are_checked_at_admission() {
         .materials(vec![node], Arc::new(Plain))
         .build();
     assert_refused(
-        Registry::new().register(package(material)),
+        kinogaki_studio_api_testing::core::registry().register(package(material)),
         &["material node acme.lights.tint: gain defaults"],
     );
 }
@@ -524,7 +530,7 @@ fn an_engines_own_prim_type_is_declared_once_under_its_vendor_and_its_outputs_ar
     let package = |id: &'static str, engine: kinogaki_render_api::EngineDescription| {
         Package::new(PackageId::declared(id), id).with_engine_description(engine)
     };
-    let mut registry = Registry::new();
+    let mut registry = kinogaki_studio_api_testing::core::registry();
     let first = engine_with("acme.glow.engine", "acme.glow.glow", own());
     assert!(registry.register(package("acme.glow", first)).is_ok());
     let again = engine_with("acme.other.engine", "acme.glow.glow", own());
@@ -553,7 +559,7 @@ fn an_engine_id_is_declared_once_under_its_vendor() {
             p.with_engine_description(engine(e))
         })
     };
-    let mut registry = Registry::new();
+    let mut registry = kinogaki_studio_api_testing::core::registry();
     assert!(
         registry
             .register(package("acme.glow", &["acme.glow.engine"]))
@@ -606,5 +612,9 @@ fn a_packages_engine_comes_with_its_description_and_maker() {
     let glow = Package::new(PackageId::declared("acme.glow"), "Glow").with_engine(Glow);
     assert_eq!((glow.engines().len(), glow.makers().len()), (1, 1));
     assert_eq!(glow.makers()[0].description().id(), glow.engines()[0].id());
-    assert!(Registry::new().register(glow).is_ok());
+    assert!(
+        kinogaki_studio_api_testing::core::registry()
+            .register(glow)
+            .is_ok()
+    );
 }

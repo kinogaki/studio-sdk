@@ -3,6 +3,7 @@
 //! and a node type adopted twice.
 use kinogaki_studio_api::cook::{Description, Port};
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
+use kinogaki_studio_api::menu::{Home, topics};
 use kinogaki_studio_api::network::NetworkContext;
 use kinogaki_studio_api::*;
 use std::sync::Arc;
@@ -244,8 +245,8 @@ fn a_context_adopts_a_node_type_once() {
     let import = NodeTypeId::declared("acme.mesh.import");
     let twice = Package::new(trees(), "Trees").with_context(
         context(TREES)
-            .adopts(import, "Model")
-            .adopts(import, "Model"),
+            .adopts(import, Home::topic(topics::IMPORT))
+            .adopts(import, Home::topic(topics::IMPORT)),
     );
     let refused = Err(Error::refused(format_args!(
         "{package}'s {context} adopts {node} twice",
@@ -254,6 +255,7 @@ fn a_context_adopts_a_node_type_once() {
         node = import
     )));
     assert_eq!(Registry::new().register(twice), refused);
-    let once = Package::new(trees(), "Trees").with_context(context(TREES).adopts(import, "Model"));
+    let once = Package::new(trees(), "Trees")
+        .with_context(context(TREES).adopts(import, Home::topic(topics::IMPORT)));
     assert!(Registry::new().register(once).is_ok());
 }

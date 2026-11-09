@@ -214,6 +214,17 @@ fn nodes_resolve_as_materialx_resolves_them() {
     assert_eq!(resolved("image", "color3", &[("nope", "float")]), None);
 }
 
+#[test]
+fn nodes_are_declared_in_library_order_each_once() {
+    let library = library();
+    let declared = library.declared();
+    assert_eq!(declared.len(), library.nodes().count());
+    let at = |node: &str| declared.iter().position(|n| *n == node).unwrap();
+    // stdlib before pbrlib.
+    assert!(at("image") < at("open_pbr_surface"), "{declared:?}");
+    assert!(at("surfacematerial") < at("oren_nayar_diffuse_bsdf"));
+}
+
 /// MaterialX's own and Kinogaki's documents read in at most 10 ms (an M4
 /// Max, release), once a process.
 #[test]

@@ -92,6 +92,7 @@ pub use settings::{PageRows, SettingsPage};
 pub use view::{Holds, KeyPress};
 
 use crate::host::{Cx, Waker};
+use kinogaki_studio_api::menu::ItemHome;
 use kinogaki_studio_api::{ContextId, Package, PackageUi};
 use std::any::Any;
 use std::fmt;
@@ -226,7 +227,8 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
 pub trait WithUi {
     /// With UI `ui`: its contexts read once and its state's type erased.
     /// The registry checks its contexts' ids like the package's others
-    /// (under the package's vendor, each given parts by one package).
+    /// (under the package's vendor, each given parts by one package) and
+    /// its items' homes like its offerings'.
     fn with_ui(self, ui: impl UiPackage) -> Self;
 }
 
@@ -234,6 +236,16 @@ impl WithUi for Package {
     fn with_ui(self, ui: impl UiPackage) -> Self {
         let registered = hosting::Registered::new(ui);
         let contexts = registered.contexts.iter().map(|c| c.id).collect();
-        self.with_package_ui(PackageUi::new(contexts, registered))
+        let items = (registered.contexts.iter())
+            .flat_map(|c| {
+                (c.library.items.iter()).map(|i| ItemHome {
+                    context: c.id,
+                    item: i.name.clone(),
+                    home: i.home.clone(),
+                    objects: i.places.objects,
+                })
+            })
+            .collect();
+        self.with_package_ui(PackageUi::new(contexts, items, registered))
     }
 }

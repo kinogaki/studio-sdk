@@ -5,6 +5,7 @@ use crate::Key;
 use crate::cook::Outputs;
 use crate::data::Data;
 use crate::id::{CreationId, NodeTypeId};
+use crate::menu::Home;
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
 use kinogaki_geometry::Time;
@@ -463,8 +464,8 @@ impl TryFrom<&NetworkSeed> for kinogaki_render_api::MaterialNetwork {
 /// of an engine's preset). A package declares it
 /// ([`Package::with_creation`](crate::Package::with_creation)) for any
 /// installed node type, its own or another package's. Studio lists it
-/// wherever `node.node_type` is listed, in that type's section, and makes
-/// it in one undo step.
+/// wherever `node.node_type` is offered, at its own home, and makes it in
+/// one undo step.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeCreation {
     /// Its item id, which menus, keys and shelves name it by, under its
@@ -472,8 +473,9 @@ pub struct NodeCreation {
     pub id: CreationId,
     /// What menus call it ("Glass").
     pub label: String,
-    /// Its family within its type's section; empty: its type's family.
-    pub family: String,
+    /// Its home wherever its node type is offered (an engine's preset in
+    /// its family).
+    pub home: Home,
     /// More words search finds it by.
     pub aliases: Vec<String>,
     /// The node made; `name` `None` names it after `label`.
@@ -485,22 +487,17 @@ pub struct NodeCreation {
 }
 
 impl NodeCreation {
-    /// Creation `id` called `label`, making `node` with an empty inside.
-    pub fn new(id: CreationId, label: impl Into<String>, node: NewNode) -> Self {
+    /// Creation `id` called `label` at `home`, making `node` with an empty
+    /// inside.
+    pub fn new(id: CreationId, label: impl Into<String>, home: Home, node: NewNode) -> Self {
         Self {
             id,
             label: label.into(),
-            family: String::new(),
+            home,
             aliases: Vec::new(),
             node,
             inside: NetworkSeed::default(),
         }
-    }
-
-    /// Listed in `family` within its type's section.
-    pub fn family(mut self, family: impl Into<String>) -> Self {
-        self.family = family.into();
-        self
     }
 
     /// Found by search under `aliases` too.

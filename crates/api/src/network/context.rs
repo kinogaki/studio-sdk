@@ -1,5 +1,6 @@
 //! [`NetworkContext`]: a context's networks, declared as data.
 use crate::id::{ContextId, NodeTypeId};
+use crate::menu::{Home, Topic, TopicId, topics};
 
 /// A context whose objects hold networks of core's one node shape (a
 /// package's `kinogaki.mesh.network`): how they evaluate, the flags their
@@ -10,13 +11,18 @@ use crate::id::{ContextId, NodeTypeId};
 ///
 /// ```
 /// use kinogaki_studio_api::{ContextId, NodeTypeId};
+/// use kinogaki_studio_api::menu::{Home, Topic, TopicId};
 /// use kinogaki_studio_api::network::{Flag, Flags, NetworkContext, NetworkKind};
+/// let model = TopicId::declared("model");
 /// let import = NodeTypeId::declared("acme.mesh.import");
 /// let context = NetworkContext::new(ContextId::declared("acme.trees.network"), "Trees", "trees")
 ///     .flags(Flags::ALL)
-///     .adopts(import, "Model");
+///     .topics([Topic::new(model, "Model")])
+///     .adopts(import, Home::topic(model));
 /// assert!(context.kind == NetworkKind::Chain && context.flags.contains(Flag::Frozen));
-/// assert_eq!((context.adopts[0].node_type, context.adopts[0].section.as_str()), (import, "Model"));
+/// assert_eq!(context.adopts[0].home, Home::topic(model));
+/// let labels: Vec<String> = context.listed_topics().into_iter().map(|t| t.label).collect();
+/// assert_eq!(labels, ["Model", "Import"]);
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct NetworkContext {
@@ -34,8 +40,12 @@ pub struct NetworkContext {
     pub storage: NetworkStorage,
     /// How its nodes are drawn in the network pane.
     pub layout: NodeLayout,
-    /// Other packages' node types its networks offer too, each listed under
-    /// a section of this context's (a trees context's networks taking a mesh
+    /// Its networks' own topics, in order: the top-level submenus its
+    /// offerings and others' list under ([`listed_topics`](Self::listed_topics)
+    /// adds core's).
+    pub topics: Vec<Topic>,
+    /// Other packages' node types its networks offer too, each at a home
+    /// of this context's (a trees context's networks taking a mesh
     /// package's Import).
     pub adopts: Vec<Adopted>,
     /// Its networks' results show on the 2D canvas, not in the views: the
@@ -64,8 +74,8 @@ pub enum NetworkKind {
 pub struct Adopted {
     /// The node type (`kinogaki.mesh.import`).
     pub node_type: NodeTypeId,
-    /// The heading Tab lists it under in this context ("Model").
-    pub section: String,
+    /// Its home in this context's networks, in place of its own listing's.
+    pub home: Home,
 }
 
 impl NetworkContext {
@@ -82,25 +92,51 @@ impl NetworkContext {
                 element: element.into(),
             },
             layout: NodeLayout::Vertical,
+            topics: Vec::new(),
             adopts: Vec::new(),
             canvas: false,
         }
     }
 
-    /// Offering `node_type`, another package's, listed under `section`.
-    pub fn adopts(mut self, node_type: NodeTypeId, section: impl Into<String>) -> Self {
-        self.adopts.push(Adopted {
-            node_type,
-            section: section.into(),
-        });
+    /// Its own topics `topics`, in order. Naming core's Import or Loops
+    /// ([`topics::import`], [`topics::loops`]) places them there.
+    pub fn topics(mut self, topics: impl IntoIterator<Item = Topic>) -> Self {
+        self.topics = topics.into_iter().collect();
         self
     }
 
-    /// Offering core's loops (For Each, Loop Input): a context whose
-    /// networks carry geometry and cook.
+    /// Offering `node_type`, another package's, at `home`.
+    pub fn adopts(mut self, node_type: NodeTypeId, home: Home) -> Self {
+        self.adopts.push(Adopted { node_type, home });
+        self
+    }
+
+    /// Offering core's loops (For Each, Loop Input) under Loops: a context
+    /// whose networks carry geometry and cook.
     pub fn with_loops(self) -> Self {
         let loops = crate::cook::LOOPS.map(NodeTypeId::declared);
-        (loops.into_iter()).fold(self, |context, id| context.adopts(id, "Loops"))
+        (loops.into_iter()).fold(self, |context, id| {
+            context.adopts(id, Home::topic(topics::LOOPS))
+        })
+    }
+
+    /// The topics its networks list, in order: its own, then core's Loops
+    /// (when it takes loops) and Import, unless it placed them among its
+    /// own.
+    pub fn listed_topics(&self) -> Vec<Topic> {
+        let named = |id: TopicId| self.topics.iter().any(|t| t.id == id);
+        let loops = self
+            .adopts
+            .iter()
+            .any(|a| a.home.topic == Some(topics::LOOPS));
+        let mut out = self.topics.clone();
+        if loops && !named(topics::LOOPS) {
+            out.push(topics::loops());
+        }
+        if !named(topics::IMPORT) {
+            out.push(topics::import());
+        }
+        out
     }
 
     /// Its nodes drawn as `layout` says.

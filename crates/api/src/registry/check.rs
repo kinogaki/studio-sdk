@@ -4,10 +4,9 @@ use crate::Error;
 use crate::cook::SPARE;
 use crate::id::{ContextId, DataTypeId, NodeTypeId, PackageId};
 use crate::network::Evaluation;
-use crate::object::{CreateCx, ObjectKindSpec};
 use crate::package::Package;
 use crate::params::{Schema, ValueKind};
-use kinogaki_render_api::{Engines, aov};
+use kinogaki_render_api::aov;
 use std::collections::BTreeSet;
 
 /// Id `text` `package` declares as an id's text, when well formed (a
@@ -37,7 +36,9 @@ impl Registry {
     /// types are any engine's) and the standard outputs it declares are the
     /// standard ones, and every schema it declares (its node types'
     /// parameters, its engines' settings, prim types and material nodes) is
-    /// whole ([`Schema::check`]). Changes nothing.
+    /// whole ([`Schema::check`]), and every home it names fits where it is
+    /// listed (`check_homes`: a topic of each place it reaches, or its own
+    /// family, which core has none of). Changes nothing.
     pub fn check(&self, package: &Package) -> Result<(), Error> {
         let id = package.id;
         if self.packages.iter().any(|(p, _)| *p == id) {
@@ -125,22 +126,6 @@ impl Registry {
                 owner(self.object_kinds.get(&k.id())),
             )?;
         }
-        // Creations, under the same rule. A kind's are those it makes with
-        // no engine installed; the rest are named by the engines' own
-        // types.
-        let engines = Engines::new(Vec::new());
-        let cx = CreateCx::new(&engines);
-        let made = |k: &dyn ObjectKindSpec| k.creations(&cx).into_iter().map(|c| c.id);
-        for text in package.object_kinds.iter().flat_map(|k| made(&**k)) {
-            let first = (self.object_kinds.values())
-                .find(|e| made(&*e.item).any(|t| t == text))
-                .map(|e| e.package);
-            declare("object creation", text.as_str(), first)?;
-        }
-        for c in &package.creations {
-            let first = self.creations.iter().find(|e| e.item.id == c.id);
-            declare("node creation", c.id.as_str(), owner(first))?;
-        }
         for e in &package.engines {
             let first = self.engines.get(&e.id()).copied();
             declare("render engine", declared_id(id, e.id().as_str())?, first)?;
@@ -184,6 +169,17 @@ impl Registry {
             for def in e.node_defs() {
                 schema(id, &format!("material node {}", def.id), &def.schema())?;
             }
+        }
+        // Object creations, under the same rule, after the engines (an
+        // engine's Render Output is one): its kinds' (made with every engine
+        // registered and its own) and its creations of others' kinds.
+        for c in self.object_creations(package)? {
+            let first = self.object_creation_ids.get(&c.id).copied();
+            declare("object creation", c.id.as_str(), first)?;
+        }
+        for c in &package.creations {
+            let first = self.creations.iter().find(|e| e.item.id == c.id);
+            declare("node creation", c.id.as_str(), owner(first))?;
         }
         for f in &package.formats {
             declare("format", f.id().as_str(), owner(self.formats.get(&f.id())))?;
@@ -248,7 +244,8 @@ impl Registry {
         self.check_names(package)?;
         self.check_compilers(package)?;
         self.check_insides(package)?;
-        self.check_references(package)
+        self.check_references(package)?;
+        self.check_homes(package)
     }
 
     /// Every context `package` names is declared, by it or before it

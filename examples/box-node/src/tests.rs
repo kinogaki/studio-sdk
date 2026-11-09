@@ -43,20 +43,15 @@ fn the_package_registers() {
     );
 }
 
-/// Where Studio offers the node: in Boxes networks, Tab's Create section.
+/// Where Studio offers the node: in Boxes networks, under their Create
+/// topic.
 #[test]
 fn the_node_is_listed_in_its_context() {
     let description = BoxNode.description();
     assert_eq!(description.contexts, [network()]);
     let listing = description.listing.expect("listed in Tab");
-    assert_eq!(
-        (
-            listing.section.as_str(),
-            listing.category,
-            listing.family.as_str()
-        ),
-        ("Create", Category::Create, "Primitives")
-    );
+    let create = kinogaki_studio_api::menu::Home::topic(CREATE);
+    assert_eq!((listing.home, listing.category), (create, Category::Create));
 }
 
 /// The node in a Boxes object's network, added and edited the way Tab and
@@ -277,20 +272,10 @@ fn boxes_are_made_empty_or_holding_a_box() {
             ),
         ]
     );
-    assert_eq!(
-        kind.create(
-            kinogaki_studio_api::CreationId::declared("example.boxes.box_node"),
-            &cx
-        )
-        .unwrap()
-        .kind(),
-        boxes()
-    );
-    assert!(
-        kind.create(
-            kinogaki_studio_api::CreationId::declared("example.pins.board"),
-            &cx
-        )
-        .is_err()
-    );
+    let made = kind.creations(&cx);
+    assert_eq!(kind.create(&made[1], &cx).unwrap().kind(), boxes());
+    let board = kinogaki_studio_api::CreationId::declared("example.pins.board");
+    let home = kinogaki_studio_api::menu::Home::family();
+    let elsewhere = KindCreation::new(board, "Pin Board", home);
+    assert!(kind.create(&elsewhere, &cx).is_err());
 }

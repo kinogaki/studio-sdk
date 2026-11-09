@@ -5,6 +5,7 @@
 //! handles from it.
 use super::handle::Handle;
 use crate::id::{ContextId, DataTypeId};
+use crate::menu::Home;
 use crate::params::Schema;
 use kinogaki_value::Condition;
 
@@ -179,41 +180,35 @@ impl Description {
         self.inside.or(self.inside_own.then_some(here))
     }
 
-    /// Listed in Tab, menus and shelves under `section` ("Filter", its
-    /// tile colored as `category`), in `family` within it, found by search
-    /// under its label and `aliases` too (other applications' names).
-    pub fn listed(
-        mut self,
-        section: impl Into<String>,
-        category: Category,
-        family: impl Into<String>,
-        aliases: &[&str],
-    ) -> Self {
+    /// Listed in Tab, menus and shelves at `home` (its tile colored as
+    /// `category`), found by search under its label and `aliases` too
+    /// (other applications' names). Its home names a topic of every
+    /// network it is offered in (core adds Import to every one), or its
+    /// package's family.
+    pub fn listed(mut self, home: Home, category: Category, aliases: &[&str]) -> Self {
         self.listing = Some(Listing {
-            section: section.into(),
+            home,
             category,
-            family: family.into(),
             aliases: aliases.iter().map(|&a| a.to_owned()).collect(),
         });
         self
     }
 }
 
-/// Where Tab lists a node type, and its tile's color.
+/// Where Tab and the menus list a node type, and its tile's color.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Listing {
-    /// Its heading in Tab ("Filter").
-    pub section: String,
+    /// Its home in the networks it is offered in (a context adopting it
+    /// names its own, [`Adopted`](crate::network::Adopted)).
+    pub home: Home,
     /// What it does, as its tile's color says.
     pub category: Category,
-    /// Its family within the section ("Blur").
-    pub family: String,
     /// More words search finds it by.
     pub aliases: Vec<String>,
 }
 
-/// What a node does, as its tile's color says; every context's sections
-/// map onto these.
+/// What a node does, as its tile's color says (nothing about where it is
+/// listed).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Category {
     /// Makes something from nothing (a primitive, a render's image).
@@ -403,14 +398,17 @@ mod tests {
 
     #[test]
     fn a_listed_type_says_where_tab_shows_it() {
-        let blur =
-            Description::new("Blur").listed("Filter", Category::Modify, "Blur", &["Defocus"]);
+        let filter = crate::menu::topics::comp::FILTER;
+        let blur = Description::new("Blur").listed(
+            Home::topic(filter).group("Blur"),
+            Category::Modify,
+            &["Defocus"],
+        );
         assert_eq!(
             blur.listing,
             Some(Listing {
-                section: "Filter".into(),
+                home: Home::topic(filter).group("Blur"),
                 category: Category::Modify,
-                family: "Blur".into(),
                 aliases: vec!["Defocus".into()],
             })
         );

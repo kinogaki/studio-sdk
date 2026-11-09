@@ -14,7 +14,8 @@
 use crate::codec::ObjectCodec;
 use crate::data::Data;
 use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
-use crate::{Diagnostic, Error};
+use crate::menu::Home;
+use crate::{Diagnostic, Error, Parameters};
 use kinogaki_render_api::{Declared, Engines};
 use std::any::Any;
 use std::fmt::Debug;
@@ -123,38 +124,50 @@ pub trait ObjectKindSpec: Send + Sync {
     }
 
     /// The ways an object level makes this kind's objects now (a Light of
-    /// each type its engine renders; a Pin Board), each listed in
-    /// Create, Tab and the A menu by its id. Only what can be made now is
-    /// listed (what doesn't apply is hidden); a kind that stays at the root
-    /// ([`at_root`](Self::at_root)) is listed only there. None by default:
-    /// the kind isn't offered.
+    /// each type an installed engine renders; a Pin Board), each listed in
+    /// Create, Tab and the A menu at its home by its id. Only what can be
+    /// made now is listed (what doesn't apply is hidden); a kind that stays
+    /// at the root ([`at_root`](Self::at_root)) is listed only there. Other
+    /// packages may add creations of it
+    /// ([`Package::with_object_creation`](crate::Package::with_object_creation)).
+    /// None by default.
     fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
         let _ = cx;
         Vec::new()
     }
 
-    /// A new body for creation `id` (one of [`creations`](Self::creations)'),
+    /// A new body as `creation` makes one (one of
+    /// [`creations`](Self::creations)', or another package's of this kind),
     /// which Studio adds selected, holding its creation's start and opened
     /// as it says, in one undo step; `Err` with why it can't be made now
     /// (a key or shelf naming a creation that is no longer offered).
-    fn create(&self, id: CreationId, cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+    fn create(
+        &self,
+        creation: &KindCreation,
+        cx: &CreateCx<'_>,
+    ) -> Result<Arc<dyn ObjectBody>, Error> {
         let _ = cx;
-        Err(Error::invalid(format_args!("{id} isn't made here")))
+        Err(Error::invalid(format_args!(
+            "{} isn't made here",
+            creation.id
+        )))
     }
 }
 
 /// One way an object level makes a kind's objects
-/// ([`ObjectKindSpec::creations`]).
+/// ([`ObjectKindSpec::creations`],
+/// [`Package::with_object_creation`](crate::Package::with_object_creation)).
 #[derive(Clone, Debug, PartialEq)]
 pub struct KindCreation {
-    /// Its item id, which menus, keys and shelves name it by
-    /// (`acme.ray.spot_light`, `example.pins.board`).
+    /// Its item id, which menus, keys and shelves name it by, under its
+    /// declaring package's vendor (`acme.ray.spot_light`,
+    /// `example.pins.board`).
     pub id: CreationId,
     /// What menus call it ("Spot Light").
     pub label: String,
-    /// The menus' family it is listed in ("Lights", "Primitives"); empty:
-    /// with the other object kinds.
-    pub family: String,
+    /// Its home at the object levels ([`topics::objects`](crate::menu::topics::objects)
+    /// or its declaring package's family).
+    pub home: Home,
     /// More words search finds it by (other applications' names).
     pub aliases: Vec<String>,
     /// The new object opens, ready for its first node.
@@ -162,27 +175,23 @@ pub struct KindCreation {
     /// The node its network starts with, displayed (a Mesh object holding
     /// a Sphere); `None`: it starts empty.
     pub start: Option<NodeTypeId>,
-    /// Where menus list it: by family (each family where its lowest member
-    /// is), then by this, lowest first; equal values keep install order.
-    /// Studio's own creations use negative values (Mesh −1000 … lights
-    /// −600) and Mesh's primitives 100 and up, so a plugin's
-    /// creation, 0 by default, lists after Studio's objects and before the
-    /// primitives unless it says otherwise.
-    pub order: i32,
+    /// What its kind makes the body from beyond its id (an engine's Render
+    /// Output names the engine, [`render::ENGINE`](crate::render::ENGINE));
+    /// the kind reads them in [`ObjectKindSpec::create`].
+    pub values: Parameters,
 }
 
 impl KindCreation {
-    /// Creation `id` called `label`, with the other kinds, starting empty,
-    /// not opening, at order 0.
-    pub fn new(id: CreationId, label: impl Into<String>) -> Self {
+    /// Creation `id` called `label` at `home`, starting empty, not opening.
+    pub fn new(id: CreationId, label: impl Into<String>, home: Home) -> Self {
         Self {
             id,
             label: label.into(),
-            family: String::new(),
+            home,
             aliases: Vec::new(),
             opens: false,
             start: None,
-            order: 0,
+            values: Parameters::new(),
         }
     }
 }

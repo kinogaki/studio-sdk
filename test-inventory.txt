@@ -352,6 +352,7 @@ kinogaki-mtlx/lib test library::tests::an_inheriting_definition_holds_its_parent
 kinogaki-mtlx/lib test library::tests::every_graph_implementation_resolves_and_type_checks
 kinogaki-mtlx/lib test library::tests::kinogakis_definitions_travel_as_the_materialx_ones_they_inherit
 kinogaki-mtlx/lib test library::tests::kinogakis_gltf_images_read_their_wraps_in_gltfs_order
+kinogaki-mtlx/lib test library::tests::nodes_are_declared_in_library_order_each_once
 kinogaki-mtlx/lib test library::tests::nodes_resolve_as_materialx_resolves_them
 kinogaki-mtlx/lib test library::tests::the_library_reads_every_definition
 kinogaki-mtlx/lib test library::tests::units_are_the_unit_definitions
@@ -492,6 +493,7 @@ kinogaki-studio-api/doc test crates/api/src/format/materialx/mod.rs - format::ma
 kinogaki-studio-api/doc test crates/api/src/format/options.rs - format::options
 kinogaki-studio-api/doc test crates/api/src/format/unique.rs - format::unique::Unique
 kinogaki-studio-api/doc test crates/api/src/kernel.rs - kernel
+kinogaki-studio-api/doc test crates/api/src/menu.rs - menu
 kinogaki-studio-api/doc test crates/api/src/network/context.rs - network::context::NetworkContext
 kinogaki-studio-api/doc test crates/api/src/package.rs - package::Package
 kinogaki-studio-api/doc test crates/api/src/standard/brep/mod.rs - standard::brep::BrepCodec
@@ -508,6 +510,11 @@ kinogaki-studio-api/doc test crates/api/src/standard/mod.rs - standard
 kinogaki-studio-api/doc test crates/api/src/standard/output.rs - standard::output::DisplayOutput
 kinogaki-studio-api/doc test crates/api/src/standard/quality.rs - standard::quality::DisplayQuality
 kinogaki-studio-api/doc test crates/api/src/viewport.rs - viewport::Surface::polygons
+kinogaki-studio-api/homes test a_home_names_a_topic_of_every_place_its_offering_is_listed_at
+kinogaki-studio-api/homes test a_node_types_item_takes_its_home_and_any_other_names_its_own
+kinogaki-studio-api/homes test an_engines_render_output_is_a_creation_of_cores_kind_in_its_family
+kinogaki-studio-api/homes test core_has_no_family_and_no_group_is_blank
+kinogaki-studio-api/homes test two_families_never_share_a_label
 kinogaki-studio-api/image_codec test a_live_layer_saves_its_result_and_held_pixels_are_refused
 kinogaki-studio-api/image_codec test an_image_round_trips_byte_exact_and_sparse_stays_sparse
 kinogaki-studio-api/image_codec test every_color_tag_and_sample_round_trips
@@ -579,6 +586,8 @@ kinogaki-studio-api/lib test format::unique::tests::file_names_number_before_the
 kinogaki-studio-api/lib test format::unique::tests::many_alike_take_linear_time
 kinogaki-studio-api/lib test image_files::tests::an_image_node_reads_its_file_its_embedded_bytes_or_a_result
 kinogaki-studio-api/lib test kernel::tests::a_run_refuses_values_its_rows_dont_take
+kinogaki-studio-api/lib test menu::tests::a_topic_id_is_one_lowercase_word
+kinogaki-studio-api/lib test menu::tests::core_places_topics_are_unique_and_in_order
 kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_through_its_lookup
 kinogaki-studio-api/lib test network::edit::tests::a_compiled_material_seeds_its_nodes_and_an_image_node_an_image
 kinogaki-studio-api/lib test network::edit::tests::a_seed_makes_the_material_it_starts
@@ -588,7 +597,7 @@ kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_light_is_a_
 kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_lights_rows_take_only_what_its_codec_reads
 kinogaki-studio-api/lib test render::lights::kind::tests::an_atmosphere_is_one_type_at_the_root
 kinogaki-studio-api/lib test render::lights::kind::tests::an_object_round_trips_keeping_what_its_type_doesnt_declare
-kinogaki-studio-api/lib test render::lights::kind::tests::creations_are_the_kinds_types_under_its_prefix
+kinogaki-studio-api/lib test render::lights::kind::tests::creations_are_the_kinds_types_an_engine_renders_under_its_prefix
 kinogaki-studio-api/lib test render::lights::value::tests::a_value_is_unplaced_and_keeps_its_image_file
 kinogaki-studio-api/lib test render::lights::value::tests::an_unknown_type_or_emission_is_refused
 kinogaki-studio-api/lib test render::lights::value::tests::every_shape_saves_and_reads_back

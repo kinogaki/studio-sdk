@@ -1,9 +1,11 @@
-//! [`DeclaredKind`]: an engine's own object kind whose objects are prims of
-//! the types it declares: its lights (placed, one kind whatever the light
-//! is) or its atmosphere (fog, at the root). Each engine brings its own
-//! (`acme.ray.light`), so a scene's lights belong to the engine that made
-//! them; core syncs them through [`RenderedKind`] to whichever engine
-//! renders, filled out with that engine's schema.
+//! [`DeclaredKind`]: an object kind whose objects are prims of declared
+//! types: lights (placed, one kind whatever the light is) or an atmosphere
+//! (fog, at the root). Core's are of the standard types (UsdLux's lights,
+//! the standard fog), which every engine renders; an engine's own holds the
+//! types only it has (Pixel's Rim Light). Core syncs an object through
+//! [`RenderedKind`] to whichever engine renders, filled out with that
+//! engine's schema of its type. A type is offered while an installed engine
+//! renders it.
 //!
 //! An object holds one prim: its type (one of the kind's) and every value it
 //! holds, written back as read. A light of a standard type gives its light as
@@ -20,6 +22,7 @@ use super::view as light_view;
 use crate::cook::Handle;
 use crate::element::{self, ElementReader, ElementWriter, Field};
 use crate::facets::Glyphs;
+use crate::menu::Home;
 use crate::{
     Adoption, ContextId, CreateCx, CreationId, Data, DataTypeId, Diagnostic, Error, KindCreation,
     ObjectBody, ObjectCodec, ObjectKindId, ObjectKindSpec, Parameters, ReadCx, RenderedKind, Value,
@@ -31,11 +34,6 @@ use std::sync::Arc;
 
 /// The element holding a prim's values.
 const VALUES: &str = "values";
-
-/// Where menus list lights (after Camera, before Render Output) and
-/// atmospheres (after Render Output).
-const LIGHTS_ORDER: i32 = -600;
-const ATMOSPHERE_ORDER: i32 = -400;
 
 /// An object of a [`DeclaredKind`]: its prim, unplaced.
 #[derive(Debug)]
@@ -50,13 +48,13 @@ impl ObjectBody for DeclaredBody {
     }
 }
 
-/// An engine's kind of objects that are prims of its declared types (see
-/// the module docs).
+/// A kind of objects that are prims of declared types (see the module
+/// docs).
 pub struct DeclaredKind {
     id: ObjectKindId,
     label: String,
     icon: &'static str,
-    family: String,
+    home: Home,
     role: Role,
     types: Vec<PrimType>,
 }
@@ -87,15 +85,15 @@ fn aliases(ty: &PrimType) -> &'static [&'static str] {
 }
 
 impl DeclaredKind {
-    /// An engine's lights: kind `id`, placed objects of one of `types` (its
-    /// light-role types; others are left out), listed under `family`. A new
-    /// one is of the first type at its defaults.
-    pub fn lights(id: ObjectKindId, family: &str, types: Vec<PrimType>) -> Self {
+    /// Lights: kind `id`, placed objects of one of `types` (its light-role
+    /// types; others are left out), each type and its presets listed at
+    /// `home`. A new one is of the first type at its defaults.
+    pub fn lights(id: ObjectKindId, home: Home, types: Vec<PrimType>) -> Self {
         Self {
             id,
             label: "Light".into(),
             icon: "light-area",
-            family: family.into(),
+            home,
             role: Role::Light,
             types: types
                 .into_iter()
@@ -104,14 +102,14 @@ impl DeclaredKind {
         }
     }
 
-    /// An engine's atmosphere of type `ty` (its fog): kind `id`, objects at
-    /// the scene's root, named as the type is.
-    pub fn atmosphere(id: ObjectKindId, ty: PrimType) -> Self {
+    /// An atmosphere of type `ty` (fog): kind `id`, objects at the scene's
+    /// root, named as the type is, listed at `home`.
+    pub fn atmosphere(id: ObjectKindId, home: Home, ty: PrimType) -> Self {
         Self {
             id,
             label: ty.label.to_string(),
             icon: "ghosted",
-            family: String::new(),
+            home,
             role: Role::Atmosphere,
             types: vec![ty],
         }
@@ -246,22 +244,16 @@ impl ObjectKindSpec for DeclaredKind {
     fn handles(&self, body: &dyn ObjectBody) -> Vec<Handle> {
         (self.prim(body)).map_or_else(Vec::new, light_view::handles)
     }
-    fn creations(&self, _: &CreateCx<'_>) -> Vec<KindCreation> {
-        let order = if self.of_lights() {
-            LIGHTS_ORDER
-        } else {
-            ATMOSPHERE_ORDER
-        };
+    /// Each type an installed engine renders, followed by its presets.
+    fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
         let made = |name: &str, label: &str, aliases: &[&str]| {
-            let mut made = KindCreation::new(self.creation_named(name)?, label);
-            made.family = self.family.clone();
+            let mut made = KindCreation::new(self.creation_named(name)?, label, self.home.clone());
             made.aliases = aliases.iter().map(|&a| a.to_owned()).collect();
-            made.order = order;
             Some(made)
         };
-        // Each type, followed by the presets of it.
+        let rendered = |ty: &&PrimType| cx.engines().iter().any(|e| e.prim_type(ty.id).is_some());
         let presets = self.presets();
-        (self.types.iter())
+        (self.types.iter().filter(rendered))
             .flat_map(|ty| {
                 let own = (presets.iter()).filter(move |(_, of)| of.id == ty.id);
                 let presets = own.map(|(p, _)| made(p.name, p.label, p.aliases));
@@ -272,7 +264,8 @@ impl ObjectKindSpec for DeclaredKind {
             .flatten()
             .collect()
     }
-    fn create(&self, id: CreationId, _: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+    fn create(&self, made: &KindCreation, _: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+        let id = made.id;
         let refused = || Error::invalid(format_args!("{} makes no {id}", self.label));
         let prim = match (self.types.iter()).find(|ty| self.creation_of(ty) == Some(id)) {
             Some(ty) => Declared::new(ty.id, ty.schema().values()),

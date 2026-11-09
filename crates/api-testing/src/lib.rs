@@ -1,5 +1,6 @@
 //! The SDK's test support (a dev-dependency only): [`assert_refused`] for
-//! admission tests, [`read_hostile`] for a format's tests of hostile files,
+//! admission tests and a stand-in for core's package to be admitted beside
+//! ([`core`](mod@core): its contexts' topics, its Render Output kind), [`read_hostile`] for a format's tests of hostile files,
 //! [`format`](mod@format) for its scratch folders and round trips, [`workers`] as a host
 //! installs them,
 //! with `wgpu` an engine's GPU tests' device, their turns
@@ -25,6 +26,7 @@
 mod brep;
 mod checks;
 mod colors;
+pub mod core;
 #[cfg(feature = "wgpu")]
 pub mod engine;
 mod fixtures;

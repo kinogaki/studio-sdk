@@ -9,6 +9,7 @@
 //! [`Registry::register`]) and turns a refusal into a plugin it doesn't
 //! load, never a crash.
 mod check;
+mod homes;
 
 use crate::Error;
 use crate::cook::NodeType;
@@ -16,7 +17,8 @@ use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
 use crate::id::{
-    ContextId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId, StoredId,
+    ContextId, CreationId, DataTypeId, FormatId, NodeTypeId, ObjectKindId, PackageId, SlotId,
+    StoredId,
 };
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
@@ -24,7 +26,7 @@ use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::SessionSlot;
 use crate::subdivider::Subdivider;
-use kinogaki_render_api::{EngineId, PrimTypeId, standard};
+use kinogaki_render_api::{EngineDescription, EngineId, PrimTypeId, standard};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
@@ -87,6 +89,13 @@ pub struct Registry {
     ui_contexts: BTreeMap<ContextId, PackageId>,
     /// The package describing each render engine, by engine id.
     engines: BTreeMap<EngineId, PackageId>,
+    /// The render engines' descriptions, in registration order: what the
+    /// object creations of their prim types are checked with.
+    engine_descriptions: Vec<Arc<EngineDescription>>,
+    /// The packages listing anything in their family, by label.
+    families: BTreeMap<String, PackageId>,
+    /// The package declaring each object creation.
+    object_creation_ids: BTreeMap<CreationId, PackageId>,
     /// The package declaring each engine's own prim type (the standard
     /// types are every engine's).
     prim_types: BTreeMap<PrimTypeId, PackageId>,
@@ -103,6 +112,12 @@ impl Registry {
     pub fn register(&mut self, package: Package) -> Result<(), Error> {
         self.check(&package)?;
         let id = package.id;
+        if self.has_family(&package) {
+            self.families.insert(package.label.clone(), id);
+        }
+        for c in self.object_creations(&package)? {
+            self.object_creation_ids.insert(c.id, id);
+        }
         self.holds.extend(
             check::holds(&package)
                 .into_iter()
@@ -159,6 +174,7 @@ impl Registry {
         }
         for engine in package.engines {
             self.engines.insert(engine.id(), id);
+            self.engine_descriptions.push(engine.clone());
             for ty in (engine.capabilities().types.iter()).filter(|t| !standard_type(t.id)) {
                 self.prim_types.insert(ty.id, id);
             }

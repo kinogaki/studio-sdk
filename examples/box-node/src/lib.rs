@@ -17,6 +17,7 @@
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
 use kinogaki_studio_api::geometry::Column;
+use kinogaki_studio_api::menu::{Home, Topic, TopicId, topics};
 use kinogaki_studio_api::network::Flags;
 use kinogaki_studio_api::params::{Number, Parameter};
 use kinogaki_studio_api::*;
@@ -230,7 +231,7 @@ impl NodeType for BoxNode {
         Description::new("Box")
             .icon("cube")
             .context(network())
-            .listed("Create", Category::Create, "Primitives", &["cube"])
+            .listed(Home::topic(CREATE), Category::Create, &["cube"])
             .output(Port::new("box", "Box", BOX.id()))
             .parameters(
                 Schema::default()
@@ -278,6 +279,14 @@ impl ObjectBody for BoxesBody {
 /// The Box node's id.
 const BOX_NODE: &str = "example.boxes.box_node";
 
+/// The empty Boxes object's creation.
+fn boxes_creation() -> CreationId {
+    CreationId::declared("example.boxes.boxes")
+}
+
+/// Boxes networks' one topic: what makes a box.
+const CREATE: TopicId = TopicId::declared("create");
+
 /// Boxes objects: placed in the scene, each holding a Boxes network whose
 /// box it shows.
 struct BoxesKind;
@@ -307,19 +316,24 @@ impl ObjectKindSpec for BoxesKind {
     fn codec(&self) -> &dyn ObjectCodec {
         self
     }
-    /// In Create, Tab and the A menu: an empty Boxes object, which opens
-    /// for its first node, and a Box: a Boxes object already holding a Box
-    /// node.
+    /// In Create, Tab and the A menu, under Geometry: an empty Boxes
+    /// object, which opens for its first node, and a Box: a Boxes object
+    /// already holding a Box node.
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
-        let mut empty = KindCreation::new(CreationId::declared("example.boxes.boxes"), "Boxes");
+        let geometry = || Home::topic(topics::objects::GEOMETRY);
+        let mut empty = KindCreation::new(boxes_creation(), "Boxes", geometry());
         empty.opens = true;
-        let mut one = KindCreation::new(CreationId::declared(BOX_NODE), "Box");
-        one.family = "Boxes".into();
+        let mut one = KindCreation::new(CreationId::declared(BOX_NODE), "Box", geometry());
         one.aliases = vec!["cube".into()];
         one.start = Some(NodeTypeId::declared(BOX_NODE));
         vec![empty, one]
     }
-    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+    fn create(
+        &self,
+        made: &KindCreation,
+        _cx: &CreateCx<'_>,
+    ) -> Result<Arc<dyn ObjectBody>, Error> {
+        let id = made.id;
         match id {
             _ if id.as_str() == boxes().as_str() || id.as_str() == BOX_NODE => Ok(self.new_body()),
             _ => Err(Error::invalid(format_args!("Boxes don't make {id}"))),
@@ -343,7 +357,9 @@ impl ObjectCodec for BoxesKind {
 
 /// The package: what Studio registers when it loads the plugin.
 pub fn package() -> Package {
-    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(Flags::ALL);
+    let context = NetworkContext::new(network(), "Boxes", "boxes")
+        .flags(Flags::ALL)
+        .topics([Topic::new(CREATE, "Create")]);
     Package::new(PackageId::declared("example.boxes"), "Boxes")
         .with_data_type(BoxType)
         .with_context(context)

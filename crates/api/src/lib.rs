@@ -33,6 +33,9 @@
 //! - **Networks** ([`network`]): the contexts a package declares
 //!   ([`NetworkContext`]) and how a package reads and edits a network,
 //!   which core owns ([`NetworkRead`], [`NetworkEdit`]).
+//! - **Menus** ([`menu`]): where each offering is listed at each place, a
+//!   [`Home`](menu::Home): one of the place's topics or its package's
+//!   family, and groups inside it.
 //! - **Formats** ([`FileFormat`]): readers and writers of outside files.
 //! - **Session slots** ([`Slot`], [`SessionSlot`]): package-owned, undoable
 //!   state of an editing session; gestures ([`Begun`]), one undo step
@@ -79,6 +82,7 @@ pub mod format;
 pub mod held;
 pub mod image_files;
 pub mod kernel;
+pub mod menu;
 pub mod mesher;
 pub mod network;
 pub mod object;

@@ -50,6 +50,7 @@ Replace `src/lib.rs` with the box and its typed handle. `BOX` wraps a `BoxShape`
 //! context and object kind the node lives in.
 use kinogaki_studio_api::cook::{Handle, HandleKind, Vector};
 use kinogaki_studio_api::element::Field;
+use kinogaki_studio_api::menu::{Home, Topic, TopicId};
 use kinogaki_studio_api::network::Flags;
 use kinogaki_studio_api::params::{Number, Parameter};
 use kinogaki_studio_api::*;
@@ -249,7 +250,7 @@ impl NodeType for BoxNode {
         let sides = Number::length().range(0.001, f64::INFINITY);
         Description::new("Box")
             .context(network())
-            .listed("Create", Category::Create, "Primitives", &["cube"])
+            .listed(Home::topic(CREATE), Category::Create, &["cube"])
             .output(Port::new("box", "Box", BOX.id()))
             .parameters(
                 Schema::default()
@@ -282,7 +283,7 @@ Studio checks each parameter value against its declaration before a cook (a size
 
 ## 4. Where the node is offered
 
-A node type is reachable only where a context offers it. `Description::context` above names the context whose networks offer the Box node, and `Description::listed` puts it in that context's Tab menu, under Create, in the Primitives family, found by "cube" too. A type with no listing can still be added by code and files, never by Tab.
+A node type is reachable only where a context offers it. `Description::context` above names the context whose networks offer the Box node, and `Description::listed` gives its home there: the context's Create topic (a top-level submenu of Tab and the menus, declared below with the context), found by "cube" too. A home is one of the topics of each network the node is offered in, or the package's own family (a submenu named for the package: what only it understands), with groups nested inside either (`Home::topic(CREATE).group("Primitives")`). Every surface lists the node on that one path. A type with no listing can still be added by code and files, never by Tab.
 
 The context is the plugin's own: Studio has no general-purpose network a third party lists into. A context is one id with two halves. Its networks are declared as data (`NetworkContext`): how they evaluate (cooked node by node, by default), the core flags their nodes offer, and the element they are saved under. Its UI half (menus, keys, levels, an inspector) is optional; without one, Studio's own network pane, Tab and inspector serve it. [Write your first context plugin](FIRST-CONTEXT-PLUGIN.md) adds a UI half.
 
@@ -357,9 +358,16 @@ A context whose networks carry geometry and cook offers core's For Each with `Ne
 A `Package` is everything the plugin registers. `export_package!` writes the entry Studio looks up in the library; it catches a panic in `package` and keeps `unsafe` out of the plugin's code.
 
 ```rust
-/// The package: what Studio registers when it loads the plugin.
+/// Boxes networks' one topic: what makes a box.
+const CREATE: TopicId = TopicId::declared("create");
+
+/// The package: what Studio registers when it loads the plugin. Its context
+/// declares its topics; core adds Import (its File and Image nodes) to every
+/// network.
 pub fn package() -> Package {
-    let context = NetworkContext::new(network(), "Boxes", "boxes").flags(Flags::ALL);
+    let context = NetworkContext::new(network(), "Boxes", "boxes")
+        .flags(Flags::ALL)
+        .topics([Topic::new(CREATE, "Create")]);
     Package::new(PackageId::declared("acme.boxes"), "Boxes")
         .with_data_type(BoxType)
         .with_context(context)
@@ -497,7 +505,7 @@ EOF
 
 A plugin that builds on another package's types names it in its manifest, one `def depends "depends0" { str id = "acme.trees" }` block each; Studio loads it after them, and not at all without them.
 
-Start Studio: Settings ▸ Plugins lists Boxes, loaded or with the reason it isn't, and the Console says why a plugin was refused. Inside a Boxes object, Tab lists Box under Create; the node draws its box, the box handle drags its size and center, and the inspector shows Size and Center. Create, Tab and the A menu offer the kind's creations (`ObjectKindSpec::creations`): an empty Boxes object, which opens, and a Box, a Boxes object already holding a Box node. Projects that hold Boxes objects open with them.
+Start Studio: Settings ▸ Plugins lists Boxes, loaded or with the reason it isn't, and the Console says why a plugin was refused. Inside a Boxes object, Tab lists Box under Create (with Import ▸ File beside it); the node draws its box, the box handle drags its size and center, and the inspector shows Size and Center. Create, Tab and the A menu offer the kind's creations (`ObjectKindSpec::creations`) under Geometry ▸, the object levels' topic their homes name (`menu::topics::objects`): an empty Boxes object, which opens, and a Box, a Boxes object already holding a Box node. Projects that hold Boxes objects open with them.
 
 ## Where to go next
 

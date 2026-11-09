@@ -24,7 +24,20 @@ fn lights() -> DeclaredKind {
         schema,
     );
     let types = [standard::lights(), vec![standard::fog(), glow]].concat();
-    DeclaredKind::lights(LIGHTS, "Ray Lights", types)
+    DeclaredKind::lights(LIGHTS, Home::family().group("Lights"), types)
+}
+
+/// An engine declaring the kind's types (`lights()`'s and the fog).
+fn rendering() -> Engines {
+    let lights = lights().types;
+    let types = [lights, vec![standard::fog()]].concat();
+    let capabilities = kinogaki_render_api::Capabilities {
+        types,
+        ..Default::default()
+    };
+    let id = kinogaki_render_api::EngineId::declared("acme.ray.engine");
+    let ray = kinogaki_render_api::EngineDescription::builder(id, "Ray");
+    Engines::new(vec![ray.capabilities(capabilities).build()])
 }
 
 fn rect() -> Declared {
@@ -66,8 +79,14 @@ fn a_new_light_is_its_first_type_and_edits_take_one_prim_of_its_types() {
 }
 
 #[test]
-fn creations_are_the_kinds_types_under_its_prefix() {
-    let (kind, engines) = (lights(), Engines::new(Vec::new()));
+fn creations_are_the_kinds_types_an_engine_renders_under_its_prefix() {
+    let kind = lights();
+    let none = Engines::new(Vec::new());
+    assert!(
+        kind.creations(&cx(&none)).is_empty(),
+        "no engine renders them"
+    );
+    let engines = rendering();
     let made = kind.creations(&cx(&engines));
     let labels: Vec<&str> = made.iter().map(|c| c.label.as_str()).collect();
     assert_eq!(
@@ -84,30 +103,26 @@ fn creations_are_the_kinds_types_under_its_prefix() {
         ]
     );
     assert_eq!(made[0].id, CreationId::declared("acme.ray.rect_light"));
-    assert_eq!(
-        (made[0].family.as_str(), made[0].order),
-        ("Ray Lights", LIGHTS_ORDER)
-    );
+    assert_eq!(made[0].home, Home::family().group("Lights"));
     assert!(made[0].aliases.contains(&"area".to_owned()));
-    let glow = kind.create(made[7].id, &cx(&engines)).unwrap();
+    let glow = kind.create(&made[7], &cx(&engines)).unwrap();
     assert_eq!(kind.declared(&*glow)[0].type_id.as_str(), "acme.ray.glow");
     // The Spot Light is a sphere light, shaped.
     assert_eq!(made[3].id, CreationId::declared("acme.ray.spot_light"));
-    let spot = kind.create(made[3].id, &cx(&engines)).unwrap();
+    let spot = kind.create(&made[3], &cx(&engines)).unwrap();
     let spot = standard::Light::decode(&kind.declared(&*spot)[0]).unwrap();
     assert_eq!(spot, standard::presets()[0].light);
-    assert!(
-        kind.create(CreationId::declared("acme.ray.fog"), &cx(&engines))
-            .is_err()
-    );
+    let fog = KindCreation::new(CreationId::declared("acme.ray.fog"), "Fog", Home::family());
+    assert!(kind.create(&fog, &cx(&engines)).is_err());
     assert!(kind.placed() && !kind.at_root());
 }
 
 #[test]
 fn an_atmosphere_is_one_type_at_the_root() {
+    let render = crate::menu::topics::objects::RENDER;
     let (fog, engines) = (
-        DeclaredKind::atmosphere(FOG, standard::fog()),
-        Engines::new(Vec::new()),
+        DeclaredKind::atmosphere(FOG, Home::topic(render), standard::fog()),
+        rendering(),
     );
     assert!(fog.at_root() && !fog.placed() && fog.result().is_none());
     let made = fog.creations(&cx(&engines));
@@ -115,7 +130,8 @@ fn an_atmosphere_is_one_type_at_the_root() {
         (made[0].label.as_str(), made[0].id),
         ("Fog", CreationId::declared("acme.ray.fog"))
     );
-    let body = fog.create(made[0].id, &cx(&engines)).unwrap();
+    assert_eq!(made[0].home, Home::topic(render));
+    let body = fog.create(&made[0], &cx(&engines)).unwrap();
     let mut denser = fog.declared(&*body).remove(0);
     denser.values.insert("density".into(), Value::Number(0.4));
     assert_eq!(

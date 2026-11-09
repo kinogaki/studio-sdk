@@ -101,8 +101,7 @@ fn library() -> Library {
         items: vec![VocabularyItem {
             name: "toy.trees.grow".into(),
             label: "Grow".into(),
-            family: "Trees".into(),
-            section: "Create".into(),
+            home: Some(kinogaki_studio_api::menu::Home::family()),
             when: When::levels(["Branch"]),
             places: Places {
                 tools: true,

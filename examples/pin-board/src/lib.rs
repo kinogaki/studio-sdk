@@ -19,6 +19,7 @@
 //! package's, so Studio undoes them with the document. Everything,
 //! headless parts and UI, is one [`Package`], exported once.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
+use kinogaki_studio_api::menu::{Home, Topic, TopicId, topics};
 use kinogaki_studio_api::*;
 use std::sync::Arc;
 use studio_ui_api::host::{Cx, HostSlotsExt, InspectorCx, Waker};
@@ -101,15 +102,22 @@ impl ObjectKindSpec for BoardKind {
     fn codec(&self) -> &dyn ObjectCodec {
         &BoardCodec
     }
-    /// The Pin Board in Create, Tab and the A menu: a new board opens,
-    /// ready for pinning.
+    /// The Pin Board in Create, Tab and the A menu, under Utility: a new
+    /// board opens, ready for pinning.
     fn creations(&self, _cx: &CreateCx<'_>) -> Vec<KindCreation> {
-        let mut board = KindCreation::new(CreationId::declared("example.pins.board"), "Pin Board");
+        let id = CreationId::declared("example.pins.board");
+        let utility = Home::topic(topics::objects::UTILITY);
+        let mut board = KindCreation::new(id, "Pin Board", utility);
         board.aliases = vec!["corkboard".into()];
         board.opens = true;
         vec![board]
     }
-    fn create(&self, id: CreationId, _cx: &CreateCx<'_>) -> Result<Arc<dyn ObjectBody>, Error> {
+    fn create(
+        &self,
+        made: &KindCreation,
+        _cx: &CreateCx<'_>,
+    ) -> Result<Arc<dyn ObjectBody>, Error> {
+        let id = made.id;
         (id.as_str() == board().as_str())
             .then(|| self.new_body())
             .ok_or_else(|| Error::invalid(format_args!("{id} isn't a Pin Board")))
@@ -158,13 +166,15 @@ impl UiPackage for PinsUi {
     }
 }
 
-/// Pin and Clear: in Tab, and on right-click.
+/// Pinning networks' one topic: what pins.
+const PINS: TopicId = TopicId::declared("pins");
+
+/// Pin and Clear: in Tab under Pins, and on right-click.
 fn library() -> Library {
     let item = |name: &str, label: &str| VocabularyItem {
         name: name.into(),
         label: label.into(),
-        family: "Pins".into(),
-        section: "Pins".into(),
+        home: Some(Home::topic(PINS)),
         places: Places {
             nodes: true,
             menus: true,
@@ -181,8 +191,6 @@ fn library() -> Library {
                 when: Default::default(),
                 title: "Pins".into(),
                 entries: vec![MenuEntry::Item(PIN.into()), MenuEntry::Item(CLEAR.into())],
-                select: Vec::new(),
-                plain_select: false,
                 browse: "Add…  Tab".into(),
             }],
             bar: Vec::new(),
@@ -267,7 +275,9 @@ impl Inspector<Pinning> for PinInspector {
 /// pins slot and the context's UI.
 pub fn package() -> Package {
     Package::new(id(), "Pins")
-        .with_context(NetworkContext::new(pinning(), "Pins", "pins"))
+        .with_context(
+            NetworkContext::new(pinning(), "Pins", "pins").topics([Topic::new(PINS, "Pins")]),
+        )
         .with_object_kind(BoardKind)
         .with_slot::<Pins>()
         .with_ui(PinsUi)

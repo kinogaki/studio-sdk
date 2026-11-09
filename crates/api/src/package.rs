@@ -4,11 +4,12 @@ use crate::cook::NodeType;
 use crate::data_type::DataType;
 use crate::format::FileFormat;
 use crate::held::HeldEdit;
-use crate::id::{ContextId, PackageId};
+use crate::id::{ContextId, CreationId, ObjectKindId, PackageId};
 use crate::kernel::Verb;
+use crate::menu::Home;
 use crate::mesher::Mesher;
 use crate::network::{NetworkCompiler, NetworkContext, NodeCreation};
-use crate::object::ObjectKindSpec;
+use crate::object::{KindCreation, ObjectKindSpec};
 use crate::render::ShaderNode;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
@@ -51,6 +52,7 @@ pub struct Package {
     pub(crate) compilers: Vec<Arc<dyn NetworkCompiler>>,
     pub(crate) creations: Vec<NodeCreation>,
     pub(crate) object_kinds: Vec<Arc<dyn ObjectKindSpec>>,
+    pub(crate) object_creations: Vec<(ObjectKindId, KindCreation)>,
     pub(crate) formats: Vec<Arc<dyn FileFormat>>,
     pub(crate) slots: Vec<SessionSlot>,
     pub(crate) stored: Vec<StoredValue>,
@@ -134,6 +136,12 @@ impl Package {
         &self.object_kinds
     }
 
+    /// Its creations of other packages' object kinds (an engine's Render
+    /// Output, a creation of core's kind), each with the kind that makes it.
+    pub fn object_creations(&self) -> &[(ObjectKindId, KindCreation)] {
+        &self.object_creations
+    }
+
     /// The file formats it reads and writes.
     pub fn formats(&self) -> &[Arc<dyn FileFormat>] {
         &self.formats
@@ -182,21 +190,29 @@ impl Package {
 }
 
 /// A package's UI as the headless API carries it: the contexts it gives
-/// parts to, which the [`Registry`](crate::Registry) checks like every
-/// other id, and the parts themselves, opaque here. The host UI interface
+/// parts to and where its libraries list their items, which the
+/// [`Registry`](crate::Registry) checks like every other id and home, and
+/// the parts themselves, opaque here. The host UI interface
 /// (`kinogaki-studio-ui-api`) makes it and reads the parts back; this
 /// crate can't name its types.
 #[derive(Clone)]
 pub struct PackageUi {
     contexts: Vec<ContextId>,
+    items: Vec<crate::menu::ItemHome>,
     parts: Arc<dyn Any + Send + Sync>,
 }
 
 impl PackageUi {
-    /// The UI giving parts to `contexts`, the parts being `parts`.
-    pub fn new(contexts: Vec<ContextId>, parts: impl Any + Send + Sync) -> Self {
+    /// The UI giving parts to `contexts`, its libraries listing `items`,
+    /// the parts being `parts`.
+    pub fn new(
+        contexts: Vec<ContextId>,
+        items: Vec<crate::menu::ItemHome>,
+        parts: impl Any + Send + Sync,
+    ) -> Self {
         Self {
             contexts,
+            items,
             parts: Arc::new(parts),
         }
     }
@@ -204,6 +220,11 @@ impl PackageUi {
     /// The contexts it gives parts to.
     pub(crate) fn contexts(&self) -> &[ContextId] {
         &self.contexts
+    }
+
+    /// Where its libraries list their items.
+    pub(crate) fn items(&self) -> &[crate::menu::ItemHome] {
+        &self.items
     }
 
     /// Its parts, as the UI interface made them.
@@ -237,6 +258,7 @@ impl Package {
             compilers: Vec::new(),
             creations: Vec::new(),
             object_kinds: Vec::new(),
+            object_creations: Vec::new(),
             formats: Vec::new(),
             slots: Vec::new(),
             stored: Vec::new(),
@@ -327,6 +349,15 @@ impl Package {
         self
     }
 
+    /// With `creation` of another package's object kind `kind` too (that
+    /// kind makes the body from it, [`ObjectKindSpec::create`]), listed at
+    /// the object levels at its home: a home in its family is this
+    /// package's.
+    pub fn with_object_creation(mut self, kind: ObjectKindId, creation: KindCreation) -> Self {
+        self.object_creations.push((kind, creation));
+        self
+    }
+
     /// With file format `format` too.
     pub fn with_format(mut self, format: impl FileFormat + 'static) -> Self {
         self.formats.push(Arc::new(format));
@@ -360,12 +391,24 @@ impl Package {
 
     /// With the description of render engine `engine` too, which this
     /// build doesn't make (a headless one, or tests reading the values it
-    /// declares).
+    /// declares): its material nodes, and a Render Output made for it, in
+    /// this package's family, the creation named as the engine is
+    /// (`kinogaki.spectre.engine`).
     pub fn with_engine_description(mut self, engine: EngineDescription) -> Self {
         for def in engine.node_defs() {
-            let node = ShaderNode::new(def.clone(), engine.label().clone());
-            self.node_types.push(Arc::new(node));
+            self.node_types.push(Arc::new(ShaderNode::new(def.clone())));
         }
+        let id = CreationId::parse(engine.id().as_str()).expect("an engine's id is an id");
+        let mut output = KindCreation::new(id, "Render Output", Home::family());
+        output.aliases = ["render", "rendersettings", "rop", "output"]
+            .map(String::from)
+            .into();
+        let named = crate::Value::Text(engine.id().to_string());
+        output
+            .values
+            .insert(crate::render::ENGINE.to_owned(), named);
+        self.object_creations
+            .push((crate::render::RENDER_OUTPUT, output));
         self.engines.push(Arc::new(engine));
         self
     }
@@ -411,6 +454,12 @@ impl fmt::Debug for Package {
             .field(
                 "object_kinds",
                 &ids(&self.object_kinds, |k| k.id().as_str()),
+            )
+            .field(
+                "object_creations",
+                &(self.object_creations.iter())
+                    .map(|(_, c)| c.id.as_str())
+                    .collect::<Vec<_>>(),
             )
             .field("formats", &ids(&self.formats, |f| f.id().as_str()))
             .field(

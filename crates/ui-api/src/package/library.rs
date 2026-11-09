@@ -6,6 +6,12 @@
 //! viewport's shared chrome. A context names its items by their stored
 //! names in its [`Vocabulary`](super::Vocabulary), which runs them.
 //!
+//! **One home each.** Every item is listed at one [`Home`] of its context
+//! (a topic of its networks or its package's family, then groups): a node
+//! type's item at the node type's own, any other at the one it names. Every
+//! surface lists it on that one path, and a menu entry may hold a whole
+//! home as one submenu ([`MenuEntry::Home`]).
+//!
 //! **Entries that can't apply are hidden, never greyed.** Each entry shows
 //! where its [`When`] holds (the active level, whether anything is
 //! selected, whether the displayed node is a held edit), and where its
@@ -22,6 +28,7 @@ use crate::Key;
 use crate::gizmo::Pivot;
 use crate::input::Modifiers;
 use kinogaki_studio_api::ContextId;
+use kinogaki_studio_api::menu::{Home, TopicId};
 
 /// What a context offers the host's menus, keys, Tab and viewport chrome.
 /// Read once, when the package registers.
@@ -70,12 +77,14 @@ pub struct VocabularyItem {
     pub name: String,
     /// What menus call it.
     pub label: String,
-    /// The family menus group it under (a submenu, a Tab subhead).
-    pub family: String,
+    /// Where every surface lists it: `None` for a node type's item (named
+    /// by the node type's id), which takes the node type's own home;
+    /// `Some` for any other (a tool, a command), a home of its context
+    /// (and of the object levels too, for an item they offer,
+    /// [`Places::objects`]).
+    pub home: Option<Home>,
     /// Lower-case synonyms for search.
     pub aliases: Vec<String>,
-    /// Tab's category for it ("Polygon").
-    pub section: String,
     /// Where it applies: an entry of it shows only where this holds, on
     /// every surface.
     pub when: When,
@@ -250,8 +259,8 @@ pub struct MenuDefaults {
 /// What a package adds to the object levels' menus and shelves.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ObjectMenus {
-    /// Items added to each held-key menu's list there, by menu.
-    pub marking: Vec<(Held, Vec<String>)>,
+    /// Entries added to each held-key menu's list there, by menu.
+    pub marking: Vec<(Held, Vec<MenuEntry>)>,
     /// Shelves added after the object levels' own.
     pub shelves: Vec<Shelf>,
 }
@@ -263,10 +272,11 @@ pub struct MarkingDefault {
     pub menu: Held,
     /// The level, by its id ("Objects" for a context without levels).
     pub level: String,
-    /// The eight compass positions, North first, clockwise; items by name.
+    /// The eight compass positions, North first, clockwise; items by name
+    /// (a slot holds one item, never a submenu).
     pub compass: [Option<String>; 8],
-    /// The list below South.
-    pub list: Vec<String>,
+    /// The list below South: items, and homes drawn as submenus.
+    pub list: Vec<MenuEntry>,
 }
 
 /// A held-key menu: A, S or D.
@@ -325,12 +335,8 @@ pub struct ContextMenuSpec {
     pub when: When,
     /// Its muted title ("Edit Mesh").
     pub title: String,
-    /// Its entries, grouped in submenus by their items' families.
+    /// Its entries, in order.
     pub entries: Vec<MenuEntry>,
-    /// Its Select ▸ submenu; empty: none.
-    pub select: Vec<MenuEntry>,
-    /// Select ▸ lists plain entries, not family submenus.
-    pub plain_select: bool,
     /// Its last button, which opens Tab ("All Tools…  Tab").
     pub browse: String,
 }
@@ -342,9 +348,8 @@ pub struct BarSection {
     pub menu: BarMenu,
     /// Where the menu lists it.
     pub when: When,
-    /// A submenu's name ("Polygon"); `None`: its families in place.
-    pub label: Option<String>,
-    /// Its entries, grouped in submenus by their items' families.
+    /// Its entries, in order. A menu whose entries are one home lists
+    /// that home's contents directly.
     pub entries: Vec<MenuEntry>,
 }
 
@@ -369,7 +374,8 @@ pub enum BarMenu {
 /// A library never lists it.
 pub const REPEAT: &str = "command:repeat";
 
-/// An entry of a right-click or menu bar menu.
+/// An entry of a right-click or menu bar menu, or of a marking menu's
+/// list.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MenuEntry {
     /// An item, by name.
@@ -379,6 +385,10 @@ pub enum MenuEntry {
     /// leads the menu, set off by a separator, and shows while there is a
     /// last item that [`Vocabulary::shown`](super::Vocabulary::shown) keeps.
     Repeat,
+    /// Everything the menu's surface offers at a home of the context, as
+    /// one submenu named for it (`Home::topic(select)`: Select ▸); a
+    /// home holding nothing that applies now is left out.
+    Home(Home),
 }
 
 /// How Tab lists a context's items.
@@ -390,23 +400,23 @@ pub struct TabSpec {
     /// When Tab over the views lists tools ([`Places::tools`]) rather
     /// than nodes; `None`: never.
     pub tools: Option<When>,
-    /// A first category of the tools that apply now, while Tab lists
-    /// tools.
+    /// A first top of the tools that apply now, while Tab lists tools: a
+    /// shortcut, which repeats them without moving their homes.
     pub suggested: Option<Suggested>,
-    /// Per level, items that lead their section there (Mesh's Loops at
+    /// Per level, items that lead their submenu there (Mesh's Loops at
     /// the Edge level, its Region elsewhere).
     pub leading: Vec<LevelItems>,
 }
 
-/// Tab's leading category of the tools that apply now (CAD's Suggested).
+/// Tab's leading top of the tools that apply now (CAD's Suggested).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Suggested {
     /// Its name.
     pub title: String,
     /// Where it shows.
     pub when: When,
-    /// The sections it takes tools from; empty: every section.
-    pub sections: Vec<String>,
+    /// The topics it takes tools from; empty: every topic.
+    pub topics: Vec<TopicId>,
     /// The tools leading it at each level (a level's usual tools first).
     pub first: Vec<LevelItems>,
 }

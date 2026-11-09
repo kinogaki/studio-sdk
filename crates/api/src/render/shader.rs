@@ -4,7 +4,8 @@
 //! [`MaterialNetwork`](kinogaki_render_api::MaterialNetwork).
 use crate::cook::{Category, Description, Port};
 use crate::data::Data;
-use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId};
+use crate::id::{ContextId, CreationId, DataTypeId, NodeTypeId, ObjectKindId};
+use crate::menu::Home;
 use crate::network::{NewNode, NodeCreation};
 use crate::{CookCx, Error, NodeType, Outputs};
 use kinogaki_render_api::NodeDef;
@@ -17,18 +18,27 @@ pub const SHADING: ContextId = ContextId::declared("kinogaki.core.shading");
 /// Core's Material node: what holds a shading network ([`SHADING`]).
 pub const MATERIAL: NodeTypeId = NodeTypeId::declared("kinogaki.core.material");
 
-/// A starting material an engine offers in Tab: a Material node
-/// labelled `label` with `inside` seeded in it, displayed, listed under
-/// `family` and found by `aliases`.
+/// Core's Render Output kind: a render of the scene, holding its
+/// compositing network. Each engine's package offers one made for it
+/// ([`Package::with_engine`](crate::Package::with_engine)).
+pub const RENDER_OUTPUT: ObjectKindId = ObjectKindId::declared("kinogaki.core.render_output");
+
+/// The value naming the engine a Render Output creation makes one for
+/// ([`KindCreation::values`](crate::KindCreation::values), the engine's id
+/// as text); none: the project's Default Engine renders it.
+pub const ENGINE: &str = "engine";
+
+/// A starting material a package offers in Tab: a Material node
+/// labelled `label` at `home` with `inside` seeded in it, displayed, found
+/// by `aliases`.
 pub fn material_creation(
     id: CreationId,
     label: &str,
-    family: &str,
+    home: Home,
     aliases: &[&str],
     inside: NewNode,
 ) -> NodeCreation {
-    NodeCreation::new(id, label, NewNode::new(MATERIAL))
-        .family(family)
+    NodeCreation::new(id, label, home, NewNode::new(MATERIAL))
         .aliases(aliases.iter().copied())
         .inside(inside.displayed())
 }
@@ -47,16 +57,16 @@ pub fn wire_type(socket: &Type) -> DataTypeId {
     }
 }
 
-/// The node type of material node `def`, listed under its engine's label.
+/// The node type of material node `def`, listed in its package's family,
+/// in the group its def names.
 pub struct ShaderNode {
     def: Arc<NodeDef>,
-    engine: Arc<str>,
 }
 
 impl ShaderNode {
-    /// The node type of `def`, which the engine labelled `engine` brings.
-    pub fn new(def: Arc<NodeDef>, engine: Arc<str>) -> Self {
-        Self { def, engine }
+    /// The node type of `def`, which an engine brings.
+    pub fn new(def: Arc<NodeDef>) -> Self {
+        Self { def }
     }
 
     /// What it is the node type of.
@@ -73,10 +83,10 @@ impl NodeType for ShaderNode {
     fn description(&self) -> Description {
         let def = &self.def;
         let aliases: Vec<&str> = def.aliases.iter().map(|a| &**a).collect();
-        let mut description = Description::new(&*def.label).context(SHADING).listed(
-            &*self.engine,
+        let home = Home::family().group(&*def.family);
+        let mut description = (Description::new(&*def.label).context(SHADING)).listed(
+            home,
             Category::Surface,
-            &*def.family,
             &aliases,
         );
         for input in &def.inputs {

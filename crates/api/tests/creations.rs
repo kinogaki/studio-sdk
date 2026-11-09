@@ -1,7 +1,9 @@
 //! Creations are named like every other id: well formed, under their
-//! package's vendor and declared once, a kind's (those it makes with no
-//! engine installed) and a package's node creations alike.
+//! package's vendor and declared once, a kind's (those it makes with the
+//! engines registered and the package's own), a package's creations of
+//! another's kind and its node creations alike.
 use kinogaki_studio_api::element::{ElementReader, ElementWriter};
+use kinogaki_studio_api::menu::{Home, topics};
 use kinogaki_studio_api::network::{NewNode, NodeCreation};
 use kinogaki_studio_api::*;
 use kinogaki_studio_api_testing::assert_refused;
@@ -26,7 +28,7 @@ impl ObjectCodec for Unsaved {
 }
 
 /// Kind `id`, made as `made` says, and as `engine_made` too while an
-/// engine is installed (named by the engine, so not checked).
+/// engine is installed.
 struct Kind {
     id: &'static str,
     made: &'static [&'static str],
@@ -61,7 +63,7 @@ impl ObjectKindSpec for Kind {
     fn creations(&self, cx: &CreateCx<'_>) -> Vec<KindCreation> {
         let engine = cx.engines().iter().next().map(|_| self.engine_made);
         (self.made.iter().copied().chain(engine))
-            .map(|id| KindCreation::new(CreationId::declared(id), id))
+            .map(|id| KindCreation::new(CreationId::declared(id), id, utility()))
             .collect()
     }
 }
@@ -74,6 +76,10 @@ fn kind(id: &'static str, made: &'static [&'static str]) -> Kind {
     }
 }
 
+fn utility() -> Home {
+    Home::topic(topics::objects::UTILITY)
+}
+
 fn package(id: &'static str) -> Package {
     Package::new(PackageId::declared(id), id)
 }
@@ -82,6 +88,7 @@ fn node(id: &'static str) -> NodeCreation {
     NodeCreation::new(
         CreationId::declared(id),
         id,
+        Home::family(),
         NewNode::new(NodeTypeId::declared("other.trees.grow")),
     )
 }
@@ -98,6 +105,23 @@ fn a_kinds_creations_are_its_vendors_and_new() {
     );
     let foreign = package("acme.odd").with_object_kind(kind("acme.odd.top", &["other.toys.top"]));
     assert_refused(registry.register(foreign), &["under another vendor's name"]);
+    // A creation of another package's kind: of a declared kind, under the
+    // declaring package's vendor, new.
+    let made = |id| KindCreation::new(CreationId::declared(id), "Top", utility());
+    let top = ObjectKindId::declared("acme.toys.top");
+    let own = package("acme.spin").with_object_creation(top, made("acme.spin.top"));
+    registry.register(own).unwrap();
+    let nowhere = ObjectKindId::declared("acme.none.top");
+    let lost = package("acme.lost").with_object_creation(nowhere, made("acme.lost.top"));
+    assert_refused(
+        registry.register(lost),
+        &["of kind acme.none.top, which no package declares"],
+    );
+    let again = package("acme.spun").with_object_creation(top, made("acme.spin.top"));
+    assert_refused(
+        registry.register(again),
+        &["acme.spin.top", "acme.spin declared"],
+    );
 }
 
 #[test]
