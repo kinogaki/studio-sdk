@@ -256,7 +256,9 @@ pub trait HostDoc {
     /// The scene's current time: what cooks and keys are at.
     fn time(&self) -> Time;
     /// Shows the scene at `time`, kept inside its frame range (navigation,
-    /// not an undo step): a package's "go to key" button.
+    /// not an undo step): a package's "go to key" button. Playback stops;
+    /// while a final render runs the time is the render's, and this leaves
+    /// it be.
     fn set_time(&mut self, time: Time);
 }
 
