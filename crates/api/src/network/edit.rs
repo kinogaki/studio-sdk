@@ -1,13 +1,12 @@
 //! [`NetworkEdit`]: the edits a package makes to a network.
 use super::{Flag, NetworkRead, Wire};
-use crate::Error;
-use crate::Key;
 use crate::cook::Outputs;
 use crate::data::Data;
 use crate::id::{CreationId, NodeTypeId};
 use crate::menu::Home;
 use crate::params::{Parameters, Value};
 use crate::refs::NodeRef;
+use crate::{Error, Key, ValueKey};
 use kinogaki_geometry::Time;
 
 /// A network a package edits through the host, inside one undo step. Each
@@ -94,11 +93,11 @@ pub trait NetworkEdit: NetworkRead {
         ))
     }
 
-    /// Sets `key` on channel `component` of parameter `row` of `node` (a
-    /// vector's X is 0, a color's G 1; a row of one value, a number or a
-    /// toggle or a ramp, has the one channel 0), replacing its key at that
-    /// time: the channel is animated from then on, its value at each moment
-    /// its keys'. Refused for a row its type doesn't let animate
+    /// Sets `key` on channel `component` of parameter `row` of `node`, a
+    /// channel that runs as a number (a vector's X is 0, a color's G 1; a
+    /// number or an integer has the one channel 0), replacing its key at
+    /// that time: the channel is animated from then on, its value at each
+    /// moment its keys'. Refused for a row its type doesn't let animate
     /// ([`Parameter::animatable`](crate::params::Parameter::animatable)), a
     /// channel it hasn't, a value the channel doesn't take and a row a
     /// subnet's parameter drives (a row has one driver).
@@ -110,6 +109,14 @@ pub trait NetworkEdit: NetworkRead {
         key: Key,
     ) -> Result<(), Error> {
         let _ = (node, row, component, key);
+        Err(Error::invalid("this network's parameters don't animate"))
+    }
+
+    /// Sets `key` on parameter `row` of `node`, a row holding whole values
+    /// (a toggle, a choice, a color space, a ramp, tone curves), as
+    /// [`set_key`](Self::set_key) sets a number's.
+    fn set_value_key(&mut self, node: NodeRef, row: &str, key: ValueKey) -> Result<(), Error> {
+        let _ = (node, row, key);
         Err(Error::invalid("this network's parameters don't animate"))
     }
 

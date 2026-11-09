@@ -474,6 +474,7 @@ kinogaki-studio-api/cook test a_cancelled_cook_reports_cancelled
 kinogaki-studio-api/cook test a_cook_reads_parameters_ports_and_scratch
 kinogaki-studio-api/cook test a_node_parameter_holding_an_object_is_refused
 kinogaki-studio-api/cook test a_parameter_named_as_spares_are_is_refused
+kinogaki-studio-api/cook test a_parameter_named_with_a_dot_is_refused
 kinogaki-studio-api/cook test held_edits_need_their_types_registered
 kinogaki-studio-api/cook test the_registry_holds_cooks_and_held_edits
 kinogaki-studio-api/cook test withheld_and_wrong_parameters_fail_by_name

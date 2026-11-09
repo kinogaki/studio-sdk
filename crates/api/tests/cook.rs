@@ -285,6 +285,31 @@ fn a_node_parameter_holding_an_object_is_refused() {
     assert_refused(Registry::new().register(package), &["an object row"]);
 }
 
+/// A node type declaring a parameter whose name holds a `.` (files spell a
+/// component's channel `<row>.<letter>`) is refused.
+#[test]
+fn a_parameter_named_with_a_dot_is_refused() {
+    struct Dotted;
+    impl NodeType for Dotted {
+        fn id(&self) -> NodeTypeId {
+            NodeTypeId::declared("toy.dotted.node")
+        }
+        fn description(&self) -> Description {
+            Description::new("Dotted").parameters(Schema::default().parameter(
+                params::Parameter::new("offset.y", "Y", params::ValueKind::Toggle, false),
+            ))
+        }
+        fn cook(&self, _cx: &mut CookCx<'_>, _inputs: &[Data]) -> Result<Outputs, Error> {
+            Ok(Outputs::default())
+        }
+    }
+    let package = Package::new(PackageId::declared("toy.dotted"), "Dotted").with_node_type(Dotted);
+    assert_refused(
+        Registry::new().register(package),
+        &["offset.y", "holds no `.`"],
+    );
+}
+
 /// A node type declaring a parameter named as spares are is refused.
 #[test]
 fn a_parameter_named_as_spares_are_is_refused() {

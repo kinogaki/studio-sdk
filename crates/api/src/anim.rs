@@ -1,23 +1,27 @@
 //! Keys: a channel's value at a moment of the scene, and how it runs to
 //! the next key. Every component of a parameter is a channel of its own (a
 //! vector's X, Y and Z, a color's R, G and B); a parameter of one value (a
-//! number, a toggle, a ramp) is one channel. Studio's core keeps a node's
-//! channels by parameter and evaluates them at the scene's time before the
-//! node cooks, so a cook reads plain [`Value`]s.
+//! number, a toggle, a ramp) is one channel. A channel that runs as a
+//! number (a number's, an integer's, a component's) keys with [`Key`]s,
+//! numbers with tangents; one that holds whole values (a toggle's, a
+//! choice's, a color space's, a ramp's, tone curves') with [`ValueKey`]s.
+//! Studio's core keeps a node's channels by parameter and evaluates them at
+//! the scene's time before the node cooks, so a cook reads plain
+//! [`Value`]s.
 use crate::Time;
 use crate::params::Value;
 
-/// One key of a channel: at `time`, the channel is `value`; `interp` says
-/// how it runs from here to the next key, `handles` the curve's tangents
-/// either side of it where they are Bézier.
+/// One key of a channel that runs as a number: at `time` the channel is
+/// `value` (an integer's a whole number), `interp` says how it runs from
+/// here to the next key, `handles` the curve's tangents either side of it
+/// where they are Bézier.
 #[non_exhaustive]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Key {
     /// When.
     pub time: Time,
-    /// The channel's value then: a number for a component, else of the
-    /// variant its parameter's kind holds.
-    pub value: Value,
+    /// The channel's value then.
+    pub value: f64,
     /// How the channel runs from this key to the next.
     pub interp: Interp,
     /// Its tangents, read on the sides whose segment is Bézier.
@@ -27,7 +31,7 @@ pub struct Key {
 impl Key {
     /// A key at `time` holding `value`, running on by `interp`, its
     /// tangents automatic.
-    pub fn new(time: Time, value: Value, interp: Interp) -> Self {
+    pub fn new(time: Time, value: f64, interp: Interp) -> Self {
         Self {
             time,
             value,
@@ -43,9 +47,34 @@ impl Key {
     }
 }
 
+/// One key of a channel that holds whole values: at `time` the channel is
+/// `value`, of the variant its parameter's kind holds. A toggle's, a
+/// choice's and a color space's keys are [`Interp::Held`]; a ramp's and
+/// tone curves' blend to the next key as `interp` says. No tangents.
+#[non_exhaustive]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValueKey {
+    /// When.
+    pub time: Time,
+    /// The channel's value then.
+    pub value: Value,
+    /// How the channel runs from this key to the next.
+    pub interp: Interp,
+}
+
+impl ValueKey {
+    /// A key at `time` holding `value`, running on by `interp`.
+    pub fn new(time: Time, value: Value, interp: Interp) -> Self {
+        Self {
+            time,
+            value,
+            interp,
+        }
+    }
+}
+
 /// How a channel runs from a key to the next. Before the first key and
-/// after the last a channel holds their values. Kinds whose values don't
-/// blend (toggles, choices) hold whatever a key says.
+/// after the last a channel holds their values.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Interp {

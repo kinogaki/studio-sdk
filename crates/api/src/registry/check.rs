@@ -26,7 +26,9 @@ impl Registry {
     /// (its UI's contexts too, and its creations' names: its kinds' with
     /// no engine installed, and its node creations', each well formed)
     /// are new and under its vendor, no node type
-    /// declares a parameter named as spares are ([`SPARE`]), holding an
+    /// declares a parameter named as spares are ([`SPARE`]) or holding a
+    /// `.` in its name (files spell a component's channel `<row>.<letter>`),
+    /// holding an
     /// object ([`ValueKind::Object`]) or an image ([`ValueKind::Image`]),
     /// each compiler
     /// and runner it brings serves a compiled context (its own or a
@@ -207,6 +209,14 @@ impl Registry {
         }
         for n in &package.node_types {
             let description = n.description();
+            if let Some(p) = (description.parameters.parameters()).find(|p| p.name.contains('.')) {
+                return Err(Error::refused(format!(
+                    "{package}'s node type {node} declares parameter {parameter}: a parameter's name holds no `.`, which a component's channel takes in files (`offset.y`)",
+                    package = id,
+                    node = n.id(),
+                    parameter = p.name.clone()
+                )));
+            }
             if let Some(p) = description
                 .parameters
                 .parameters()

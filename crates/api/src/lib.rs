@@ -115,7 +115,7 @@ pub use kinogaki_geometry::{
 pub use kinogaki_value as value;
 pub use kinogaki_value::{data, id};
 
-pub use anim::{Handles, Interp, Key};
+pub use anim::{Handles, Interp, Key, ValueKey};
 pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;
