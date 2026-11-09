@@ -1,8 +1,8 @@
 //! The fake host's answers to the capabilities a context's tools lean on:
 //! restarting a gesture, render views, Console records, the clipboard,
-//! latest-wins jobs, the inspector's row hooks, the vocabulary's node
-//! edit, a held node's result over its input, and a library's viewport
-//! chrome.
+//! latest-wins jobs, the inspector's row hooks, a dropped Material, the
+//! vocabulary's node edit, a held node's result over its input, and a
+//! library's viewport chrome.
 use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire};
 use kinogaki_studio_api::{
@@ -13,13 +13,14 @@ use std::sync::LazyLock;
 use std::sync::atomic::Ordering;
 use studio_ui_api::Ui;
 use studio_ui_api::gizmo::Pivot;
+use studio_ui_api::host::ObjectRef;
 use studio_ui_api::host::{
     Cx, HostLatestExt, HostShell, HostSlotsExt, HostStatus, HostUndo, HostView, InspectorCx,
     LatestKey,
 };
 use studio_ui_api::package::{
-    ContextPart, Inspector, Invoked, Library, RowAction, UiPackage, ViewportSpec, Vocabulary,
-    WithUi,
+    ContextPart, Inspector, Invoked, Library, Materials, RowAction, UiPackage, ViewportSpec,
+    Vocabulary, WithUi,
 };
 use studio_ui_api_testing::{FakeHost, FakeNetwork, HostCall, Hosting};
 
@@ -193,6 +194,26 @@ impl Vocabulary<Heard> for Edits {
     fn run(&self, _: &mut Heard, _: &mut dyn Cx, _: &str, _: Invoked) {}
 }
 
+struct Dropped;
+
+impl Materials<Heard> for Dropped {
+    fn assign(
+        &self,
+        s: &mut Heard,
+        _: &mut dyn Cx,
+        object: ObjectRef,
+        path: &str,
+    ) -> Result<(), Error> {
+        match path {
+            "" => Err(Error::invalid("no Material")),
+            _ => {
+                s.0.push(format!("{} {path}", object.0));
+                Ok(())
+            }
+        }
+    }
+}
+
 struct Counts;
 
 impl UiPackage for Counts {
@@ -204,7 +225,8 @@ impl UiPackage for Counts {
         vec![
             ContextPart::new(context())
                 .with_inspector(Rows)
-                .with_vocabulary(Edits),
+                .with_vocabulary(Edits)
+                .with_materials(Dropped),
         ]
     }
 }
@@ -223,6 +245,26 @@ fn row_actions_and_typing_reach_the_contexts_parts() {
     assert_eq!(
         hosted.state::<Heard>().0,
         ["4 group Pick", "4 group Some(\"top\")", "4 group None",]
+    );
+}
+
+#[test]
+fn a_dropped_material_reaches_the_contexts_part_with_its_refusal() {
+    let mut host = host();
+    let package = Package::new(PackageId::declared("acme.counts"), "Counts").with_ui(Counts);
+    let mut hosted = Hosting::new(package, &host);
+    let mut refused = None;
+    hosted.with(|p, s| {
+        let materials = p.contexts[0].materials.as_ref().unwrap();
+        materials
+            .assign(s, &mut host, ObjectRef(3), "/Looks/Red")
+            .unwrap();
+        refused = materials.assign(s, &mut host, ObjectRef(3), "").err();
+    });
+    assert_eq!(hosted.state::<Heard>().0, ["3 /Looks/Red"]);
+    assert_eq!(
+        refused.map(|e| e.to_string()).as_deref(),
+        Some("no Material")
     );
 }
 

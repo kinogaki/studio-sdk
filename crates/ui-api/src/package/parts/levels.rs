@@ -35,8 +35,7 @@ part! {
         /// value it shows ([`HostDoc::shown`](crate::host::HostDoc::shown)):
         /// one set per element kind the selection holds (edges and faces after
         /// a Shift-mixed pick), no kind twice, each highlighted with its own
-        /// kind's style; what a Material dropped on that object takes, and the
-        /// selection the spreadsheet shows. A set may be empty: its level shows
+        /// kind's style, and the selection the spreadsheet shows. A set may be empty: its level shows
         /// with nothing selected at it (an empty point set still draws the
         /// points). `None`: the context keeps no component selection there.
         fn components(&self, s: &S, cx: &dyn Cx) -> Option<(ObjectRef, Vec<Components>)> {

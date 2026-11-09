@@ -1,7 +1,8 @@
 //! A context's parts, one trait each, over the package's state `S`: the
 //! selection [`Levels`]; in the viewport its [`LiveTools`], [`Panels`],
 //! [`Transforms`] and [`Display`]; the
-//! [`Inspector`] and the [`Vocabulary`]. A context has the parts it gives and nothing else: what
+//! [`Inspector`], the [`Vocabulary`] and what a dropped Material does
+//! ([`Materials`]). A context has the parts it gives and nothing else: what
 //! a part does is there only where the part is.
 //!
 //! Each method gets the package's state and the call's context (`cx`);
@@ -27,10 +28,12 @@
 //! of it.
 mod content;
 mod levels;
+mod materials;
 mod viewport;
 
 pub use content::{Inspector, Invoked, RowAction, Vocabulary};
 pub use levels::Levels;
+pub use materials::Materials;
 pub use viewport::{Display, LiveTools, Panels, Transforms};
 
 use std::any::Any;

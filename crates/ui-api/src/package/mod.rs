@@ -86,7 +86,8 @@ pub use library::{
     ShelfEntry, Situation, Suggested, TabSpec, ViewMenus, ViewportSpec, VocabularyItem, When,
 };
 pub use parts::{
-    Display, Inspector, Invoked, Levels, LiveTools, Panels, RowAction, Transforms, Vocabulary,
+    Display, Inspector, Invoked, Levels, LiveTools, Materials, Panels, RowAction, Transforms,
+    Vocabulary,
 };
 pub use settings::{PageRows, SettingsPage};
 pub use view::{Holds, KeyPress};
@@ -151,6 +152,8 @@ pub struct ContextPart<S: ?Sized> {
     pub inspector: Option<Box<dyn Inspector<S>>>,
     /// Its tools and commands.
     pub vocabulary: Option<Box<dyn Vocabulary<S>>>,
+    /// What a Material dropped on its objects does; `None`: they refuse it.
+    pub materials: Option<Box<dyn Materials<S>>>,
 }
 
 /// `with_*`: the context with part `$field` given.
@@ -179,6 +182,7 @@ impl<S: ?Sized> ContextPart<S> {
             display: None,
             inspector: None,
             vocabulary: None,
+            materials: None,
         }
     }
 
@@ -203,6 +207,8 @@ impl<S: ?Sized> ContextPart<S> {
         with_inspector: inspector: Inspector,
         /// With a vocabulary.
         with_vocabulary: vocabulary: Vocabulary,
+        /// With what a dropped Material does.
+        with_materials: materials: Materials,
     }
 }
 
@@ -219,6 +225,7 @@ impl<S: ?Sized> fmt::Debug for ContextPart<S> {
             .field("display", &has(self.display.is_some()))
             .field("inspector", &has(self.inspector.is_some()))
             .field("vocabulary", &has(self.vocabulary.is_some()))
+            .field("materials", &has(self.materials.is_some()))
             .finish()
     }
 }

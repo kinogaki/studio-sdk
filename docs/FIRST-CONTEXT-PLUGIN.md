@@ -315,6 +315,8 @@ impl Inspector<Pinning> for PinInspector {
 
 ```
 
+**Materials.** A Material dragged from Studio's Materials pane and let go over one of the context's objects calls `Materials::assign` with the object and the Material's absolute path, inside one undo step. Give the part (`with_materials`) when your objects can carry a Material; Mesh adds its Material node after the displayed one, on the open object's selection or on all of it. Without the part your objects refuse the drop.
+
 ## 7. One package
 
 The UI is part of the package it belongs to: `with_ui` adds it, and the plugin exports the one package. Its id, label and slots are the `Package`'s. Studio's registry checks the UI's contexts like every other id: under the package's vendor, and given parts by no other package.
