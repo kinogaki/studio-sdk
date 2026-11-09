@@ -99,13 +99,15 @@ fn creations_are_the_kinds_types_an_engine_renders_under_its_prefix() {
             "Cylinder Light",
             "Distant Light",
             "Dome Light",
+            "Portal Light",
+            "Geometry Light",
             "Glow"
         ]
     );
     assert_eq!(made[0].id, CreationId::declared("acme.ray.rect_light"));
     assert_eq!(made[0].home, Home::family().group("Lights"));
     assert!(made[0].aliases.contains(&"area".to_owned()));
-    let glow = kind.create(&made[7], &cx(&engines)).unwrap();
+    let glow = kind.create(&made[9], &cx(&engines)).unwrap();
     assert_eq!(kind.declared(&*glow)[0].type_id.as_str(), "acme.ray.glow");
     // The Spot Light is a sphere light, shaped.
     assert_eq!(made[3].id, CreationId::declared("acme.ray.spot_light"));

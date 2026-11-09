@@ -1,10 +1,11 @@
 //! How a [`DeclaredKind`](super::DeclaredKind)'s lights show in the
-//! viewport: their line glyphs (a rect's or disk's outline with an arrow
-//! down its −Z, a sphere, a tube along X, a point's or line's cross, a
-//! dome's globe, a distant light's parallel rays, a shaped light's cone,
-//! another type a ring) and their handles (a size or radius, a shaped
-//! light's cone and softness, a distant light's angle), by their standard
-//! shapes. Studio places, picks, frames and drags them.
+//! viewport: their line glyphs (a rect's, disk's or portal's outline with an
+//! arrow down its −Z, a portal's crossed, a sphere, a tube along X, a
+//! point's or line's cross, a dome's globe, a distant light's parallel
+//! rays, a shaped light's cone, a geometry light's star, another type a
+//! ring) and their handles (a size or radius, a shaped light's cone and
+//! softness, a distant light's angle), by their standard shapes. Studio
+//! places, picks, frames and drags them.
 use super::kind::DeclaredBody;
 use crate::cook::{Handle, HandleKind, Scalar, Vector};
 use crate::facets::{GlyphScale, Glyphs};
@@ -61,11 +62,22 @@ impl Glyphs for LightGlyphs {
         };
         match light.shape {
             LightShape::Rect { width, height, .. } => {
-                let (w, h) = (f64::from(width) * 0.5, f64::from(height) * 0.5);
-                let corners =
-                    [[-w, -h], [w, -h], [w, h], [-w, h]].map(|[x, y]| Vec3::new(x, y, 0.0));
-                out.extend((0..4).map(|i| [corners[i], corners[(i + 1) % 4]]));
+                rectangle(&mut out, width, height);
                 arrow(&mut out, Vec3::ZERO, DOWN, X, size);
+            }
+            LightShape::Portal { width, height, .. } => {
+                // An opening: its outline crossed, light passing down −Z.
+                let corners = rectangle(&mut out, width, height);
+                out.extend([[corners[0], corners[2]], [corners[1], corners[3]]]);
+                arrow(&mut out, Vec3::ZERO, DOWN, X, size);
+            }
+            LightShape::Geometry { .. } => {
+                // Its mesh emits; where it stands, a star of six rays.
+                let half = size * 0.2;
+                cross(&mut out, half);
+                for d in [X + Y, X - Y] {
+                    out.push([d * (-half * 0.7), d * (half * 0.7)]);
+                }
             }
             LightShape::Disk { radius } => {
                 circle(&mut out, Vec3::ZERO, X, Y, f64::from(radius));
@@ -129,6 +141,14 @@ impl Glyphs for LightGlyphs {
     }
 }
 
+/// A `width` × `height` rectangle's outline in the XY plane; its corners.
+fn rectangle(out: &mut Vec<[Vec3; 2]>, width: f32, height: f32) -> [Vec3; 4] {
+    let (w, h) = (f64::from(width) * 0.5, f64::from(height) * 0.5);
+    let corners = [[-w, -h], [w, -h], [w, h], [-w, h]].map(|[x, y]| Vec3::new(x, y, 0.0));
+    out.extend((0..4).map(|i| [corners[i], corners[(i + 1) % 4]]));
+    corners
+}
+
 /// A small cross of three lines `half` each way: a point's or line's mark.
 fn cross(out: &mut Vec<[Vec3; 2]>, half: f64) {
     for axis in [X, Y, Z] {
@@ -136,9 +156,9 @@ fn cross(out: &mut Vec<[Vec3; 2]>, half: f64) {
     }
 }
 
-/// A light `prim`'s handles: a rect's size, a disk's, sphere's or
-/// cylinder's radius, a shaped light's cone and softness, a distant light's
-/// angle; none for a dome or another type.
+/// A light `prim`'s handles: a rect's or portal's size, a disk's, sphere's
+/// or cylinder's radius, a shaped light's cone and softness, a distant
+/// light's angle; none for a dome, a geometry light or another type.
 pub(super) fn handles(prim: &Declared) -> Vec<Handle> {
     let origin = || Vector::fixed(Vec3::ZERO);
     let angle = |label: &str, name: &str, within: Option<&str>| {
@@ -164,7 +184,7 @@ pub(super) fn handles(prim: &Declared) -> Vec<Handle> {
         return Vec::new();
     };
     let mut handles = match light.shape {
-        LightShape::Rect { .. } => {
+        LightShape::Rect { .. } | LightShape::Portal { .. } => {
             let size = Vector::components("width", "height", 0.0);
             let size = HandleKind::Box {
                 center: origin(),
@@ -175,9 +195,10 @@ pub(super) fn handles(prim: &Declared) -> Vec<Handle> {
         LightShape::Disk { .. } | LightShape::Sphere { point: false, .. } => vec![radius(2)],
         LightShape::Cylinder { line: false, .. } => vec![radius(0)],
         LightShape::Distant { .. } => vec![angle("Angle", "angle", None).range(0.0, 180.0)],
-        LightShape::Sphere { .. } | LightShape::Cylinder { .. } | LightShape::Dome { .. } => {
-            Vec::new()
-        }
+        LightShape::Sphere { .. }
+        | LightShape::Cylinder { .. }
+        | LightShape::Dome { .. }
+        | LightShape::Geometry { .. } => Vec::new(),
     };
     if light.shaping.is_some() {
         handles.extend([
@@ -207,10 +228,12 @@ mod tests {
         }
     }
 
-    /// The standard light types: rect, disk, sphere, cylinder, distant and
-    /// dome.
-    fn types() -> [PrimType; 6] {
-        standard::lights().try_into().expect("six standard lights")
+    /// The standard light types: rect, disk, sphere, cylinder, distant,
+    /// dome, portal and geometry.
+    fn types() -> [PrimType; 8] {
+        standard::lights()
+            .try_into()
+            .expect("eight standard lights")
     }
 
     fn unit(size: f64) -> GlyphScale {
@@ -232,7 +255,7 @@ mod tests {
 
     #[test]
     fn glyphs_follow_the_light_shape() {
-        let [rect, _, sphere, cylinder, _, dome] = types();
+        let [rect, _, sphere, cylinder, _, dome, portal, geometry] = types();
         let rect = light(
             &rect,
             &[
@@ -263,11 +286,28 @@ mod tests {
         // A dome is a globe one grid step round, sized by the grid.
         let dome = light(&dome, &[]);
         assert!((extent(&LightGlyphs.lines(&dome, unit(10.0)))[0] - 10.0).abs() < 1e-9);
+        // A portal is its outline, crossed, with the arrow of its light.
+        let portal = light(&portal, &[("width", Value::Number(3.0))]);
+        let lines = LightGlyphs.lines(&portal, unit(1.0));
+        assert_eq!(extent(&lines), [1.5, 0.5, 1.0]);
+        assert_eq!(lines.len(), 4 + 2 + 3);
+        // A geometry light is a small star where it stands.
+        let star = LightGlyphs.lines(&light(&geometry, &[]), unit(1.0));
+        assert_eq!((star.len(), extent(&star)[2]), (5, 0.2));
     }
 
     #[test]
     fn handles_bind_to_the_light_shape() {
-        let [rect, disk, sphere, cylinder, distant, dome] = types();
+        let [
+            rect,
+            disk,
+            sphere,
+            cylinder,
+            distant,
+            dome,
+            portal,
+            geometry,
+        ] = types();
         let names = |body: &DeclaredBody| -> Vec<Vec<String>> {
             (handles(&body.prim).iter())
                 .map(|h| h.parameters().into_iter().map(str::to_owned).collect())
@@ -289,5 +329,7 @@ mod tests {
         assert!(names(&point).is_empty());
         assert_eq!(names(&light(&distant, &[])), [vec!["angle"]]);
         assert!(handles(&light(&dome, &[]).prim).is_empty());
+        assert_eq!(names(&light(&portal, &[])), [vec!["width", "height"]]);
+        assert!(handles(&light(&geometry, &[]).prim).is_empty());
     }
 }

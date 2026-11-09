@@ -6,10 +6,19 @@
 //! The standard types ([`crate::standard`]: UsdLux's lights and fog) are
 //! declared alike by every engine that renders them, so they keep their id
 //! across engines. An engine adds types of its own (a rim light).
+//!
+//! A prim's object rows ([`ValueKind::Object`]: a portal's dome, a geometry
+//! light's mesh) name the host's objects, which an engine never sees: the
+//! host sends what each names as the prims it renders as
+//! ([`Declared::members`]).
+//!
+//! [`ValueKind::Object`]: kinogaki_value::ValueKind::Object
 
 use kinogaki_geometry::{Sampled, Xform};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::id::PrimId;
 use crate::settings::Textures;
 use kinogaki_value::{Parameters, ParametersExt, PrimTypeId, Schema, Value};
 
@@ -66,6 +75,33 @@ impl PrimType {
     }
 }
 
+/// The prims an object row names, as the host resolved it for one engine:
+/// an object's Shape prims and Instancers (a prototype renders through the
+/// Instancers placing it) and the prims its kind declares. Held sorted, so
+/// [`holds`](Self::holds) searches.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Members(Arc<[PrimId]>);
+
+impl Members {
+    /// `prims`, sorted, each once.
+    pub fn new(prims: impl IntoIterator<Item = PrimId>) -> Members {
+        let mut prims: Vec<PrimId> = prims.into_iter().collect();
+        prims.sort_unstable();
+        prims.dedup();
+        Members(prims.into())
+    }
+
+    /// Whether it holds `prim`.
+    pub fn holds(&self, prim: PrimId) -> bool {
+        self.0.binary_search(&prim).is_ok()
+    }
+
+    /// The prims it holds, in order.
+    pub fn prims(&self) -> &[PrimId] {
+        &self.0
+    }
+}
+
 /// A placed prim of a declared type: its values by parameter name and where
 /// it sits. A host sends the prims that render: a hidden light is no prim.
 #[derive(Clone, Debug, PartialEq)]
@@ -79,6 +115,11 @@ pub struct Declared {
     /// Its image values' Texture prims (filled by the host as it sends the
     /// prim).
     pub textures: Textures,
+    /// What its object rows name, by the row's name, as prims of this
+    /// engine's scene (filled by the host as it sends the prim, and sent
+    /// again when they change); a row naming nothing, or no object row, has
+    /// none.
+    pub members: BTreeMap<String, Members>,
     /// Prim to world across the shutter (unused by atmospheres).
     pub xform: Sampled<Xform>,
 }
@@ -90,8 +131,14 @@ impl Declared {
             type_id,
             values,
             textures: Textures::new(),
+            members: BTreeMap::new(),
             xform: Sampled::still(Xform::IDENTITY),
         }
+    }
+
+    /// What object row `name` names (none when it names nothing).
+    pub fn members(&self, name: &str) -> Members {
+        self.members.get(name).cloned().unwrap_or_default()
     }
 
     /// Value `name`.
@@ -124,5 +171,25 @@ impl Declared {
             .color(name)
             .unwrap_or([0.0; 3])
             .map(|c| c as f32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prim(slot: u32) -> PrimId {
+        PrimId {
+            slot,
+            generation: 0,
+        }
+    }
+
+    #[test]
+    fn members_hold_the_prims_named_each_once() {
+        let named = Members::new([prim(3), prim(1), prim(3)]);
+        assert_eq!(named.prims(), [prim(1), prim(3)]);
+        assert!(named.holds(prim(1)) && !named.holds(prim(2)));
+        assert!(!Members::default().holds(prim(0)));
     }
 }

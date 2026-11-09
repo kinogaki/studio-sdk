@@ -81,7 +81,11 @@ use std::path::Path;
 pub type FormatOptions = Parameters;
 
 /// One item of a file: a value or a group, named, placed, and under a
-/// parent.
+/// parent. A value naming another item of the same list (a portal's dome,
+/// a geometry light's mesh: an [`ObjectRef`](crate::ObjectRef) in a light
+/// value) names it by its index in the list, both ways: the host names the
+/// objects made of them on Import, and the items written of the objects
+/// named on Export.
 #[derive(Clone, Debug)]
 pub struct FileItem {
     /// Its name in the file (a USD prim's, an OBJ group's); empty for an

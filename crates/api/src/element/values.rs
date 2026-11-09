@@ -10,6 +10,7 @@
 //! | Bool | [`Bool`](Field::Bool) |
 //! | Choice | [`Text`](Field::Text): its key |
 //! | Text | [`Text`](Field::Text) |
+//! | Object | [`I64s`](Field::I64s): none, or the object's id (an id in a project; an item's index where a format's items name one another) |
 //! | Ramp | [`F64s`](Field::F64s): a key after another, each its position, its value (one channel, or three) and its interpolation's place in `Interpolation::ALL` |
 //! | ToneCurves | [`F64s`](Field::F64s): a curve after another, its interpolation (0 monotone, 1 linear), its key count, then its keys' x, y |
 //!
@@ -33,7 +34,7 @@ use crate::standard::embedded_file;
 use crate::{Error, Parameters};
 use kinogaki_geometry::image::{ImageColor, ImageFile, ImageSource};
 use kinogaki_render_api::Parameter;
-use kinogaki_value::ImageRef;
+use kinogaki_value::{ImageRef, ObjectRef};
 use std::collections::btree_map::Entry;
 use std::sync::Arc;
 
@@ -153,8 +154,8 @@ pub fn read_values<'d>(
 /// `value` as a field (named `name`, for what it says).
 ///
 /// # Errors
-/// An object (it saves with its kind's codec), a ramp without keys, or data
-/// (it saves as an element of its own).
+/// An id past `i64`, a ramp without keys, or data (it saves as an element
+/// of its own).
 pub fn field_of(name: &str, value: &Value) -> Result<Field, Error> {
     let refused = |what: &str| Error::invalid(format_args!("{name}: {what}"));
     Ok(match value {
@@ -165,7 +166,10 @@ pub fn field_of(name: &str, value: &Value) -> Result<Field, Error> {
         Value::Bool(b) => Field::Bool(*b),
         Value::Choice(key) => Field::Text(key.to_string()),
         Value::Text(t) => Field::Text(t.clone()),
-        Value::Object(_) => return Err(refused("an object saves with its kind's codec")),
+        Value::Object(object) => {
+            let id = |o: &ObjectRef| i64::try_from(o.0).map_err(|_| refused("an id out of range"));
+            Field::I64s(object.iter().map(id).collect::<Result<_, _>>()?)
+        }
         Value::Ramp(r) if r.keys.is_empty() => return Err(refused("a ramp with no key")),
         Value::Ramp(r) => Field::F64s(ramp_numbers(r)),
         Value::ToneCurves(curves) => Field::F64s(curve_numbers(curves)),
@@ -229,7 +233,13 @@ pub fn value_of(field: FieldRef<'_>, kind: Option<&ValueKind>) -> Result<Value, 
             Value::ToneCurves(curves_of(numbers()?).ok_or_else(|| wrong("tone curves"))?)
         }
         Some(K::Vector { .. } | K::Channels(_)) => Value::Numbers(numbers()?.to_vec()),
-        Some(K::Object(_)) => return Err(wrong("a node's or a tool's value")),
+        Some(K::Object(_)) => match field {
+            FieldRef::I64s([]) => Value::Object(None),
+            FieldRef::I64s(&[id]) => Value::Object(Some(ObjectRef(
+                u64::try_from(id).map_err(|_| wrong("an id"))?,
+            ))),
+            _ => return Err(wrong("an object's id")),
+        },
         Some(K::Data(_)) => return Err(wrong("a data element")),
         Some(K::Image) => return Err(wrong("an image element")),
         Some(_) => return Err(wrong("a kind no field holds")),
@@ -370,6 +380,19 @@ mod tests {
         values.insert("width".into(), Value::Text("wide".into()));
         let why = back(&values, &[width()]).unwrap_err().to_string();
         assert!(why.contains("width is not a float64"), "{why}");
+    }
+
+    #[test]
+    fn an_object_value_saves_as_its_id_or_none() {
+        let kind = ValueKind::Object(crate::params::RefFilter::objects([]));
+        let dome = Parameter::new("dome", "Dome", kind, Value::Object(None));
+        for held in [None, Some(ObjectRef(42))] {
+            let values = Parameters::from([("dome".to_owned(), Value::Object(held))]);
+            assert_eq!(back(&values, std::slice::from_ref(&dome)).unwrap(), values);
+        }
+        let wrong = Parameters::from([("dome".to_owned(), Value::Text("/Sky".into()))]);
+        let why = back(&wrong, &[dome]).unwrap_err().to_string();
+        assert!(why.contains("dome is not an object's id"), "{why}");
     }
 
     #[test]

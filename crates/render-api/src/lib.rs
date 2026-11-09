@@ -52,7 +52,7 @@ pub use aov::{Aov, AovClass, AovDesc, AovFormat, AovSpec};
 /// in the project's working space; the host converts them to this as it
 /// sends them, through its color service.
 pub const RENDER_SPACE: &str = "ACEScg";
-pub use declared::{Declared, PrimType, Role};
+pub use declared::{Declared, Members, PrimType, Role};
 pub use description::{
     Capabilities, EngineBuilder, EngineDescription, Engines, MaterialRules, Motion,
 };

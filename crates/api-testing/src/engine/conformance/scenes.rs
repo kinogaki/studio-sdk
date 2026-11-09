@@ -4,7 +4,10 @@
 //!
 //! The subjects stand on a quad facing +Z, lit by the standard dome when
 //! the engine declares it, seen by an orthographic camera from above a
-//! corner; a light is placed above the quad, emitting down -Z. An engine
+//! corner; a light is placed above the quad, emitting down -Z: a portal
+//! over the quad, naming the dome it lets through; a geometry light naming
+//! a small quad above the floor (prims are numbered as a scene lists them,
+//! its setting first). An engine
 //! taking materials also renders MaterialX materials as a host sends them,
 //! adopted ([`Engines::adopt`]): an OpenPBR Surface; a glTF PBR of an
 //! occlusion-roughness-metallic texture, cut out by its alpha; a USD Preview
@@ -20,8 +23,8 @@ use kinogaki_render_api::geometry::{
 use kinogaki_render_api::material::mtlx;
 use kinogaki_render_api::value::{Parameters, Value};
 use kinogaki_render_api::{
-    Camera, Declared, EngineDescription, Engines, Id, Instancer, Material, MaterialNetwork, Prim,
-    PrimKind, Projection, Shape, Subsets, Topology, standard,
+    Camera, Declared, EngineDescription, Engines, Id, Instancer, Material, MaterialNetwork,
+    Members, Prim, PrimKind, Projection, Shape, Subsets, Topology, standard,
 };
 use std::sync::Arc;
 
@@ -127,10 +130,29 @@ pub(super) fn scenes(description: &EngineDescription) -> Vec<Scene> {
         let mut light = filled(Declared::new(ty.id, ty.schema().values()), description);
         let above = Vec3::new(0.0, 0.0, 3.0);
         light.xform = Sampled::still(Xform::from_axes(Vec3::X, Vec3::Y, Vec3::Z, above));
-        add(
-            &ty.label,
-            (vec![floor.clone()], vec![Prim::Declared(light)]),
-        );
+        // What it names stands in its setting, after the floor (prim 1).
+        let named = match ty.id {
+            standard::PORTAL_LIGHT => match &dome {
+                Some(dome) => Some(("dome", dome.clone())),
+                None => continue,
+            },
+            standard::GEOMETRY_LIGHT => {
+                let panel = quad(0.5)
+                    .rebuilt()
+                    .xform(Sampled::still(Xform::translation(Vec3::new(0.0, 0.0, 1.5))));
+                Some((
+                    "geometry",
+                    Prim::Shape(panel.build().expect("a whole quad")),
+                ))
+            }
+            _ => None,
+        };
+        let mut setting = vec![floor.clone()];
+        if let Some((row, prim)) = named {
+            light.members.insert(row.to_owned(), Members::new([id(1)]));
+            setting.push(prim);
+        }
+        add(&ty.label, (setting, vec![Prim::Declared(light)]));
     }
     if let Some(dome) = dome {
         add("dome light", (vec![floor.clone()], vec![dome]));

@@ -381,6 +381,7 @@ kinogaki-render-api/lib test aov::tests::cryptomatte_ranks_fill_layers_of_two_an
 kinogaki-render-api/lib test aov::tests::each_output_class_is_its_layer_and_sample
 kinogaki-render-api/lib test aov::tests::the_specifications_hashes_and_keys
 kinogaki-render-api/lib test aov::tests::values_not_of_the_frame_are_refused
+kinogaki-render-api/lib test declared::tests::members_hold_the_prims_named_each_once
 kinogaki-render-api/lib test engine::tests::a_dropped_deliverer_resolves_its_result_and_wakes_once
 kinogaki-render-api/lib test engine::tests::a_failure_resolves_once_saying_why
 kinogaki-render-api/lib test material::adopt::tests::a_conditional_of_values_passes_the_input_it_chooses_on
@@ -424,6 +425,7 @@ kinogaki-render-api/lib test standard::ies::tests::multiplier_and_ballast_scale_
 kinogaki-render-api/lib test standard::ies::tests::power_is_the_mean_candela_over_its_sphere
 kinogaki-render-api/lib test standard::ies::tests::tilt_data_is_skipped_and_other_types_refused
 kinogaki-render-api/lib test standard::light::tests::a_light_keeps_its_motion_through_its_prim
+kinogaki-render-api/lib test standard::light::tests::a_portal_and_a_geometry_light_keep_what_they_name_through_their_prims
 kinogaki-render-api/lib test standard::light::tests::keys_are_usds_tokens
 kinogaki-render-api/lib test tests::batches::a_change_to_an_added_prim_replaces_its_payload
 kinogaki-render-api/lib test tests::batches::a_primvar_reads_at_each_corner_by_one_rule
@@ -549,6 +551,7 @@ kinogaki-studio-api/lib test element::memory::tests::fields_children_and_metadat
 kinogaki-studio-api/lib test element::memory::tests::values_are_the_same_as_the_caller_says
 kinogaki-studio-api/lib test element::values::tests::a_damaged_ramp_or_curve_is_refused
 kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused
+kinogaki-studio-api/lib test element::values::tests::an_object_value_saves_as_its_id_or_none
 kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back
 kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewports_detail_unless_told
 kinogaki-studio-api/lib test format::budget::tests::allocations_are_refused_alone_and_together_and_clones_share_them

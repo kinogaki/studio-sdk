@@ -79,6 +79,10 @@ fn aliases(ty: &PrimType) -> &'static [&'static str] {
         Some(LightShape::Cylinder { .. }) => &["usdlux", "tube", "line", "cylinderlight"],
         Some(LightShape::Dome { .. }) => &["usdlux", "environment", "sky", "domelight", "hdri"],
         Some(LightShape::Distant { .. }) => &["usdlux", "sun", "directional", "distantlight"],
+        Some(LightShape::Portal { .. }) => &["usdlux", "portallight", "window", "skylight"],
+        Some(LightShape::Geometry { .. }) => {
+            &["usdlux", "meshlight", "geometrylight", "emissive", "neon"]
+        }
         None if ty.role == Role::Atmosphere => &["mist", "haze", "atmosphere", "height fog"],
         None => &[],
     }

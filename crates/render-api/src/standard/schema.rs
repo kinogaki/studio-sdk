@@ -2,15 +2,18 @@
 //! then the emission's, then LightAPI's Normalize, Diffuse, Specular and
 //! whether the camera sees it, then its own; then the Shaping section
 //! (ShapingAPI, opened by its toggle) on the lights it shapes, and the
-//! Shadows section (ShadowAPI) on all. Defaults are UsdLux's fallbacks.
+//! Shadows section (ShadowAPI) on those that cast shadows. A portal has its
+//! size and its dome alone; a geometry light no camera row (its mesh shows
+//! as itself), no shaping and no shadows. Defaults are UsdLux's fallbacks.
 use super::{
-    CYLINDER_LIGHT, DISK_LIGHT, DISTANT_LIGHT, DOME_LIGHT, ILLUMINANTS, LIGHT_GROUP, RECT_LIGHT,
-    SHADOW_GROUP, SHAPING_GROUP, SPHERE_LIGHT, choice,
+    CYLINDER_LIGHT, DISK_LIGHT, DISTANT_LIGHT, DOME_LIGHT, GEOMETRY_DATA, GEOMETRY_LIGHT,
+    ILLUMINANTS, LIGHT_DATA, LIGHT_GROUP, MaterialSync, PORTAL_LIGHT, RECT_LIGHT, SHADOW_GROUP,
+    SHAPING_GROUP, SPHERE_LIGHT, choice,
 };
 use crate::declared::{PrimType, Role};
 use kinogaki_value::{
-    Choice, Condition, Number, NumberLook, Parameter, PrimTypeId, Schema, Section, Unit, Value,
-    ValueKind,
+    Choice, Condition, Number, NumberLook, Parameter, PrimTypeId, RefFilter, Schema, Section, Unit,
+    Value, ValueKind,
 };
 use std::sync::Arc;
 
@@ -89,18 +92,22 @@ fn file(name: &str, label: &str, group: &str) -> Parameter {
 }
 
 /// LightAPI's rows after the emission: Normalize (the dome has none: UsdLux
-/// ignores it there), Diffuse, Specular, and Visible to Camera (off), shown
-/// while `seen` holds (a point or line has nothing to see).
-fn light_api(normalize: bool, seen: Option<Condition>) -> Vec<Parameter> {
+/// ignores it there), Diffuse, Specular, and Visible to Camera (off) where
+/// the camera may see it (`seen`: `Some` of when it does, a point or line
+/// having nothing to see), none where it shows as its mesh.
+fn light_api(normalize: bool, seen: Option<Option<Condition>>) -> Vec<Parameter> {
     let multiplier = |name: &str, label: &str| {
         Parameter::slider(name, label, (0.0, 1e6), (0.0, 2.0), 2, 1.0).group(LIGHT_GROUP)
     };
-    let mut camera = Parameter::toggle("cameraVisibility", "Visible to Camera", false)
-        .group(LIGHT_GROUP)
-        .help("The camera sees the light itself; it lights, and reflects, either way");
-    if let Some(seen) = seen {
-        camera = camera.requires(seen);
-    }
+    let camera = seen.map(|when| {
+        let camera = Parameter::toggle("cameraVisibility", "Visible to Camera", false)
+            .group(LIGHT_GROUP)
+            .help("The camera sees the light itself; it lights, and reflects, either way");
+        match when {
+            Some(when) => camera.requires(when),
+            None => camera,
+        }
+    });
     let normalize = normalize.then(|| {
         Parameter::toggle("normalize", "Normalize", false)
             .group(LIGHT_GROUP)
@@ -110,8 +117,8 @@ fn light_api(normalize: bool, seen: Option<Condition>) -> Vec<Parameter> {
         .chain([
             multiplier("diffuse", "Diffuse"),
             multiplier("specular", "Specular"),
-            camera,
         ])
+        .chain(camera)
         .collect()
 }
 
@@ -189,16 +196,18 @@ fn shadow() -> Schema {
 
 /// A standard light type: its `shape` rows, the emission's (`intensity` by
 /// default), LightAPI's (Normalize when `normalize`, Visible to Camera
-/// while `seen` holds), then `after`; Shaping when `shaped`, then Shadows.
+/// where `seen` says), then `after`; Shaping when `shaped`, then Shadows
+/// when `shadowed`.
 struct Kind {
     id: PrimTypeId,
     label: &'static str,
     shape: Vec<Parameter>,
     intensity: f64,
     normalize: bool,
-    seen: Option<Condition>,
+    seen: Option<Option<Condition>>,
     after: Vec<Parameter>,
     shaped: bool,
+    shadowed: bool,
 }
 
 impl Kind {
@@ -209,9 +218,10 @@ impl Kind {
             shape,
             intensity: 1.0,
             normalize: true,
-            seen: None,
+            seen: Some(None),
             after: Vec::new(),
             shaped: true,
+            shadowed: true,
         }
     }
 
@@ -225,7 +235,10 @@ impl Kind {
         if self.shaped {
             schema = schema.merged(shaping());
         }
-        PrimType::new(self.id, self.label, Role::Light, schema.merged(shadow()))
+        if self.shadowed {
+            schema = schema.merged(shadow());
+        }
+        PrimType::new(self.id, self.label, Role::Light, schema)
     }
 }
 
@@ -260,7 +273,7 @@ pub(crate) fn sphere_light() -> PrimType {
         Parameter::toggle("treatAsPoint", "Treat As Point", false).group(LIGHT_GROUP),
     ];
     Kind {
-        seen: Some(Condition::when("treatAsPoint", false)),
+        seen: Some(Some(Condition::when("treatAsPoint", false))),
         ..Kind::new(SPHERE_LIGHT, "Sphere Light", shape)
     }
     .build()
@@ -276,7 +289,7 @@ pub(crate) fn cylinder_light() -> PrimType {
         Parameter::toggle("treatAsLine", "Treat As Line", false).group(LIGHT_GROUP),
     ];
     Kind {
-        seen: Some(Condition::when("treatAsLine", false)),
+        seen: Some(Some(Condition::when("treatAsLine", false))),
         ..Kind::new(CYLINDER_LIGHT, "Cylinder Light", shape)
     }
     .build()
@@ -340,6 +353,68 @@ pub(crate) fn dome_light() -> PrimType {
     .build()
 }
 
+/// UsdLux's PortalLight: a `width` × `height` (1 × 1) opening in its XY
+/// plane through which the dome light it names (`dome`, an object row; none
+/// by default) lights, toward its -Z. It has no emission of its own.
+pub(crate) fn portal_light() -> PrimType {
+    let dome = Parameter::new(
+        "dome",
+        "Dome",
+        ValueKind::Object(RefFilter::data([LIGHT_DATA])),
+        Value::Object(None),
+    )
+    .group(LIGHT_GROUP)
+    .help("The dome light that lights through it");
+    let rows = [
+        size("width", "Width", 1.0),
+        size("height", "Height", 1.0),
+        dome,
+    ];
+    let schema = Schema::default().section(Section::new(LIGHT_GROUP, "Light", true));
+    let schema = rows.into_iter().fold(schema, Schema::parameter);
+    PrimType::new(PORTAL_LIGHT, "Portal Light", Role::Light, schema)
+}
+
+/// A mesh that emits (UsdLux's MeshLightAPI, and its deprecated
+/// GeometryLight): the polygons object it names (`geometry`, an object row;
+/// none by default) and how its material takes part (`materialSyncMode`,
+/// MeshLightAPI's Material Glow Tints Light by default); the emission rows,
+/// Normalize, Diffuse and Specular. No camera row (the mesh shows as
+/// itself), no shaping, no shadows.
+pub(crate) fn geometry_light() -> PrimType {
+    let syncs = [
+        (MaterialSync::GlowTintsLight, "Material Glow Tints Light"),
+        (MaterialSync::Independent, "Independent"),
+        (MaterialSync::NoMaterialResponse, "No Material Response"),
+    ]
+    .map(|(sync, label)| (sync.key(), label));
+    let shape = vec![
+        Parameter::new(
+            "geometry",
+            "Geometry",
+            ValueKind::Object(RefFilter::data([GEOMETRY_DATA])),
+            Value::Object(None),
+        )
+        .group(LIGHT_GROUP)
+        .help("The mesh that emits the light"),
+        Parameter::choice(
+            "materialSyncMode",
+            "Material Sync",
+            &syncs,
+            MaterialSync::default().key(),
+        )
+        .group(LIGHT_GROUP)
+        .help("What the mesh shows, and whether its material's glow tints the light"),
+    ];
+    Kind {
+        seen: None,
+        shaped: false,
+        shadowed: false,
+        ..Kind::new(GEOMETRY_LIGHT, "Geometry Light", shape)
+    }
+    .build()
+}
+
 /// UsdLux's lights, in the order a UI lists them.
 pub fn lights() -> Vec<PrimType> {
     vec![
@@ -349,5 +424,7 @@ pub fn lights() -> Vec<PrimType> {
         cylinder_light(),
         distant_light(),
         dome_light(),
+        portal_light(),
+        geometry_light(),
     ]
 }

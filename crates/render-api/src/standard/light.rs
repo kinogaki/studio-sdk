@@ -1,17 +1,19 @@
 //! A standard light as a typed value ([`Light`]): its shape, one UsdLux
 //! kind's ([`LightShape`]), LightAPI's emission and multipliers, ShapingAPI's
 //! shaping ([`Shaping`]), ShadowAPI's ([`Shadow`]) and whether the camera
-//! sees it; decoded from a prim of its type and encoded as one.
+//! sees it; decoded from a prim of its type and encoded as one. What a type
+//! has no row for (a portal's emission) decodes as [`Light::default`]'s.
 use super::schema::{
-    cylinder_light, disk_light, distant_light, dome_light, rect_light, sphere_light,
+    cylinder_light, disk_light, distant_light, dome_light, geometry_light, portal_light,
+    rect_light, sphere_light,
 };
 use super::{
-    CYLINDER_LIGHT, DISK_LIGHT, DISTANT_LIGHT, DOME_LIGHT, Emission, RECT_LIGHT, SPHERE_LIGHT,
-    choice,
+    CYLINDER_LIGHT, DISK_LIGHT, DISTANT_LIGHT, DOME_LIGHT, Emission, GEOMETRY_LIGHT, PORTAL_LIGHT,
+    RECT_LIGHT, SPHERE_LIGHT, choice,
 };
 use crate::declared::{Declared, PrimType};
 use kinogaki_geometry::{Sampled, Xform};
-use kinogaki_value::{ImageRef, Value};
+use kinogaki_value::{ImageRef, ObjectRef, Value};
 
 /// How a dome's image is laid out (UsdLux's `inputs:texture:format`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -85,6 +87,43 @@ impl Pole {
     }
 }
 
+/// What a geometry light's mesh shows and what its light takes from the
+/// mesh's material (UsdLux's `light:materialSyncMode`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MaterialSync {
+    /// Rays see the material; its light is the light's emission times the
+    /// material's glow, where the material glows (MeshLightAPI's fallback).
+    #[default]
+    GlowTintsLight,
+    /// Rays see the material; its light is the light's emission alone.
+    Independent,
+    /// The mesh is the light alone: rays see its emission, and it scatters
+    /// nothing.
+    NoMaterialResponse,
+}
+
+impl MaterialSync {
+    /// Every mode, by its USD token.
+    pub const ALL: [(MaterialSync, &'static str); 3] = [
+        (MaterialSync::GlowTintsLight, "materialGlowTintsLight"),
+        (MaterialSync::Independent, "independent"),
+        (MaterialSync::NoMaterialResponse, "noMaterialResponse"),
+    ];
+
+    /// Its key, USD's token (`independent`).
+    pub fn key(self) -> &'static str {
+        Self::ALL
+            .iter()
+            .find(|(m, _)| *m == self)
+            .map_or("", |m| m.1)
+    }
+
+    /// The mode of key `key`.
+    pub fn of_key(key: &str) -> Option<MaterialSync> {
+        Self::ALL.iter().find(|(_, k)| *k == key).map(|m| m.0)
+    }
+}
+
 /// A standard light's shape: one UsdLux kind.
 #[derive(Clone, Debug, PartialEq)]
 pub enum LightShape {
@@ -143,6 +182,30 @@ pub enum LightShape {
         /// shines this color, linear ACEScg, times its intensity and
         /// exposure; above it, its emission. None: one color all round.
         ground: Option<[f32; 3]>,
+    },
+    /// A PortalLight: a `width` × `height` opening in its XY plane through
+    /// which a dome lights, toward its -Z. A dome a portal serves lights
+    /// only through its portals; a portal emits nothing of its own.
+    Portal {
+        /// Along X.
+        width: f32,
+        /// Along Y.
+        height: f32,
+        /// The dome light it serves (none: none); an engine reads its prim
+        /// from the portal's [`members`](Declared::members) (`dome`).
+        dome: Option<ObjectRef>,
+    },
+    /// A mesh that emits (MeshLightAPI; UsdLux's deprecated GeometryLight):
+    /// its triangles shine the light's emission from both sides (normalized:
+    /// over their area). Where the light is placed is unused.
+    Geometry {
+        /// The polygons object that emits (none: nothing does); an engine
+        /// reads its prims from the light's [`members`](Declared::members)
+        /// (`geometry`).
+        geometry: Option<ObjectRef>,
+        /// What its mesh shows and what its light takes from the mesh's
+        /// material.
+        sync: MaterialSync,
     },
 }
 
@@ -293,8 +356,14 @@ fn image(prim: &Declared, name: &str) -> Option<ImageRef> {
     prim.value(name).and_then(Value::image).cloned()
 }
 
+/// The object value `name` of `prim`.
+fn object(prim: &Declared, name: &str) -> Option<ObjectRef> {
+    prim.value(name).and_then(Value::object)
+}
+
 impl Light {
-    /// `prim` as a standard light (none when it is of another type).
+    /// `prim` as a standard light (none when it is of another type), what
+    /// its type has no row for as [`Light::default`]'s.
     pub fn decode(prim: &Declared) -> Option<Light> {
         let shape = match prim.type_id {
             RECT_LIGHT => LightShape::Rect {
@@ -323,7 +392,30 @@ impl Light {
                 pole: Pole::of_key(prim.choice("poleAxis")).unwrap_or_default(),
                 ground: prim.bool("ground").then(|| prim.color("groundColor")),
             },
+            PORTAL_LIGHT => LightShape::Portal {
+                width: prim.float("width"),
+                height: prim.float("height"),
+                dome: object(prim, "dome"),
+            },
+            GEOMETRY_LIGHT => LightShape::Geometry {
+                geometry: object(prim, "geometry"),
+                sync: MaterialSync::of_key(prim.choice("materialSyncMode")).unwrap_or_default(),
+            },
             _ => return None,
+        };
+        let held = Light::default();
+        let has = |name: &str| prim.value(name).is_some();
+        let float = |name: &str, fallback: f32| match has(name) {
+            true => prim.float(name),
+            false => fallback,
+        };
+        let flag = |name: &str, fallback: bool| match has(name) {
+            true => prim.bool(name),
+            false => fallback,
+        };
+        let color = |name: &str, fallback: [f32; 3]| match has(name) {
+            true => prim.color(name),
+            false => fallback,
         };
         let shaping = prim.bool("shaping").then(|| Shaping {
             cone_angle: prim.float("coneAngle"),
@@ -334,25 +426,26 @@ impl Light {
             ies_angle_scale: prim.float("iesAngleScale"),
             ies_normalize: prim.bool("iesNormalize"),
         });
+        let shadow = &held.shadow;
         Some(Light {
             shape,
             emission: Emission::of_key(prim.choice("emission")).unwrap_or_default(),
-            color: prim.color("color"),
-            intensity: prim.float("intensity"),
-            exposure: prim.float("exposure"),
-            normalize: prim.bool("normalize"),
-            color_temperature: prim.float("colorTemperature"),
-            diffuse: prim.float("diffuse"),
-            specular: prim.float("specular"),
+            color: color("color", held.color),
+            intensity: float("intensity", held.intensity),
+            exposure: float("exposure", held.exposure),
+            normalize: flag("normalize", held.normalize),
+            color_temperature: float("colorTemperature", held.color_temperature),
+            diffuse: float("diffuse", held.diffuse),
+            specular: float("specular", held.specular),
             shaping,
             shadow: Shadow {
-                enable: prim.bool("shadowEnable"),
-                color: prim.color("shadowColor"),
-                distance: prim.float("shadowDistance"),
-                falloff: prim.float("shadowFalloff"),
-                falloff_gamma: prim.float("shadowFalloffGamma"),
+                enable: flag("shadowEnable", shadow.enable),
+                color: color("shadowColor", shadow.color),
+                distance: float("shadowDistance", shadow.distance),
+                falloff: float("shadowFalloff", shadow.falloff),
+                falloff_gamma: float("shadowFalloffGamma", shadow.falloff_gamma),
             },
-            camera: prim.bool("cameraVisibility"),
+            camera: flag("cameraVisibility", held.camera),
             xform: prim.xform.clone(),
         })
     }
@@ -388,6 +481,8 @@ impl Light {
             LightShape::Cylinder { .. } => cylinder_light(),
             LightShape::Distant { .. } => distant_light(),
             LightShape::Dome { .. } => dome_light(),
+            LightShape::Portal { .. } => portal_light(),
+            LightShape::Geometry { .. } => geometry_light(),
         }
     }
 
@@ -441,6 +536,19 @@ impl Light {
                 if let Some(g) = ground {
                     set("groundColor", color(*g));
                 }
+            }
+            LightShape::Portal {
+                width,
+                height,
+                dome,
+            } => {
+                set("width", float(*width));
+                set("height", float(*height));
+                set("dome", Value::Object(*dome));
+            }
+            LightShape::Geometry { geometry, sync } => {
+                set("geometry", Value::Object(*geometry));
+                set("materialSyncMode", choice(sync.key()));
             }
         }
         set("emission", choice(self.emission.key()));
@@ -532,11 +640,57 @@ mod tests {
     }
 
     #[test]
+    fn a_portal_and_a_geometry_light_keep_what_they_name_through_their_prims() {
+        let portal = Light {
+            shape: LightShape::Portal {
+                width: 2.0,
+                height: 0.5,
+                dome: Some(ObjectRef(7)),
+            },
+            ..Light::default()
+        };
+        let prim = portal.declared();
+        assert_eq!(prim.type_id, super::super::PORTAL_LIGHT);
+        // A portal has its size and its dome alone.
+        let mut names: Vec<&str> = prim.values.keys().map(String::as_str).collect();
+        names.sort_unstable();
+        assert_eq!(names, ["dome", "height", "width"]);
+        assert_eq!(Light::decode(&prim), Some(portal));
+        let geometry = Light {
+            shape: LightShape::Geometry {
+                geometry: Some(ObjectRef(3)),
+                sync: MaterialSync::NoMaterialResponse,
+            },
+            intensity: 5.0,
+            normalize: true,
+            ..Light::default()
+        };
+        let prim = geometry.declared();
+        assert!(prim.value("cameraVisibility").is_none() && prim.value("shadowEnable").is_none());
+        assert_eq!(Light::decode(&prim), Some(geometry));
+        // MeshLightAPI's fallback when a prim says nothing else.
+        let fresh = Declared::new(
+            super::super::GEOMETRY_LIGHT,
+            geometry_light().schema().values(),
+        );
+        assert!(matches!(
+            Light::decode(&fresh).unwrap().shape,
+            LightShape::Geometry {
+                geometry: None,
+                sync: MaterialSync::GlowTintsLight
+            }
+        ));
+    }
+
+    #[test]
     fn keys_are_usds_tokens() {
         for (format, key) in DomeFormat::ALL {
             assert_eq!((format.key(), DomeFormat::of_key(key)), (key, Some(format)));
         }
         assert_eq!(Pole::of_key("Z"), Some(Pole::Z));
         assert_eq!(Pole::default().key(), "scene");
+        for (sync, key) in MaterialSync::ALL {
+            assert_eq!((sync.key(), MaterialSync::of_key(key)), (key, Some(sync)));
+        }
     }
 }
