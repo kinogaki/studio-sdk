@@ -364,6 +364,49 @@ impl Brep {
         &self.curves
     }
 
+    /// The smallest box the value is sure to lie in, from what bounds each
+    /// part of it: the bodies' vertices, their circles' and ellipses'
+    /// discs, their spheres' and tori's balls, the control points of their
+    /// NURBS curves and surfaces (which hold them), and the free curves.
+    /// A carrier that runs on (a plane, a cylinder) counts by its face's
+    /// edges. `None` when the value holds nothing.
+    pub fn bounds(&self) -> Option<crate::Bounds> {
+        let mut balls: Vec<(Vec3, f64)> = Vec::new();
+        let point = |p: &[f64; 3]| (Vec3::from(*p), 0.0);
+        for body in self.bodies.iter() {
+            let g = body.geometry();
+            balls.extend(g.points().iter().map(point));
+            for c in g.curves().iter() {
+                match c {
+                    Curve::Circle(c) => balls.push((c.frame().origin(), c.radius())),
+                    Curve::Ellipse(e) => {
+                        let [a, b] = e.semi_axes();
+                        balls.push((e.frame().origin(), a.max(b)));
+                    }
+                    Curve::Nurbs(n) => balls.extend(n.points().iter().map(point)),
+                    Curve::Line(_) => {}
+                }
+            }
+            for s in g.surfaces().iter() {
+                match s {
+                    Surface::Sphere(s) => balls.push((s.frame().origin(), s.radius())),
+                    Surface::Torus(t) => balls.push((t.frame().origin(), t.major() + t.minor())),
+                    Surface::Nurbs(n) => balls.extend(n.points().iter().map(point)),
+                    _ => {}
+                }
+            }
+        }
+        let ball = |&(c, r): &(Vec3, f64)| crate::Bounds {
+            min: c - Vec3::new(r, r, r),
+            max: c + Vec3::new(r, r, r),
+        };
+        balls
+            .iter()
+            .map(ball)
+            .chain(self.curves.bounds())
+            .reduce(crate::Bounds::union)
+    }
+
     /// The datums.
     pub fn datums(&self) -> &Column<Datum> {
         &self.datums

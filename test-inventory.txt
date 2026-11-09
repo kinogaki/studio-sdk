@@ -221,6 +221,7 @@ kinogaki-geometry/lib test brep::tests::reading::a_cone_closes_at_its_apex_with_
 kinogaki-geometry/lib test brep::tests::reading::a_cylinder_has_no_seam_and_its_loops_wrap
 kinogaki-geometry/lib test brep::tests::reading::a_trimmed_patch_is_a_sheet_on_its_surface
 kinogaki-geometry/lib test brep::tests::reading::a_value_holds_bodies_curves_and_datums
+kinogaki-geometry/lib test brep::tests::reading::a_value_s_bounds_hold_its_carriers_beyond_its_vertices
 kinogaki-geometry/lib test brep::tests::reading::a_whole_sphere_needs_no_loops
 kinogaki-geometry/lib test brep::tests::reading::an_edit_reads_one_body_and_builds_another
 kinogaki-geometry/lib test brep::tests::reading::attributes_follow_the_body_classes

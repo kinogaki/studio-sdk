@@ -410,3 +410,32 @@ fn a_value_holds_bodies_curves_and_datums() {
     );
     assert_eq!(Brep::empty(), Brep::default());
 }
+
+#[test]
+fn a_value_s_bounds_hold_its_carriers_beyond_its_vertices() {
+    let body = |b: BrepBuilder| b.build(Attributes::new()).unwrap();
+    let value = |bodies| {
+        Brep::new(
+            bodies,
+            crate::Geometry::empty(),
+            Vec::new(),
+            Attributes::new(),
+        )
+        .unwrap()
+    };
+    assert_eq!(value(Vec::new()).bounds(), None);
+    // A box by its vertices; a whole sphere, with none, by its ball.
+    let b = value(vec![body(cuboid([0.0; 3], [2.0, 3.0, 4.0]))])
+        .bounds()
+        .unwrap();
+    assert_eq!((b.min, b.max), ([0.0; 3].into(), [2.0, 3.0, 4.0].into()));
+    let b = value(vec![body(sphere(1.5))]).bounds().unwrap();
+    assert_eq!((b.min, b.max), ([-1.5; 3].into(), [1.5; 3].into()));
+    // Both: one box round them.
+    let both = value(vec![
+        body(cuboid([0.0; 3], [2.0, 3.0, 4.0])),
+        body(sphere(1.5)),
+    ]);
+    let b = both.bounds().unwrap();
+    assert_eq!((b.min, b.max), ([-1.5; 3].into(), [2.0, 3.0, 4.0].into()));
+}
