@@ -75,7 +75,7 @@ pub use paint::{
     Circle, IconShape, Painter, RectShape, Segment, Shape, Slot, Stroke, StrokeKind, TextShape,
 };
 pub use projection::ViewProjection;
-pub use response::{InnerResponse, Response, Sense};
+pub use response::{DragEnd, InnerResponse, Response, Sense};
 pub use sheet::{Edits, FieldKey, SheetStyle};
 pub use text::{Font, FontRole, TextStyle};
 pub use theme::{Metrics, Radii, Theme};

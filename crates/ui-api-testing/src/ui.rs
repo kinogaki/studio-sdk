@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use studio_ui_api::Body;
 use studio_ui_api::Color;
+use studio_ui_api::DragEnd;
 use studio_ui_api::Font;
 use studio_ui_api::Id;
 use studio_ui_api::Theme;
@@ -298,7 +299,7 @@ impl RecordingUi {
         if self.enabled && sense.drag && pointer.press_origin.is_some_and(|p| rect.contains(p)) {
             response.dragged = pointer.primary_down();
             response.drag_started = pointer.primary_pressed();
-            response.drag_stopped = pointer.primary_released();
+            response.drag_ended = pointer.primary_released().then_some(DragEnd::Released);
             response.drag_delta = if response.dragged {
                 pointer.delta
             } else {

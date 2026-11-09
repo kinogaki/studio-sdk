@@ -298,11 +298,8 @@ impl Ui for RecordingUi {
         for field in schema.fields_mut().filter(|f| f.enabled && self.enabled) {
             if let Some(at) = shared.edits.iter().position(|(l, _)| *l == field.label) {
                 field.value = Some(shared.edits.remove(at).1);
+                // A value given whole is a change of its own, no gesture.
                 edits.changed.push(field.key);
-                edits.started = true;
-                edits.ended = Some(studio_ui_api::sheet::EditEnd::Commit);
-                edits.active.get_or_insert(field.key);
-                edits.gesture.get_or_insert(field.key);
             }
             if let Some(at) = shared.actions.iter().position(|(l, _)| *l == field.label) {
                 edits.actions.push((field.key, shared.actions.remove(at).1));

@@ -47,6 +47,15 @@ impl Sense {
     };
 }
 
+/// How a drag ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DragEnd {
+    /// The button came up: what the drag did stands.
+    Released,
+    /// Escape: what the drag did goes back.
+    Cancelled,
+}
+
 /// What happened to a widget or area this frame, as plain data. Fields
 /// the area did not sense stay false.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -70,8 +79,8 @@ pub struct Response {
     pub drag_started: bool,
     /// It is being dragged.
     pub dragged: bool,
-    /// A drag on it ended this frame.
-    pub drag_stopped: bool,
+    /// How a drag on it ended this frame: released, or cancelled (Escape).
+    pub drag_ended: Option<DragEnd>,
     /// How far the drag moved this frame.
     pub drag_delta: Vec2,
     /// Where the pointer acts on it, while hovered or dragged.
@@ -106,7 +115,7 @@ impl Response {
             double_clicked: self.double_clicked || other.double_clicked,
             drag_started: self.drag_started || other.drag_started,
             dragged: self.dragged || other.dragged,
-            drag_stopped: self.drag_stopped || other.drag_stopped,
+            drag_ended: self.drag_ended.or(other.drag_ended),
             drag_delta: self.drag_delta + other.drag_delta,
             interact_pos: self.interact_pos.or(other.interact_pos),
             changed: self.changed || other.changed,

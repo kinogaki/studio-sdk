@@ -52,26 +52,35 @@ pub enum EditEnd {
     Cancel,
 }
 
+/// A sheet's gesture open as a frame began.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Open<K> {
+    /// Its field: its changes this frame are the gesture's (`None`: the field
+    /// is no longer drawn, and the gesture ends).
+    pub field: Option<K>,
+    /// How this frame ended it: committed (released, Enter, a click
+    /// elsewhere, its field out of view or gone, another field's gesture
+    /// begun), or cancelled (Escape: the owner puts back what it changed).
+    pub ended: Option<EditEnd>,
+}
+
 /// What the user did to a schema this frame. Changed fields have their new
 /// values in the schema already; the owner applies them.
 ///
-/// One undo step spans a gesture, from `started` to `ended` (a drag, a text
-/// edit, a picker opened and closed). A sheet has one gesture at a time, on
-/// the field `gesture` names: a change of that field is the gesture's, any
-/// other change a step of its own.
+/// A sheet has one gesture at a time (a drag, a burst of typing, a picker
+/// open): one undo step from its beginning to its end. A frame tells, in
+/// order: the gesture open as it began, its field's changes and how it ended
+/// ([`Open`]); the changes of other fields, each a step of its own; a gesture
+/// begun on a field ([`Edits::begun`]), and that field's changes, its own.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Edits<K> {
     /// The fields whose values changed.
     pub changed: Vec<K>,
-    /// A gesture began.
-    pub started: bool,
-    /// The gesture ended, and how.
-    pub ended: Option<EditEnd>,
-    /// The field whose gesture began this frame (an owner names its undo
-    /// step after it).
-    pub active: Option<K>,
-    /// The field whose gesture this frame drew: begun, going on or ended.
-    pub gesture: Option<K>,
+    /// The gesture open as the frame began.
+    pub open: Option<Open<K>>,
+    /// The field a gesture began on this frame (an owner names its undo step
+    /// after it); its changes this frame are the new gesture's.
+    pub begun: Option<K>,
     /// Actions taken, by field.
     pub actions: Vec<(K, Action)>,
     /// The text being typed in a field, while it has focus.
@@ -82,10 +91,8 @@ impl<K> Default for Edits<K> {
     fn default() -> Self {
         Edits {
             changed: Vec::new(),
-            started: false,
-            ended: None,
-            active: None,
-            gesture: None,
+            open: None,
+            begun: None,
             actions: Vec::new(),
             typing: None,
         }
@@ -95,7 +102,10 @@ impl<K> Default for Edits<K> {
 impl<K: PartialEq> Edits<K> {
     /// Nothing happened.
     pub fn is_empty(&self) -> bool {
-        self.changed.is_empty() && !self.started && self.ended.is_none() && self.actions.is_empty()
+        self.changed.is_empty()
+            && self.open.as_ref().is_none_or(|o| o.ended.is_none())
+            && self.begun.is_none()
+            && self.actions.is_empty()
     }
 
     /// Whether the field at `key` changed.
@@ -115,10 +125,11 @@ impl<K> Edits<K> {
     pub fn filter_map<J>(self, f: impl Fn(K) -> Option<J>) -> Edits<J> {
         Edits {
             changed: self.changed.into_iter().filter_map(&f).collect(),
-            started: self.started,
-            ended: self.ended,
-            active: self.active.and_then(&f),
-            gesture: self.gesture.and_then(&f),
+            open: self.open.map(|o| Open {
+                field: o.field.and_then(&f),
+                ended: o.ended,
+            }),
+            begun: self.begun.and_then(&f),
             actions: self
                 .actions
                 .into_iter()
@@ -137,17 +148,21 @@ mod tests {
     fn edits_read_and_map() {
         let edits = Edits {
             changed: vec![1, 2],
-            started: true,
-            active: Some(2),
+            open: Some(Open {
+                field: Some(1),
+                ended: Some(EditEnd::Commit),
+            }),
+            begun: Some(2),
             actions: vec![(3, Action::Press)],
             typing: Some((2, "1.5".into())),
-            ..Edits::default()
         };
         assert!(!edits.is_empty() && edits.changed(&2) && !edits.changed(&3));
         assert_eq!(edits.action(&3), Some(Action::Press));
         let mapped = edits.filter_map(|k| (k != 1).then_some(k * 10));
         assert_eq!(mapped.changed, [20]);
-        assert_eq!(mapped.active, Some(20));
+        assert_eq!(mapped.begun, Some(20));
+        let open = mapped.open.expect("the open gesture");
+        assert_eq!((open.field, open.ended), (None, Some(EditEnd::Commit)));
         assert_eq!(mapped.actions, [(30, Action::Press)]);
         assert_eq!(mapped.typing, Some((20, "1.5".into())));
         assert!(Edits::<u8>::default().is_empty());
