@@ -170,3 +170,16 @@ mod tests {
         assert!(Edits::<u8>::default().is_empty());
     }
 }
+
+/// Where a row's menu opened ([`RowMenu`](crate::RowMenu)), and whether it
+/// opened this frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MenuAt {
+    /// The component whose field was clicked (0 for a field of one value, a
+    /// vector's or color's component); `None` for the label or a control of
+    /// the whole row.
+    pub part: Option<usize>,
+    /// It opened this frame: what it shows is built now and kept while it
+    /// stays open.
+    pub opened: bool,
+}

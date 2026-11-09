@@ -17,9 +17,10 @@ use std::hash::Hash;
 /// A body the host lays out: called with the `Ui` of the region it made.
 pub type Body<'a> = &'a mut dyn FnMut(&mut dyn Ui);
 
-/// What fills the menu a secondary click on a sheet row's label opens:
-/// called with the menu's `Ui` and the row's field key.
-pub type RowMenu<'a, K> = &'a mut dyn FnMut(&mut dyn Ui, &K);
+/// What fills the menu a secondary click on a sheet row's label or value
+/// opens: called with the menu's `Ui`, the row's field key and where it
+/// opened ([`MenuAt`](crate::sheet::MenuAt)), every frame it shows.
+pub type RowMenu<'a, K> = &'a mut dyn FnMut(&mut dyn Ui, &K, sheet::MenuAt);
 
 /// A region of the host's window a plugin draws widgets into, top to
 /// bottom (or left to right inside [`Ui::horizontal`]), immediate mode:
@@ -167,8 +168,9 @@ pub trait Ui {
 
     /// A property sheet: the host draws `schema` across the region and
     /// writes edited values into it. `menu`, when given, fills the menu a
-    /// secondary click on a row's label opens, for that field. Use
-    /// [`UiExt::sheet_keyed`] to key fields by your own type.
+    /// secondary click on a row's label or anywhere on its value opens, for
+    /// that field. Use [`UiExt::sheet_keyed`] to key fields by your own
+    /// type.
     fn sheet(
         &mut self,
         style: &SheetStyle<'_>,
@@ -240,9 +242,9 @@ pub trait UiExt: Ui {
         let (keyed, mut fields) = Keyed::new(std::mem::take(schema));
         let edits = match menu {
             Some(menu) => {
-                let mut by_field = |ui: &mut dyn Ui, field: &FieldKey| {
+                let mut by_field = |ui: &mut dyn Ui, field: &FieldKey, at: sheet::MenuAt| {
                     if let Some(key) = keyed.key(*field) {
-                        menu(ui, key);
+                        menu(ui, key, at);
                     }
                 };
                 self.sheet(style, &mut fields, Some(&mut by_field))

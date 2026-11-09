@@ -31,7 +31,7 @@ pub use kinogaki_studio_api::params::tone_curve;
 
 pub use kinogaki_studio_api::params::ramp;
 
-pub use edits::{Action, EditEnd, Edits, Open};
+pub use edits::{Action, EditEnd, Edits, MenuAt, Open};
 pub use items::{Animation, Band, Field, Item, Sheet};
 pub use keyed::{FieldKey, Keyed};
 pub use kind::{
