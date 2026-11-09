@@ -7,7 +7,7 @@
 //!
 //! | Trait | What |
 //! |---|---|
-//! | [`HostUndo`] | undo, redo and gestures |
+//! | [`HostUndo`] ([`HostUndoExt`]) | undo, redo and gestures, one opened around what it makes |
 //! | [`HostSlots`] ([`HostSlotsExt`]) | the session's slots, typed |
 //! | [`HostSelection`] | selected objects, picked nodes |
 //! | [`HostDoc`] ([`HostDocExt`]) | where the user is, objects and their bodies, packages' stored values |
@@ -40,7 +40,7 @@ mod network;
 
 pub use capabilities::{
     HostDoc, HostDocExt, HostSelection, HostShell, HostSlots, HostSlotsExt, HostStatus, HostTools,
-    HostTransform, HostUndo, HostView,
+    HostTransform, HostUndo, HostUndoExt, HostView,
 };
 pub use data::{
     Ground, HostPrefs, Inspected, NodeRef, NodeRows, ObjectRef, Place, PointerOver, View,

@@ -7,7 +7,7 @@ use kinogaki_studio_api::Diagnostic;
 use kinogaki_studio_api::network::{NetworkContext, NetworkEdit, NetworkRead, NewNode, Wire};
 use kinogaki_studio_api::{
     ContextId, CookCx, Data, DataTypeId, Description, Error, HeldEdit, NodeRef, NodeType,
-    NodeTypeId, Outputs, Package, PackageId, Port, Slot, SlotId, Typed,
+    NodeTypeId, Opened, Outputs, Package, PackageId, Port, Slot, SlotId, Typed,
 };
 use std::sync::LazyLock;
 use std::sync::atomic::Ordering;
@@ -15,8 +15,8 @@ use studio_ui_api::Ui;
 use studio_ui_api::gizmo::Pivot;
 use studio_ui_api::host::ObjectRef;
 use studio_ui_api::host::{
-    Cx, HostLatestExt, HostShell, HostSlotsExt, HostStatus, HostUndo, HostView, InspectorCx,
-    LatestKey,
+    Cx, HostLatestExt, HostShell, HostSlotsExt, HostStatus, HostUndo, HostUndoExt, HostView,
+    InspectorCx, LatestKey,
 };
 use studio_ui_api::package::{
     ContextPart, Inspector, Invoked, Library, Materials, RowAction, UiPackage, ViewportSpec,
@@ -51,7 +51,7 @@ fn host() -> FakeHost {
 #[test]
 fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
     let mut host = host();
-    let kinogaki_studio_api::Begun::Own(gesture) = host.begin_gesture("Adjust") else {
+    let Opened::Own(gesture) = host.begin_gesture("Adjust").into_opened() else {
         panic!("none was open");
     };
     host.edit_slot("step", |slot| *slot = Count(1));
@@ -79,17 +79,51 @@ fn a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step() {
 fn a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it() {
     let mut host = host();
     use kinogaki_studio_api::Begun;
-    let tool = host.begin_gesture("Tool");
-    assert!(matches!(tool, Begun::Own(_)), "none was open");
+    let tool = host.begin_gesture("Tool").into_opened();
+    assert!(matches!(tool, Opened::Own(_)), "none was open");
     host.edit_slot("step", |slot| *slot = Count(1));
-    let drag = host.begin_gesture("Drag");
-    assert!(matches!(drag, Begun::Joined(_)), "the tool's is open");
+    let drag = host.begin_gesture("Drag").into_opened();
+    assert!(matches!(drag, Opened::Joined(_)), "the tool's is open");
     host.edit_slot("step", |slot| *slot = Count(2));
-    host.put_back(drag);
+    host.put_back(Begun::new(drag));
     assert_eq!(host.slot::<Count>(), &Count(1), "back to where it joined");
     assert!(host.in_gesture(), "going back leaves the tool's open");
-    host.keep(tool).unwrap();
+    host.keep(Begun::new(tool)).unwrap();
     assert_eq!(host.history(), ["Tool"]);
+}
+
+#[test]
+fn a_gesture_opened_with_what_it_makes_is_put_back_when_making_fails() {
+    let mut host = host();
+    let refused = host.begin_gesture_with("Add", |host| {
+        host.edit_slot("step", |slot| *slot = Count(1));
+        Err::<(), _>(Error::invalid("refused"))
+    });
+    assert!(refused.is_err());
+    assert!(!host.in_gesture(), "put back");
+    assert_eq!(host.slot::<Count>(), &Count(0));
+    let made = host.begin_gesture_with("Add", |host| {
+        host.edit_slot("step", |slot| *slot = Count(2));
+        Ok(7)
+    });
+    let (begun, seven) = made.expect("made");
+    assert_eq!(seven, 7);
+    host.keep(begun).unwrap();
+    assert_eq!(host.history(), ["Add"]);
+}
+
+/// A `Begun` ends once: dropped without `keep`, `put_back` or `forget` it
+/// would leave its gesture open, which a debug build says with a panic;
+/// `forget` lets one go with its document.
+#[test]
+fn a_begun_dropped_unended_panics_in_a_debug_build_and_forget_lets_it_go() {
+    let mut forgetting = host();
+    forgetting.begin_gesture("Gone with its document").forget();
+    let mut dropping = host();
+    let dropped = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        drop(dropping.begin_gesture("Dropped"));
+    }));
+    assert_eq!(dropped.is_err(), cfg!(debug_assertions));
 }
 
 #[test]

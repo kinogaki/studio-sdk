@@ -104,8 +104,8 @@ use std::fmt;
 /// The host calls every method on its UI thread. `state` once per host
 /// (one editor window), when the package is first needed; `poll` after
 /// each wake of the host (a worker's result may be ready: adopt it);
-/// `reset` when a new document replaces the open one (live tools,
-/// workers' results and caches belong to the old one).
+/// `reset` when a new document replaces the open one, and when the host
+/// closes (live tools, workers' results and caches belong to the old one).
 pub trait UiPackage: Send + Sync + 'static {
     /// The package's UI state.
     type State: Any;
@@ -126,7 +126,8 @@ pub trait UiPackage: Send + Sync + 'static {
         let _ = (s, cx);
     }
 
-    /// A new document: forget what belonged to the old one.
+    /// A new document, or the host closing: forget what belonged to the
+    /// old one (a live tool's gesture went with it: [`Begun::forget`](kinogaki_studio_api::Begun::forget)).
     fn reset(&self, s: &mut Self::State, cx: &mut dyn Cx) {
         let _ = (s, cx);
     }

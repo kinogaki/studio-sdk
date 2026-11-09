@@ -151,7 +151,9 @@ pub use params::{Parameters, ParametersExt, Schema, Value};
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, ShapeSource};
-pub use session::{Begun, GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
+pub use session::{
+    Begun, GestureMark, GestureToken, Opened, SessionSlot, SessionSlots, Slot, SlotDoc,
+};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
 pub use subdivider::{Refined, Subdivider};
 pub use viewport::{ElementKind, ElementSet, Hit, Streams, Surface, SurfaceSource};

@@ -259,9 +259,9 @@ impl fmt::Debug for SessionSlots {
 
 /// The open gesture, held by whoever opened it: only its holder finishes
 /// or cancels it. Not `Clone`: a gesture ends once. A host makes these
-/// (its gesture number); a package gets one from the host's
-/// `begin_gesture` ([`Begun::Own`]), which marks a join instead while
-/// another's gesture is open.
+/// (its gesture number); a package gets one inside a [`Begun`] from the
+/// host's `begin_gesture` ([`Opened::Own`]), which marks a join instead
+/// while another's gesture is open.
 #[must_use = "only the gesture's opener finishes or cancels it"]
 #[derive(Debug, PartialEq, Eq)]
 pub struct GestureToken(u64);
@@ -287,15 +287,57 @@ impl GestureToken {
 
 /// What opening a gesture gave: the gesture itself, or, while another's
 /// is open (a live tool's run), the place in it where what follows joined.
-/// Either way every edit up to the gesture's finish is one undo step.
+/// Either way every edit up to the gesture's finish is one undo step. A
+/// package holds it as a [`Begun`].
 #[must_use = "a gesture's opener alone finishes or cancels it; a join goes back to its mark"]
 #[derive(Debug, PartialEq, Eq)]
-pub enum Begun {
+pub enum Opened {
     /// No gesture was open: this one is the opener's, to finish or cancel.
     Own(GestureToken),
     /// Another's gesture is open: what follows is part of it, which its
     /// opener ends; going back to the mark puts back only what followed.
     Joined(GestureMark),
+}
+
+/// A gesture a package opened (the host's `begin_gesture`), ended once: the
+/// host's `keep` or `put_back` ends it as its opener or its joiner
+/// ([`Opened`]), and [`Begun::forget`] lets it go with its document.
+/// Dropped any other way it would leave its gesture open, so a debug build
+/// panics.
+#[must_use = "a gesture ends once: keep it, put it back, or forget it with its document"]
+#[derive(Debug)]
+pub struct Begun(Option<Opened>);
+
+impl Begun {
+    /// `opened`, to be ended once (what a host's `begin_gesture` gives).
+    pub fn new(opened: Opened) -> Self {
+        Self(Some(opened))
+    }
+
+    /// What it holds, to end, for hosts: `HostUndo`'s `keep` and
+    /// `put_back` take it so (a package ends a `Begun` through those).
+    pub fn into_opened(mut self) -> Opened {
+        self.0
+            .take()
+            .expect("a Begun holds what it opened until it ends")
+    }
+
+    /// Lets it go without ending it: its gesture went with its document (a
+    /// new document replaced the one it was opened in, or the host closed).
+    pub fn forget(mut self) {
+        self.0 = None;
+    }
+}
+
+impl Drop for Begun {
+    /// A gesture ends once: a `Begun` dropped unended would leave it open.
+    fn drop(&mut self) {
+        debug_assert!(
+            self.0.is_none() || std::thread::panicking(),
+            "a Begun dropped without keep, put_back or forget leaves its gesture open: {:?}",
+            self.0
+        );
+    }
 }
 
 /// A point inside an open gesture to go back to: its start

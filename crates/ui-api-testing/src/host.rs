@@ -12,7 +12,7 @@ use kinogaki_studio_api::params::Unit;
 use kinogaki_studio_api::session::SlotDoc;
 use kinogaki_studio_api::{
     Begun, Bounds, ContextId, Data, Drawn, Error, GestureMark, GestureToken, ObjectBody,
-    ObjectKindId, Package, RowsFor, SessionSlot, SessionSlots, SlotId, StoredId, Time,
+    ObjectKindId, Opened, Package, RowsFor, SessionSlot, SessionSlots, SlotId, StoredId, Time,
 };
 use kinogaki_studio_api::{CancelToken, Components};
 use std::any::Any;
@@ -300,12 +300,12 @@ impl HostUndo for FakeHost {
             let id = *id;
             self.marks += 1;
             self.joined = Some((self.marks, self.kept()));
-            return Begun::Joined(GestureMark::new(id, self.marks));
+            return Begun::new(Opened::Joined(GestureMark::new(id, self.marks)));
         }
         self.gestures += 1;
         self.gesture = Some((self.gestures, label.into(), self.kept()));
         self.joined = None;
-        Begun::Own(GestureToken::new(self.gestures))
+        Begun::new(Opened::Own(GestureToken::new(self.gestures)))
     }
     fn finish_gesture(&mut self, gesture: GestureToken) -> Result<(), Error> {
         self.calls.push(HostCall::FinishGesture);
@@ -777,5 +777,14 @@ impl Hosting {
     /// [`UiPackage::poll`](studio_ui_api::package::UiPackage::poll) on `host`.
     pub fn poll(&mut self, host: &mut FakeHost) {
         self.with(|p, s| p.poll(s, host))
+    }
+
+    /// [`UiPackage::reset`](studio_ui_api::package::UiPackage::reset) on
+    /// `host`, as Studio calls it for a new document and as it closes. A
+    /// test that ends with a package's tool on calls it last: the package
+    /// lets the tool's gesture go there, and a `Begun` dropped with the
+    /// package's state instead panics in a debug build.
+    pub fn reset(&mut self, host: &mut FakeHost) {
+        self.with(|p, s| p.reset(s, host))
     }
 }

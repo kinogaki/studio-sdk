@@ -663,9 +663,11 @@ kinogaki-studio-ui-api-testing/doc test crates/ui-api-testing/src/lib.rs -
 kinogaki-studio-ui-api-testing/doc test crates/ui-api-testing/src/network.rs - network::FakeNetwork
 kinogaki-studio-ui-api-testing/lib test painter::tests::a_reserved_place_holds_many_shapes_and_text_wraps
 kinogaki-studio-ui-api-testing/lib test painter::tests::draws_are_recorded_in_order_with_their_clip
+kinogaki-studio-ui-api/capabilities test a_begun_dropped_unended_panics_in_a_debug_build_and_forget_lets_it_go
 kinogaki-studio-ui-api/capabilities test a_dropped_material_reaches_the_contexts_part_with_its_refusal
 kinogaki-studio-ui-api/capabilities test a_gesture_back_at_its_start_puts_back_its_changes_and_stays_one_step
 kinogaki-studio-ui-api/capabilities test a_gesture_begun_inside_another_is_part_of_it_and_only_its_opener_ends_it
+kinogaki-studio-ui-api/capabilities test a_gesture_opened_with_what_it_makes_is_put_back_when_making_fails
 kinogaki-studio-ui-api/capabilities test a_held_node_applies_its_delta_to_its_input_as_it_is_and_reports_its_result
 kinogaki-studio-ui-api/capabilities test a_library_without_a_viewport_spec_gets_cores_scene_view
 kinogaki-studio-ui-api/capabilities test row_actions_and_typing_reach_the_contexts_parts

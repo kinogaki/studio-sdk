@@ -17,7 +17,7 @@ use kinogaki_studio_api::session::Slot;
 use kinogaki_studio_api::stored::Stored;
 use kinogaki_studio_api::{
     Begun, Bounds, Components, Data, Drawn, Error, GestureMark, GestureToken, NodeTypeId,
-    ObjectBody, ObjectKindId, Parameters, SlotId, Time, Vec3,
+    ObjectBody, ObjectKindId, Opened, Parameters, SlotId, Time, Vec3,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -29,11 +29,12 @@ use std::sync::Arc;
 /// to its finish is one step, named when the gesture began (a drag). The
 /// gesture is its opener's: [`begin_gesture`](HostUndo::begin_gesture)
 /// gives a [`Begun`], which [`keep`](HostUndo::keep) or
-/// [`put_back`](HostUndo::put_back) ends as its opener or its joiner.
+/// [`put_back`](HostUndo::put_back) ends as its opener or its joiner
+/// ([`HostUndoExt::begin_gesture_with`] opens one around what it makes).
 pub trait HostUndo {
-    /// Opens a gesture named `label`: [`Begun::Own`] with its token, or,
-    /// while a gesture is open already (a live tool's run),
-    /// [`Begun::Joined`]: what follows is part of that one, which its
+    /// Opens a gesture named `label`: a [`Begun`] of [`Opened::Own`] with
+    /// its token, or, while a gesture is open already (a live tool's run),
+    /// of [`Opened::Joined`]: what follows is part of that one, which its
     /// opener ends, and [`back_to`](Self::back_to) the mark puts back only
     /// what followed.
     fn begin_gesture(&mut self, label: &str) -> Begun;
@@ -61,18 +62,18 @@ pub trait HostUndo {
     /// # Errors
     /// What the finished gesture made doesn't check: it is put back.
     fn keep(&mut self, begun: Begun) -> Result<(), Error> {
-        match begun {
-            Begun::Own(token) => self.finish_gesture(token),
-            Begun::Joined(_) => Ok(()),
+        match begun.into_opened() {
+            Opened::Own(token) => self.finish_gesture(token),
+            Opened::Joined(_) => Ok(()),
         }
     }
     /// Puts back what followed `begun`: a gesture it opened is cancelled
     /// ([`cancel_gesture`](Self::cancel_gesture)); one it joined goes back
     /// to where it joined ([`back_to`](Self::back_to)) and stays open.
     fn put_back(&mut self, begun: Begun) {
-        match begun {
-            Begun::Own(token) => self.cancel_gesture(token),
-            Begun::Joined(mark) => self.back_to(mark),
+        match begun.into_opened() {
+            Opened::Own(token) => self.cancel_gesture(token),
+            Opened::Joined(mark) => self.back_to(mark),
         }
     }
     /// Undoes the last step (live tools end first, after this call).
@@ -84,6 +85,34 @@ pub trait HostUndo {
     /// The step Redo would redo, by its label.
     fn redo_label(&self) -> Option<String>;
 }
+
+/// A gesture opened around what it makes, over [`HostUndo`].
+pub trait HostUndoExt: HostUndo {
+    /// Opens a gesture named `label` ([`HostUndo::begin_gesture`]) and
+    /// makes `make` in it: the gesture and what was made, or, when making
+    /// fails, the gesture put back and why. A tool that opens its gesture
+    /// with what it adds (a node, a step) leaves none open when the add is
+    /// refused.
+    ///
+    /// # Errors
+    /// What `make` refused; the gesture is put back first.
+    fn begin_gesture_with<T>(
+        &mut self,
+        label: &str,
+        make: impl FnOnce(&mut Self) -> Result<T, Error>,
+    ) -> Result<(Begun, T), Error> {
+        let begun = self.begin_gesture(label);
+        match make(self) {
+            Ok(made) => Ok((begun, made)),
+            Err(why) => {
+                self.put_back(begun);
+                Err(why)
+            }
+        }
+    }
+}
+
+impl<H: HostUndo + ?Sized> HostUndoExt for H {}
 
 /// The session's slots ([`Slot`]): package-owned state undone with the
 /// document. Untyped here so the trait stays object-safe; packages use the

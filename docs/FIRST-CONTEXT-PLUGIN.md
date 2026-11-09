@@ -443,13 +443,17 @@ The pin board changes its own body. A context over geometry (Studio's Mesh plugi
 
 ```rust
 // Starting the tool (a library item ran): one undo step from here on,
-// or, while another's gesture is open, a part of that one (Begun::Joined).
-live.gesture = cx.begin_gesture("Push");
-let mut made = None;
-cx.edit_network(object, "Push", &mut |edit| {
-    made = Some(edit.add_node_in(None, new_node.clone(), Insertion::Grow(Growth::Modify))?);
-    Ok(())
+// or, while another's gesture is open, a part of that one (Opened::Joined).
+// Its node is made in the gesture (HostUndoExt): a refused add puts it back.
+let (gesture, node) = cx.begin_gesture_with("Push", |cx| {
+    let mut made = None;
+    cx.edit_network(object, "Push", &mut |edit| {
+        made = Some(edit.add_node_in(None, new_node.clone(), Insertion::Grow(Growth::Modify))?);
+        Ok(())
+    })?;
+    made.ok_or_else(|| Error::invalid("the node wasn't made"))
 })?;
+s.live = Some(Live { gesture, node });
 // Each change of a row while it is live: inside the same gesture.
 cx.edit_network(object, "Push", &mut |edit| edit.set_parameter(node, "distance", Value::Number(d)))?;
 // Enter, or LiveTools::accept: keep it (a gesture it joined stays its opener's).
@@ -460,7 +464,13 @@ if let Some(live) = s.live.take() {
 if let Some(live) = s.live.take() {
     cx.put_back(live.gesture);
 }
+// A new document (UiPackage::reset): the gesture went with the old one.
+if let Some(live) = s.live.take() {
+    live.gesture.forget();
+}
 ```
+
+A `Begun` ends once: `keep`, `put_back`, or `forget` when its document goes. Dropped any other way it would leave its gesture open, and a debug build panics.
 
 - `tools` reads a view's input each frame and says what it `Takes` (core's picks, gizmo, handles and wheel stay off while it does); `key` takes Enter; `cancel` ends it for the reason `Ended` gives; `accept` keeps it when the user goes elsewhere (another context, another node), as Enter does, always asked before the location leaves the context. `live_node` names the node while its card is up, and `Panels` draws that card with `Cx::node_rows`.
 - The host calls none of these from inside a host method, so a tool's state is always the package's to change.
