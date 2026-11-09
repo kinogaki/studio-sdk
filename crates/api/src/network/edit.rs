@@ -45,8 +45,9 @@ pub trait NetworkEdit: NetworkRead {
     /// computes changes.
     fn set_position(&mut self, node: NodeRef, position: [f32; 2]) -> Result<(), Error>;
 
-    /// Sets parameter `name` of `node` to `value`: on an animated row, its
-    /// key at the current time (a new one between keys).
+    /// Sets parameter `name` of `node` to `value`: on a row with an
+    /// animated channel, a key at the current time on every component (a
+    /// new one between keys).
     fn set_parameter(&mut self, node: NodeRef, name: &str, value: Value) -> Result<(), Error>;
 
     /// Replaces every parameter of `node`: `parameters` hold each one its
@@ -93,28 +94,43 @@ pub trait NetworkEdit: NetworkRead {
         ))
     }
 
-    /// Sets `key` on parameter `row` of `node`, replacing its key at that
-    /// time: the row is animated from then on, its value at each moment
+    /// Sets `key` on channel `component` of parameter `row` of `node` (a
+    /// vector's X is 0, a color's G 1; a row of one value, a number or a
+    /// toggle or a ramp, has the one channel 0), replacing its key at that
+    /// time: the channel is animated from then on, its value at each moment
     /// its keys'. Refused for a row its type doesn't let animate
-    /// ([`Parameter::animatable`](crate::params::Parameter::animatable)),
-    /// a value the row doesn't take and a row a subnet's parameter drives
-    /// (a row has one driver).
-    fn set_key(&mut self, node: NodeRef, row: &str, key: Key) -> Result<(), Error> {
-        let _ = (node, row, key);
+    /// ([`Parameter::animatable`](crate::params::Parameter::animatable)), a
+    /// channel it hasn't, a value the channel doesn't take and a row a
+    /// subnet's parameter drives (a row has one driver).
+    fn set_key(
+        &mut self,
+        node: NodeRef,
+        row: &str,
+        component: usize,
+        key: Key,
+    ) -> Result<(), Error> {
+        let _ = (node, row, component, key);
         Err(Error::invalid("this network's parameters don't animate"))
     }
 
-    /// Removes the key at `time` of parameter `row` of `node`; removing
-    /// its last key is [`clear_channel`](Self::clear_channel).
-    fn remove_key(&mut self, node: NodeRef, row: &str, time: Time) -> Result<(), Error> {
-        let _ = (node, row, time);
+    /// Removes the key at `time` of channel `component` of parameter `row`
+    /// of `node`; removing its last key is
+    /// [`clear_channel`](Self::clear_channel).
+    fn remove_key(
+        &mut self,
+        node: NodeRef,
+        row: &str,
+        component: usize,
+        time: Time,
+    ) -> Result<(), Error> {
+        let _ = (node, row, component, time);
         Err(Error::invalid("this network's parameters don't animate"))
     }
 
-    /// Stops animating parameter `row` of `node`: it keeps the value it
-    /// has at the scene's current time.
-    fn clear_channel(&mut self, node: NodeRef, row: &str) -> Result<(), Error> {
-        let _ = (node, row);
+    /// Stops animating channel `component` of parameter `row` of `node`:
+    /// it keeps the value it has at the scene's current time.
+    fn clear_channel(&mut self, node: NodeRef, row: &str, component: usize) -> Result<(), Error> {
+        let _ = (node, row, component);
         Err(Error::invalid("this network's parameters don't animate"))
     }
 

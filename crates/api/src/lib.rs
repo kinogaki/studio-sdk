@@ -54,7 +54,7 @@
 //! the user reads), [`params`] (parameter values and schemas), [`element`] (the
 //! project's element tree codecs write), [`viewport`] (display surfaces,
 //! element sets, picks), [`refs`] (the host's objects and nodes),
-//! [`render`] (neutral render items) and [`anim`] (a parameter's keys over
+//! [`render`] (neutral render items) and [`anim`] (a channel's keys over
 //! time).
 //!
 //! **Self-contained.** The crate depends on the standard library and the
@@ -115,7 +115,7 @@ pub use kinogaki_geometry::{
 pub use kinogaki_value as value;
 pub use kinogaki_value::{data, id};
 
-pub use anim::{Interp, Key};
+pub use anim::{Handles, Interp, Key};
 pub use cancel::CancelToken;
 pub use codec::{DataCodec, ObjectCodec, ReadCx};
 pub use components::Components;

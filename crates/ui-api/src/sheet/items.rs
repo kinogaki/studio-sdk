@@ -94,10 +94,13 @@ pub struct Field<K> {
     pub socket: Option<Socket>,
     /// The slot at the field's right edge.
     pub trailing: Trailing,
-    /// How its value moves over time (its tint).
-    pub animation: Animation,
+    /// How its value moves over time (its tint), a part: a field of one
+    /// value reads the first, a vector's, a color's or channels' fields
+    /// one a component (X, Y, Z, W; R, G, B, A).
+    pub animation: [Animation; 4],
     /// The host keys it: an Alt+click on its label reports
-    /// [`Action::Key`](super::Action::Key).
+    /// [`Action::Key`](super::Action::Key)`(None)`, one on a component's
+    /// field `Action::Key(Some(component))`.
     pub keyable: bool,
 }
 
@@ -118,7 +121,7 @@ impl<K> Field<K> {
             mixed: false,
             socket: None,
             trailing: Trailing::None,
-            animation: Animation::Static,
+            animation: [Animation::Static; 4],
             keyable: false,
         }
     }
@@ -319,8 +322,9 @@ impl<K> Field<K> {
         self
     }
 
-    /// Keyable by the host, its value moving as `animation` says.
-    pub fn keyed(mut self, animation: Animation) -> Self {
+    /// Keyable by the host, its value moving as `animation` says, a part
+    /// ([`Field::animation`]).
+    pub fn keyed(mut self, animation: [Animation; 4]) -> Self {
         self.keyable = true;
         self.animation = animation;
         self

@@ -34,8 +34,8 @@ pub trait NetworkRead {
         let _ = node;
         None
     }
-    /// Parameter `row` of `node` at `time`: its keys' value there when it
-    /// is animated, else its value. `None` when the node or the row isn't
+    /// Parameter `row` of `node` at `time`: each animated channel's value
+    /// there, each other component its static one. `None` when the node or the row isn't
     /// there, or the network doesn't animate (a package's handles read
     /// the value at the scene's current time, not the static one).
     fn value_at(&self, node: NodeRef, row: &str, time: Time) -> Option<Value> {
@@ -56,7 +56,7 @@ pub struct NodeInfo<'a> {
     /// value, the one it keeps when its keys are cleared
     /// ([`NetworkRead::value_at`] reads its value at a moment).
     pub parameters: &'a Parameters,
-    /// Its animated parameters (rows with keys), by name.
+    /// Its animated parameters (rows with a keyed channel), by name.
     pub animated: Vec<String>,
     /// Its input wires, one list a port in port order, in wire order.
     pub inputs: Vec<Vec<Wire>>,
