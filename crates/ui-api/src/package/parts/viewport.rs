@@ -163,7 +163,7 @@ part! {
         /// input and command of the frame, before any view is drawn:
         /// where a context adopts a change (a new topology, a selection)
         /// and asks its background jobs. A display option changed later in
-        /// the frame (the Display popover) settles it again, so what the
+        /// the frame (a view's mode settings) settles it again, so what the
         /// views show ([`HostView::displayed`](crate::host::HostView::displayed))
         /// draws in that frame.
         fn settle(&self, s: &mut S, cx: &mut dyn Cx) {

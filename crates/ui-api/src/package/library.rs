@@ -433,8 +433,8 @@ pub struct LevelItems {
 /// The viewport chrome a context takes from the host.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ViewportSpec {
-    /// Its display options: rows of each view's Display popover, after
-    /// core's own ([`DisplayOption`]).
+    /// Its display options: rows of each view's Wireframe and Solid
+    /// settings, after core's own ([`DisplayOption`]).
     pub display: Vec<DisplayOption>,
     /// Where the transform pivot starts.
     pub default_pivot: Pivot,

@@ -1,8 +1,8 @@
 //! A context's display options ([`DisplayOption`]): what its views may
 //! show besides the value itself (labels, guides, a coloring), declared as
 //! data in its [`ViewportSpec`](super::ViewportSpec). The host keeps each
-//! option's value, draws its row in each view's Display popover after
-//! core's own rows, and answers a view call's
+//! option's value, draws its row in each view's Wireframe and Solid
+//! settings after core's own rows, and answers a view call's
 //! [`ViewCx::displayed`](crate::host::ViewCx::displayed); the context draws
 //! what the option shows (its [`Display`](super::Display): `edited` or `overlay`).
 //!
