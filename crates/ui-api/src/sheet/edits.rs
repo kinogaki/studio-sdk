@@ -41,22 +41,37 @@ pub enum Action {
     Remove(usize),
 }
 
+/// How a sheet's gesture ended: what it did stands, or goes back (Escape
+/// ends typing or cancels a drag).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditEnd {
+    /// What the gesture did applies.
+    Commit,
+    /// The values the gesture began with stay: the owner puts back what it
+    /// changed.
+    Cancel,
+}
+
 /// What the user did to a schema this frame. Changed fields have their new
 /// values in the schema already; the owner applies them.
 ///
-/// One undo step spans a gesture, from `started` to `finished` (a drag, a
-/// text edit, a picker opened and closed).
+/// One undo step spans a gesture, from `started` to `ended` (a drag, a text
+/// edit, a picker opened and closed). A sheet has one gesture at a time, on
+/// the field `gesture` names: a change of that field is the gesture's, any
+/// other change a step of its own.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Edits<K> {
     /// The fields whose values changed.
     pub changed: Vec<K>,
     /// A gesture began.
     pub started: bool,
-    /// The gesture ended.
-    pub finished: bool,
+    /// The gesture ended, and how.
+    pub ended: Option<EditEnd>,
     /// The field whose gesture began this frame (an owner names its undo
     /// step after it).
     pub active: Option<K>,
+    /// The field whose gesture this frame drew: begun, going on or ended.
+    pub gesture: Option<K>,
     /// Actions taken, by field.
     pub actions: Vec<(K, Action)>,
     /// The text being typed in a field, while it has focus.
@@ -68,8 +83,9 @@ impl<K> Default for Edits<K> {
         Edits {
             changed: Vec::new(),
             started: false,
-            finished: false,
+            ended: None,
             active: None,
+            gesture: None,
             actions: Vec::new(),
             typing: None,
         }
@@ -79,7 +95,7 @@ impl<K> Default for Edits<K> {
 impl<K: PartialEq> Edits<K> {
     /// Nothing happened.
     pub fn is_empty(&self) -> bool {
-        self.changed.is_empty() && !self.started && !self.finished && self.actions.is_empty()
+        self.changed.is_empty() && !self.started && self.ended.is_none() && self.actions.is_empty()
     }
 
     /// Whether the field at `key` changed.
@@ -100,8 +116,9 @@ impl<K> Edits<K> {
         Edits {
             changed: self.changed.into_iter().filter_map(&f).collect(),
             started: self.started,
-            finished: self.finished,
+            ended: self.ended,
             active: self.active.and_then(&f),
+            gesture: self.gesture.and_then(&f),
             actions: self
                 .actions
                 .into_iter()
