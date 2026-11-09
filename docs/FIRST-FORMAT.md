@@ -56,7 +56,7 @@ export_package!(package);
 
 - `id`, `label` and `extensions` say what Studio's file dialogs offer; `detects` (no by default) recognizes a file by its first bytes where the extension isn't enough.
 - `produces` lists the data types a read makes: the standard ones' ids are `const`, so the list is a constant. A read gives what `Reading::wants` names when it names one (a File node's type).
-- `options` gives every option with its default, by name, and `schema(chosen, purpose)` its rows: File ▸ Import's (`Purpose::Objects`), which Studio shows on Settings ▸ Import (File ▸ Import opens no dialog of its own and reads with what is set there), or one value's (`Purpose::Value`: a File node's, which leaves out options that shape objects). `format::options` holds the rows most formats show (`scale`, `embed`: Embed Textures, `toggle`) and reads a typed option (`option`). The example has two: Scale, and Embed Textures.
+- `options` gives every option with its default, by name, and `schema(chosen, purpose)` its rows: File ▸ Import's (`Purpose::Objects`), which Studio shows on Settings ▸ File Formats (File ▸ Import and File ▸ Open open no dialog of their own and read with what is set there), File ▸ Open's (`Purpose::Document`, which leaves out what changes the file's content: a scale, embedding the files it names; Studio reads those at their defaults on Open), or one value's (`Purpose::Value`: a File node's, which leaves out options that shape objects). `format::options` holds the rows most formats show (`scale`, `embed`: Embed Textures, `toggle`) and reads a typed option (`option`). The example has two: Scale, and Embed Textures, and no `Document` rows.
 - `read` and `writer`, below. The host saves the options, one field per option (`format::options::write`, read back strictly by `format::options::read`), so a format holds no codec of its own for them.
 
 ## Reading
@@ -66,19 +66,23 @@ fn read(&self, input: &Input<'_>, chosen: &FormatOptions, reading: &Reading<'_>)
     let bytes = input.bytes()?;
     let text = std::str::from_utf8(&bytes)
         .map_err(|_| Error::invalid(format_args!("{input}: not text")))?;
+    // The file's metres times the scale; XYZ turns no axis.
     let scale = options::option(chosen, SCALE, Value::number)?;
-    let mut file = File::read(text, scale * per_metre(reading.units), reading)?;
+    let stated = Units::new(scale, reading.units.up())?;
+    let kept = reading.document_units(stated);
+    let mut file = File::read(text, scale * per_metre(kept.unwrap_or(reading.units)), reading)?;
     let named = Named::new(input, chosen, reading);
     let materials = file.materials(&named, reading.colors)?;
-    // …the items: the materials first, then the geometry
+    // …the items: the materials first, then the geometry, and `units: kept`
 }
 ```
 
 - **The input.** An `Input` is a file on disk (`Input::file`), a file kept in the project or packed in another (`Input::embedded`, an `EmbeddedFile` whose bytes are shared), or bytes lent from memory (`Input::memory`). `input.bytes()` lends its bytes; a message about the file names it as `input` displays (its path, else its name). A format that keeps files packed in its file (a usdz's textures) takes `input.held()`: all of its bytes as one `EmbeddedFile`, read once and shared, whose ranges `held.slice(name, range)` keep without a copy.
 - **What the read is for.** `Reading` carries the purpose, the project's `Units`, the host's `ColorService`, the read's `ReadBudget` (and its cancellation) and, for a value, the type wanted.
 - **Into the project.** A format converts at its boundary: lengths from the file's unit into the project's (`Reading::units`; the example's metres times `per_metre`), and colors from the file's space into the working space (`Reading::colors`). A format names the spaces files mean by their interop names: `color::LIN_REC709` (the example's material colors), `color::SRGB_TEXTURE`, `color::SRGB_DISPLAY`. A format of a hierarchy changes its file's space into the project's with `format::Conversion` (a scale, a turn, a mirroring): points by `point`, normals by `direction`, lengths by `length`, a node's placement by `placement` (`C·M·C⁻¹`, so no placement carries the change of units) and a camera's or a light's by `frame` (`Q·M`: its value keeps the frame it looks down); a writer converts back through its `inverse`. A format of one piece of polygons may place it with the editor's `gather` (`kinogaki_studio_api::edit::editor`) instead.
+- **A document in its own units.** File ▸ Open reads a file with `Purpose::Document`: its items as Import's, with lengths left in the units the file states (or those its options say it is in) and the axis not turned. `Reading::document_units(file)` is `Some(file)` for such a read and `None` otherwise: a format converts into `document_units(file).unwrap_or(reading.units)` and returns what it gave as `Imported::units`, which Studio's new project takes. A format whose files state no unit reads in `Reading::units` and returns none.
 - **Long reads stop when they are no longer wanted.** The example calls `reading.check()` on every line: a read Studio cancels ends with `Error::cancelled()`.
-- **What comes back.** `Imported` holds `FileItem`s, parents before children (each named, placed relative to its parent, shown or hidden, holding a value or nothing for a group), and warnings (`Diagnostic::warning`) for what was read with loss or left out. A damaged or truncated file is an `Error` naming the line or the input, never a panic.
+- **What comes back.** `Imported` holds `FileItem`s, parents before children (each named, placed relative to its parent, shown or hidden, holding a value or nothing for a group), warnings (`Diagnostic::warning`) for what was read with loss or left out, and a `Document` read's units. A damaged or truncated file is an `Error` naming the line or the input, never a panic.
 
 ## Reading untrusted files
 
@@ -197,6 +201,7 @@ The example's tests (`src/tests.rs`) are the pattern, through the format alone, 
 - a file lands in the standard values; units and the scale option place it; a bad line is an error naming it;
 - materials read first, their colors in the working space and their pictures as Image nodes, embedded with Embed Textures;
 - what is written reads back the same (`kinogaki_studio_api_testing::format::round_trip`, in a folder of the test's own, `format::Scratch`), an embedded picture written beside the file once;
+- a `Document` read is an Import read in the units it reports (`kinogaki_studio_api_testing::format::document`);
 - the conformance suite's fixtures as a `Consumer`: every standard geometry value written and read back keeps its points.
 
 Add the hostile files of [Reading untrusted files](#reading-untrusted-files), cancellation of long reads and writes, parallel work compared on one thread and several (`kinogaki_studio_api_testing::workers::install`), and the reference files of the format's own test suite where one exists.
@@ -205,5 +210,5 @@ Add the hostile files of [Reading untrusted files](#reading-untrusted-files), ca
 
 1. A dylib crate exporting a package that carries the format.
 2. The parser and writer apart from the SDK, but for the read's budget, `Named`, `replace`, `Unique` and the workers.
-3. The `FileFormat` and, if it writes, its `FormatWriter`: standard values only; units, axes and colors converted at the boundary; what the file claims checked against the read's budget, and the files it names reached through `Named`.
+3. The `FileFormat` and, if it writes, its `FormatWriter`: standard values only; units, axes and colors converted at the boundary (a `Document` read in the file's own units, reported); what the file claims checked against the read's budget, and the files it names reached through `Named`.
 4. The tests above.

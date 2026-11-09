@@ -8,7 +8,7 @@ use kinogaki_studio_api::geometry::{Domain, Units, names};
 use kinogaki_studio_api::{
     Data, Error, FileFormat, FileItem, Imported, Input, Purpose, Reading, Value, standard,
 };
-use kinogaki_studio_api_testing::format::{Scratch, round_trip};
+use kinogaki_studio_api_testing::format::{Scratch, document, round_trip};
 use kinogaki_studio_api_testing::{Consumer, Fixtures, Unconverted, run};
 
 /// Writes each value and reads it back.
@@ -81,6 +81,16 @@ fn a_file_reads_in_the_projects_units_scaled_by_its_option() {
         points.positions().as_slice(),
         &[[2000.0, 4000.0, 6000.0], [1000.0, 0.0, -2000.0]]
     );
+}
+
+#[test]
+fn a_file_opens_in_its_metres_as_import_reads_it() {
+    let scratch = Scratch::new("points-document");
+    std::fs::write(scratch.join("clay.png"), b"a picture").unwrap();
+    let path = scratch.join("clay.xyz");
+    std::fs::write(&path, CLAY).unwrap();
+    let opened = document(&Points, &Input::file(&path), &Points.options()).unwrap();
+    assert_eq!(opened.meters_per_unit(), 1.0);
 }
 
 #[test]

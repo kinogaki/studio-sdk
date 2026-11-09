@@ -3,11 +3,12 @@
 //! A format reads a file, on disk or held in memory ([`Input`]), into
 //! [`Imported`] items carrying [`Data`] of the types it declares. The
 //! environment turns the items into objects (File ▸ Import,
-//! [`Purpose::Objects`]), or takes the one value a file is
-//! ([`Purpose::Value`]: a File node's output, an image the host's image
-//! store reads); a File node offers every format whose output its port
-//! accepts. With no format registered, nothing can be imported, and
-//! nothing breaks.
+//! [`Purpose::Objects`]), makes a document of them (File ▸ Open,
+//! [`Purpose::Document`]: lengths in the file's own units), or takes the
+//! one value a file is ([`Purpose::Value`]: a File node's output, an image
+//! the host's image store reads); a File node offers every format whose
+//! output its port accepts. With no format registered, nothing can be
+//! imported, and nothing breaks.
 //!
 //! **Options.** A format's options are [`Parameters`] by name with
 //! defaults ([`FileFormat::options`]), shown by its [`Schema`]
@@ -122,6 +123,11 @@ pub struct Imported {
     pub items: Vec<FileItem>,
     /// What was read with loss or skipped, for the user: warnings.
     pub warnings: Vec<Diagnostic>,
+    /// For a [`Purpose::Document`] read, the units its items' lengths are
+    /// in: the file's own ([`Reading::document_units`]), or `None` for a
+    /// file stating none, whose lengths are in [`Reading::units`]. `None`
+    /// for the other purposes, whose lengths are in [`Reading::units`].
+    pub units: Option<Units>,
 }
 
 /// What the host makes of a read.
@@ -130,6 +136,14 @@ pub enum Purpose {
     /// File ▸ Import: the file's items become objects, so options that
     /// shape them (keeping a hierarchy, a piece per object) apply.
     Objects,
+    /// File ▸ Open: the file's items become a document of their own, as
+    /// [`Objects`](Self::Objects) do, with their lengths in the units the
+    /// file states, or those its options say it is in, and its axis not
+    /// turned ([`Reading::document_units`]); [`Imported::units`] says
+    /// which. Its schema lists the options that apply, leaving out those
+    /// that change the file's content (a scale, embedding the files it
+    /// names): the host reads with those at their defaults.
+    Document,
     /// One value of the type the host wants ([`Reading::wants`]): a File
     /// node's output, an image of the host's image store. The format reads
     /// the file as one item, and its schema leaves the options shaping
@@ -143,7 +157,9 @@ pub enum Purpose {
 pub struct Reading<'a> {
     /// What the host makes of the items.
     pub purpose: Purpose,
-    /// The project's units: lengths in the file are converted into them.
+    /// The project's units: lengths in the file are converted into them,
+    /// except for a [`Purpose::Document`] read of a file stating its own
+    /// ([`Reading::document_units`]).
     pub units: Units,
     /// The host's color management: colors in the file are converted
     /// from the file's space into the project's working space.
@@ -174,6 +190,28 @@ impl<'a> Reading<'a> {
     /// `Err(Error::cancelled())` once the read is no longer wanted.
     pub fn check(&self) -> Result<(), Error> {
         self.budget.check()
+    }
+
+    /// The units of a file stating `file` (its own, or those its options
+    /// say it is in) when this read keeps them: `Some(file)` for a
+    /// [`Purpose::Document`] read, which reports them as
+    /// [`Imported::units`]; `None` for the others, whose lengths go into
+    /// [`Reading::units`]. A format converts into
+    /// `document_units(file).unwrap_or(reading.units)`.
+    ///
+    /// ```
+    /// use kinogaki_studio_api::geometry::{Units, UpAxis};
+    /// use kinogaki_studio_api::{Purpose, Reading};
+    /// # let colors = kinogaki_studio_api_testing::Unconverted;
+    ///
+    /// let centimetres = Units::new(0.01, UpAxis::Z).unwrap();
+    /// let open = Reading::new(Purpose::Document, Units::MILLIMETERS, &colors);
+    /// assert_eq!(open.document_units(centimetres), Some(centimetres));
+    /// let import = Reading::new(Purpose::Objects, Units::MILLIMETERS, &colors);
+    /// assert_eq!(import.document_units(centimetres), None);
+    /// ```
+    pub fn document_units(&self, file: Units) -> Option<Units> {
+        (self.purpose == Purpose::Document).then_some(file)
     }
 }
 
@@ -206,10 +244,12 @@ pub trait FileFormat: Send + Sync {
     }
 
     /// The rows for `options` when read for `purpose` (Studio shows
-    /// [`Purpose::Objects`]' on Settings ▸ Import, and a File node shows
+    /// [`Purpose::Objects`]' on Settings ▸ File Formats, which File ▸
+    /// Import and File ▸ Open both read with, and a File node shows
     /// [`Purpose::Value`]'): a parameter per option that applies, named as
     /// the option and holding its current value; empty (no rows) by
-    /// default.
+    /// default. An option [`Purpose::Document`]'s rows leave out is read
+    /// at its default on File ▸ Open.
     fn schema(&self, options: &FormatOptions, purpose: Purpose) -> Schema {
         let _ = (options, purpose);
         Schema::default()

@@ -15,6 +15,7 @@ example-pin-board/lib test tests::levels_choose_and_commands_are_undo_steps
 example-pin-board/lib test tests::the_inspector_shows_the_count
 example-pin-board/lib test tests::the_package_registers_whole
 example-points-format/lib test tests::a_bad_line_is_refused_naming_it
+example-points-format/lib test tests::a_file_opens_in_its_metres_as_import_reads_it
 example-points-format/lib test tests::a_file_reads_in_the_projects_units_scaled_by_its_option
 example-points-format/lib test tests::every_fixtures_points_survive_a_round_trip
 example-points-format/lib test tests::materials_and_faces_write_back_as_they_read
@@ -458,6 +459,7 @@ kinogaki-studio-api-testing/doc test crates/api-testing/src/format.rs - format::
 kinogaki-studio-api-testing/doc test crates/api-testing/src/hostile.rs - hostile::read_hostile
 kinogaki-studio-api-testing/doc test crates/api-testing/src/lib.rs -
 kinogaki-studio-api-testing/doc test crates/api-testing/src/workers.rs - workers::install
+kinogaki-studio-api-testing/lib test format::tests::document_read_is_an_objects_read_in_its_own_units
 kinogaki-studio-api-testing/turns test alone_waits_for_the_shared_turns_and_ends_with_its_thread
 kinogaki-studio-api/admission test a_context_adopts_a_node_type_once
 kinogaki-studio-api/admission test a_node_type_is_offered_in_declared_contexts
@@ -489,6 +491,7 @@ kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory:
 kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement::read_defaulted
 kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::dynElementReader+'r::over
 kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::is_name
+kinogaki-studio-api/doc test crates/api/src/format.rs - format::Reading<'a>::document_units
 kinogaki-studio-api/doc test crates/api/src/format/budget.rs - format::budget
 kinogaki-studio-api/doc test crates/api/src/format/conversion.rs - format::conversion::Conversion
 kinogaki-studio-api/doc test crates/api/src/format/files.rs - format::files

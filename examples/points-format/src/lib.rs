@@ -99,7 +99,12 @@ impl FileFormat for Points {
             (options::EMBED.to_owned(), Value::Bool(false)),
         ])
     }
-    fn schema(&self, chosen: &FormatOptions, _purpose: Purpose) -> Schema {
+    /// Scale and Embed Textures change what the file holds: File ▸ Open
+    /// reads a file as it is, without them.
+    fn schema(&self, chosen: &FormatOptions, purpose: Purpose) -> Schema {
+        if purpose == Purpose::Document {
+            return Schema::default();
+        }
         let scale = options::option(chosen, SCALE, Value::number).unwrap_or(1.0);
         let embed = options::option(chosen, options::EMBED, Value::bool).unwrap_or(false);
         options::embed(options::scale(Schema::default(), scale), embed)
@@ -113,8 +118,12 @@ impl FileFormat for Points {
         let bytes = input.bytes()?;
         let text = std::str::from_utf8(&bytes)
             .map_err(|_| Error::invalid(format_args!("{input}: not text")))?;
+        // The file's metres times the scale; XYZ turns no axis.
         let scale = options::option(chosen, SCALE, Value::number)?;
-        let mut file = File::read(text, scale * per_metre(reading.units), reading)?;
+        let stated = Units::new(scale, reading.units.up())?;
+        let kept = reading.document_units(stated);
+        let into = kept.unwrap_or(reading.units);
+        let mut file = File::read(text, scale * per_metre(into), reading)?;
         let named = Named::new(input, chosen, reading);
         let materials = file.materials(&named, reading.colors)?;
         let name = Path::new(input.name()).file_stem();
@@ -130,7 +139,11 @@ impl FileFormat for Points {
         items.push(FileItem::top(name, geometry));
         let mut warnings = named.warnings();
         warnings.append(&mut file.said);
-        Ok(Imported { items, warnings })
+        Ok(Imported {
+            items,
+            warnings,
+            units: kept,
+        })
     }
     fn writer(&self) -> Option<&dyn FormatWriter> {
         Some(self)

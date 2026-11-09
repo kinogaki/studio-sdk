@@ -217,7 +217,7 @@ impl FileFormat for XyzFormat {
                 "cloud",
                 CLOUD.wrap(Cloud(vec![[1.0, 2.0, 3.0]])),
             )],
-            warnings: Vec::new(),
+            ..Imported::default()
         })
     }
 }
