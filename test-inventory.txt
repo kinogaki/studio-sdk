@@ -460,6 +460,7 @@ kinogaki-studio-api-testing/doc test crates/api-testing/src/hostile.rs - hostile
 kinogaki-studio-api-testing/doc test crates/api-testing/src/lib.rs -
 kinogaki-studio-api-testing/doc test crates/api-testing/src/workers.rs - workers::install
 kinogaki-studio-api-testing/lib test format::tests::document_read_is_an_objects_read_in_its_own_units
+kinogaki-studio-api-testing/lib test format::tests::round_trip_carries_metadata
 kinogaki-studio-api-testing/turns test alone_waits_for_the_shared_turns_and_ends_with_its_thread
 kinogaki-studio-api/admission test a_context_adopts_a_node_type_once
 kinogaki-studio-api/admission test a_node_type_is_offered_in_declared_contexts

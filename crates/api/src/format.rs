@@ -128,6 +128,13 @@ pub struct Imported {
     /// file stating none, whose lengths are in [`Reading::units`]. `None`
     /// for the other purposes, whose lengths are in [`Reading::units`].
     pub units: Option<Units>,
+    /// What the file says of itself that no item holds (a USD layer's
+    /// `defaultPrim`, `doc` and time codes; the unit, up axis and MTL name an
+    /// OBJ was read with), by name, in the format's own spelling (a value
+    /// only text can hold as [`Value::Text`](crate::Value::Text)): what this
+    /// format's writer takes back ([`Writing::metadata`]) when it writes the
+    /// document read from the file again. Empty when there is none.
+    pub metadata: FormatOptions,
 }
 
 /// What the host makes of a read.
@@ -328,17 +335,23 @@ pub struct Writing<'a> {
     /// (a B-rep through the installed mesher); `None` when nothing meshes
     /// it.
     pub meshed: &'a (dyn Fn(&Data) -> Option<kinogaki_geometry::Geometry> + Sync),
+    /// The metadata this format read from the file the document came from
+    /// ([`Imported::metadata`]), when this format writes the document
+    /// again; `None` otherwise. A writer uses what still applies (a
+    /// `defaultPrim` naming no top item doesn't) and says what it left out.
+    pub metadata: Option<&'a FormatOptions>,
 }
 
 impl<'a> Writing<'a> {
     /// A write in `units` and `colors`' working space, never cancelled,
-    /// meshing nothing.
+    /// meshing nothing, of no metadata.
     pub fn new(units: Units, colors: &'a dyn ColorService) -> Self {
         Self {
             units,
             colors,
             cancel: CancelToken::default(),
             meshed: &|_| None,
+            metadata: None,
         }
     }
 

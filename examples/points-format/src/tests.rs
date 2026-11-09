@@ -26,7 +26,7 @@ impl Consumer for RoundTrip {
         let items = [FileItem::top("value", data.clone())];
         let (read, _) = round_trip(
             &Points,
-            &items,
+            (&items, None),
             &scratch.join("value.xyz"),
             Units::default(),
         )
@@ -202,7 +202,7 @@ fn materials_and_faces_write_back_as_they_read() {
     std::fs::create_dir(&out).unwrap();
     let (back, said) = round_trip(
         &Points,
-        &read.items,
+        (&read.items, None),
         &out.join("clay.xyz"),
         Units::default(),
     )
@@ -231,7 +231,7 @@ fn materials_and_faces_write_back_as_they_read() {
     std::fs::create_dir(&packed).unwrap();
     round_trip(
         &Points,
-        &read.items,
+        (&read.items, None),
         &packed.join("clay.xyz"),
         Units::default(),
     )

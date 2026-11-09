@@ -70,23 +70,28 @@ impl Drop for Scratch {
 }
 
 /// `items` written to `path` by `format`'s writer with its default
-/// options, and the file read back as Import reads it with the format's
-/// default options, in a project of `units` whose colors convert to
-/// nothing ([`Unconverted`]): what was read (its warnings the read's), and
-/// the writer's warnings.
+/// options and `metadata` (what a read of the file the items came from
+/// gave, [`Imported::metadata`]; `None` for items of no such file), and
+/// the file read back as Import reads it with the format's default
+/// options, in a project of `units` whose colors convert to nothing
+/// ([`Unconverted`]): what was read (its warnings and metadata the read's),
+/// and the writer's warnings.
 ///
 /// # Errors
 /// A format that writes nothing, a failed write, or a failed read.
 pub fn round_trip(
     format: &dyn FileFormat,
-    items: &[FileItem],
+    (items, metadata): (&[FileItem], Option<&FormatOptions>),
     path: &Path,
     units: Units,
 ) -> Result<(Imported, Vec<Diagnostic>), Error> {
     let label = format.label();
     let writer =
         (format.writer()).ok_or_else(|| Error::invalid(format!("{label} writes nothing")))?;
-    let writing = Writing::new(units, &Unconverted);
+    let writing = Writing {
+        metadata,
+        ..Writing::new(units, &Unconverted)
+    };
     let said = writer.write(path, items, &writing, &writer.options())?;
     let reading = Reading::new(Purpose::Objects, units, &Unconverted);
     let read = format.read(&Input::file(path), &format.options(), &reading)?;
@@ -172,6 +177,7 @@ mod tests {
     use kinogaki_studio_api::format::Conversion;
     use kinogaki_studio_api::geometry::{Vec3, Xform};
     use kinogaki_studio_api::id::FormatId;
+    use kinogaki_studio_api::{FormatWriter, Value};
 
     /// A file of one group 1 centimetre along X; `keeps` whether its
     /// Document read reports the units it keeps.
@@ -214,6 +220,72 @@ mod tests {
                 ..Imported::default()
             })
         }
+    }
+
+    /// A file holding one note, the metadata `note`, which its writer
+    /// writes back from the metadata it is handed.
+    struct Note;
+
+    impl FileFormat for Note {
+        fn id(&self) -> FormatId {
+            FormatId::declared("acme.format.note")
+        }
+        fn label(&self) -> &str {
+            "Note"
+        }
+        fn extensions(&self) -> &[&str] {
+            &["note"]
+        }
+        fn produces(&self) -> &[DataTypeId] {
+            &[]
+        }
+        fn read(
+            &self,
+            input: &Input<'_>,
+            _: &FormatOptions,
+            _: &Reading<'_>,
+        ) -> Result<Imported, Error> {
+            let text = String::from_utf8_lossy(&input.bytes()?).into_owned();
+            let metadata = FormatOptions::from([("note".to_owned(), Value::Text(text))]);
+            Ok(Imported {
+                metadata,
+                ..Imported::default()
+            })
+        }
+        fn writer(&self) -> Option<&dyn FormatWriter> {
+            Some(self)
+        }
+    }
+
+    impl FormatWriter for Note {
+        fn accepts(&self) -> &[DataTypeId] {
+            &[]
+        }
+        fn write(
+            &self,
+            path: &Path,
+            _: &[FileItem],
+            writing: &Writing<'_>,
+            _: &FormatOptions,
+        ) -> Result<Vec<Diagnostic>, Error> {
+            let note = writing
+                .metadata
+                .and_then(|m| m.get("note"))
+                .and_then(Value::text);
+            std::fs::write(path, note.unwrap_or_default())?;
+            Ok(Vec::new())
+        }
+    }
+
+    #[test]
+    fn round_trip_carries_metadata() {
+        let scratch = Scratch::new("note");
+        let path = scratch.join("a.note");
+        let kept = FormatOptions::from([("note".to_owned(), Value::Text("kept".into()))]);
+        let (read, _) = round_trip(&Note, (&[], Some(&kept)), &path, Units::METERS).unwrap();
+        assert_eq!(read.metadata, kept);
+        let (read, _) = round_trip(&Note, (&[], None), &path, Units::METERS).unwrap();
+        assert_eq!(read.metadata.get("note"), Some(&Value::Text(String::new())));
     }
 
     #[test]

@@ -143,6 +143,7 @@ impl FileFormat for Points {
             items,
             warnings,
             units: kept,
+            ..Imported::default()
         })
     }
     fn writer(&self) -> Option<&dyn FormatWriter> {
