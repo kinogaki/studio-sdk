@@ -206,7 +206,7 @@ impl Renderable for BoxType {
 }
 ```
 
-**In project files**, a type writes its own element through its codec and reads it back strictly: a missing or malformed field is an error, never a default.
+**In project files**, a type writes its own element through its codec and reads it back strictly: a malformed field is an error. A field the element lacks is an error too unless the codec declares its default: it then reads the default and says so (`ElementReader::defaulted`, or the element read over its defaults with `ElementReader::over`), and Studio warns of it when the project opens. A node's parameters are Studio's to read: one the file lacks takes its declared default.
 
 ```rust
 impl DataCodec for BoxType {

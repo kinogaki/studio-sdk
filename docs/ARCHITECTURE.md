@@ -247,7 +247,7 @@ A value held in several places (two frozen nodes keeping the same mesh) is writt
 Codecs follow the project rules:
 - reading is strict both ways: the typed reads fail naming the field and the element, and Studio refuses a field, metadata entry or child a codec's read leaves unread, so a codec writes only what it reads back;
 - the element is the codec's alone: the host keeps its own fields elsewhere (an object's placement on the object's element, its body in a `body` child);
-- there are no defaults for missing values;
+- a value the element lacks that the codec declares takes its declared default, and the codec says so (`ElementReader::defaulted`; Studio warns of each in the load's report): a codec whose fields are the same whatever its value holds reads over its defaults as it writes them (`ElementReader::over`; Studio reads every stored value so), and one whose fields follow what it holds declares each default where it reads it (`element::read_values`);
 - there are no version fields.
 
 `ObjectCodec::read` also receives a `ReadCx`, a read-only view of what is installed (the render engines' descriptions, `engines()`). A body that needs something no installed package provides, such as a light of a type no installed engine declares, reads as an `ErrorKind::Missing` error with a plain message saying what is missing.
@@ -318,7 +318,7 @@ Some values belong to a package and to the project rather than to an object: a k
 - `id`, a `StoredId` (`kinogaki.cad.tolerances`) naming its element in the project, under the package's vendor and declared once among the installed packages (the registry refuses a second);
 - `scope`: one value for the project (`Scope::Project`), one per view (`Scope::View`), or one for the user (`Scope::User`, kept in the user's settings folder, never in a project);
 - `defaults`, what a new project or view starts with;
-- `write` and `read`, its codec; reading is strict, as codecs' is.
+- `write` and `read`, its codec; reading is strict, as codecs' is. Studio reads a project's over `defaults` as `write` writes them, so a field the file lacks (the value gained it since the save) takes the default's and the load warns of it; a value the project lacks whole starts at its defaults. So `write` writes the same fields whatever the value holds.
 
 The host keeps them in `StoredValues` tables (the project's, and one per view), shared and copy-on-write like session slots, and saves each into the project under an element naming its package, so a project holding a value of a package that isn't installed keeps it as read and writes it back. Core keeps one view value of its own in every view's table: what the view draws, its Wireframe or Solid mode and their settings with the per-view display options the user set there (see "A view's modes and display options"). A package's UI reads and sets the project's and the user's through `HostDoc` (typed through `HostDocExt::stored`); a project value's change is a change to the project, saved with it, and a user's is saved with the user's settings. A cook reads the project's values when its node declares `Reads::project` (`CookCx`'s `Project::stored`); a change recooks it. Cooks never read the user's, so a project cooks alike for every user.
 

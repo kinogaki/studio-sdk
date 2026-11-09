@@ -7,7 +7,9 @@ use kinogaki_studio_api::element::MemoryElement;
 use kinogaki_studio_api::standard::{self, BrepCodec, GeometryCodec, Instances, InstancesCodec};
 
 /// Saves each standard value with its codec and reads it back: the read
-/// value equals it bit for bit, and a selection of it round-trips too.
+/// value equals it bit for bit, nothing read took a default (what a codec
+/// writes holds every value it reads), and a selection of it round-trips
+/// too.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Codecs;
 
@@ -31,9 +33,15 @@ impl Consumer for Codecs {
         saved
             .write(|w| codec.write(data, w))
             .map_err(|e| format!("write: {e}"))?;
-        let read = saved
-            .read(|r| codec.read(r))
+        let (read, filled) = saved
+            .read_defaulted(|r| codec.read(r))
             .map_err(|e| format!("read: {e}"))?;
+        if !filled.is_empty() {
+            return Err(format!(
+                "read back, it took defaults: {}",
+                filled.join(", ")
+            ));
+        }
         if !same_bits(data, &read) {
             return Err("the value read back differs".into());
         }

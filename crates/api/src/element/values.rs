@@ -108,27 +108,34 @@ pub fn read_image(e: &dyn ElementReader, name: &str) -> Result<Option<ImageRef>,
 }
 
 /// The values `e`'s fields hold: each of `settings` by its descriptor (of
-/// its kind, within its limits), and every other field as its type says
+/// its kind, within its limits; one `e` lacks at its default, said with
+/// [`ElementReader::defaulted`]), and every other field as its type says
 /// (another engine's value, kept so a save writes it back).
 ///
 /// # Errors
-/// A setting missing, of another kind or out of range, naming it.
+/// A setting of another kind or out of range, naming it.
 pub fn read_values<'d>(
     e: &dyn ElementReader,
     settings: impl IntoIterator<Item = &'d Parameter>,
 ) -> Result<Parameters, Error> {
     let bad =
         |name: &str, why: String| Error::invalid(format_args!("{}: {name} {why}", e.location()));
+    let defaulted = |d: &Parameter| {
+        let field = field_of(&d.name, &d.value).ok();
+        e.defaulted(&d.name, field.as_ref().map(Field::as_ref));
+        d.value.clone()
+    };
     let mut values = Parameters::new();
     for d in settings {
         let value = match d.kind {
-            ValueKind::Image => Value::Image(read_image(e, &d.name)?),
-            _ => {
-                let field = e
-                    .field(&d.name)
-                    .ok_or_else(|| bad(&d.name, "is missing".into()))?;
-                value_of(field, Some(&d.kind)).map_err(|why| bad(&d.name, why))?
+            ValueKind::Image if e.children().contains(&d.name) => {
+                Value::Image(read_image(e, &d.name)?)
             }
+            ValueKind::Image => defaulted(d),
+            _ => match e.field(&d.name) {
+                Some(field) => value_of(field, Some(&d.kind)).map_err(|why| bad(&d.name, why))?,
+                None => defaulted(d),
+            },
         };
         if !d.accepts(&value) {
             return Err(bad(&d.name, "is out of range".into()));
@@ -370,16 +377,36 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused() {
+    fn a_value_out_of_range_or_of_another_kind_is_refused() {
         let mut values = Parameters::from([("width".to_owned(), Value::Number(-1.0))]);
         let why = back(&values, &[width()]).unwrap_err().to_string();
         assert!(why.contains("width is out of range"), "{why}");
-        values.remove("width");
-        let why = back(&values, &[width()]).unwrap_err().to_string();
-        assert!(why.contains("width is missing"), "{why}");
         values.insert("width".into(), Value::Text("wide".into()));
         let why = back(&values, &[width()]).unwrap_err().to_string();
         assert!(why.contains("width is not a float64"), "{why}");
+    }
+
+    /// A declared value the element lacks takes its descriptor's default,
+    /// said once by name; an image row's default (none) is said too.
+    #[test]
+    fn a_declared_value_the_element_lacks_takes_its_default_said() {
+        let dome = Parameter::new("dome", "Dome", ValueKind::Image, Value::Image(None));
+        let mut e = MemoryElement::new("values");
+        let glow = Parameters::from([("acmeGlow".to_owned(), Value::Number(2.5))]);
+        e.write(|out| write_values(out, &glow)).unwrap();
+        let (read, said) = e
+            .read_defaulted(|r| read_values(r, &[width(), dome.clone()]))
+            .unwrap();
+        let mut whole = glow;
+        whole.insert("width".into(), Value::Number(1.0));
+        whole.insert("dome".into(), Value::Image(None));
+        assert_eq!(read, whole);
+        assert_eq!(said, ["/: width", "/: dome"]);
+        // Saved, the defaults are values like any other: nothing is said.
+        let mut saved = MemoryElement::new("values");
+        saved.write(|out| write_values(out, &whole)).unwrap();
+        let again = saved.read_defaulted(|r| read_values(r, &[width(), dome]));
+        assert_eq!(again.unwrap(), (whole, Vec::new()));
     }
 
     #[test]

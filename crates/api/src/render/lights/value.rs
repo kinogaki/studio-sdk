@@ -66,11 +66,12 @@ impl LightCodec {
     }
 
     /// Reads the light [`write_light`](Self::write_light) wrote, strictly:
-    /// a standard type, every value it has, and a valid light
+    /// a standard type, every value it has (one it lacks at its type's
+    /// default, said: [`element::read_values`]), and a valid light
     /// ([`light_value`]).
     ///
     /// # Errors
-    /// An unknown type, a value missing or out of range, or an invalid light.
+    /// An unknown type, a value out of range, or an invalid light.
     pub(crate) fn read_light(e: &dyn ElementReader) -> Result<Light, Error> {
         let at = || e.location();
         let id = e.text("type")?;

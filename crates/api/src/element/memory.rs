@@ -63,20 +63,42 @@ impl MemoryElement {
         &self,
         read: impl FnOnce(&dyn ElementReader) -> Result<R, Error>,
     ) -> Result<R, Error> {
+        self.read_defaulted(read).map(|(value, _)| value)
+    }
+
+    /// Runs `read` as [`read`](Self::read) does, with what it read as its
+    /// declared defaults ([`ElementReader::defaulted`]): `<element>:
+    /// <name>` each, in the order said.
+    ///
+    /// ```
+    /// use kinogaki_studio_api::element::{Field, MemoryElement};
+    ///
+    /// let mut defaults = MemoryElement::new("lens");
+    /// defaults.write(|w| w.set("fStop", Field::Float(5.6))).unwrap();
+    /// let older = MemoryElement::new("lens");
+    /// let (f_stop, said) = older.read_defaulted(|r| r.over(&defaults).float("fStop")).unwrap();
+    /// assert_eq!((f_stop, said), (5.6, vec!["/: fStop".to_owned()]));
+    /// ```
+    pub fn read_defaulted<R>(
+        &self,
+        read: impl FnOnce(&dyn ElementReader) -> Result<R, Error>,
+    ) -> Result<(R, Vec<String>), Error> {
         let cache = RefCell::new(BTreeMap::new());
         let taken = RefCell::new(BTreeMap::new());
+        let said = RefCell::new(Vec::new());
         let reader = Reader {
             root: self,
             element: self,
             path: String::new(),
             cache: &cache,
             taken: &taken,
+            said: &said,
         };
         reader.visit();
         let value = read(&reader)?;
         match leftover(self, &taken.borrow(), &cache.borrow()) {
             Some(left) => Err(Error::invalid(left)),
-            None => Ok(value),
+            None => Ok((value, said.take())),
         }
     }
 
@@ -91,6 +113,31 @@ impl MemoryElement {
             .iter()
             .find(|(n, _)| n == name)
             .map(|(_, e)| e)
+    }
+
+    /// Field `name`, when it is set.
+    pub(crate) fn field(&self, name: &str) -> Option<&Field> {
+        self.fields.get(name)
+    }
+
+    /// Every field's name, in name order.
+    pub(crate) fn field_names(&self) -> Vec<String> {
+        self.fields.keys().cloned().collect()
+    }
+
+    /// Metadata `key`, when it is set.
+    pub(super) fn metadata(&self, key: &str) -> Option<&str> {
+        self.metadata.get(key).map(String::as_str)
+    }
+
+    /// The children's names, in the order they were added.
+    pub(super) fn child_names(&self) -> Vec<String> {
+        self.children.iter().map(|(n, _)| n.clone()).collect()
+    }
+
+    /// The value [`ElementWriter::data`] wrote as `name`, when there is one.
+    pub(super) fn value(&self, name: &str) -> Option<&Data> {
+        (self.values.iter()).find_map(|(n, v)| (n == name).then_some(&v.0))
     }
 
     /// Whether `other` holds what this element holds, each value
@@ -239,6 +286,8 @@ struct Reader<'a> {
     cache: &'a RefCell<BTreeMap<String, SharedValue>>,
     /// What was read of each element visited, by path.
     taken: &'a RefCell<BTreeMap<String, Taken>>,
+    /// What was read as its declared default: `<element>: <name>` each.
+    said: &'a RefCell<Vec<String>>,
 }
 
 impl<'a> Reader<'a> {
@@ -249,6 +298,7 @@ impl<'a> Reader<'a> {
             path,
             cache: self.cache,
             taken: self.taken,
+            said: self.said,
         };
         reader.visit();
         reader
@@ -366,6 +416,11 @@ impl ElementReader for Reader<'_> {
         } else {
             self.path.clone()
         }
+    }
+
+    fn defaulted(&self, name: &str, _: Option<FieldRef<'_>>) {
+        let said = format!("{}: {name}", self.location());
+        self.said.borrow_mut().push(said);
     }
 }
 

@@ -485,6 +485,8 @@ kinogaki-studio-api/doc test crates/api/src/cook/description.rs - cook::descript
 kinogaki-studio-api/doc test crates/api/src/cook/handle.rs - cook::handle::Handle
 kinogaki-studio-api/doc test crates/api/src/cook/placement.rs - cook::placement::Placement
 kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement
+kinogaki-studio-api/doc test crates/api/src/element/memory.rs - element::memory::MemoryElement::read_defaulted
+kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::dynElementReader+'r::over
 kinogaki-studio-api/doc test crates/api/src/element/mod.rs - element::is_name
 kinogaki-studio-api/doc test crates/api/src/format/budget.rs - format::budget
 kinogaki-studio-api/doc test crates/api/src/format/conversion.rs - format::conversion::Conversion
@@ -546,12 +548,14 @@ kinogaki-studio-api/lib test cook::placement::tests::orienting_writes_the_up_and
 kinogaki-studio-api/lib test cook::placement::tests::placements_are_right_handed_and_turn_about_up
 kinogaki-studio-api/lib test cook::sheet::tests::a_new_node_reads_the_render_outputs
 kinogaki-studio-api/lib test cook::sheet::tests::ports_past_the_ends_are_unwired_and_uncooked
+kinogaki-studio-api/lib test element::defaults::tests::a_child_the_element_lacks_is_said_once_and_read_from_the_defaults
 kinogaki-studio-api/lib test element::memory::tests::a_shared_value_is_written_once_and_read_once
 kinogaki-studio-api/lib test element::memory::tests::bad_names_and_rows_are_refused
 kinogaki-studio-api/lib test element::memory::tests::fields_children_and_metadata_round_trip
 kinogaki-studio-api/lib test element::memory::tests::values_are_the_same_as_the_caller_says
 kinogaki-studio-api/lib test element::values::tests::a_damaged_ramp_or_curve_is_refused
-kinogaki-studio-api/lib test element::values::tests::a_missing_value_and_one_out_of_range_or_of_another_kind_are_refused
+kinogaki-studio-api/lib test element::values::tests::a_declared_value_the_element_lacks_takes_its_default_said
+kinogaki-studio-api/lib test element::values::tests::a_value_out_of_range_or_of_another_kind_is_refused
 kinogaki-studio-api/lib test element::values::tests::an_object_value_saves_as_its_id_or_none
 kinogaki-studio-api/lib test element::values::tests::values_keep_what_no_descriptor_declares_and_save_it_back
 kinogaki-studio-api/lib test facets::render::tests::a_render_asks_at_the_viewports_detail_unless_told
@@ -608,6 +612,7 @@ kinogaki-studio-api/lib test render::lights::value::tests::every_shape_saves_and
 kinogaki-studio-api/lib test render::lights::value::tests::only_lights_in_range_are_light_values
 kinogaki-studio-api/lib test render::lights::view::tests::glyphs_follow_the_light_shape
 kinogaki-studio-api/lib test render::lights::view::tests::handles_bind_to_the_light_shape
+kinogaki-studio-api/lib test standard::camera::tests::a_lens_field_the_element_lacks_is_a_new_cameras
 kinogaki-studio-api/lib test standard::camera::tests::a_lens_saves_and_reads_back
 kinogaki-studio-api/lib test standard::camera::tests::only_lenses_are_cameras
 kinogaki-studio-api/lib test standard::materials::tests::every_value_wire_inside_standard_form_and_embedded_file_round_trips

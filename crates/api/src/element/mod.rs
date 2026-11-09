@@ -21,17 +21,30 @@
 //!
 //! **Strictness.** Readers fail on anything missing or of the wrong type,
 //! naming the field and the element ([`ElementReader::location`]); there
-//! are no defaults for missing values and no version fields. Studio and
-//! [`MemoryElement`] also refuse what a codec's read leaves unread (a
-//! field, metadata, a child), so a codec writes only what it reads back,
-//! and a package's round-trip test finds one that doesn't.
+//! are no version fields. Studio and [`MemoryElement`] also refuse what a
+//! codec's read leaves unread (a field, metadata, a child), so a codec
+//! writes only what it reads back, and a package's round-trip test finds
+//! one that doesn't.
+//!
+//! **Defaults.** A value the element lacks that the codec declares takes
+//! its declared default, and the reader is told so
+//! ([`ElementReader::defaulted`]): Studio warns of each in the load's
+//! report, and a save writes it as any other value. A codec whose fields
+//! are the same whatever its value holds reads over its defaults as it
+//! writes them ([`over`](trait.ElementReader.html#method.over): a
+//! camera's lens; Studio reads every stored value so); one whose fields
+//! follow what it holds declares each default where it reads it
+//! ([`read_values`]: a light's values, by its type). A field of the wrong
+//! type is refused all the same.
 //!
 //! **Values.** A parameter's or setting's [`Value`](crate::Value) has one
 //! encoding as a field ([`field_of`], [`value_of`]); an image is an element
 //! of its own ([`write_image`], [`read_image`]).
+mod defaults;
 mod memory;
 mod values;
 
+use defaults::Over;
 pub use memory::MemoryElement;
 pub use values::{field_of, read_image, read_values, value_of, write_image, write_values};
 
@@ -269,6 +282,13 @@ pub trait ElementReader {
 
     /// Where the element is, for messages (`/objects/box/result`).
     fn location(&self) -> String;
+
+    /// Tells the reader that `name`, a field, child or data value the
+    /// codec reads, isn't in the element and reads as its declared
+    /// default: `default` as a field, or `None` where no field holds it
+    /// (an image, a child, data). Studio warns of each once in the load's
+    /// report; a save writes it as any other value.
+    fn defaulted(&self, name: &str, default: Option<FieldRef<'_>>);
 }
 
 impl<'r> dyn ElementReader + 'r {
@@ -286,6 +306,42 @@ impl<'r> dyn ElementReader + 'r {
                 self.location()
             ))
         })
+    }
+
+    /// This element read over `defaults`, what its codec writes of the
+    /// value a new one holds: a field, child or data value the element
+    /// lacks reads as `defaults` holds it, and the element's reader is
+    /// told ([`ElementReader::defaulted`]; once for a child, however much
+    /// of it is read). Everything else is the element's; a child both
+    /// hold is read over the default's child in turn.
+    ///
+    /// It suits a codec whose fields are the same whatever its value
+    /// holds (a camera's lens; Studio reads every stored value over its
+    /// `defaults()`). Where the fields follow what the value holds (a
+    /// light's values follow its type), another value's default would
+    /// stand in, so such a codec declares each default where it reads it
+    /// ([`read_values`]).
+    ///
+    /// ```
+    /// use kinogaki_studio_api::element::{ElementReader, Field, MemoryElement};
+    ///
+    /// let mut defaults = MemoryElement::new("tolerances");
+    /// defaults.write(|w| {
+    ///     w.set("fitMm", Field::Float(0.01))?;
+    ///     w.set("tangentDegrees", Field::Float(0.5))
+    /// }).unwrap();
+    /// let mut older = MemoryElement::new("tolerances");
+    /// older.write(|w| w.set("fitMm", Field::Float(0.1))).unwrap();
+    /// let read = |r: &dyn ElementReader| {
+    ///     let r = r.over(&defaults);
+    ///     Ok((r.float("fitMm")?, r.float("tangentDegrees")?))
+    /// };
+    /// let (read, said) = older.read_defaulted(read).unwrap();
+    /// assert_eq!(read, (0.1, 0.5));
+    /// assert_eq!(said, ["/: tangentDegrees"]);
+    /// ```
+    pub fn over<'a>(&'a self, defaults: &'a MemoryElement) -> Box<dyn ElementReader + 'a> {
+        Box::new(Over::new(self, defaults))
     }
 
     /// Child `name`, or an error naming it.

@@ -309,7 +309,8 @@ impl RenderedKind for DeclaredKind {
     }
 }
 
-/// An object saves its type and every value it holds.
+/// An object saves its type and every value it holds; one its element
+/// lacks reads as its type's default, said ([`element::read_values`]).
 impl ObjectCodec for DeclaredKind {
     fn write(&self, body: &dyn ObjectBody, out: &mut dyn ElementWriter) -> Result<(), Error> {
         let prim = self

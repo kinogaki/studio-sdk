@@ -15,7 +15,7 @@ use super::camera;
 use crate::Error;
 use crate::codec::DataCodec;
 use crate::data::Data;
-use crate::element::{ElementReader, ElementWriter, Field};
+use crate::element::{ElementReader, ElementWriter, Field, MemoryElement};
 use kinogaki_geometry::{Sampled, Xform};
 use kinogaki_render_api::{Camera, Projection};
 
@@ -105,12 +105,17 @@ impl CameraCodec {
     }
 
     /// Reads the lens [`write_lens`](Self::write_lens) wrote, strictly:
-    /// every field, a known projection, and a valid lens (as
-    /// [`camera`](fn@camera) checks one).
+    /// a known projection and a valid lens (as [`camera`](fn@camera)
+    /// checks one), each field the element lacks at a new camera's
+    /// (`Camera::default`), said (`ElementReader::over`).
     ///
     /// # Errors
-    /// A field missing or of another kind, or an invalid lens.
+    /// A field of another kind, or an invalid lens.
     pub fn read_lens(e: &dyn ElementReader) -> Result<Camera, Error> {
+        let mut defaults = MemoryElement::new(e.kind());
+        defaults.write(|out| Self::write_lens(&Camera::default(), out))?;
+        let over = e.over(&defaults);
+        let e = &*over;
         let at = || e.location();
         let projection = match e.text("projection")? {
             "Perspective" => Projection::Perspective,
@@ -185,6 +190,36 @@ mod tests {
             .unwrap();
         let back = e.read(|r| CameraCodec.read(r)).unwrap();
         assert_eq!(camera().get(&back), Some(&lens));
+    }
+
+    /// A lens field the element lacks reads as a new camera's, said once;
+    /// one of another kind is refused.
+    #[test]
+    fn a_lens_field_the_element_lacks_is_a_new_cameras() {
+        let mut whole = MemoryElement::new("camera");
+        (whole.write(|w| CameraCodec::write_lens(&Camera::default(), w))).unwrap();
+        let mut older = MemoryElement::new("camera");
+        older
+            .write(|w| {
+                for name in whole.field_names().into_iter().filter(|n| n != "fStop") {
+                    let field = match name.as_str() {
+                        "focalLength" => Field::Float(85.0),
+                        _ => whole.field(&name).expect("written").clone(),
+                    };
+                    w.set(&name, field)?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        let (read, said) = older.read_defaulted(CameraCodec::read_lens).unwrap();
+        let expected = Camera {
+            focal_length: 85.0,
+            ..Camera::default()
+        };
+        assert_eq!((read, said), (expected, vec!["/: fStop".to_owned()]));
+        let mut wrong = older.clone();
+        (wrong.write(|w| w.set("fStop", Field::Text("wide".into())))).unwrap();
+        assert!(wrong.read(CameraCodec::read_lens).is_err());
     }
 
     #[test]

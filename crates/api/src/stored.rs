@@ -15,7 +15,14 @@
 //! value is that element in each view's. The element is typed with the id,
 //! which names its package, so a project holding a value of a package that
 //! isn't installed keeps it as read. Reading is strict: a field the value's
-//! codec doesn't read refuses the project, as one missing does.
+//! codec doesn't read refuses the project, as one of another type does.
+//! What the element lacks (the value gained a field since the file was
+//! saved) takes its default: the host reads the element over the value's
+//! [`Stored::defaults`] as [`Stored::write`] writes them
+//! (`ElementReader::over`), and the load warns of each field it
+//! filled in. So `write` writes the same fields whatever the value holds
+//! (one saying none, never a field left out). A value the project lacks
+//! whole starts at its defaults, and the load says so too.
 //!
 //! **For the user.** A [`Scope::User`] value is that element in the
 //! user's settings folder, kept beside the user's settings, never in a
@@ -61,8 +68,10 @@ pub trait Stored: Any + Clone + PartialEq + fmt::Debug + Send + Sync {
     fn defaults() -> Self;
     /// Writes the value's fields into its element.
     fn write(&self, to: &mut dyn ElementWriter) -> Result<(), Error>;
-    /// Reads a value from its element; fails on anything missing or
-    /// unknown.
+    /// Reads a value from its element; fails on anything missing,
+    /// unknown or of another type. The host reads a project's over
+    /// [`defaults`](Self::defaults) as [`write`](Self::write) writes
+    /// them, so a field the file lacks reads as the default's.
     fn read(from: &dyn ElementReader) -> Result<Self, Error>;
 }
 
