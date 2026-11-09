@@ -158,7 +158,7 @@ fn attributes_are_sized_to_their_domain() {
         .with(
             Domain::Edge,
             "crease",
-            Attribute::tuples(vec![0.0; 6], Meaning::None).unwrap(),
+            Attribute::tuples(vec![0.0f32; 6], Meaning::None).unwrap(),
         )
         .unwrap()
         .with(

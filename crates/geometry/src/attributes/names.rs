@@ -26,6 +26,10 @@
 //! | [`MATERIAL`], [`NAME`], [`PART`] | any | text |
 //! | [`MATERIAL_MAP`] | Instance | an array of text |
 //! | groups [`SHARP`], [`SMOOTH`] / [`HIDDEN`] | Edge / Primitive | group |
+//! | [`CREASE`] | Edge, Point | f32 |
+//! | [`SUBDIVISION_SCHEME`], [`SUBDIVISION_BOUNDARY`], [`SUBDIVISION_FACE_VARYING`], [`SUBDIVISION_TRIANGLES`] | Detail | text |
+//! | [`SUBDIVISION_LEVEL`] | Detail | i32 |
+//! | group [`SUBDIVISION_HOLE`] | Primitive | group |
 //!
 //! [`Attributes::with`]: crate::Attributes::with
 //! [`Attributes::with_group`]: crate::Attributes::with_group
@@ -88,6 +92,29 @@ pub const SHARP: &str = "sharp";
 pub const SMOOTH: &str = "smooth";
 /// The hidden primitives (a [`Domain::Primitive`] group): Hide.
 pub const HIDDEN: &str = ".hidden";
+/// How sharply a subdivision surface creases: on an edge, along it; on a
+/// point, at it (a corner). In levels of subdivision: each level spends one,
+/// so a crease of 1 is sharp for one level and 10 (USD's infinitely sharp)
+/// for every level there is; 0 is smooth.
+pub const CREASE: &str = "crease";
+/// How the value subdivides when it renders ([`Subdivision`](crate::Subdivision)):
+/// `catmull_clark`, `loop` or `bilinear`; absent, it is polygons.
+pub const SUBDIVISION_SCHEME: &str = "subdivision_scheme";
+/// How many times a subdividing value is refined when it renders
+/// ([`Subdivision`](crate::Subdivision)).
+pub const SUBDIVISION_LEVEL: &str = "subdivision_level";
+/// How a subdividing value's border subdivides
+/// ([`Boundary`](crate::Boundary)'s keys).
+pub const SUBDIVISION_BOUNDARY: &str = "subdivision_boundary";
+/// How a subdividing value's Vertex attributes interpolate
+/// ([`FaceVarying`](crate::FaceVarying)'s keys).
+pub const SUBDIVISION_FACE_VARYING: &str = "subdivision_face_varying";
+/// Catmull-Clark's rule for a subdividing value's triangles
+/// ([`Triangles`](crate::Triangles)'s keys).
+pub const SUBDIVISION_TRIANGLES: &str = "subdivision_triangles";
+/// The holes (a [`Domain::Primitive`] group): faces that render as nothing,
+/// though a subdividing value's surface around them is shaped by them.
+pub const SUBDIVISION_HOLE: &str = "subdivision_hole";
 
 /// The whole type and the domains of the standard attribute `name`, as the table
 /// fixes them: what a tool making an attribute of that name follows. `None` for
@@ -124,7 +151,7 @@ pub(crate) const ANY: &[Domain] = &Domain::ALL;
 /// The standard meaning of `name`, if it has one: the one table every
 /// reader and writer follows.
 pub(crate) fn standard(name: &str) -> Option<Standard> {
-    use Domain::{Edge, Instance, Point, Primitive, Vertex};
+    use Domain::{Detail, Edge, Instance, Point, Primitive, Vertex};
     let f32s = |width, meaning| AttributeType::new(Storage::F32, width, meaning);
     let attribute = |ty, domains| Some(Standard::Attribute(ty, domains));
     match name {
@@ -160,7 +187,16 @@ pub(crate) fn standard(name: &str) -> Option<Standard> {
             &[Instance],
         ),
         SHARP | SMOOTH => Some(Standard::Group(Edge)),
-        HIDDEN => Some(Standard::Group(Primitive)),
+        HIDDEN | SUBDIVISION_HOLE => Some(Standard::Group(Primitive)),
+        CREASE => attribute(f32s(1, Meaning::None), &[Edge, Point]),
+        SUBDIVISION_SCHEME
+        | SUBDIVISION_BOUNDARY
+        | SUBDIVISION_FACE_VARYING
+        | SUBDIVISION_TRIANGLES => attribute(AttributeType::TEXT, &[Detail]),
+        SUBDIVISION_LEVEL => attribute(
+            AttributeType::new(Storage::I32, 1, Meaning::None),
+            &[Detail],
+        ),
         _ => None,
     }
 }

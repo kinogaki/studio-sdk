@@ -114,6 +114,10 @@ impl Registry {
             let first = self.meshers.iter().find(|e| e.item.id() == m.id());
             declare("mesher", m.id().as_str(), owner(first))?;
         }
+        for s in &package.subdividers {
+            let first = self.subdividers.iter().find(|e| e.item.id() == s.id());
+            declare("subdivider", s.id().as_str(), owner(first))?;
+        }
         for k in &package.object_kinds {
             declare(
                 "object kind",

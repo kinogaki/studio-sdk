@@ -35,6 +35,6 @@ pub use glyph::{GlyphScale, Glyphs};
 pub use held::Held;
 pub use object::{Look, Marquee, MaterialDisplays, ObjectPicking};
 pub use pick::{Combine, Pickable};
-pub use render::{RenderCx, Renderable, Rendered};
+pub use render::{Refine, Refining, RenderCx, Renderable, Rendered};
 pub use snap::{SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable};
 pub use table::{CellKind, Cells, Table, TableColumn, Tabular};

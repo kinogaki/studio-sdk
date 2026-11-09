@@ -12,13 +12,14 @@ use crate::object::ObjectKindSpec;
 use crate::render::ShaderNode;
 use crate::session::{SessionSlot, Slot};
 use crate::stored::{Stored, StoredValue};
+use crate::subdivider::Subdivider;
 use kinogaki_render_api::EngineDescription;
 use std::any::Any;
 use std::fmt;
 use std::sync::Arc;
 
 /// Everything one package contributes through the headless API: its data
-/// types, held edits over them, B-rep meshers, the verbs it offers as a
+/// types, held edits over them, B-rep meshers, subdividers, the verbs it offers as a
 /// kernel (a kernel adds no data types: it is a package of verbs), node
 /// types' cooks, the network contexts its object kinds hold, object
 /// kinds, file formats, session slots and stored values, the render
@@ -42,6 +43,7 @@ pub struct Package {
     pub(crate) data_types: Vec<Arc<dyn DataType>>,
     pub(crate) held_edits: Vec<Arc<dyn HeldEdit>>,
     pub(crate) meshers: Vec<Arc<dyn Mesher>>,
+    pub(crate) subdividers: Vec<Arc<dyn Subdivider>>,
     pub(crate) verbs: Vec<Verb>,
     pub(crate) script_engine: Option<Arc<dyn crate::script::ScriptEngine>>,
     pub(crate) node_types: Vec<Arc<dyn NodeType>>,
@@ -92,6 +94,12 @@ impl Package {
     /// How it meshes B-rep bodies for display, rendering and export.
     pub fn meshers(&self) -> &[Arc<dyn Mesher>] {
         &self.meshers
+    }
+
+    /// How it refines polygons as their subdivision setting says, for
+    /// rendering.
+    pub fn subdividers(&self) -> &[Arc<dyn Subdivider>] {
+        &self.subdividers
     }
 
     /// The functions it offers every other package, as a kernel.
@@ -221,6 +229,7 @@ impl Package {
             data_types: Vec::new(),
             held_edits: Vec::new(),
             meshers: Vec::new(),
+            subdividers: Vec::new(),
             verbs: Vec::new(),
             script_engine: None,
             node_types: Vec::new(),
@@ -288,6 +297,12 @@ impl Package {
     /// With B-rep mesher `mesher` too.
     pub fn with_mesher(mut self, mesher: impl Mesher + 'static) -> Self {
         self.meshers.push(Arc::new(mesher));
+        self
+    }
+
+    /// With subdivider `subdivider` too.
+    pub fn with_subdivider(mut self, subdivider: impl Subdivider + 'static) -> Self {
+        self.subdividers.push(Arc::new(subdivider));
         self
     }
 

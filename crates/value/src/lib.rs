@@ -38,7 +38,7 @@ pub use condition::Condition;
 pub use data::{Checked, Data, Typed};
 pub use id::{
     ContextId, CreationId, DataTypeId, EngineId, FormatId, MesherId, NodeTypeId, ObjectKindId,
-    PackageId, PrimTypeId, SlotId, StoredId,
+    PackageId, PrimTypeId, SlotId, StoredId, SubdividerId,
 };
 pub use kind::{Choice, CurveChannel, Number, Unit, ValueKind};
 pub use look::{NumberLook, NumberStyle};

@@ -3,8 +3,8 @@ use crate::Error;
 use crate::cancel::CancelToken;
 use crate::data::Data;
 use crate::render::{Detail, RenderItem};
-use kinogaki_geometry::Time;
-use kinogaki_geometry::Tolerances;
+use crate::subdivider::Refined;
+use kinogaki_geometry::{Geometry, Time, Tolerances};
 use std::any::Any;
 use std::sync::Arc;
 
@@ -39,6 +39,7 @@ pub struct Rendered {
     /// The render items, in order.
     pub items: Arc<[RenderItem]>,
     detail: Option<Arc<dyn Any + Send + Sync>>,
+    waiting: bool,
 }
 
 impl Rendered {
@@ -47,7 +48,24 @@ impl Rendered {
         Self {
             items: items.into(),
             detail: None,
+            waiting: false,
         }
+    }
+
+    /// Standing in for items the host is still making for the type (a
+    /// subdivision surface it refines, [`RenderCx::refine`]): whatever keeps
+    /// items by their value (the host's, a type holding values) asks the
+    /// type again rather than keeping these, and the host renders the
+    /// value again once its work lands.
+    pub fn waiting(mut self) -> Self {
+        self.waiting = true;
+        self
+    }
+
+    /// Whether they stand in for items the host is still making
+    /// ([`waiting`](Self::waiting)).
+    pub fn is_waiting(&self) -> bool {
+        self.waiting
     }
 
     /// With `detail` beside the items, for the type's own later calls.
@@ -87,6 +105,35 @@ pub struct RenderCx<'a> {
     /// rendering values its value holds asks for each (the host fills it;
     /// none otherwise, and the type renders them itself).
     pub held: Option<&'a dyn super::Held>,
+    /// The host's refinement of polygons that subdivide, which a type
+    /// rendering such polygons asks for them (the host fills it; none
+    /// otherwise, and the type renders the cage).
+    pub refine: Option<&'a dyn Refine>,
+}
+
+/// The host's refinement of polygons into the subdivision surfaces their
+/// [`Subdivision`](kinogaki_geometry::Subdivision) says, made by the
+/// installed [`Subdivider`](crate::Subdivider) off the render's thread.
+pub trait Refine: Send + Sync {
+    /// `cage` refined as its setting says. `previous` is the refinement the
+    /// type rendered of the value before it (a drag's last step), which the
+    /// host moves when `cage` is that one's cage moved. While the host
+    /// works the type renders what it rendered before (else the cage),
+    /// [`waiting`](Rendered::waiting), and is asked again once the work
+    /// lands.
+    fn refined(&self, cage: &Geometry, previous: Option<&Arc<dyn Refined>>) -> Refining;
+}
+
+/// What [`Refine::refined`] answers.
+#[derive(Clone)]
+pub enum Refining {
+    /// The refinement.
+    Ready(Arc<dyn Refined>),
+    /// The host is making it: render a stand-in, waiting.
+    Waiting,
+    /// It won't be made (no subdivider installed, or the refinement
+    /// failed, which the host says): render the cage.
+    Cage,
 }
 
 impl std::fmt::Debug for RenderCx<'_> {
@@ -97,6 +144,7 @@ impl std::fmt::Debug for RenderCx<'_> {
             .field("tolerances", &self.tolerances)
             .field("cancelled", &self.cancel.is_cancelled())
             .field("held", &self.held.is_some())
+            .field("refine", &self.refine.is_some())
             .finish()
     }
 }
@@ -111,6 +159,7 @@ impl<'a> RenderCx<'a> {
             tolerances: Tolerances::default(),
             cancel,
             held: None,
+            refine: None,
         }
     }
 
@@ -128,6 +177,14 @@ impl<'a> RenderCx<'a> {
     pub fn with_held(self, held: &'a dyn super::Held) -> Self {
         Self {
             held: Some(held),
+            ..self
+        }
+    }
+
+    /// With the host's `refine`.
+    pub fn with_refine(self, refine: &'a dyn Refine) -> Self {
+        Self {
+            refine: Some(refine),
             ..self
         }
     }

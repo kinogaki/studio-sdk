@@ -91,6 +91,7 @@ pub mod script;
 pub mod session;
 pub mod standard;
 pub mod stored;
+pub mod subdivider;
 pub mod viewport;
 
 /// The edit contracts core and the kernels share: selection rules and
@@ -125,8 +126,8 @@ pub use element::{ElementReader, ElementWriter, Field, FieldRef};
 pub use facets::{
     Canvas, CanvasPiece, CellKind, Cells, Combine, DisplayRequest, Displayable, DrawPurpose, Drawn,
     Held, Look, MaterialDisplays, ObjectPicking, Pickable, Picture, Piece, PieceRole, Probe,
-    RenderCx, Renderable, Rendered, SnapHit, SnapKind, SnapQuery, SnapTargets, Snappable, Table,
-    TableColumn, Tabular, Tally,
+    Refine, Refining, RenderCx, Renderable, Rendered, SnapHit, SnapKind, SnapQuery, SnapTargets,
+    Snappable, Table, TableColumn, Tabular, Tally,
 };
 pub use format::{
     FileFormat, FileItem, FormatOptions, FormatWriter, Imported, Input, Purpose, Reading, Writing,
@@ -134,7 +135,7 @@ pub use format::{
 pub use held::HeldEdit;
 pub use id::{
     ContextId, CreationId, DataTypeId, FormatId, MesherId, NodeTypeId, ObjectKindId, PackageId,
-    SlotId, StoredId, VerbId,
+    SlotId, StoredId, SubdividerId, VerbId,
 };
 pub use mesher::{Meshed, Mesher};
 pub use network::{NetworkContext, NetworkEdit, NetworkRead};
@@ -148,4 +149,5 @@ pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, ShapeSource};
 pub use session::{Begun, GestureMark, GestureToken, SessionSlot, SessionSlots, Slot, SlotDoc};
 pub use stored::{Scope, Stored, StoredValue, StoredValues};
+pub use subdivider::{Refined, Subdivider};
 pub use viewport::{ElementKind, ElementSet, Hit, Streams, Surface, SurfaceSource};

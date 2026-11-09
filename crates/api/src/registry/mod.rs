@@ -23,6 +23,7 @@ use crate::network::{NetworkCompiler, NetworkContext, NodeCreation, NodeTypes};
 use crate::object::ObjectKindSpec;
 use crate::package::Package;
 use crate::session::SessionSlot;
+use crate::subdivider::Subdivider;
 use kinogaki_render_api::{EngineId, PrimTypeId, standard};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -52,7 +53,7 @@ fn owner<T: ?Sized>(entry: Option<&Entry<T>>) -> Option<PackageId> {
 }
 
 /// Every package's registered data types, held edits, node types, network
-/// contexts, B-rep meshers, object kinds, formats, session slots
+/// contexts, B-rep meshers, subdividers, object kinds, formats, session slots
 /// and stored values.
 #[derive(Default)]
 pub struct Registry {
@@ -74,6 +75,8 @@ pub struct Registry {
     creations: Vec<Entry<NodeCreation>>,
     /// B-rep meshers, in registration order.
     meshers: Vec<Entry<dyn Mesher>>,
+    /// Subdividers, in registration order.
+    subdividers: Vec<Entry<dyn Subdivider>>,
     object_kinds: BTreeMap<ObjectKindId, Entry<dyn ObjectKindSpec>>,
     formats: BTreeMap<FormatId, Entry<dyn FileFormat>>,
     slots: BTreeMap<SlotId, Entry<SessionSlot>>,
@@ -138,6 +141,9 @@ impl Registry {
         }
         for mesher in package.meshers {
             self.meshers.push(Entry::new(id, mesher));
+        }
+        for subdivider in package.subdividers {
+            self.subdividers.push(Entry::new(id, subdivider));
         }
         for kind in package.object_kinds {
             self.object_kinds.insert(kind.id(), Entry::new(id, kind));
@@ -206,6 +212,12 @@ impl Registry {
     /// them is the user's: no vendor is preferred).
     pub fn meshers(&self) -> impl Iterator<Item = &dyn Mesher> {
         self.meshers.iter().map(|e| &*e.item)
+    }
+
+    /// The subdividers, in registration order (the host renders with the
+    /// first).
+    pub fn subdividers(&self) -> impl Iterator<Item = &dyn Subdivider> {
+        self.subdividers.iter().map(|e| &*e.item)
     }
 
     /// Object kind `id`.

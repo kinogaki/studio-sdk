@@ -12,7 +12,7 @@
 //!
 //! Each kind of id is its own type ([`DataTypeId`], [`ObjectKindId`],
 //! [`ContextId`], [`FormatId`], [`NodeTypeId`], [`SlotId`], [`StoredId`],
-//! [`MesherId`], [`VerbId`], [`CreationId`], [`EngineId`], [`PrimTypeId`]), so a node type
+//! [`MesherId`], [`SubdividerId`], [`VerbId`], [`CreationId`], [`EngineId`], [`PrimTypeId`]), so a node type
 //! id can't be passed where a data type is meant. An id is a `Copy` value over `'static` text: one a package
 //! declares in code is its literal (made in a `const`, with no lock or
 //! allocation), and one parsed from a file is interned in one table (each
@@ -194,6 +194,12 @@ declare_id!(
     /// `Mesher`.
     MesherId,
     "mesher"
+);
+declare_id!(
+    /// A subdivider of polygons (`kinogaki.mesh_kernel.subdivider`).
+    /// Registered by a `Subdivider`.
+    SubdividerId,
+    "subdivider"
 );
 declare_id!(
     /// A verb: a function a kernel offers every other package

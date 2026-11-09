@@ -185,6 +185,7 @@ kinogaki-geometry/doc test crates/geometry/src/primitives/kind.rs - primitives::
 kinogaki-geometry/doc test crates/geometry/src/primitives/mod.rs - primitives::Primitives::new
 kinogaki-geometry/doc test crates/geometry/src/sampled.rs - sampled::Sampled
 kinogaki-geometry/doc test crates/geometry/src/selection/mod.rs - selection::Selection
+kinogaki-geometry/doc test crates/geometry/src/subdivision.rs - subdivision::Subdivision
 kinogaki-geometry/doc test crates/geometry/src/time.rs - time::Time
 kinogaki-geometry/doc test crates/geometry/src/tolerances.rs - tolerances::Tolerances
 kinogaki-geometry/doc test crates/geometry/src/units.rs - units::Units
@@ -288,6 +289,10 @@ kinogaki-geometry/lib test primitives::index::tests::the_index_is_its_definition
 kinogaki-geometry/lib test sampled::tests::a_turn_blends_along_its_arc
 kinogaki-geometry/lib test sampled::tests::samples_are_checked
 kinogaki-geometry/lib test sampled::tests::stretches_origins_and_mirrors_blend
+kinogaki-geometry/lib test subdivision::tests::a_setting_writes_its_fallbacks_nowhere_and_reads_back
+kinogaki-geometry/lib test subdivision::tests::every_key_parses_back
+kinogaki-geometry/lib test subdivision::tests::no_scheme_is_polygons_and_the_rest_falls_back
+kinogaki-geometry/lib test subdivision::tests::the_names_hold_their_standard_types_alone
 kinogaki-geometry/lib test time::tests::moments_sit_on_the_tick_grid
 kinogaki-geometry/lib test time::tests::only_finite_moments_and_rates_are_made
 kinogaki-geometry/lib test vec3::tests::a_column_of_arrays_views_as_vectors

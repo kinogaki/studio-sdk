@@ -14,6 +14,7 @@
 //! | [`Attributes`] | named [`Attribute`] columns (an [`AttributeType`]: [`Storage`] × width × [`Meaning`], arrays) and groups ([`Elements`]) per [`Domain`]; [`Text`] is indexed; [standard names](names) |
 //! | [`Selection`], [`Incidence`] | selected elements of one domain, with the active one; which elements of a value touch which (selection rules live in `kinogaki-edit`) |
 //! | [`Triangulation`], [`ShadingNormals`] | how polygons are shown: the one display triangulation and shading rule every viewport, engine and kernel shares |
+//! | [`Subdivision`] | how polygons render as a subdivision surface: the scheme and level a value's Detail attributes hold |
 //! | [`Detail`], [`DisplayQuality`] | how fine geometry is made for a view or a render |
 //! | [`Tolerances`] | the project's modeling tolerances |
 //! | [`Vec3`], [`Xform`], [`Bounds`], [`Ray`], [`Projective`] | the one vector, placement (affine, column vectors), box, ray and view matrix every crate exchanges; [`Frame`] is an orthonormal frame |
@@ -123,6 +124,7 @@ mod sampled;
 mod selection;
 mod shading;
 mod spline;
+mod subdivision;
 mod time;
 mod tolerances;
 mod triangulation;
@@ -158,6 +160,7 @@ pub use primitives::{
 pub use sampled::Sampled;
 pub use selection::Selection;
 pub use shading::ShadingNormals;
+pub use subdivision::{Boundary, FaceVarying, Scheme, Subdivision, Triangles};
 pub use time::{Rate, Time};
 pub use tolerances::Tolerances;
 pub use triangulation::{Triangle, Triangulation};
