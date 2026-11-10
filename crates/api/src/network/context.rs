@@ -120,6 +120,13 @@ impl NetworkContext {
         })
     }
 
+    /// Offering core's Import Object under Import: a context whose networks
+    /// cook and read what other networks give.
+    pub fn with_import_object(self) -> Self {
+        let node = NodeTypeId::declared(crate::cook::IMPORT_OBJECT);
+        self.adopts(node, Home::topic(topics::IMPORT))
+    }
+
     /// The topics its networks list, in order: its own, then core's Loops
     /// (when it takes loops) and Import, unless it placed them among its
     /// own.

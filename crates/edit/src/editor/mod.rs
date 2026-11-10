@@ -65,6 +65,7 @@
 //! assert!(Arc::ptr_eq(longer.primitives(), house.primitives()));
 //! assert_eq!((change.moved, change.topology), (vec![tip], false));
 //! ```
+mod breps;
 mod carry;
 mod change;
 mod extract;
@@ -77,6 +78,7 @@ mod reblend;
 mod settle;
 mod split;
 
+pub use breps::gather_breps;
 pub use carry::{Rule, default_item, rule};
 pub use change::{Change, Numbers};
 pub use extract::extract;

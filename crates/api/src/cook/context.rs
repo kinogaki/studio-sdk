@@ -1,7 +1,7 @@
 //! [`CookCx`]: everything one cook may read besides its inputs.
 use crate::cancel::CancelToken;
 use crate::components::Components;
-use crate::cook::{Error, Inside, Iteration, Project, Resolved, Written};
+use crate::cook::{Error, Inside, Iteration, Project, Resolved, Source, Written};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, ParametersExt, Value};
@@ -103,6 +103,15 @@ impl<'a> CookCx<'a> {
     pub fn object(&self, name: &str) -> Option<&Data> {
         self.resolved.iter().find_map(|(n, r)| match r {
             Resolved::Object(data, _) if n == name => Some(data),
+            _ => None,
+        })
+    }
+
+    /// What path parameter `name`, a row reading many, names, when the node
+    /// reads objects and core resolved it.
+    pub fn objects(&self, name: &str) -> Option<&'a [Source]> {
+        self.resolved.iter().find_map(|(n, r)| match r {
+            Resolved::Objects(sources) if n == name => Some(&sources[..]),
             _ => None,
         })
     }

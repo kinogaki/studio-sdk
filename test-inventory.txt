@@ -22,6 +22,7 @@ example-points-format/lib test tests::materials_and_faces_write_back_as_they_rea
 example-points-format/lib test tests::materials_read_first_their_colors_in_the_working_space_and_pictures_as_image_nodes
 kinogaki-edit/doc test crates/edit/src/deform.rs - deform
 kinogaki-edit/doc test crates/edit/src/deform.rs - deform::Move::from_parts
+kinogaki-edit/doc test crates/edit/src/editor/breps.rs - editor::breps::gather_breps
 kinogaki-edit/doc test crates/edit/src/editor/carry.rs - editor::carry::rule
 kinogaki-edit/doc test crates/edit/src/editor/finish.rs - editor::finish::place
 kinogaki-edit/doc test crates/edit/src/editor/gather.rs - editor::gather::gather
@@ -72,6 +73,9 @@ kinogaki-edit/lib test deform::tests::full_weight_is_the_matrix_and_none_is_stil
 kinogaki-edit/lib test deform::tests::half_weight_goes_half_way
 kinogaki-edit/lib test deform::tests::mirrored_sides_move_as_images_and_the_plane_holds
 kinogaki-edit/lib test deform::tests::scale_acts_along_the_axes
+kinogaki-edit/lib test editor::breps::tests::one_value_at_the_identity_is_that_value
+kinogaki-edit/lib test editor::breps::tests::placed_moves_every_surface_and_curve
+kinogaki-edit/lib test editor::breps::tests::what_scales_or_mirrors_is_refused
 kinogaki-edit/lib test editor::extract::tests::a_piece_keeps_what_its_elements_held
 kinogaki-edit/lib test editor::gather::tests::a_placement_moves_what_turns_with_it
 kinogaki-edit/lib test editor::gather::tests::a_transform_composes_after_the_placement

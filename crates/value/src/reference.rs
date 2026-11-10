@@ -52,6 +52,9 @@ impl ImageRef {
 pub struct RefFilter {
     /// What fits.
     pub fits: Fits,
+    /// Whether the row reads every match of a wildcard and everything
+    /// below a Part, not one thing.
+    pub many: bool,
 }
 
 /// What fits a reference.
@@ -61,7 +64,8 @@ pub enum Fits {
     /// when empty.
     Objects(Vec<ObjectKindId>),
     /// Objects and nodes whose result is of one of these data types
-    /// (geometry: a Mesh object, a Part, a node in a Mesh network).
+    /// (geometry: a Mesh object, a Part, a node in a Mesh network); anything
+    /// with a result when empty.
     Data(Vec<DataTypeId>),
     /// Any Material: a Material node, a Material Library's or one in any
     /// other network.
@@ -80,7 +84,8 @@ impl RefFilter {
         Self::of(Fits::Objects(kinds.into_iter().collect()))
     }
 
-    /// One object or node whose result is of `types`.
+    /// One object or node whose result is of `types` (any result when
+    /// empty).
     pub fn data(types: impl IntoIterator<Item = DataTypeId>) -> Self {
         Self::of(Fits::Data(types.into_iter().collect()))
     }
@@ -100,7 +105,13 @@ impl RefFilter {
         Self::of(Fits::Written)
     }
 
+    /// Reading every match of a wildcard and everything below a Part.
+    pub fn many(mut self) -> Self {
+        self.many = true;
+        self
+    }
+
     fn of(fits: Fits) -> Self {
-        RefFilter { fits }
+        RefFilter { fits, many: false }
     }
 }

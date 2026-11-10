@@ -353,6 +353,8 @@ impl ObjectCodec for BoxesKind {
 
 A context whose networks carry geometry and cook offers core's For Each with `NetworkContext::with_loops`: a node holding a network of its own context, which cooks once per piece, point or primitive of its input or a number of times, merging what it makes or feeding each pass into the next. Loop Input, inside it, gives what the pass works on. Each pass keeps its cooks, so a piece that didn't change doesn't cook. Any node inside can ask which pass it is in: declare `Reads::iteration` and read `CookCx::iteration` (its number, the count and the piece's value); only nodes that declare it cook again when those move. A holder of your own runs its network the same way with `Reads { inside: true, passes: true, .. }`, `Description::holding_own` and `Inside::Passes`.
 
+It offers core's Import Object the same way, with `NetworkContext::with_import_object`: a node bringing another network's result into this one by a path row (an object, a node, a Part or a wildcard), as Houdini's Object Merge.
+
 ## 5. The package and its entry point
 
 A `Package` is everything the plugin registers. `export_package!` writes the entry Studio looks up in the library; it catches a panic in `package` and keeps `unsafe` out of the plugin's code.

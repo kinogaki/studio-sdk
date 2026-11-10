@@ -35,6 +35,10 @@ pub use sheet::{NewCx, PortsCx, RowsFor, SchemaCx};
 /// [`Registry`](crate::Registry) refuses one that does).
 pub const SPARE: &str = "spare-";
 
+/// The node bringing other networks' results in, which a context offers with
+/// [`NetworkContext::with_import_object`](crate::network::NetworkContext::with_import_object).
+pub const IMPORT_OBJECT: &str = "kinogaki.core.import_object";
+
 /// Core's loop node types, For Each and Loop Input, which a context offers
 /// with [`NetworkContext::with_loops`](crate::network::NetworkContext::with_loops).
 pub const LOOPS: [&str; 2] = ["kinogaki.core.for_each", "kinogaki.core.loop_input"];
@@ -163,11 +167,25 @@ pub enum Resolved {
     /// what holds it places it (a camera's lens, another object's geometry
     /// brought into this one's space).
     Object(Data, kinogaki_geometry::Xform),
+    /// What a row reading many names ([`RefFilter::many`](crate::params::RefFilter::many)).
+    Objects(Vec<Source>),
     /// The path itself, as core resolved it from the node (absolute), for
     /// a path the node writes rather than reads (a Material's).
     Path(String),
     /// What a row fitting [`Fits::Written`](crate::params::Fits::Written) names.
     Written(Written),
+}
+
+/// One of the things a row reading many names.
+#[derive(Clone, Debug)]
+pub struct Source {
+    /// Its path, from the first name the row matched (`camera/Lens/Ring 2`
+    /// for a row naming `/camera`).
+    pub path: String,
+    /// Its result.
+    pub data: Data,
+    /// Where it is placed in the space of the object the node cooks in.
+    pub placement: kinogaki_geometry::Xform,
 }
 
 /// What a row fitting [`Fits::Written`](crate::params::Fits::Written) names:
