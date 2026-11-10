@@ -235,6 +235,14 @@ pub trait FileFormat: Send + Sync {
     /// What file dialogs call it ("Wavefront OBJ").
     fn label(&self) -> &str;
 
+    /// Its name in a word or two, where a host names the format of a
+    /// document read from one of its files (Studio's format banner: "OBJ");
+    /// the label by default, for a format whose label is that short already
+    /// ("glTF").
+    fn short_label(&self) -> &str {
+        self.label()
+    }
+
     /// Its file name extensions, lowercase and without the dot (`obj`).
     fn extensions(&self) -> &[&str];
 

@@ -283,7 +283,7 @@ Core's lights and fog are kinds with this facet (`render::lights::DeclaredKind` 
 ## Formats
 
 A `FileFormat` declares:
-- its label and extensions, and optionally `detects`, for a file recognized by its first bytes;
+- its label, its short label (`short_label`, the label by default: what a host calls a document read from one of its files) and its extensions, and optionally `detects`, for a file recognized by its first bytes;
 - the data types it produces (none for a format that only writes, such as G-code);
 - its options: defaults by name, a `params::Schema` for a `Purpose` (File ▸ Import's `Objects`; File ▸ Open's `Document`, which leaves out what changes the file's content, a scale or embedding the files it names; or `Value`, one value of the type the host wants: a File node's output, an image of the host's image store, which leaves out options that shape objects). Studio shows File ▸ Import's rows on Settings ▸ File Formats and reads with what is set there on Import and on Open, the rows `Document` leaves out at their defaults (neither opens a dialog), and saves the options a field per option (`format::options::write`, read back strictly by `format::options::read`), so a format holds no codec for them.
 

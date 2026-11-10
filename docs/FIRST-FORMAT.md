@@ -54,7 +54,7 @@ pub fn package() -> Package {
 export_package!(package);
 ```
 
-- `id`, `label` and `extensions` say what Studio's file dialogs offer; `detects` (no by default) recognizes a file by its first bytes where the extension isn't enough.
+- `id`, `label` and `extensions` say what Studio's file dialogs offer; `short_label` (the label by default) is what Studio's window calls a document read from one of its files, for a long label ("Wavefront OBJ" is "OBJ" there); `detects` (no by default) recognizes a file by its first bytes where the extension isn't enough.
 - `produces` lists the data types a read makes: the standard ones' ids are `const`, so the list is a constant. A read gives what `Reading::wants` names when it names one (a File node's type).
 - `options` gives every option with its default, by name, and `schema(chosen, purpose)` its rows: File ▸ Import's (`Purpose::Objects`), which Studio shows on Settings ▸ File Formats (File ▸ Import and File ▸ Open open no dialog of their own and read with what is set there), File ▸ Open's (`Purpose::Document`, which leaves out what changes the file's content: a scale, embedding the files it names; Studio reads those at their defaults on Open), or one value's (`Purpose::Value`: a File node's, which leaves out options that shape objects). `format::options` holds the rows most formats show (`scale`, `embed`: Embed Textures, `toggle`) and reads a typed option (`option`). The example has two: Scale, and Embed Textures, and no `Document` rows.
 - `read` and `writer`, below. The host saves the options, one field per option (`format::options::write`, read back strictly by `format::options::read`), so a format holds no codec of its own for them.
