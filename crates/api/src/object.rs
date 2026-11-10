@@ -56,7 +56,9 @@ pub trait ObjectKindSpec: Send + Sync {
     fn context(&self) -> Option<ContextId>;
 
     /// The data type of its objects' results (what the viewport draws and
-    /// engines render), when they have one.
+    /// engines render), when they have one: a networkless object's value,
+    /// or what a network yields until its nodes say otherwise (a CAD network
+    /// may end in polygons).
     fn result(&self) -> Option<DataTypeId>;
 
     /// The body of a new, empty object of this kind.
