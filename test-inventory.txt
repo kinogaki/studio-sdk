@@ -510,6 +510,7 @@ kinogaki-studio-api/doc test crates/api/src/kernel.rs - kernel
 kinogaki-studio-api/doc test crates/api/src/menu.rs - menu
 kinogaki-studio-api/doc test crates/api/src/network/context.rs - network::context::NetworkContext
 kinogaki-studio-api/doc test crates/api/src/package.rs - package::Package
+kinogaki-studio-api/doc test crates/api/src/progress.rs - progress::Progress
 kinogaki-studio-api/doc test crates/api/src/standard/brep/mod.rs - standard::brep::BrepCodec
 kinogaki-studio-api/doc test crates/api/src/standard/color.rs - standard::color::ColorConfiguration
 kinogaki-studio-api/doc test crates/api/src/standard/embedded.rs - standard::embedded::EmbeddedFileCodec
@@ -609,6 +610,10 @@ kinogaki-studio-api/lib test network::compile::tests::a_compile_sees_node_types_
 kinogaki-studio-api/lib test network::edit::tests::a_compiled_material_seeds_its_nodes_and_an_image_node_an_image
 kinogaki-studio-api/lib test network::edit::tests::a_seed_makes_the_material_it_starts
 kinogaki-studio-api/lib test network::edit::tests::a_seeds_lengths_scale_and_nothing_else
+kinogaki-studio-api/lib test progress::tests::a_fraction_outside_the_range_is_the_nearer_end_and_nan_nothing
+kinogaki-studio-api/lib test progress::tests::cleared_progress_says_nothing_again
+kinogaki-studio-api/lib test progress::tests::it_only_goes_forward_from_any_thread
+kinogaki-studio-api/lib test progress::tests::unshown_progress_reports_to_no_one
 kinogaki-studio-api/lib test render::lights::kind::tests::a_new_light_is_its_first_type_and_edits_take_one_prim_of_its_types
 kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_light_is_a_light_value_and_one_is_adopted
 kinogaki-studio-api/lib test render::lights::kind::tests::a_standard_lights_rows_take_only_what_its_codec_reads

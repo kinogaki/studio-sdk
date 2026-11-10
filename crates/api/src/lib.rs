@@ -88,6 +88,7 @@ pub mod network;
 pub mod object;
 pub mod package;
 pub mod params;
+pub mod progress;
 pub mod refs;
 pub mod registry;
 pub mod render;
@@ -148,6 +149,7 @@ pub use object::{
 };
 pub use package::{Package, PackageUi};
 pub use params::{Parameters, ParametersExt, Schema, Value};
+pub use progress::Progress;
 pub use refs::{NodeRef, ObjectRef};
 pub use registry::Registry;
 pub use render::{PlainTriangles, RenderItem, ShapeSource};

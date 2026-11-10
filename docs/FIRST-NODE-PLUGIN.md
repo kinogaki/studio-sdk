@@ -277,7 +277,7 @@ impl NodeType for BoxNode {
 }
 ```
 
-A cook is a pure function of its inputs and parameters. It reads only what its type declares (`NodeType::reads`: time, input names, the selection, objects, the project), polls `cx.check()` in long work, and splits work with `geometry::parallel::chunks_mut` (the host's shared workers); it never starts threads or keeps caches of its own (`cx.scratch` is the core-owned slot for that).
+A cook is a pure function of its inputs and parameters. It reads only what its type declares (`NodeType::reads`: time, input names, the selection, objects, the project), polls `cx.check()` in long work, may say how far it has come (`cx.progress().report(fraction)`: from any thread, cheap enough for a tight loop; a cook that never calls it shows only that it is cooking, and only forward reports count), and splits work with `geometry::parallel::chunks_mut` (the host's shared workers); it never starts threads or keeps caches of its own (`cx.scratch` is the core-owned slot for that).
 
 Studio checks each parameter value against its declaration before a cook (a size under the range's 0.001 is refused), so the cook needn't.
 

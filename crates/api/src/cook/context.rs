@@ -5,6 +5,7 @@ use crate::cook::{Error, Inside, Iteration, Project, Resolved, Source, Written};
 use crate::data::Data;
 use crate::id::ContextId;
 use crate::params::{Parameters, ParametersExt, Value};
+use crate::progress::{Progress, UNSHOWN};
 use crate::refs::NodeRef;
 use kinogaki_geometry::{Rate, Time, Xform};
 use std::any::Any;
@@ -27,6 +28,7 @@ pub struct CookCx<'a> {
     selection: Option<&'a Components>,
     incoming: Option<&'a Components>,
     cancel: &'a CancelToken,
+    progress: &'a Progress,
     time: Time,
     rate: Rate,
     node: NodeRef,
@@ -61,6 +63,7 @@ impl<'a> CookCx<'a> {
             selection: None,
             incoming: None,
             cancel,
+            progress: &UNSHOWN,
             time: Time::ZERO,
             rate: Rate::FILM,
             node: NodeRef(0),
@@ -247,6 +250,13 @@ impl<'a> CookCx<'a> {
         self.cancel
     }
 
+    /// Where a long cook says how far it has come: its tile shows it. Shared
+    /// by a cook's threads; a cook that never reports shows only that it is
+    /// cooking.
+    pub fn progress(&self) -> &'a Progress {
+        self.progress
+    }
+
     /// `Err(Error::cancelled())` once the cook is cancelled, for `?`.
     pub fn check(&self) -> Result<(), Error> {
         if self.cancel.is_cancelled() {
@@ -377,6 +387,12 @@ impl<'a> CookCxBuilder<'a> {
     /// name ([`Reads::objects`](crate::cook::Reads::objects)).
     pub fn with_resolved(mut self, resolved: &'a [(String, Resolved)]) -> Self {
         self.0.resolved = resolved;
+        self
+    }
+
+    /// Reporting how far it has come into `progress`.
+    pub fn with_progress(mut self, progress: &'a Progress) -> Self {
+        self.0.progress = progress;
         self
     }
 
